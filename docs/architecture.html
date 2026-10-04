@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>shtetl architecture</title>
+<style>
+:root {
+	--bg: #fbfaf7;
+	--fg: #1d1c1a;
+	--muted: #6b675f;
+	--line: #d9d4ca;
+	--panel: #f2efe8;
+	--accent: #8a4b14;
+	--lake: #2f6690;
+	--config: #6a4c93;
+	--build: #8a4b14;
+	--run: #2d6a4f;
+	--code-bg: #efebe2;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		--bg: #161513;
+		--fg: #ebe7df;
+		--muted: #a39e94;
+		--line: #3a3732;
+		--panel: #201f1c;
+		--accent: #e0a060;
+		--lake: #7fb3d9;
+		--config: #b9a0dc;
+		--build: #e0a060;
+		--run: #7cc4a0;
+		--code-bg: #24221f;
+	}
+}
+:root[data-theme="dark"] {
+	--bg: #161513;
+	--fg: #ebe7df;
+	--muted: #a39e94;
+	--line: #3a3732;
+	--panel: #201f1c;
+	--accent: #e0a060;
+	--lake: #7fb3d9;
+	--config: #b9a0dc;
+	--build: #e0a060;
+	--run: #7cc4a0;
+	--code-bg: #24221f;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--fg);
+	font: 16px/1.55 Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+}
+main {
+	max-width: 980px;
+	margin: 0 auto;
+	padding: 32px 16px 64px;
+}
+h1, h2, h3 {
+	font-family: "Helvetica Neue", Arial, sans-serif;
+	line-height: 1.2;
+}
+h1 { font-size: 2.1rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+h2 {
+	font-size: 1.3rem;
+	margin: 48px 0 12px;
+	padding-top: 16px;
+	border-top: 1px solid var(--line);
+}
+h3 { font-size: 1.05rem; margin: 24px 0 8px; }
+.sub { color: var(--muted); margin: 0 0 24px; }
+p, li { max-width: 72ch; }
+code, pre {
+	font-family: "SF Mono", Menlo, Consolas, monospace;
+	font-size: 0.86em;
+}
+code { background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+pre {
+	background: var(--code-bg);
+	padding: 12px 14px;
+	border-radius: 6px;
+	overflow-x: auto;
+	line-height: 1.45;
+	margin: 8px 0 16px;
+}
+pre code { background: none; padding: 0; }
+.diagram {
+	background: var(--panel);
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	padding: 12px;
+	margin: 16px 0;
+}
+.diagram .scroll { overflow-x: auto; }
+.diagram svg { display: block; width: 100%; min-width: 680px; height: auto; }
+.diagram .cap { color: var(--muted); font-size: 0.9rem; margin: 8px 4px 0; }
+svg text {
+	font-family: "Helvetica Neue", Arial, sans-serif;
+	fill: var(--fg);
+}
+svg .small { font-size: 12px; fill: var(--muted); }
+svg .label { font-size: 15px; font-weight: 700; }
+svg .item { font-size: 13px; font-family: "SF Mono", Menlo, monospace; }
+svg .edge { stroke: var(--muted); stroke-width: 1.6; fill: none; }
+svg .edge-run { stroke: var(--run); }
+svg .edge-lake { stroke: var(--lake); }
+svg .edge-build { stroke: var(--build); }
+svg .edge-config { stroke: var(--config); stroke-dasharray: 5 4; }
+svg .edgetext { font-size: 12px; fill: var(--fg); }
+svg .box { fill: var(--bg); stroke-width: 2; }
+.grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+	gap: 14px;
+	margin: 16px 0;
+}
+.space {
+	border: 1px solid var(--line);
+	border-top: 4px solid var(--c);
+	border-radius: 6px;
+	padding: 12px 14px;
+	background: var(--panel);
+	min-width: 0;
+}
+.space h3 { margin: 0 0 2px; color: var(--c); }
+.space .role { color: var(--muted); font-size: 0.92rem; margin: 0 0 8px; }
+.space pre { background: var(--bg); margin: 0; }
+.lake { --c: var(--lake); }
+.config { --c: var(--config); }
+.build { --c: var(--build); }
+.run { --c: var(--run); }
+table {
+	border-collapse: collapse;
+	width: 100%;
+	margin: 8px 0 16px;
+	font-size: 0.95rem;
+}
+th, td {
+	text-align: left;
+	vertical-align: top;
+	padding: 6px 8px;
+	border-bottom: 1px solid var(--line);
+}
+th {
+	font-family: "Helvetica Neue", Arial, sans-serif;
+	font-size: 0.85rem;
+	color: var(--muted);
+	font-weight: 600;
+}
+.tablewrap { overflow-x: auto; }
+ol.steps { padding-left: 1.4em; }
+ol.steps li { margin: 6px 0; }
+.lanes { display: grid; gap: 8px; margin: 12px 0 16px; }
+.lane {
+	display: grid;
+	grid-template-columns: minmax(130px, 200px) 1fr;
+	gap: 10px;
+	align-items: center;
+	border: 1px solid var(--line);
+	border-left: 4px solid var(--c);
+	border-radius: 6px;
+	padding: 8px 10px;
+	background: var(--panel);
+}
+.lane .ds { font-family: "SF Mono", Menlo, monospace; font-size: 0.86rem; overflow-wrap: anywhere; }
+.lane .act { font-size: 0.93rem; }
+.lane.rebased { --c: var(--run); }
+.lane.carried { --c: var(--accent); }
+.note {
+	border-left: 3px solid var(--accent);
+	padding: 4px 12px;
+	color: var(--fg);
+	background: var(--panel);
+	border-radius: 0 4px 4px 0;
+}
+.gone li { color: var(--muted); }
+@media (max-width: 560px) {
+	h1 { font-size: 1.7rem; }
+	.lane { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+<main>
+
+<h1>shtetl</h1>
+<p class="sub">Architecture, draft of 2026-10-04. FreeBSD foundations,
+containers and systems kept on ZFS alone, with zfs_rebase in place of
+git. The details and the open questions are in
+<code>docs/planning.md</code>.</p>
+
+<p>shtetl builds FreeBSD from source into <strong>foundations</strong>,
+runs <strong>containers</strong> (jails) and <strong>systems</strong>
+(bootable roots) as ZFS clones of them, saves each one as a delta, and
+carries each one onto a newer foundation with <code>zfs_rebase</code>.
+It follows mishkan and parasa. What is new is that the whole git layer
+is gone: no repositories inside trees, no mtree drift tracking, no
+two-commit save. A save is a snapshot and an incremental send; an
+update is one rebase per dataset.</p>
+
+<h2>Four spaces</h2>
+
+<p>The user hands shtetl four existing pools or datasets at bootstrap.
+shtetl never touches devices. It marks each root with a
+<code>shtetl:space</code> user property (proposal) and builds its layout
+beneath, using the property defaults inherited from parasa
+(<code>atime=off</code>, <code>compression=zstd</code>,
+<code>aclmode=passthrough</code>, <code>mountpoint=none</code>,
+<code>canmount=noauto</code>), each overridable in
+<code>shtetl.conf</code>.</p>
+
+<div class="diagram">
+<div class="scroll">
+<svg viewBox="0 0 900 500" role="img" aria-labelledby="flowtitle">
+<title id="flowtitle">Data flow between zconfig, zbuild, zlake and zrun</title>
+<defs>
+	<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+		<path d="M0,0 L10,5 L0,10 z" style="fill: var(--muted)"/>
+	</marker>
+</defs>
+
+<!-- recipes to zrun: drawn in the band above the boxes -->
+<path class="edge edge-config" d="M200,50 C200,24 780,24 780,48" marker-end="url(#arr)"/>
+<text class="edgetext" x="490" y="16" text-anchor="middle">recipes (create, update)</text>
+
+<g transform="translate(0,30)">
+<!-- zconfig -->
+<rect class="box" x="20" y="20" width="250" height="110" rx="8" style="stroke: var(--config)"/>
+<text class="label" x="36" y="46" style="fill: var(--config)">zconfig</text>
+<text class="small" x="36" y="64">configuration</text>
+<text class="item" x="36" y="88">shtetl.conf</text>
+<text class="item" x="36" y="108">zshtetl-recipes/  (git)</text>
+
+<!-- zbuild -->
+<rect class="box" x="20" y="250" width="250" height="110" rx="8" style="stroke: var(--build)"/>
+<text class="label" x="36" y="276" style="fill: var(--build)">zbuild</text>
+<text class="small" x="36" y="294">compiles</text>
+<text class="item" x="36" y="318">src/</text>
+<text class="item" x="36" y="338">obj/</text>
+
+<!-- zlake -->
+<rect class="box" x="330" y="20" width="215" height="440" rx="8" style="stroke: var(--lake)"/>
+<text class="label" x="346" y="46" style="fill: var(--lake)">zlake</text>
+<text class="small" x="346" y="64">archive and last save</text>
+<text class="item" x="346" y="110">foundations/F</text>
+<text class="small" x="346" y="128">@v1 @v2 ... + children</text>
+<text class="small" x="346" y="146">zbuild installs into it</text>
+<text class="item" x="346" y="300">containers/X</text>
+<text class="small" x="346" y="318">delta, clone of F@vN</text>
+<text class="item" x="346" y="350">systems/S</text>
+<text class="item" x="346" y="410">build/obj</text>
+<text class="small" x="346" y="428">obj cache backup</text>
+
+<!-- zrun -->
+<rect class="box" x="680" y="20" width="200" height="440" rx="8" style="stroke: var(--run)"/>
+<text class="label" x="696" y="46" style="fill: var(--run)">zrun</text>
+<text class="small" x="696" y="64">everything that runs</text>
+<text class="item" x="696" y="110">foundations/F</text>
+<text class="small" x="696" y="128">readonly</text>
+<text class="item" x="696" y="300">containers/X</text>
+<text class="small" x="696" y="318">clone of F@vN + children</text>
+<text class="item" x="696" y="350">systems/S</text>
+
+<!-- recipes to zbuild -->
+<path class="edge edge-config" d="M145,130 L145,250" marker-end="url(#arr)"/>
+<text class="edgetext" x="152" y="195">recipes</text>
+
+<!-- zbuild installs into the zlake foundation -->
+<path class="edge edge-build" d="M270,280 C300,280 300,118 337,118" marker-end="url(#arr)"/>
+
+<!-- obj backup -->
+<path class="edge edge-build" d="M270,338 C300,338 300,410 337,410" marker-end="url(#arr)"/>
+
+<!-- zlake foundation to zrun foundation -->
+<path class="edge edge-lake" d="M480,118 L688,118" marker-end="url(#arr)"/>
+<text class="edgetext" x="612" y="108" text-anchor="middle">send -i</text>
+
+<!-- zrun foundation to zrun containers -->
+<path class="edge edge-run" d="M760,140 L760,286" marker-end="url(#arr)"/>
+<text class="edgetext" x="768" y="200">clone, and</text>
+<text class="edgetext" x="768" y="216">zfs_rebase</text>
+<text class="edgetext" x="768" y="232">on update</text>
+
+<!-- save zrun containers to zlake -->
+<path class="edge edge-run" d="M688,330 L480,330" marker-end="url(#arr)"/>
+<text class="edgetext" x="612" y="350" text-anchor="middle">save:</text>
+<text class="edgetext" x="612" y="365" text-anchor="middle">snapshot</text>
+<text class="edgetext" x="612" y="380" text-anchor="middle">+ send -i</text>
+</g>
+</svg>
+</div>
+<p class="cap">Solid arrows move data; dashed arrows are configuration
+read. zlake is the authority for foundations and holds the last save
+of everything zrun runs.</p>
+</div>
+
+<div class="grid">
+<div class="space config">
+<h3>zconfig</h3>
+<p class="role">Site settings and the recipe repo. Snapshotted on every
+change to shtetl.conf.</p>
+<pre><code>shtetl.conf
+zshtetl-recipes/
+    default.conf
+    foundations/
+    containers/
+    systems/</code></pre>
+</div>
+
+<div class="space build">
+<h3>zbuild</h3>
+<p class="role">Compiles only. There is no DESTDIR here: the build
+installs into the zlake foundation, mounted for the build.</p>
+<pre><code>src/     freebsd-src checkout
+obj/     MAKEOBJDIRPREFIX</code></pre>
+</div>
+
+<div class="space lake">
+<h3>zlake</h3>
+<p class="role">Foundation archive, plus the last save of every
+zrun entity as a delta. Nothing here runs.</p>
+<pre><code>foundations/
+    F/            @v1 @v2 ...
+        var/
+        usr-local/
+containers/
+    X/            clone of F@vN
+        var/      clone of F/var@vN
+        www/      container-only
+systems/
+    S/
+build/obj</code></pre>
+</div>
+
+<div class="space run">
+<h3>zrun</h3>
+<p class="role">Everything that runs, in one pool so clones work.
+Children mount by inheritance.</p>
+<pre><code>foundations/
+    F/            readonly
+        var/
+        usr-local/
+containers/       /containers
+    X/            clone of F@vN
+        var/
+        usr-local/
+        www/      from X's recipe
+systems/
+    S/            / when booted</code></pre>
+</div>
+</div>
+
+<h2>Datasets are the unit</h2>
+
+<p>zfs_rebase rebases one dataset per run: it reads each side through
+<code>.zfs/snapshot</code>, where a child dataset is only an empty
+directory, and refuses a mount nested inside the tree. So shtetl works
+dataset by dataset, and gives every dataset a lineage it can follow:</p>
+
+<ul>
+<li><strong>Foundation-inherited datasets.</strong> The foundation
+recipe's <code>datasets</code> are created empty in
+<code>zlake/foundations/F</code> before anything is installed. Every
+container and system dataset cloned from them has a base to rebase
+from.</li>
+<li><strong>Container-only datasets.</strong> A container recipe's own
+datasets (nginx's <code>www</code>) are created under the container on
+zrun. Their lineage starts at the first save into zlake. A foundation
+update does not touch them, so they are carried across, not
+rebased.</li>
+<li><strong>Everything is saved.</strong> Data included. There is no
+container-data or system-data tree: a container's datasets are its
+children, and so are their backups in zlake.</li>
+</ul>
+
+<h2>Lifecycle</h2>
+
+<h3>Foundation</h3>
+<ol class="steps">
+<li>Create <code>zlake/foundations/F</code> and its recipe datasets,
+empty.</li>
+<li>Mount F at a build path; <code>buildworld buildkernel</code> on
+zbuild.</li>
+<li><code>installworld installkernel distribution DESTDIR=</code> the
+mounted F; on an update, then <code>delete-old delete-old-libs</code>.</li>
+<li>Foundation packages, commands, derivations.</li>
+<li>Unmount; <code>zfs snapshot -r F@vN</code>. Every version of F is
+one snapshot chain, which zfs_rebase and incremental send both
+need.</li>
+</ol>
+
+<h3>Container</h3>
+<ol class="steps">
+<li>Send F@vN from zlake to zrun if zrun lacks it.</li>
+<li>Clone each dataset of F@vN under <code>zrun/containers/X</code>;
+create the recipe's own datasets.</li>
+<li>Start the jail; packages, commands, derivations.</li>
+<li>Save: <code>snapshot -r</code>, then one send per dataset into
+<code>zlake/containers/X</code>, as a clone of the zlake foundation
+where there is one.</li>
+</ol>
+
+<h3>Update a container onto F@v2</h3>
+
+<p>Save as <code>@pre</code>, then one zfs_rebase per inherited
+dataset, parent first, each into <code>X-new</code>:</p>
+
+<pre><code>zfs_rebase --from zrun/containers/X/var@pre \
+    --onto zrun/foundations/F/var@v2 \
+    --result zrun/containers/X-new/var</code></pre>
+
+<div class="lanes">
+<div class="lane rebased"><div class="ds">X</div><div class="act">rebased onto F@v2; base F@v1 found from X's origin</div></div>
+<div class="lane rebased"><div class="ds">X/usr-local</div><div class="act">rebased onto F/usr-local@v2 (packages travel with it)</div></div>
+<div class="lane rebased"><div class="ds">X/var</div><div class="act">rebased onto F/var@v2 (logs and databases merged onto the new base var)</div></div>
+<div class="lane carried"><div class="ds">X/www</div><div class="act">carried: <code>zfs rename</code> under X-new at finalize</div></div>
+</div>
+
+<p>Conflicts stop a rebase at its gate (exit 1) and shtetl opens the
+picker; any failure aborts every rebase the update started. Finalize
+stops the jail, checks <code>written@pre</code>, carries the
+container-only datasets, swaps X-new into place, sets mountpoints and
+<code>readonly=off</code>, restarts, and saves. The zlake copy is then
+re-homed as a clone of <code>zlake/foundations/F@v2</code>.</p>
+
+<p class="note">Re-homing in zlake, and whether a child's incremental
+sends survive its parent changing lineage, is the first thing to test
+on the box (planning.md, probes P1 - P3) before this design is
+committed.</p>
+
+<h3>System</h3>
+<p>The same as a container, deployed with <code>zfs set -u
+mountpoint=/</code> and <code>nextboot</code>; children mount at
+<code>/var</code>, <code>/usr/local</code> and so on by inheritance.
+Finalize crosses a reboot.</p>
+
+<h2>Configuration</h2>
+
+<p>All configuration is UCL (<code>textproc/libucl</code>; base's copy
+is private). Each file is parsed strictly: no duplicate keys, no
+macros, no variables. shtetl owns the cascade:</p>
+
+<div class="tablewrap">
+<table>
+<tr><th>layer</th><th>file</th></tr>
+<tr><td>1</td><td>built-in defaults</td></tr>
+<tr><td>2</td><td><code>zconfig/shtetl.conf</code></td></tr>
+<tr><td>3</td><td><code>zshtetl-recipes/default.conf</code></td></tr>
+<tr><td>4</td><td>recipes named in the target's <code>import</code></td></tr>
+<tr><td>5</td><td>the target recipe</td></tr>
+</table>
+</div>
+
+<p>Nearer layers replace scalars, merge objects and append to lists.
+Recipe keys follow mishkan: <code>ver</code>, <code>src_branch</code>,
+<code>kernconf</code>, <code>buildopts</code>, <code>datasets</code>,
+<code>pkg</code>, <code>commands</code>, <code>derivations</code>,
+<code>requires</code>, <code>jailconf</code>. See
+<code>docs/ucl-primer.md</code>.</p>
+
+<h2>Implementation</h2>
+
+<p>C, userspace, laid out like zfs_rebase: a portable core (config,
+cascade, planning) that builds and tests on the mac, and a FreeBSD
+layer on libzfs, libzfs_core and libjail. shtetl runs make, pkg, git,
+jail and zfs_rebase as child processes with argv arrays, never through
+a shell. FreeBSD 15.1 is the floor.</p>
+
+<h2>Gone since parasa</h2>
+<ul class="gone">
+<li>foundation.git, parasa.git, recipes.git on the data pool, and
+<code>.git</code> datasets inside trees</li>
+<li>mtree baselines and drift classification prompts</li>
+<li>the two-commit save, and <code>pkg.list</code> (packages are
+rebased with /usr/local)</li>
+<li>container-data and system-data, and <code>mount.fstab</code> for a
+container's own datasets</li>
+<li>disk partitioning, GELI and glabel at bootstrap</li>
+<li>a DESTDIR or build workspace separate from the foundation</li>
+</ul>
+
+</main>
+</body>
+</html>
