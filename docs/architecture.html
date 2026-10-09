@@ -187,7 +187,7 @@ ol.steps li { margin: 6px 0; }
 <main>
 
 <h1>shtetl</h1>
-<p class="sub">Architecture, draft 2 of 2026-10-08. FreeBSD foundations,
+<p class="sub">Architecture, draft 3 of 2026-10-09. FreeBSD foundations,
 containers and systems kept on ZFS alone, with zfs_rebase in place of
 git. The details, the rulings and the open questions are in
 <code>docs/planning.md</code>.</p>
@@ -199,9 +199,11 @@ carries each one onto a newer foundation with <code>zfs_rebase</code>.
 It follows mishkan and parasa. What is new is that the whole git layer
 is gone: no repositories inside trees, no mtree drift tracking, no
 two-commit save. A save is a snapshot carrying a commit message in
-<code>shtetl:commit</code>, and an incremental send; an update is one
-rebase per dataset into a staging tree that runs beside the old one
-until you cut over.</p>
+<code>shtetl:commit</code>, and an incremental send; ZFS snapshots are
+the record, and git survives only as the way recipes are shared. An
+update stops the container and replays its saves, one rebase per
+dataset and snapshot, into a staging tree that takes its place until
+you cut over or abandon.</p>
 
 <h2>Four spaces</h2>
 
@@ -310,9 +312,10 @@ foundation, and mirrors everything zrun runs as of its last save.</p>
 <div class="grid">
 <div class="space config">
 <h3>zconfig</h3>
-<p class="role">The root is the zshtetl-recipes working tree.
-Site files are ignored upstream by default; a contributor un-ignores
-the recipe they want to share.</p>
+<p class="role">The root is the zshtetl-recipes working tree. Its
+snapshots are the record; git is only for sharing. Upstream ignores
+everything it does not ship, and a user shares a file by adding it
+explicitly.</p>
 <pre><code>.git/
 .gitignore
 shtetl.conf      site settings
@@ -402,19 +405,29 @@ children, and zlake mirrors them the same way.</li>
 <div class="tablewrap">
 <table>
 <tr><th>what</th><th>name</th><th>shtetl:kind</th></tr>
-<tr><td>foundation</td><td><code>generic-15.1-releng</code></td><td></td></tr>
-<tr><td>foundation version</td><td><code>@2026-10-08-0f691888dc56</code></td><td>version</td></tr>
-<tr><td>after a pkg upgrade</td><td><code>@2026-10-08-0f691888dc56-pkg</code></td><td>pkg</td></tr>
+<tr><td>foundation</td><td><code>generic</code> (the recipe's name)</td><td></td></tr>
+<tr><td>foundation version</td><td><code>@15.1-releng-2026-10-08-0f691888dc56</code></td><td>version</td></tr>
+<tr><td>after a pkg upgrade</td><td><code>@15.1-releng-2026-10-08-0f691888dc56-pkg</code></td><td>pkg</td></tr>
 <tr><td>container after an update</td><td>the version it was rebased onto</td><td>version</td></tr>
 <tr><td>save</td><td><code>@save-2026-10-08-153012</code></td><td>save</td></tr>
+<tr><td>a save replayed by an update</td><td>the original's name</td><td>save</td></tr>
 </table>
 </div>
 
-<p>Every snapshot carries its message in <code>shtetl:commit</code>.
-shtetl reads the properties and never parses a name. Retention is set
-per class in shtetl.conf: <code>0</code> keeps everything (the
-default), a bare number keeps that many newest saves, and a quoted
-date(1) interval such as <code>"1y"</code> prunes by age from cron.</p>
+<p>The version lives in the snapshot name, so a foundation is one
+dataset for its whole life: <code>generic@15.2-releng-...</code> follows
+<code>generic@15.1-releng-...</code> on the same chain, and a new
+release is an ordinary update, allowed or refused by the recipe's
+<code>ver</code>. Every snapshot carries its message in
+<code>shtetl:commit</code> and the config snapshot it was made with in
+<code>shtetl:config</code>; shtetl reads properties and never parses a
+name.</p>
+
+<p>Three policies, each <code>0</code> (everything, the default), a
+bare number (the newest N) or a quoted date(1) interval
+(<code>"7d"</code>): <code>retention.run</code> (saves on zrun, and
+zlake's mirror keeps the same), <code>retention.archive</code> (retired
+trees), and <code>update.depth</code> (saves an update replays).</p>
 
 <h2>Lifecycle</h2>
 
@@ -448,14 +461,20 @@ one.</li>
 
 <h3>Update a container onto F@v2</h3>
 
-<p>X may be running. shtetl takes a from-snapshot (warning that
-anything written after it will not be in the update), then runs one
-zfs_rebase per inherited dataset, parent first, into the staging
-tree:</p>
+<p>The recipe's <code>ver</code> must allow v2. shtetl stops X, which
+stays stopped as the rollback, takes a from-snapshot, and replays X's
+saves into the staging tree, oldest first and as many as
+<code>update.depth</code> allows, one zfs_rebase per inherited dataset
+and save, parent first. The first step finds its base from the
+origins; each later step names the previous save as its base, so a
+conflict answered once is not asked again:</p>
 
-<pre><code>zfs_rebase --from zrun/containers/X/var@&lt;from&gt; \
+<pre><code>zfs_rebase --from zrun/containers/X/var@s1 \
     --onto zrun/foundations/F/var@v2 \
-    --result zrun/containers/X-staging/var</code></pre>
+    --result zrun/containers/X-staging/var
+zfs_rebase --allow-unrelated --base zrun/containers/X/var@s1 \
+    --from zrun/containers/X/var@s2 \
+    --onto zrun/containers/X-staging/var --result &lt;name of s1&gt;</code></pre>
 
 <div class="lanes">
 <div class="lane rebased"><div class="ds">X-staging</div><div class="act">rebased onto F@v2; base F@v1 found from X's origin</div></div>
@@ -474,33 +493,36 @@ merged sources and runs <code>--continue</code>. Derivations run only
 here. The step-by-step version is <code>docs/story.html</code>.</p>
 
 <p><strong>Soak.</strong> The results are placed at
-<code>/containers/X-staging</code> and started as their own jail, beside
-the old X. The suffix is <code>update.suffix</code> in shtetl.conf. A
+<code>/containers/X-staging</code> and started as a jail with X's own
+settings, address included: X is stopped, so nothing collides. The
+suffix is <code>update.suffix</code> in shtetl.conf. A
 <code>pkg-upgrade</code> during the soak adds a <code>-pkg</code>
 snapshot, so both states are there to pick from.</p>
 
 <p><strong>Cutover</strong> is a human decision, made after the soak.
-shtetl repeats the warning if X was written after the from-snapshot,
-stops both, saves X one last time, promotes the container-only clones,
-destroys the old tree on zrun, renames X-staging to X and starts it.
-In zlake the old X becomes <code>archive/containers/X-&lt;date&gt;</code>,
-kept whole, so anything it wrote after the from-snapshot can still be
-recovered. <strong>Abandon</strong> destroys the staging tree and
-leaves X as it was.</p>
+X has been stopped since the from-snapshot, so there is nothing to
+reconcile (if it was started again, shtetl says how much it wrote and
+asks). shtetl stops the staging jail, promotes the container-only
+clones, destroys the old tree on zrun, renames X-staging to X and
+starts it. In zlake the old X becomes
+<code>archive/containers/X-&lt;date&gt;</code>, kept whole by
+<code>retention.archive</code>. <strong>Abandon</strong> destroys the
+staging tree and starts X again as it was.</p>
 
 <p class="note">The lineage moves in zlake (a child keeping its
 incremental sends while its parent changes lineage, and promotes
-mirrored across pools) are the first things to test on the box
-(planning.md, probes P1 - P3 and P11) before this design is
-committed.</p>
+mirrored across pools) and the replay step's explicit base are the
+first things to test on the box (planning.md, probes P1 - P3, P11 and
+P14) before this design is committed.</p>
 
 <h3>System</h3>
 <p>The same as a container, deployed with <code>zfs set -u
 mountpoint=/</code> and a one-shot boot; children mount at
 <code>/var</code>, <code>/usr/local</code> and so on by inheritance. A
-system is never updated while it runs: the update runs from a RAM root
-after <code>reboot -r</code>, the soak is a one-shot boot into the
-staging tree, and the cutover runs from the RAM root again.</p>
+system is never updated while it runs: everything, cutover included,
+happens from outer space, either a RAM root after <code>reboot -r</code>
+or, under discussion, a shutdown hook. The soak is a one-shot boot into
+the staging tree.</p>
 
 <h2>Configuration</h2>
 

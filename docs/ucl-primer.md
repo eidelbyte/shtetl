@@ -101,9 +101,9 @@ Consequences for shtetl:
 
 - **Versions must be quoted.** `ver = 15.10` is the float 15.1. The
   schema requires a string and says so when it gets a number.
-- **Retention intervals must be quoted.** shtetl reads them with
-  date(1) units, where `m` is a month; UCL reads a bare `6m` as the
-  integer 6000000 and a bare `30d` as a time in seconds. Write
+- **Retention and depth intervals must be quoted.** shtetl reads them
+  with date(1) units, where `m` is a month; UCL reads a bare `6m` as
+  the integer 6000000 and a bare `30d` as a time in seconds. Write
   `archive = "6m";`.
 - **ZFS property values may arrive as booleans.** `atime = off;` is
   boolean false, not the string "off". shtetl's schema maps a boolean
@@ -276,9 +276,10 @@ with the file and line each value came from.
 
 `containers/nginx.conf`
 
+    ver = ">=15";
+
     pkg { nginx = true; tmux = false; }
     datasets {
-        tmp = false;
         www { readonly = true; }
     }
     commands {
@@ -287,8 +288,15 @@ with the file and line each value came from.
     EOD
     }
 
-Merged for nginx: pkg = sudo, nginx; datasets = var, usr/local, www;
-commands = nginx.
+Merged for nginx: pkg = sudo, nginx; datasets = tmp, var, usr/local,
+www; commands = nginx. A container cannot drop a dataset its foundation
+splits, so `tmp = false` here would be an error (planning.md 14, F);
+whether `tmux = false` should be one too, when the foundation installed
+tmux, is planning.md Q-H.
+
+A container recipe names no foundation: `ver` says which foundations it
+fits, and the foundation is chosen with `shtetl create nginx --on
+generic`.
 
 `containers/recipya.conf`
 
@@ -304,10 +312,12 @@ commands = nginx.
         default { compression = "zstd"; }
         lake    { compression = "zstd-9"; }
     }
-    update { suffix = "staging"; }
+    update {
+        suffix = "staging";
+        depth = 0;          # replay every save zrun holds
+    }
     retention {
         run = 10;
-        lake = 0;
         archive = "1y";
     }
 
