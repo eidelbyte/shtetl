@@ -187,9 +187,9 @@ ol.steps li { margin: 6px 0; }
 <main>
 
 <h1>shtetl</h1>
-<p class="sub">Architecture, draft of 2026-10-04. FreeBSD foundations,
+<p class="sub">Architecture, draft 2 of 2026-10-08. FreeBSD foundations,
 containers and systems kept on ZFS alone, with zfs_rebase in place of
-git. The details and the open questions are in
+git. The details, the rulings and the open questions are in
 <code>docs/planning.md</code>.</p>
 
 <p>shtetl builds FreeBSD from source into <strong>foundations</strong>,
@@ -198,15 +198,20 @@ runs <strong>containers</strong> (jails) and <strong>systems</strong>
 carries each one onto a newer foundation with <code>zfs_rebase</code>.
 It follows mishkan and parasa. What is new is that the whole git layer
 is gone: no repositories inside trees, no mtree drift tracking, no
-two-commit save. A save is a snapshot and an incremental send; an
-update is one rebase per dataset.</p>
+two-commit save. A save is a snapshot carrying a commit message in
+<code>shtetl:commit</code>, and an incremental send; an update is one
+rebase per dataset into a staging tree that runs beside the old one
+until you cut over.</p>
 
 <h2>Four spaces</h2>
 
-<p>The user hands shtetl four existing pools or datasets at bootstrap.
-shtetl never touches devices. It marks each root with a
-<code>shtetl:space</code> user property (proposal) and builds its layout
-beneath, using the property defaults inherited from parasa
+<p>The user hands shtetl existing datasets at bootstrap; shtetl never
+touches devices. Each root carries a <code>shtetl:space</code> user
+property. <strong>zlake</strong> and <strong>zrun</strong> may have
+several roots, across pools: a child is looked for under every root of
+its space, and two matches is an error. An entity always lives in the
+root that holds its foundation, because a clone cannot cross pools.
+Layouts are created with the property defaults inherited from parasa
 (<code>atime=off</code>, <code>compression=zstd</code>,
 <code>aclmode=passthrough</code>, <code>mountpoint=none</code>,
 <code>canmount=noauto</code>), each overridable in
@@ -230,29 +235,31 @@ beneath, using the property defaults inherited from parasa
 <!-- zconfig -->
 <rect class="box" x="20" y="20" width="250" height="110" rx="8" style="stroke: var(--config)"/>
 <text class="label" x="36" y="46" style="fill: var(--config)">zconfig</text>
-<text class="small" x="36" y="64">configuration</text>
-<text class="item" x="36" y="88">shtetl.conf</text>
-<text class="item" x="36" y="108">zshtetl-recipes/  (git)</text>
+<text class="small" x="36" y="64">the recipes clone</text>
+<text class="item" x="36" y="88">zshtetl-recipes (git)</text>
+<text class="item" x="36" y="108">shtetl.conf default.conf</text>
 
 <!-- zbuild -->
 <rect class="box" x="20" y="250" width="250" height="110" rx="8" style="stroke: var(--build)"/>
 <text class="label" x="36" y="276" style="fill: var(--build)">zbuild</text>
-<text class="small" x="36" y="294">compiles</text>
-<text class="item" x="36" y="318">src/</text>
-<text class="item" x="36" y="338">obj/</text>
+<text class="small" x="36" y="294">the src checkout</text>
+<text class="item" x="36" y="318">freebsd-src</text>
+<text class="small" x="36" y="340">obj lives in zlake</text>
 
 <!-- zlake -->
 <rect class="box" x="330" y="20" width="215" height="440" rx="8" style="stroke: var(--lake)"/>
 <text class="label" x="346" y="46" style="fill: var(--lake)">zlake</text>
-<text class="small" x="346" y="64">archive and last save</text>
+<text class="small" x="346" y="64">archive and mirror</text>
 <text class="item" x="346" y="110">foundations/F</text>
 <text class="small" x="346" y="128">@v1 @v2 ... + children</text>
 <text class="small" x="346" y="146">zbuild installs into it</text>
 <text class="item" x="346" y="300">containers/X</text>
-<text class="small" x="346" y="318">delta, clone of F@vN</text>
-<text class="item" x="346" y="350">systems/S</text>
-<text class="item" x="346" y="410">build/obj</text>
-<text class="small" x="346" y="428">obj cache backup</text>
+<text class="small" x="346" y="318">mirror of zrun, last save</text>
+<text class="item" x="346" y="346">systems/S</text>
+<text class="item" x="346" y="374">archive/</text>
+<text class="small" x="346" y="392">trees retired at cutover</text>
+<text class="item" x="346" y="422">foundation-builds/F</text>
+<text class="small" x="346" y="440">obj cache per foundation</text>
 
 <!-- zrun -->
 <rect class="box" x="680" y="20" width="200" height="440" rx="8" style="stroke: var(--run)"/>
@@ -262,7 +269,10 @@ beneath, using the property defaults inherited from parasa
 <text class="small" x="696" y="128">readonly</text>
 <text class="item" x="696" y="300">containers/X</text>
 <text class="small" x="696" y="318">clone of F@vN + children</text>
-<text class="item" x="696" y="350">systems/S</text>
+<text class="item" x="696" y="346">containers/</text>
+<text class="item" x="712" y="362">X-staging</text>
+<text class="small" x="696" y="380">an update under soak</text>
+<text class="item" x="696" y="410">systems/S</text>
 
 <!-- recipes to zbuild -->
 <path class="edge edge-config" d="M145,130 L145,250" marker-end="url(#arr)"/>
@@ -271,8 +281,8 @@ beneath, using the property defaults inherited from parasa
 <!-- zbuild installs into the zlake foundation -->
 <path class="edge edge-build" d="M270,280 C300,280 300,118 337,118" marker-end="url(#arr)"/>
 
-<!-- obj backup -->
-<path class="edge edge-build" d="M270,338 C300,338 300,410 337,410" marker-end="url(#arr)"/>
+<!-- obj cache -->
+<path class="edge edge-build" d="M270,338 C300,338 300,422 337,422" marker-end="url(#arr)"/>
 
 <!-- zlake foundation to zrun foundation -->
 <path class="edge edge-lake" d="M480,118 L688,118" marker-end="url(#arr)"/>
@@ -293,63 +303,71 @@ beneath, using the property defaults inherited from parasa
 </svg>
 </div>
 <p class="cap">Solid arrows move data; dashed arrows are configuration
-read. zlake is the authority for foundations and holds the last save
-of everything zrun runs.</p>
+read. zlake is the authority for foundations, keeps one obj cache per
+foundation, and mirrors everything zrun runs as of its last save.</p>
 </div>
 
 <div class="grid">
 <div class="space config">
 <h3>zconfig</h3>
-<p class="role">Site settings and the recipe repo. Snapshotted on every
-change to shtetl.conf.</p>
-<pre><code>shtetl.conf
-zshtetl-recipes/
-    default.conf
-    foundations/
-    containers/
-    systems/</code></pre>
+<p class="role">The root is the zshtetl-recipes working tree.
+Site files are ignored upstream by default; a contributor un-ignores
+the recipe they want to share.</p>
+<pre><code>.git/
+.gitignore
+shtetl.conf      site settings
+default.conf     base of every recipe
+foundations/
+containers/
+systems/</code></pre>
 </div>
 
 <div class="space build">
 <h3>zbuild</h3>
-<p class="role">Compiles only. There is no DESTDIR here: the build
-installs into the zlake foundation, mounted for the build.</p>
-<pre><code>src/     freebsd-src checkout
-obj/     MAKEOBJDIRPREFIX</code></pre>
+<p class="role">The root is the FreeBSD src checkout and nothing else.
+The build installs into the zlake foundation and keeps its obj tree in
+zlake too.</p>
+<pre><code>freebsd-src working tree</code></pre>
 </div>
 
 <div class="space lake">
 <h3>zlake</h3>
-<p class="role">Foundation archive, plus the last save of every
-zrun entity as a delta. Nothing here runs.</p>
+<p class="role">Foundation archive and obj caches; a mirror of zrun's
+dataset graph as of each entity's last save; retired trees. Nothing
+here runs.</p>
 <pre><code>foundations/
-    F/            @v1 @v2 ...
+    F/                @v1 @v2 ...
         var/
         usr-local/
+foundation-builds/
+    F/                obj cache
 containers/
-    X/            clone of F@vN
-        var/      clone of F/var@vN
-        www/      container-only
+    X/                clone of F@vN
+        var/
+        www/          container-only
+    X-staging/        during a soak
 systems/
-    S/
-build/obj</code></pre>
+archive/
+    containers/
+        X-2026-10-08/</code></pre>
 </div>
 
 <div class="space run">
 <h3>zrun</h3>
-<p class="role">Everything that runs, in one pool so clones work.
-Children mount by inheritance.</p>
+<p class="role">Everything that runs. Children mount by inheritance,
+so no fstab for a container's own datasets.</p>
 <pre><code>foundations/
-    F/            readonly
+    F/                readonly
         var/
         usr-local/
-containers/       /containers
-    X/            clone of F@vN
+containers/           /containers
+    X/                clone of F@vN
         var/
         usr-local/
-        www/      from X's recipe
+        www/          from X's recipe
+    X-staging/        an update
 systems/
-    S/            / when booted</code></pre>
+    S/                / when booted</code></pre>
 </div>
 </div>
 
@@ -368,13 +386,33 @@ container and system dataset cloned from them has a base to rebase
 from.</li>
 <li><strong>Container-only datasets.</strong> A container recipe's own
 datasets (nginx's <code>www</code>) are created under the container on
-zrun. Their lineage starts at the first save into zlake. A foundation
-update does not touch them, so they are carried across, not
-rebased.</li>
+zrun; their lineage starts at the first save into zlake. A foundation
+update does not touch them, so the update clones them from the
+from-snapshot into the staging tree, and cutover promotes the clone so
+their history moves with them.</li>
 <li><strong>Everything is saved.</strong> Data included. There is no
 container-data or system-data tree: a container's datasets are its
-children, and so are their backups in zlake.</li>
+children, and zlake mirrors them the same way.</li>
 </ul>
+
+<h2>Snapshots</h2>
+
+<div class="tablewrap">
+<table>
+<tr><th>what</th><th>name</th><th>shtetl:kind</th></tr>
+<tr><td>foundation</td><td><code>generic-15.1-releng</code></td><td></td></tr>
+<tr><td>foundation version</td><td><code>@2026-10-08-0f691888dc56</code></td><td>version</td></tr>
+<tr><td>after a pkg upgrade</td><td><code>@2026-10-08-0f691888dc56-pkg</code></td><td>pkg</td></tr>
+<tr><td>container after an update</td><td>the version it was rebased onto</td><td>version</td></tr>
+<tr><td>save</td><td><code>@save-2026-10-08-153012</code></td><td>save</td></tr>
+</table>
+</div>
+
+<p>Every snapshot carries its message in <code>shtetl:commit</code>.
+shtetl reads the properties and never parses a name. Retention is set
+per class in shtetl.conf: <code>0</code> keeps everything (the
+default), a bare number keeps that many newest saves, and a quoted
+date(1) interval such as <code>"1y"</code> prunes by age from cron.</p>
 
 <h2>Lifecycle</h2>
 
@@ -382,14 +420,16 @@ children, and so are their backups in zlake.</li>
 <ol class="steps">
 <li>Create <code>zlake/foundations/F</code> and its recipe datasets,
 empty.</li>
-<li>Mount F at a build path; <code>buildworld buildkernel</code> on
-zbuild.</li>
+<li>Mount F, <code>foundation-builds/F</code> and the src checkout;
+<code>buildworld buildkernel</code> with the obj tree on
+foundation-builds/F.</li>
 <li><code>installworld installkernel distribution DESTDIR=</code> the
 mounted F; on an update, then <code>delete-old delete-old-libs</code>.</li>
-<li>Foundation packages, commands, derivations.</li>
-<li>Unmount; <code>zfs snapshot -r F@vN</code>. Every version of F is
-one snapshot chain, which zfs_rebase and incremental send both
-need.</li>
+<li>Foundation packages and commands; snapshot <code>-r</code> with the
+version name. Every version of F is one snapshot chain, which
+zfs_rebase and incremental send both need.</li>
+<li>Optionally <code>shtetl pkg-upgrade F</code>, a second snapshot
+ending in <code>-pkg</code>. Both are versions to rebase onto.</li>
 </ol>
 
 <h3>Container</h3>
@@ -397,68 +437,92 @@ need.</li>
 <li>Send F@vN from zlake to zrun if zrun lacks it.</li>
 <li>Clone each dataset of F@vN under <code>zrun/containers/X</code>;
 create the recipe's own datasets.</li>
-<li>Start the jail; packages, commands, derivations.</li>
-<li>Save: <code>snapshot -r</code>, then one send per dataset into
-<code>zlake/containers/X</code>, as a clone of the zlake foundation
-where there is one.</li>
+<li>Start the jail; packages, then commands. Commands run once and
+never again on update.</li>
+<li>Save: snapshot with a message, then one send per dataset into the
+zlake mirror, as a clone of the zlake foundation where there is
+one.</li>
 </ol>
 
 <h3>Update a container onto F@v2</h3>
 
-<p>Save as <code>@pre</code>, then one zfs_rebase per inherited
-dataset, parent first, each into <code>X-new</code>:</p>
+<p>X may be running. shtetl takes a from-snapshot (warning that
+anything written after it will not be in the update), then runs one
+zfs_rebase per inherited dataset, parent first, into the staging
+tree:</p>
 
-<pre><code>zfs_rebase --from zrun/containers/X/var@pre \
+<pre><code>zfs_rebase --from zrun/containers/X/var@&lt;from&gt; \
     --onto zrun/foundations/F/var@v2 \
-    --result zrun/containers/X-new/var</code></pre>
+    --result zrun/containers/X-staging/var</code></pre>
 
 <div class="lanes">
-<div class="lane rebased"><div class="ds">X</div><div class="act">rebased onto F@v2; base F@v1 found from X's origin</div></div>
-<div class="lane rebased"><div class="ds">X/usr-local</div><div class="act">rebased onto F/usr-local@v2 (packages travel with it)</div></div>
-<div class="lane rebased"><div class="ds">X/var</div><div class="act">rebased onto F/var@v2 (logs and databases merged onto the new base var)</div></div>
-<div class="lane carried"><div class="ds">X/www</div><div class="act">carried: <code>zfs rename</code> under X-new at finalize</div></div>
+<div class="lane rebased"><div class="ds">X-staging</div><div class="act">rebased onto F@v2; base F@v1 found from X's origin</div></div>
+<div class="lane rebased"><div class="ds">X-staging/usr-local</div><div class="act">rebased onto F/usr-local@v2 (packages travel with it)</div></div>
+<div class="lane rebased"><div class="ds">X-staging/var</div><div class="act">rebased onto F/var@v2 (logs and databases merged onto the new base var)</div></div>
+<div class="lane carried"><div class="ds">X-staging/www</div><div class="act">cloned from X/www@&lt;from&gt;; promoted at cutover</div></div>
 </div>
 
-<p>Conflicts stop a rebase at its gate (exit 1) and shtetl opens the
-picker; any failure aborts every rebase the update started. Finalize
-stops the jail, checks <code>written@pre</code>, carries the
-container-only datasets, swaps X-new into place, sets mountpoints and
-<code>readonly=off</code>, restarts, and saves. The zlake copy is then
-re-homed as a clone of <code>zlake/foundations/F@v2</code>.</p>
+<p><strong>Conflicts.</strong> A rebase that stops at its gate has
+already applied every clean action. For each conflicted file that a
+recipe's <code>derivations</code> can regenerate (pwd.db from
+master.passwd), shtetl runs the derivation in the gated result and
+answers it <code>keep</code>; then it opens the picker with
+<code>--continue -i</code> for whatever is left. Derivations run only
+here.</p>
 
-<p class="note">Re-homing in zlake, and whether a child's incremental
-sends survive its parent changing lineage, is the first thing to test
-on the box (planning.md, probes P1 - P3) before this design is
+<p><strong>Soak.</strong> The results are placed at
+<code>/containers/X-staging</code> and started as their own jail, beside
+the old X. The suffix is <code>update.suffix</code> in shtetl.conf. A
+<code>pkg-upgrade</code> during the soak adds a <code>-pkg</code>
+snapshot, so both states are there to pick from.</p>
+
+<p><strong>Cutover</strong> is a human decision, made after the soak.
+shtetl repeats the warning if X was written after the from-snapshot,
+stops both, saves X one last time, promotes the container-only clones,
+destroys the old tree on zrun, renames X-staging to X and starts it.
+In zlake the old X becomes <code>archive/containers/X-&lt;date&gt;</code>,
+kept whole, so anything it wrote after the from-snapshot can still be
+recovered. <strong>Abandon</strong> destroys the staging tree and
+leaves X as it was.</p>
+
+<p class="note">The lineage moves in zlake (a child keeping its
+incremental sends while its parent changes lineage, and promotes
+mirrored across pools) are the first things to test on the box
+(planning.md, probes P1 - P3 and P11) before this design is
 committed.</p>
 
 <h3>System</h3>
 <p>The same as a container, deployed with <code>zfs set -u
-mountpoint=/</code> and <code>nextboot</code>; children mount at
-<code>/var</code>, <code>/usr/local</code> and so on by inheritance.
-Finalize crosses a reboot.</p>
+mountpoint=/</code> and a one-shot boot; children mount at
+<code>/var</code>, <code>/usr/local</code> and so on by inheritance. A
+system is never updated while it runs: the update runs from a RAM root
+after <code>reboot -r</code>, the soak is a one-shot boot into the
+staging tree, and the cutover runs from the RAM root again.</p>
 
 <h2>Configuration</h2>
 
-<p>All configuration is UCL (<code>textproc/libucl</code>; base's copy
-is private). Each file is parsed strictly: no duplicate keys, no
-macros, no variables. shtetl owns the cascade:</p>
+<p>All configuration is UCL, the format FreeBSD itself uses for pkg,
+ctld, bhyve and iovctl (read with <code>textproc/libucl</code>; base's
+copy is private). Each file is parsed strictly: no duplicate keys, no
+macros, no variables. <code>shtetl.conf</code> holds what is about the
+machine; a recipe is built from layers, nearest last:</p>
 
 <div class="tablewrap">
 <table>
 <tr><th>layer</th><th>file</th></tr>
-<tr><td>1</td><td>built-in defaults</td></tr>
-<tr><td>2</td><td><code>zconfig/shtetl.conf</code></td></tr>
-<tr><td>3</td><td><code>zshtetl-recipes/default.conf</code></td></tr>
-<tr><td>4</td><td>recipes named in the target's <code>import</code></td></tr>
-<tr><td>5</td><td>the target recipe</td></tr>
+<tr><td>1</td><td>built-in recipe defaults</td></tr>
+<tr><td>2</td><td><code>default.conf</code></td></tr>
+<tr><td>3</td><td>recipes named in the target's <code>import</code></td></tr>
+<tr><td>4</td><td>the target recipe</td></tr>
 </table>
 </div>
 
-<p>Nearer layers replace scalars, merge objects and append to lists.
-Recipe keys follow mishkan: <code>ver</code>, <code>src_branch</code>,
-<code>kernconf</code>, <code>buildopts</code>, <code>datasets</code>,
-<code>pkg</code>, <code>commands</code>, <code>derivations</code>,
-<code>requires</code>, <code>jailconf</code>. See
+<p>Nearer layers replace scalars and merge objects. Every collection
+(<code>pkg</code>, <code>datasets</code>, <code>derivations</code>,
+<code>requires</code>, <code>commands</code>) is an object keyed by
+name, so a recipe adds an element by naming it, changes one by naming
+it with new fields, drops one with <code>name = false</code>, and drops
+everything inherited with <code>reset</code>. See
 <code>docs/ucl-primer.md</code>.</p>
 
 <h2>Implementation</h2>
@@ -476,10 +540,12 @@ a shell. FreeBSD 15.1 is the floor.</p>
 <li>mtree baselines and drift classification prompts</li>
 <li>the two-commit save, and <code>pkg.list</code> (packages are
 rebased with /usr/local)</li>
+<li>replaying commands on update</li>
 <li>container-data and system-data, and <code>mount.fstab</code> for a
 container's own datasets</li>
 <li>disk partitioning, GELI and glabel at bootstrap</li>
-<li>a DESTDIR or build workspace separate from the foundation</li>
+<li>a DESTDIR or build workspace separate from the foundation, and an
+obj tree outside zlake</li>
 </ul>
 
 </main>
