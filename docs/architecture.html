@@ -337,8 +337,9 @@ dataset graph as of each entity's last save; retired trees. Nothing
 here runs.</p>
 <pre><code>foundations/
     F/                @v1 @v2 ...
+        usr/          canmount=off
+            local/
         var/
-        usr-local/
 foundation-builds/
     F/                obj cache
 containers/
@@ -358,12 +359,13 @@ archive/
 so no fstab for a container's own datasets.</p>
 <pre><code>foundations/
     F/                readonly
+        usr/          canmount=off
+            local/
         var/
-        usr-local/
 containers/           /containers
     X/                clone of F@vN
+        usr/local/
         var/
-        usr-local/
         www/          from X's recipe
     X-staging/        an update
 systems/
@@ -457,18 +459,19 @@ tree:</p>
 
 <div class="lanes">
 <div class="lane rebased"><div class="ds">X-staging</div><div class="act">rebased onto F@v2; base F@v1 found from X's origin</div></div>
-<div class="lane rebased"><div class="ds">X-staging/usr-local</div><div class="act">rebased onto F/usr-local@v2 (packages travel with it)</div></div>
+<div class="lane rebased"><div class="ds">X-staging/usr/local</div><div class="act">rebased onto F/usr/local@v2 (packages travel with it)</div></div>
 <div class="lane rebased"><div class="ds">X-staging/var</div><div class="act">rebased onto F/var@v2 (logs and databases merged onto the new base var)</div></div>
 <div class="lane carried"><div class="ds">X-staging/www</div><div class="act">cloned from X/www@&lt;from&gt;; promoted at cutover</div></div>
 </div>
 
-<p><strong>Conflicts.</strong> A rebase that stops at its gate has
-already applied every clean action. For each conflicted file that a
-recipe's <code>derivations</code> can regenerate (pwd.db from
-master.passwd), shtetl runs the derivation in the gated result and
-answers it <code>keep</code>; then it opens the picker with
-<code>--continue -i</code> for whatever is left. Derivations run only
-here.</p>
+<p><strong>Conflicts: the text first.</strong> A rebase that stops at
+its gate has already applied every clean action, and zfs_rebase merges
+nothing by itself. shtetl answers the derived files (pwd.db from
+master.passwd) <code>keep</code>, opens the picker with
+<code>--continue -i --no-merge</code> so the person merges the text
+while the gate stands, then regenerates the derived files from the
+merged sources and runs <code>--continue</code>. Derivations run only
+here. The step-by-step version is <code>docs/story.html</code>.</p>
 
 <p><strong>Soak.</strong> The results are placed at
 <code>/containers/X-staging</code> and started as their own jail, beside

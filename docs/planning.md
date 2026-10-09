@@ -1,6 +1,7 @@
 # shtetl: planning
 
-Status: draft 2, 2026-10-08. Nothing here is built. Draft 1 (2026-10-04)
+Status: draft 2, 2026-10-08 (7.7, 4.6, 4.7 and 5.5 amended the same day
+from docs/story.html). Nothing here is built. Draft 1 (2026-10-04)
 was reviewed and the rulings are folded in; section 14 lists them so
 each can be traced. Sections marked PROPOSAL still need a ruling;
 section 15 collects the open questions.
@@ -186,7 +187,8 @@ freebsd-src). Nothing else lives in zbuild. obj caches live in zlake
     <lake root>/
         foundations/
             F/                 built into directly by zbuild; @v1, @v2, ...
-                usr-local/     children the foundation recipe pre-splits
+                usr/           children the foundation recipe pre-splits;
+                    local/     usr is a canmount=off placeholder
                 var/
         foundation-builds/
             F/                 obj cache for F: MAKEOBJDIRPREFIX
@@ -211,11 +213,13 @@ best with `WITH_META_MODE` (needs filemon).
     <run root>/
         foundations/
             F/                 recv'd from zlake; readonly
-                usr-local/
+                usr/           canmount=off placeholder
+                    local/
                 var/
         containers/            mountpoint=/containers
             X/                 clone of foundations/F@vN
-                usr-local/     clone of foundations/F/usr-local@vN
+                usr/           clone of foundations/F/usr@vN (placeholder)
+                    local/     clone of foundations/F/usr/local@vN
                 var/           clone of foundations/F/var@vN
                 www/           container-only, created by X's recipe
             X-staging/         an update under soak (7.8)
@@ -223,7 +227,14 @@ best with `WITH_META_MODE` (needs filemon).
             S/                 same shape; mounted at / when booted
 
 All running resources live on zrun. Children mount by inheritance
-(`/containers/X/var`), so a container needs no `mount.fstab` for its
+(`/containers/X/var`). An inherited mountpoint is the parent's plus the
+child's name, so a dataset path must mirror the directory it holds:
+`usr/local` is a `usr` dataset with `canmount=off` that holds nothing,
+and `usr/local` under it, as FreeBSD's own zroot does (parasa's
+`usr-local` only worked because parasa set every mountpoint by hand).
+With inheritance, a container needs no `mount.fstab` for its
+own datasets and a system needs no fstab entries for its own; renames
+carry the mountpoints along. So a container needs no `mount.fstab` for its
 own datasets and a system needs no fstab entries for its own. nullfs
 remains only for one container mounting another's dataset
 (`requires`).
@@ -391,6 +402,7 @@ Alternatives considered:
 |-----|-------|------|---------|
 | import | all | names | recipes merged in before this file |
 | reset | all | key names | empty these inherited collections first |
+| foundation | container, system | string | the foundation recipe it is built on: `"generic"` |
 | ver | all | string | version constraint: `">=15"`, `"=15.1"` |
 | src_branch | foundation | string | FreeBSD branch |
 | kernconf | foundation | string or heredoc | config name, or an inline kernel config |
@@ -565,27 +577,48 @@ clone of the new foundation, never into X.
 
 The suffix is `update.suffix` in shtetl.conf, `staging` by default.
 
-### 7.7 Conflicts and derivations
+### 7.7 Conflicts and derivations: the text first
 
 A rebase that exits 1 stops at its conflicts gate with every clean
 action already applied, and a resolution document beside its manifest:
 one line per conflicted name, choice `-`, to be answered `keep`,
 `onto` or `from`.
 
-1. For each conflicted name that is a derivation's derived path, and
-   whose source is not itself conflicted: the source is already merged
-   in the tree, so run the derivation's command in a chroot of the
-   result's private mount and answer the line `keep`.
-2. Then, if lines remain: `zfs_rebase --continue -i IDENT` (the
-   picker) for the rest. If none remain: `--continue`.
-3. A derived path whose source is also conflicted cannot be generated
-   yet: the source's answer is applied only after the gate. shtetl
-   answers it `keep` provisionally, and runs the derivation after done,
-   before placing the result (7.6 step 5).
+zfs_rebase merges nothing by itself. A file both sides changed is a
+conflict however far apart the edits are; the three-way merge lives
+only in the picker, runs when a person opens the name, and writes only
+on `w` (v4-merge3.md: "nothing merges automatically"). So a conflicted
+derived file almost always has a conflicted source behind it: whoever
+changed the binary changed its source too. The derivation can only run
+once the source is merged, so the text goes first (ruled 2026-10-08):
+
+1. For each conflicted name that is a derivation's derived path,
+   shtetl answers the line `keep` and notes the derivation. The picker
+   will show these lines already answered.
+2. `zfs_rebase --continue -i --no-merge IDENT`: the person merges the
+   text in the picker. `--no-merge` holds the gate even when the
+   document is complete.
+3. For each noted derivation whose source is now in the tree (its line
+   answered `keep`, a hand merge, or `onto`, which the clone already
+   holds; or a source that was never in conflict): run the command once
+   per distinct command, in a chroot of the result's private mount.
+4. `zfs_rebase --continue IDENT`: applying2, the final check, done.
+5. A source answered `from` reaches the tree only in applying2, so its
+   derivation runs after done instead, before the result is placed
+   (7.6 step 5).
 
 Derivations run only here. A derived file that is not conflicted is
 consistent with its source already: whichever side changed the text
 also regenerated the binary.
+
+The headless future: zfs_rebase's planned merge drivers
+(sprints/future-features.md, "Merge drivers") run a rules file at the
+gate before the picker, exit 0 = merged (`keep`), 1 = left for the
+picker. A built-in text driver that accepts only merges with no
+conflict chunk, followed by shtetl's derivations as rules, would do
+steps 1 - 3 without a person whenever the text merges cleanly. shtetl
+needs one thing added to that design: rules run in the order written,
+so sources settle before the files derived from them.
 
 Open detail: a derivation whose source and output are in different
 datasets spans two rebases and two private mounts.
@@ -854,6 +887,20 @@ Q-E. How much history to keep: every archive forever (the retention
 default of 0), archives pruned by age, or only the live tree and the
 foundation chain? And should shtetl record the `shtetl:from` /
 `shtetl:archive` links (section 8)?
+
+Q-F. May a container recipe drop what its foundation provides? A
+`tmp = false` for a dataset the foundation splits would leave `/tmp` a
+plain directory in the container with nothing to rebase; a
+`pkg { x = false; }` for a package the foundation installed cannot
+reach into the foundation. Proposal: both are errors at check time
+(docs/story.html, frame 9).
+
+Q-G. Moving between releases. A recipe moved from `releng/15.1` to
+`releng/15.2` names a new foundation, `generic-15.2-releng`, with no
+lineage shared with 15.1, so no container can be rebased onto it. Is
+an upgrade across releases a new container, or should a new release be
+built into a clone of the previous release's newest version so the
+lineage continues?
 
 ## 16. Dropped from parasa
 
