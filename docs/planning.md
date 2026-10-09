@@ -150,7 +150,8 @@ Per-role overrides inside the layout:
 | dataset | properties |
 |---------|------------|
 | zrun/containers | mountpoint=/containers, canmount=on (the one auto-mounted parent) |
-| zrun/foundations/F and children | mountpoint=none, readonly=on |
+| zrun/foundations | mountpoint=/shtetl/foundations, inherited below |
+| zrun/foundations/F and children | canmount=noauto, readonly=on; mounted only while an update reads them (9) |
 | zrun/systems/S | mountpoint=none until deployed; then `zfs set -u mountpoint=/` |
 | zlake/** | mountpoint=none, canmount=noauto; mounted only while built into |
 | config root, build root | a mountpoint; config is read on every run |
@@ -232,7 +233,7 @@ best with `WITH_META_MODE` (needs filemon).
 
     <run root>/
         foundations/
-            F/                 recv'd from zlake; readonly
+            F/                 recv'd from zlake; readonly, canmount=noauto
                 usr/           canmount=off placeholder
                     local/
                 var/
@@ -575,8 +576,11 @@ ObsoleteFiles.inc does not list survive delete-old either way (P6).
 ### 7.3 Bring a foundation to zrun
 
 `zfs send` each dataset of F (full the first time, `-i` from the
-newest version zrun has after that) into the zrun copy of F, readonly,
-mountpoint none.
+newest version zrun has after that) into the zrun copy of F:
+`readonly=on`, `canmount=noauto`, and the mountpoint inherited from
+`zrun/foundations` (`/shtetl/foundations/F/...`). It is never mounted
+except while an update reads it: zfs_rebase reads every side at its
+mountpoint and refuses one that is not mounted (9).
 
 ### 7.4 New container X
 
@@ -620,25 +624,34 @@ a 15.2 target at check time.
    current version's; no staging tree for X exists; no open rebase.
 2. **Stop X** (ruled 2026-10-09). X stays stopped until cutover or
    abandon. Nothing writes to it during the update, so the staging
-   tree cannot drift from it, and X is the rollback.
+   tree cannot drift from it, and X is the rollback. Its datasets stay
+   mounted: the rebases read them.
 3. From-snapshot: a save of X (7.5 step 1), message "update to
    F@<version>".
-4. Replay, per dataset inherited from F, parent first, into
-   `containers/X-staging/d` (7.6.1, 7.6.2). Backing out runs `--abort`
-   on every rebase this update started.
-5. Container-only datasets: `zfs clone X/www@<from> X-staging/www`.
+4. Mount the target foundation's datasets on zrun, read-only, at their
+   mountpoints (9).
+5. Per dataset inherited from F, parent first:
+   - a placeholder (`canmount=off`, like `usr`) is never mounted, so it
+     can never be a rebase's side; it holds nothing, and shtetl clones
+     it from the target instead: `zfs clone F/usr@<target>
+     X-staging/usr`;
+   - any other dataset is replayed (7.6.1, 7.6.2). Step 1 is a clone
+     form rebase that creates `X-staging/d`; shtetl then places it
+     (`zfs inherit mountpoint`, `readonly=off`, mounted at
+     `/containers/X-staging/...`), because steps 2 and on are dataset
+     form rebases of it, and the dataset form takes only a mounted
+     dataset.
+   Backing out runs `--abort` on every rebase this update started.
+6. Container-only datasets: `zfs clone X/www@<from> X-staging/www`.
    Nothing in a foundation update touches them, so a clone is the
    whole of their "rebase"; it is promoted at cutover (7.9).
-6. Place: the tool hands results back unmounted, readonly,
-   mountpoint none, and never places them. shtetl does `zfs inherit
-   mountpoint` and `readonly=off`, so the tree mounts at
-   `/containers/X-staging` by inheritance.
-7. Snapshot X-staging with the version name of the target (6.1).
-8. Start X-staging with X's own jail settings, address included: X is
+7. Unmount the foundation's datasets.
+8. Snapshot X-staging with the version name of the target (6.1).
+9. Start X-staging with X's own jail settings, address included: X is
    stopped, so nothing collides.
-9. Save X-staging (7.10 mirrors it into zlake). This first sends X's
-   from-snapshot to zlake if it is not there yet: the mirror's
-   container-only children are clones of it.
+10. Save X-staging (7.10 mirrors it into zlake). This first sends X's
+    from-snapshot to zlake if it is not there yet: the mirror's
+    container-only children are clones of it.
 
 The suffix is `update.suffix` in shtetl.conf, `staging` by default.
 
@@ -650,7 +663,8 @@ The suffix is `update.suffix` in shtetl.conf, `staging` by default.
 
 The tool derives base `F/d@<X's version>` from X/d's origin. Exit 0 =
 done; 1 = stopped at conflicts (7.7); 2 = refused before touching
-anything; 3 = failed part way, or drift at the final check.
+anything; 3 = failed part way, or drift at the final check. Base, from
+and onto must all be mounted at their mountpoints (9).
 
 ### 7.6.2 History replay (`update.depth`)
 
@@ -668,9 +682,18 @@ history across an update means replaying its saves in order (ruled
              replayed s(k-1)
     last     snapshot X-staging/d with sn's name
 
-**Why step k names its base** (disputed 2026-10-09, Q-J). The chain
-of from snapshots is the user's scheme unchanged: s1, s2, ... each
-replayed onto the result so far. Only the base of step k is at issue.
+**Why step k names its base** (ruled 2026-10-09). In every step, base
+and onto are the same point in history, before and after the move:
+
+| step | from | onto | base |
+|------|------|------|------|
+| 1 | X@s1 | F@<target> | F@<X's version>, the divergence point (derived) |
+| 2 | X@s2 | s1' | X@s1 |
+| k | X@sk | s(k-1)' | X@s(k-1) |
+
+So each step carries only what the admin did between two consecutive
+saves onto the already-moved copy. Step 1 is the special case: its
+"same point" is the foundation itself, before and after.
 Left to derive it, the tool walks both origins back to the foundation
 and takes `F/d@<X's version>`, the divergence point, at every step.
 That is right for step 1 and wrong after it, because onto is no longer
@@ -692,9 +715,18 @@ cases, with the foundation update leaving `rc.conf` alone:
 This is how git replays a branch: each commit is cherry-picked with its
 own parent as the merge base, not the branch point.
 
+zfs_rebase does this today: `--allow-unrelated --base` takes any
+snapshot no newer than either side (`createtxg`), and the dataset form
+takes the pre-apply snapshot under the name `--result` gives
+(`unrelated_base()`, `preconditions()`, `onto_open()` in src/run.c).
+It is lightly tested: the box suite runs `--allow-unrelated --base`
+only as a dry run (tests/box/run-fixture.sh step 0a); a real apply
+under it (matrix row ZX5) is planned, and the dataset form under it has
+never run. Probe P14.
+
 **Cost.** `--allow-unrelated` turns the tool's prune off, so each step
 after the first reads every file of the dataset on all three sides.
-Proposal for zfs_rebase (Q-J): accept an explicit `--base` that lies in
+Proposal for zfs_rebase (Q-N): accept an explicit `--base` that lies in
 from's own lineage (an earlier snapshot of from's dataset) without
 `--allow-unrelated`, and keep from's prune. Names from did not change
 between base and from need nothing done, since the result already holds
@@ -737,7 +769,7 @@ once the source is merged, so the text goes first (ruled 2026-10-08):
 4. `zfs_rebase --continue IDENT`: applying2, the final check, done.
 5. A source answered `from` reaches the tree only in applying2, so its
    derivation runs after done instead, before the result is placed
-   (7.6 step 6).
+   (7.6 step 5).
 
 Derivations run only here. A derived file that is not conflicted is
 consistent with its source already: whichever side changed the text
@@ -851,9 +883,16 @@ Facts from the tool's README that shape shtetl:
   step 2). The one exception is `--allow-unrelated --base`, which
   history replay uses for every step after the first (7.6.2).
 - Clone form (`--onto` a snapshot) creates `--result` and never places
-  it. shtetl places results in the staging tree (7.6 step 6).
+  it. shtetl places results in the staging tree (7.6 step 5).
 - The resolution document is the interface for 7.7: shtetl writes
   `keep` lines into it and runs `--continue`.
+- Every side must be mounted at its own mountpoint. The tool reads a
+  snapshot at `<mountpoint property>/.zfs/snapshot/<name>` (`snapdir()`
+  in src/run.c) and refuses a dataset that is not mounted
+  (`preconditions()`), base included. Hence: the zrun foundation copy
+  has a real mountpoint and is mounted while an update reads it (7.3);
+  a `canmount=off` placeholder is cloned, never rebased; and a staging
+  dataset is placed before a dataset form step takes it (7.6 step 5).
 - The tool holds its input snapshots for the life of the rebase and
   releases them at done or --abort. On FreeBSD a hold release
   force-unmounts that snapshot's `.zfs` view: shtetl must not have
@@ -926,12 +965,12 @@ Receive the new X as a clone of F@v2 at a new name, move www under it,
 destroy the old X, rename the new X into place. Does `send -i www@s1
 www@s2` still receive?
 
-P3. P2 on zrun with clone and promote instead of move (7.6 step 5,
+P3. P2 on zrun with clone and promote instead of move (7.6 step 6,
 7.9 step 3).
 
-P4. zfs_rebase with `--result containers/X-staging/var` while
-X-staging is itself the result of an open rebase: accepted? Do the
-private mounts collide?
+P4. A clone form rebase creating `containers/X-staging/var` under a
+placed, mounted `X-staging`; then a dataset form step on the child
+while the parent stays mounted.
 
 P5. Rebuild in place, then rebase a container whose admin edited
 /etc/rc.conf where v1 -> v2 left rc.conf's bytes unchanged. Expect no
@@ -968,6 +1007,11 @@ replayed s(k-1); timing against the dataset's size.
 P15. A cross-release update: install 15.2 over a 15.1 foundation with
 delete-old, then rebase a container from 15.1 onto it.
 
+P16. The mount requirement end to end: a zrun foundation with
+`canmount=noauto` and an inherited mountpoint, mounted read-only for an
+update and unmounted after; a `canmount=off` placeholder refused as a
+side (expected) and cloned instead.
+
 ## 14. Rulings
 
 ### 2026-10-09 (open questions of draft 2)
@@ -989,6 +1033,14 @@ delete-old, then rebase a container from 15.1 onto it.
   fit. A foundation dataset is `{recipe}`, and the version is in the
   snapshot name, `@{ver}-{branch-type}-{ISO-date}-{short-sha}[-pkg]`,
   so a new release continues the same dataset.
+
+### 2026-10-09 (Q-J)
+
+- History replay: step 1's base is the divergence point; every later
+  step's base is the previous original save, and its onto that save's
+  replayed copy (7.6.2). It runs on today's `--allow-unrelated --base`.
+- The mount findings of 9 (foundation copies mounted during updates,
+  placeholders cloned, staging placed before step 2) are accepted.
 
 ### 2026-10-09 (questions H - M of draft 3)
 
@@ -1035,17 +1087,12 @@ delete-old, then rebase a container from 15.1 onto it.
 
 ## 15. Open questions
 
-Q-J (disputed). History replay: the base of step 2 and later. The user
-holds that the base is always the divergence point, the foundation
-version X was cloned from. This plan holds that the divergence point is
-the base of step 1 only, and that each later step needs the previous
-save as its base, or files the admin edited in more than one save and
-conflicts already answered in step 1 come back as conflicts at every
-later step. 7.6.2 works both cases through. If the plan is right, a
-second question follows: naming a base needs `--allow-unrelated`,
-which turns the prune off; should zfs_rebase accept a base that is an
-earlier snapshot of from's own dataset and keep from's prune, so a
-step costs about its own changes?
+Q-N (not blocking). History replay costs a full read of the dataset
+for every step after the first, because naming a base needs
+`--allow-unrelated`, which turns the prune off. Should zfs_rebase
+accept a base that is an earlier snapshot of from's own dataset and
+keep from's prune, so a step costs about its own changes (7.6.2,
+"Cost")? Replay works without it.
 
 ## 16. Dropped from parasa
 

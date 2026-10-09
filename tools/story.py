@@ -715,8 +715,11 @@ frame("Bring the foundation to zrun",
     after=p(
 	"<b>1</b> One <code>zfs send</code> per dataset of v1, received under "
 	"<code>fast/shtetl/run/foundations</code> with <code>readonly=on</code> "
-	"and <code>mountpoint=none</code>. A full stream this first time; "
-	"every later version goes as an incremental."))
+	"and <code>canmount=noauto</code>. A full stream this first time; "
+	"every later version goes as an incremental. The copy has a real "
+	"mountpoint, <code>/shtetl/foundations/generic</code>, but is never "
+	"mounted except while an update reads it: zfs_rebase reads every side "
+	"at its own mountpoint and refuses one that is not mounted."))
 
 st.add(*T("R/c/n", TREEW))
 st.mounted |= set(T("R/c/n", ["", "/tmp", "/usr/local", "/var", "/www"]))
@@ -1006,18 +1009,22 @@ frame("Two saves, two steps, two bases", diagram=False,
 	"holds the admin's version, onto the merged one, and both differ from "
 	"v1. With base s1, only what the admin changed between s1 and s2 is "
 	"replayed, the way git replays each commit against its own parent. "
-	"This step is disputed (planning.md Q-J). Naming a base takes "
-	"<code>--allow-unrelated</code> today, which turns the tool's prune "
-	"off, so this step reads every file."))
+	"Naming a base takes <code>--allow-unrelated</code> today, which "
+	"turns the tool's prune off, so this step reads every file; the box "
+	"suite has run that flag only as a dry run so far (probe P14)."))
 
 st.add("R/c/ns")
 st.tag("R/c/ns", "private mount, exit 1")
+st.mounted |= set(T("R/f/G", ["", "/tmp", "/usr/local", "/var"]))
 frame("Step 1, the top dataset: s1 onto v2",
     hl={"R/c/ns": "new"},
     arrows=[A("R/f/G", "R/c/ns", "rebase", 1, side="R", bulge=48, t=0.3),
 	A("R/c/n", "R/c/ns", "rebase", 2, side="R", bulge=24, t=0.5)],
     before=p(
-	"Parent first. zfs_rebase clones <b>1</b> onto (v2) as "
+	"First shtetl mounts the foundation's datasets on zrun, read-only, at "
+	"<code>/shtetl/foundations/generic</code>: zfs_rebase reads base, "
+	"from and onto at their own mountpoints. Then, parent first, "
+	"zfs_rebase clones <b>1</b> onto (v2) as "
 	"<code>nginx-staging</code>, mounted only at its own private "
 	"directory, and replays <b>2</b> from's changes (s1 against the base "
 	"v1) into it."),
@@ -1146,9 +1153,13 @@ zfs_rebase --continue fast/shtetl/run/containers/nginx-staging
 	"the tree\". <code>--continue</code> applies the rest, runs the final "
 	"check and reaches done: <code>nginx-staging</code> now holds s1's "
 	"tree on v2. The tool hands it back unmounted, read-only, "
-	"<code>mountpoint=none</code>; where it goes is shtetl's business."))
+	"<code>mountpoint=none</code>, and shtetl places it at once "
+	"(<code>zfs inherit mountpoint</code>, <code>readonly=off</code>): "
+	"step 2 takes it as a dataset, and the dataset form takes only a "
+	"mounted one."))
 
 st.tag("R/c/ns", "exit 0")
+st.mounted.add("R/c/ns")
 st.snap(["R/c/ns"], "s1'")
 st.snap(["R/c/ns"], "s2'")
 frame("Step 2, the top dataset: s2 onto the result",
@@ -1181,10 +1192,11 @@ zfs snapshot -o shtetl:kind=save -o shtetl:replayed-from=<guid of nginx@s2> \
 st.tag("R/c/ns", "")
 st.add(*T("R/c/ns", TREEW))
 st.mounted |= set(T("R/c/ns", ["", "/tmp", "/usr/local", "/var", "/www"]))
-st.tag("R/c/ns/usr", "canmount=off")
+st.tag("R/c/ns/usr", "clone of generic/usr@v2")
 st.tag("R/c/ns/www", "clone of nginx/www@s2")
-st.snap(T("R/c/ns", TREE[1:]), "s1'")
-st.snap(T("R/c/ns", TREE[1:]), "s2'")
+st.snap(T("R/c/ns", ["/tmp", "/usr/local", "/var"]), "s1'")
+st.snap(T("R/c/ns", ["/tmp", "/usr/local", "/var"]), "s2'")
+st.mounted -= set(T("R/f/G"))
 st.snap(T("R/c/ns", TREEW), "v2")
 st.tag("R/c/ns", "jail")
 frame("The children, www, and starting the new tree",
@@ -1192,28 +1204,33 @@ frame("The children, www, and starting the new tree",
     arrows=[A("R/f/G/var", "R/c/ns/var", "rebase", 1, side="R", bulge=56,
 	t=0.25),
 	A("R/c/n/var", "R/c/ns/var", "rebase", None, side="R", bulge=34),
-	A("R/c/n/www", "R/c/ns/www", "clone", 2, side="R", bulge=20)],
+	A("R/c/n/www", "R/c/ns/www", "clone", 2, side="R", bulge=20),
+	A("R/f/G/usr", "R/c/ns/usr", "clone", 3, side="R", bulge=66,
+	t=0.6)],
     before=p(
 	"<b>1</b> Each child replays the same two steps into the matching "
 	"name under <code>nginx-staging</code>: <code>tmp</code>, "
-	"<code>usr</code>, <code>usr/local</code> and <code>var</code> (one "
-	"drawn). Step 1 finds each child's base through the foundation's "
-	"matching dataset; step 2 names the child's own s1. None conflicts. "
-	"<code>var</code>'s logs and pkg database land on the new base's "
-	"<code>var</code>."),
+	"<code>usr/local</code> and <code>var</code> (one drawn), each placed "
+	"after its step 1 so that step 2 can take it. Step 1 finds each "
+	"child's base through the foundation's matching dataset; step 2 names "
+	"the child's own s1. None conflicts. <code>var</code>'s logs and pkg "
+	"database land on the new base's <code>var</code>.",
+	"<b>3</b> <code>usr</code> is a placeholder with "
+	"<code>canmount=off</code>: never mounted, so it can never be a "
+	"rebase's side, and it holds nothing anyway. shtetl clones it from "
+	"<code>generic/usr@v2</code> before <code>usr/local</code>'s result is "
+	"created under it."),
     after=p(
 	"<b>2</b> <code>www</code> has no foundation counterpart and nothing "
 	"in a foundation update touches it, so it is never replayed: its "
 	"whole \"rebase\" is <code>zfs clone nginx/www@s2 "
 	"nginx-staging/www</code>.",
-	"Then shtetl places the tree (<code>zfs inherit mountpoint</code>, "
-	"<code>readonly=off</code>) so it mounts at "
-	"<code>/containers/nginx-staging</code>, snapshots it with the version "
+	"Then shtetl unmounts the foundation's datasets, snapshots the tree, "
+	"mounted at <code>/containers/nginx-staging</code>, with the version "
 	"it now sits on (<b>v2</b>, <code>shtetl:kind=version</code>), and "
 	"starts it as a jail with nginx's own settings, address included: "
-	"nginx is stopped, so nothing collides. Whether a rebase may create "
-	"its result under another rebase's result is probe P4; the replay "
-	"step is P14."))
+	"nginx is stopped, so nothing collides. Creating a result under a "
+	"placed result is probe P4, the replay step P14, and the mounts P16."))
 
 st.snap(T("L/c/n", TREEW), "s2")
 st.add(*T("L/c/ns", TREEW))

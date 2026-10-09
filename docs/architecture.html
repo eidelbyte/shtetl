@@ -467,7 +467,11 @@ saves into the staging tree, oldest first and as many as
 <code>update.depth</code> allows, one zfs_rebase per inherited dataset
 and save, parent first. The first step finds its base from the
 origins; each later step names the previous save as its base, so a
-conflict answered once is not asked again:</p>
+conflict answered once is not asked again. zfs_rebase reads every side
+at its own mountpoint, so shtetl mounts the zrun foundation read-only
+for the update, places each staging dataset before a later step takes
+it, and clones placeholders such as <code>usr</code> instead of
+rebasing them:</p>
 
 <pre><code>zfs_rebase --from zrun/containers/X/var@s1 \
     --onto zrun/foundations/F/var@v2 \

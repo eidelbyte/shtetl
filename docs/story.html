@@ -765,7 +765,7 @@ jailconf     2 lines                            containers/nginx.conf:16</code><
 <path class="ar ar-lake" d="M630.0,178.0 C660.6,178.0 667.4,178.0 698.0,178.0" marker-end="url(#m10-lake)"/>
 <path class="ar ar-lake" d="M630.0,198.0 C660.6,198.0 667.4,198.0 698.0,198.0" marker-end="url(#m10-lake)"/>
 </svg></div>
-<p><b>1</b> One <code>zfs send</code> per dataset of v1, received under <code>fast/shtetl/run/foundations</code> with <code>readonly=on</code> and <code>mountpoint=none</code>. A full stream this first time; every later version goes as an incremental.</p>
+<p><b>1</b> One <code>zfs send</code> per dataset of v1, received under <code>fast/shtetl/run/foundations</code> with <code>readonly=on</code> and <code>canmount=noauto</code>. A full stream this first time; every later version goes as an incremental. The copy has a real mountpoint, <code>/shtetl/foundations/generic</code>, but is never mounted except while an update reads it: zfs_rebase reads every side at its own mountpoint and refuses one that is not mounted.</p>
 </section>
 <section class="frame" id="f11">
 <div class="fnum">Frame 11</div><h3>Clone, dataset by dataset</h3>
@@ -1968,11 +1968,11 @@ zfs snapshot -r -o shtetl:kind=save \
 <td>the same dataset, rebased in place; snapshotted as <b>s2'</b></td></tr>
 </table></div>
 <p><b>1</b> The first step names only from and onto. The tool walks each side's origin chain: <code>nginx@s1</code>, then nginx's origin <code>generic@v1</code>; <code>generic@v2</code>, the same dataset. Of the two snapshots the walks name there, the older is the base: v1. So step 1 replays everything nginx changed up to s1 onto v2, and that is where the conflicts are.</p>
-<p><b>2</b> The second step names its base: s1. Left to derive it, the tool would find v1, the divergence point, again (both origins still meet at the foundation). But onto is now the result so far, which already holds s1: with base v1, a file the admin edited both before s1 and before s2 would look changed on both sides and conflict, and every conflict answered in step 1 would come back, since from still holds the admin's version, onto the merged one, and both differ from v1. With base s1, only what the admin changed between s1 and s2 is replayed, the way git replays each commit against its own parent. This step is disputed (planning.md Q-J). Naming a base takes <code>--allow-unrelated</code> today, which turns the tool's prune off, so this step reads every file.</p>
+<p><b>2</b> The second step names its base: s1. Left to derive it, the tool would find v1, the divergence point, again (both origins still meet at the foundation). But onto is now the result so far, which already holds s1: with base v1, a file the admin edited both before s1 and before s2 would look changed on both sides and conflict, and every conflict answered in step 1 would come back, since from still holds the admin's version, onto the merged one, and both differ from v1. With base s1, only what the admin changed between s1 and s2 is replayed, the way git replays each commit against its own parent. Naming a base takes <code>--allow-unrelated</code> today, which turns the tool's prune off, so this step reads every file; the box suite has run that flag only as a dry run so far (probe P14).</p>
 </section>
 <section class="frame" id="f22">
 <div class="fnum">Frame 22</div><h3>Step 1, the top dataset: s1 onto v2</h3>
-<p>Parent first. zfs_rebase clones <b>1</b> onto (v2) as <code>nginx-staging</code>, mounted only at its own private directory, and replays <b>2</b> from's changes (s1 against the base v1) into it.</p>
+<p>First shtetl mounts the foundation's datasets on zrun, read-only, at <code>/shtetl/foundations/generic</code>: zfs_rebase reads base, from and onto at their own mountpoints. Then, parent first, zfs_rebase clones <b>1</b> onto (v2) as <code>nginx-staging</code>, mounted only at its own private directory, and replays <b>2</b> from's changes (s1 against the base v1) into it.</p>
 <pre class=""><code>zfs_rebase --from fast/shtetl/run/containers/nginx@save-2026-10-09-101500 \
     --onto fast/shtetl/run/foundations/generic@15.1-releng-2026-11-12-5b2c7e01a9d4 \
     --result fast/shtetl/run/containers/nginx-staging</code></pre>
@@ -2061,12 +2061,14 @@ zfs snapshot -r -o shtetl:kind=save \
 <text class="ssub" x="714" y="58">shtetl:space=run  pool fast (NVMe, boot)</text>
 <text class="rroot" x="722" y="82.0">fast/shtetl/run</text>
 <text class="rds" x="736" y="102.0">foundations</text>
+<circle class="mdot" cx="712" cy="118.0" r="3.5"/>
 <text class="rds" x="750" y="122.0">generic</text>
 <text class="rtag" x="808.8" y="122.0">ro</text>
 <rect class="pill pill-version" x="1014.4" y="110.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="1025.7" y="121.5" text-anchor="middle">v2</text>
 <rect class="pill pill-version" x="987.8" y="110.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="999.1" y="121.5" text-anchor="middle">v1</text>
+<circle class="mdot" cx="712" cy="138.0" r="3.5"/>
 <text class="rds" x="764" y="142.0">tmp</text>
 <text class="rtag" x="793.8" y="142.0">ro</text>
 <rect class="pill pill-version" x="1014.4" y="130.5" width="22.6" height="15" rx="7.5"/>
@@ -2079,12 +2081,14 @@ zfs snapshot -r -o shtetl:kind=save \
 <text class="pilltext" x="1025.7" y="161.5" text-anchor="middle">v2</text>
 <rect class="pill pill-version" x="987.8" y="150.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="999.1" y="161.5" text-anchor="middle">v1</text>
+<circle class="mdot" cx="712" cy="178.0" r="3.5"/>
 <text class="rds" x="778" y="182.0">local</text>
 <text class="rtag" x="822.2" y="182.0">ro</text>
 <rect class="pill pill-version" x="1014.4" y="170.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="1025.7" y="181.5" text-anchor="middle">v2</text>
 <rect class="pill pill-version" x="987.8" y="170.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="999.1" y="181.5" text-anchor="middle">v1</text>
+<circle class="mdot" cx="712" cy="198.0" r="3.5"/>
 <text class="rds" x="764" y="202.0">var</text>
 <text class="rtag" x="793.8" y="202.0">ro</text>
 <rect class="pill pill-version" x="1014.4" y="190.5" width="22.6" height="15" rx="7.5"/>
@@ -2201,7 +2205,7 @@ zfs snapshot -r -o shtetl:kind=save \
 
 zfs_rebase --continue fast/shtetl/run/containers/nginx-staging
     applying2 ... done, verified: exit 0</code></pre>
-<p><code>passwd</code>, <code>pwd.db</code> and <code>spwd.db</code> now agree with the merged <code>master.passwd</code>, and their lines already say <code>keep</code>, which is exactly "leave what is in the tree". <code>--continue</code> applies the rest, runs the final check and reaches done: <code>nginx-staging</code> now holds s1's tree on v2. The tool hands it back unmounted, read-only, <code>mountpoint=none</code>; where it goes is shtetl's business.</p>
+<p><code>passwd</code>, <code>pwd.db</code> and <code>spwd.db</code> now agree with the merged <code>master.passwd</code>, and their lines already say <code>keep</code>, which is exactly "leave what is in the tree". <code>--continue</code> applies the rest, runs the final check and reaches done: <code>nginx-staging</code> now holds s1's tree on v2. The tool hands it back unmounted, read-only, <code>mountpoint=none</code>, and shtetl places it at once (<code>zfs inherit mountpoint</code>, <code>readonly=off</code>): step 2 takes it as a dataset, and the dataset form takes only a mounted one.</p>
 </section>
 <section class="frame" id="f26">
 <div class="fnum">Frame 26</div><h3>Step 2, the top dataset: s2 onto the result</h3>
@@ -2301,12 +2305,14 @@ zfs snapshot -o shtetl:kind=save -o shtetl:replayed-from=&lt;guid of nginx@s2&gt
 <text class="ssub" x="714" y="58">shtetl:space=run  pool fast (NVMe, boot)</text>
 <text class="rroot" x="722" y="82.0">fast/shtetl/run</text>
 <text class="rds" x="736" y="102.0">foundations</text>
+<circle class="mdot" cx="712" cy="118.0" r="3.5"/>
 <text class="rds" x="750" y="122.0">generic</text>
 <text class="rtag" x="808.8" y="122.0">ro</text>
 <rect class="pill pill-version" x="1014.4" y="110.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="1025.7" y="121.5" text-anchor="middle">v2</text>
 <rect class="pill pill-version" x="987.8" y="110.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="999.1" y="121.5" text-anchor="middle">v1</text>
+<circle class="mdot" cx="712" cy="138.0" r="3.5"/>
 <text class="rds" x="764" y="142.0">tmp</text>
 <text class="rtag" x="793.8" y="142.0">ro</text>
 <rect class="pill pill-version" x="1014.4" y="130.5" width="22.6" height="15" rx="7.5"/>
@@ -2319,12 +2325,14 @@ zfs snapshot -o shtetl:kind=save -o shtetl:replayed-from=&lt;guid of nginx@s2&gt
 <text class="pilltext" x="1025.7" y="161.5" text-anchor="middle">v2</text>
 <rect class="pill pill-version" x="987.8" y="150.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="999.1" y="161.5" text-anchor="middle">v1</text>
+<circle class="mdot" cx="712" cy="178.0" r="3.5"/>
 <text class="rds" x="778" y="182.0">local</text>
 <text class="rtag" x="822.2" y="182.0">ro</text>
 <rect class="pill pill-version" x="1014.4" y="170.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="1025.7" y="181.5" text-anchor="middle">v2</text>
 <rect class="pill pill-version" x="987.8" y="170.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="999.1" y="181.5" text-anchor="middle">v1</text>
+<circle class="mdot" cx="712" cy="198.0" r="3.5"/>
 <text class="rds" x="764" y="202.0">var</text>
 <text class="rtag" x="793.8" y="202.0">ro</text>
 <rect class="pill pill-version" x="1014.4" y="190.5" width="22.6" height="15" rx="7.5"/>
@@ -2373,6 +2381,7 @@ zfs snapshot -o shtetl:kind=save -o shtetl:replayed-from=&lt;guid of nginx@s2&gt
 <rect class="pill pill-save" x="987.8" y="330.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="999.1" y="341.5" text-anchor="middle">s1</text>
 <rect class="hl hl-snap" x="704" y="349.0" width="337" height="18" rx="4"/>
+<circle class="mdot" cx="712" cy="358.0" r="3.5"/>
 <text class="rds" x="750" y="362.0">nginx-staging</text>
 <text class="rtag" x="852.2" y="362.0">exit 0</text>
 <rect class="pill pill-save" x="1008.1" y="350.5" width="28.9" height="15" rx="7.5"/>
@@ -2388,7 +2397,8 @@ zfs snapshot -o shtetl:kind=save -o shtetl:replayed-from=&lt;guid of nginx@s2&gt
 </section>
 <section class="frame" id="f27">
 <div class="fnum">Frame 27</div><h3>The children, www, and starting the new tree</h3>
-<p><b>1</b> Each child replays the same two steps into the matching name under <code>nginx-staging</code>: <code>tmp</code>, <code>usr</code>, <code>usr/local</code> and <code>var</code> (one drawn). Step 1 finds each child's base through the foundation's matching dataset; step 2 names the child's own s1. None conflicts. <code>var</code>'s logs and pkg database land on the new base's <code>var</code>.</p>
+<p><b>1</b> Each child replays the same two steps into the matching name under <code>nginx-staging</code>: <code>tmp</code>, <code>usr/local</code> and <code>var</code> (one drawn), each placed after its step 1 so that step 2 can take it. Step 1 finds each child's base through the foundation's matching dataset; step 2 names the child's own s1. None conflicts. <code>var</code>'s logs and pkg database land on the new base's <code>var</code>.</p>
+<p><b>3</b> <code>usr</code> is a placeholder with <code>canmount=off</code>: never mounted, so it can never be a rebase's side, and it holds nothing anyway. shtetl clones it from <code>generic/usr@v2</code> before <code>usr/local</code>'s result is created under it.</p>
 <div class="diagram"><svg viewBox="0 0 1110 716" role="img" aria-label="The children, www, and starting the new tree">
 <defs>
 <marker id="m27-build" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-build" d="M0,0 L10,5 L0,10 z"/></marker>
@@ -2566,13 +2576,9 @@ zfs snapshot -o shtetl:kind=save -o shtetl:replayed-from=&lt;guid of nginx@s2&gt
 <text class="pilltext" x="963.1" y="381.5" text-anchor="middle">s1'</text>
 <rect class="hl hl-new" x="704" y="389.0" width="337" height="18" rx="4"/>
 <text class="rds" x="764" y="402.0">usr</text>
-<text class="rtag" x="793.8" y="402.0">canmount=off</text>
+<text class="rtag" x="793.8" y="402.0">clone of generic/usr@v2</text>
 <rect class="pill pill-version" x="1014.4" y="390.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="1025.7" y="401.5" text-anchor="middle">v2</text>
-<rect class="pill pill-save" x="981.5" y="390.5" width="28.9" height="15" rx="7.5"/>
-<text class="pilltext" x="996.0" y="401.5" text-anchor="middle">s2'</text>
-<rect class="pill pill-save" x="948.6" y="390.5" width="28.9" height="15" rx="7.5"/>
-<text class="pilltext" x="963.1" y="401.5" text-anchor="middle">s1'</text>
 <rect class="hl hl-new" x="704" y="409.0" width="337" height="18" rx="4"/>
 <circle class="mdot" cx="712" cy="418.0" r="3.5"/>
 <text class="rds" x="778" y="422.0">local</text>
@@ -2605,9 +2611,12 @@ zfs snapshot -o shtetl:kind=save -o shtetl:replayed-from=&lt;guid of nginx@s2&gt
 <path class="ar ar-run" d="M1045.0,338.0 C1065.0,338.0 1065.0,458.0 1047.0,458.0" marker-end="url(#m27-run)"/>
 <circle class="badge badge-run" cx="1060.2" cy="398.0" r="9"/>
 <text class="badgetext" x="1060.2" y="402.0" text-anchor="middle">2</text>
+<path class="ar ar-run" d="M1045.0,158.0 C1111.0,158.0 1111.0,398.0 1047.0,398.0" marker-end="url(#m27-run)"/>
+<circle class="badge badge-run" cx="1093.0" cy="313.5" r="9"/>
+<text class="badgetext" x="1093.0" y="317.5" text-anchor="middle">3</text>
 </svg></div>
 <p><b>2</b> <code>www</code> has no foundation counterpart and nothing in a foundation update touches it, so it is never replayed: its whole "rebase" is <code>zfs clone nginx/www@s2 nginx-staging/www</code>.</p>
-<p>Then shtetl places the tree (<code>zfs inherit mountpoint</code>, <code>readonly=off</code>) so it mounts at <code>/containers/nginx-staging</code>, snapshots it with the version it now sits on (<b>v2</b>, <code>shtetl:kind=version</code>), and starts it as a jail with nginx's own settings, address included: nginx is stopped, so nothing collides. Whether a rebase may create its result under another rebase's result is probe P4; the replay step is P14.</p>
+<p>Then shtetl unmounts the foundation's datasets, snapshots the tree, mounted at <code>/containers/nginx-staging</code>, with the version it now sits on (<b>v2</b>, <code>shtetl:kind=version</code>), and starts it as a jail with nginx's own settings, address included: nginx is stopped, so nothing collides. Creating a result under a placed result is probe P4, the replay step P14, and the mounts P16.</p>
 </section>
 <section class="frame" id="f28">
 <div class="fnum">Frame 28</div><h3>Soak</h3>
@@ -2845,13 +2854,11 @@ zfs snapshot -o shtetl:kind=save -o shtetl:replayed-from=&lt;guid of nginx@s2&gt
 <rect class="pill pill-save" x="954.9" y="370.5" width="28.9" height="15" rx="7.5"/>
 <text class="pilltext" x="969.4" y="381.5" text-anchor="middle">s2'</text>
 <text class="rds" x="764" y="402.0">usr</text>
-<text class="rtag" x="793.8" y="402.0">canmount=off</text>
+<text class="rtag" x="793.8" y="402.0">clone of generic/usr@v2</text>
 <rect class="pill pill-save" x="1014.4" y="390.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="1025.7" y="401.5" text-anchor="middle">s3</text>
 <rect class="pill pill-version" x="987.8" y="390.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="999.1" y="401.5" text-anchor="middle">v2</text>
-<rect class="pill pill-save" x="954.9" y="390.5" width="28.9" height="15" rx="7.5"/>
-<text class="pilltext" x="969.4" y="401.5" text-anchor="middle">s2'</text>
 <circle class="mdot" cx="712" cy="418.0" r="3.5"/>
 <text class="rds" x="778" y="422.0">local</text>
 <rect class="pill pill-save" x="1014.4" y="410.5" width="22.6" height="15" rx="7.5"/>
@@ -3132,13 +3139,11 @@ cut over to nginx-staging? [y/N] y</code></pre>
 <rect class="pill pill-save" x="954.9" y="370.5" width="28.9" height="15" rx="7.5"/>
 <text class="pilltext" x="969.4" y="381.5" text-anchor="middle">s2'</text>
 <text class="rds" x="764" y="402.0">usr</text>
-<text class="rtag" x="793.8" y="402.0">canmount=off</text>
+<text class="rtag" x="793.8" y="402.0">clone of generic/usr@v2</text>
 <rect class="pill pill-save" x="1014.4" y="390.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="1025.7" y="401.5" text-anchor="middle">s3</text>
 <rect class="pill pill-version" x="987.8" y="390.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="999.1" y="401.5" text-anchor="middle">v2</text>
-<rect class="pill pill-save" x="954.9" y="390.5" width="28.9" height="15" rx="7.5"/>
-<text class="pilltext" x="969.4" y="401.5" text-anchor="middle">s2'</text>
 <circle class="mdot" cx="712" cy="418.0" r="3.5"/>
 <text class="rds" x="778" y="422.0">local</text>
 <rect class="pill pill-save" x="1014.4" y="410.5" width="22.6" height="15" rx="7.5"/>
@@ -3400,13 +3405,11 @@ cut over to nginx-staging? [y/N] y</code></pre>
 <rect class="pill pill-save" x="954.9" y="250.5" width="28.9" height="15" rx="7.5"/>
 <text class="pilltext" x="969.4" y="261.5" text-anchor="middle">s2'</text>
 <text class="rds" x="764" y="282.0">usr</text>
-<text class="rtag" x="793.8" y="282.0">canmount=off</text>
+<text class="rtag" x="793.8" y="282.0">clone of generic/usr@v2</text>
 <rect class="pill pill-save" x="1014.4" y="270.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="1025.7" y="281.5" text-anchor="middle">s3</text>
 <rect class="pill pill-version" x="987.8" y="270.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="999.1" y="281.5" text-anchor="middle">v2</text>
-<rect class="pill pill-save" x="954.9" y="270.5" width="28.9" height="15" rx="7.5"/>
-<text class="pilltext" x="969.4" y="281.5" text-anchor="middle">s2'</text>
 <circle class="mdot" cx="712" cy="298.0" r="3.5"/>
 <text class="rds" x="778" y="302.0">local</text>
 <rect class="pill pill-save" x="1014.4" y="290.5" width="22.6" height="15" rx="7.5"/>
@@ -3682,13 +3685,11 @@ cut over to nginx-staging? [y/N] y</code></pre>
 <rect class="pill pill-save" x="954.9" y="250.5" width="28.9" height="15" rx="7.5"/>
 <text class="pilltext" x="969.4" y="261.5" text-anchor="middle">s2'</text>
 <text class="rds" x="764" y="282.0">usr</text>
-<text class="rtag" x="793.8" y="282.0">canmount=off</text>
+<text class="rtag" x="793.8" y="282.0">clone of generic/usr@v2</text>
 <rect class="pill pill-save" x="1014.4" y="270.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="1025.7" y="281.5" text-anchor="middle">s3</text>
 <rect class="pill pill-version" x="987.8" y="270.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="999.1" y="281.5" text-anchor="middle">v2</text>
-<rect class="pill pill-save" x="954.9" y="270.5" width="28.9" height="15" rx="7.5"/>
-<text class="pilltext" x="969.4" y="281.5" text-anchor="middle">s2'</text>
 <circle class="mdot" cx="712" cy="298.0" r="3.5"/>
 <text class="rds" x="778" y="302.0">local</text>
 <rect class="pill pill-save" x="1014.4" y="290.5" width="22.6" height="15" rx="7.5"/>
@@ -3919,7 +3920,7 @@ cut over to nginx-staging? [y/N] y</code></pre>
 <text class="pilltext" x="972.5" y="261.5" text-anchor="middle">v2</text>
 <rect class="hl hl-snap" x="704" y="269.0" width="337" height="18" rx="4"/>
 <text class="rds" x="764" y="282.0">usr</text>
-<text class="rtag" x="793.8" y="282.0">canmount=off</text>
+<text class="rtag" x="793.8" y="282.0">clone of generic/usr@v2</text>
 <rect class="pill pill-save" x="1014.4" y="270.5" width="22.6" height="15" rx="7.5"/>
 <text class="pilltext" x="1025.7" y="281.5" text-anchor="middle">s5</text>
 <rect class="pill pill-save" x="987.8" y="270.5" width="22.6" height="15" rx="7.5"/>
