@@ -80,9 +80,9 @@ LAKE = Space("lake", "zlake", "shtetl:space=lake  pool tank (HDD)", 270, 20,
     360, [
 	("L", "tank/shtetl", 0, "root"),
 	("L/f", "foundations", 1, "ds"),
-] + tree("L/f/G", "generic-15.1-releng", 2) + [
+] + tree("L/f/G", "generic", 2) + [
 	("L/fb", "foundation-builds", 1, "ds"),
-	("L/fb/G", "generic-15.1-releng", 2, "ds"),
+	("L/fb/G", "generic", 2, "ds"),
 	("L/c", "containers", 1, "ds"),
 ] + tree("L/c/n", "nginx", 2, True) + tree("L/c/ns", "nginx-staging", 2, True) + [
 	("L/s", "systems", 1, "ds"),
@@ -94,7 +94,7 @@ RUN = Space("run", "zrun", "shtetl:space=run  pool fast (NVMe, boot)", 700,
     20, 345, [
 	("R", "fast/shtetl/run", 0, "root"),
 	("R/f", "foundations", 1, "ds"),
-] + tree("R/f/G", "generic-15.1-releng", 2) + [
+] + tree("R/f/G", "generic", 2) + [
 	("R/c", "containers", 1, "ds"),
 ] + tree("R/c/n", "nginx", 2, True) + tree("R/c/ns", "nginx-staging", 2, True) + [
 	("R/s", "systems", 1, "ds"),
@@ -111,7 +111,8 @@ def space_of(rid):
 
 PILL_KIND = {
 	"v1": "version", "v2": "version",
-	"s1": "save", "s2": "from", "s3": "save", "s4": "save", "s5": "save",
+	"s1": "save", "s2": "from", "s3": "save", "s5": "save",
+	"s1'": "save", "s2'": "save",
 }
 
 
@@ -437,12 +438,16 @@ frame("The admin writes a foundation recipe", diagram=False,
 	"about this machine."),
     panel=codes(("foundations/generic.conf (new)", GENERIC_CONF),
 	("default.conf", DEFAULT_CONF), ("shtetl.conf", SHTETL_CONF)),
-    after=callout("question", "Open question Q-A",
-	p("<code>shtetl.conf</code> and <code>generic.conf</code> are site "
-	"files, which upstream's default <code>.gitignore</code> would ignore. "
-	"An ignored file has no git history at all. Are zconfig's snapshots "
-	"enough history for them, or should site files be committed in the "
-	"local clone and only kept out of what is pushed upstream?")))
+    after=callout("note", "ZFS is the record; git is for sharing",
+	p("Upstream's <code>.gitignore</code> ignores everything upstream does "
+	"not ship, so <code>shtetl.conf</code> and <code>generic.conf</code> "
+	"stay local unless the admin shares one on purpose "
+	"(<code>git add -f</code>). Their history is zconfig's snapshots, and "
+	"every snapshot shtetl takes records the config snapshot it was made "
+	"with. One hazard, tested: git overwrites ignored files without a "
+	"word when a pull brings a file at the same path, so shtetl "
+	"snapshots zconfig before any pull and refuses one that would "
+	"collide.")))
 
 FAILS = r'''
 foundations/generic.conf:2: ver must be a string; write "15.10"
@@ -477,8 +482,8 @@ frame("shtetl checks the recipe", diagram=False,
     ]) + checks("meaning", [
 	("ok", "<code>releng/15.1</code> is version 15.1, branch type releng; "
 	    "it satisfies <code>ver &gt;= 15</code>"),
-	("ok", "the foundation name is <code>generic-15.1-releng</code>; no "
-	    "dataset of that name exists in any lake root, so this is a new "
+	("ok", "a foundation is named after its recipe: <code>generic</code>; "
+	    "no dataset of that name exists in any lake root, so this is a new "
 	    "foundation"),
 	("ok", "spaces: one root each for config, build, lake and run"),
 	("ok", "after checkout: <code>sys/amd64/conf/GENERIC</code> exists in "
@@ -489,7 +494,8 @@ frame("shtetl checks the recipe", diagram=False,
 CONFIG_SHOW = r'''
 $ shtetl config show foundations/generic
 kind         foundation
-name         generic-15.1-releng            (computed)
+name         generic                        (the recipe)
+version      15.1-releng                    (from src_branch)
 ver          ">=15"                         foundations/generic.conf:2
 src_branch   "releng/15.1"                  foundations/generic.conf:3
 kernconf     "GENERIC"                      foundations/generic.conf:4
@@ -505,20 +511,20 @@ derivations  etc/passwd        <- etc/master.passwd   default.conf:10
 
 PLAN1 = r'''
 $ shtetl build generic
-foundation generic-15.1-releng (new), version @2026-10-08-0f691888dc56
+foundation generic (new), version @15.1-releng-2026-10-08-0f691888dc56
 
-  create   tank/shtetl/foundations/generic-15.1-releng
+  create   tank/shtetl/foundations/generic
   create     .../tmp
   create     .../usr                    canmount=off (placeholder)
   create     .../usr/local
   create     .../var
-  create   tank/shtetl/foundation-builds/generic-15.1-releng
+  create   tank/shtetl/foundation-builds/generic
   src      fast/shtetl/src: checkout releng/15.1 (0f691888dc56)
   build    buildworld buildkernel KERNCONF=GENERIC
-           MAKEOBJDIRPREFIX=<foundation-builds/generic-15.1-releng>
+           MAKEOBJDIRPREFIX=<foundation-builds/generic>
   install  installworld installkernel distribution
-           DESTDIR=<foundations/generic-15.1-releng>
-  snapshot -r @2026-10-08-0f691888dc56  shtetl:kind=version
+           DESTDIR=<foundations/generic>
+  snapshot -r @15.1-releng-2026-10-08-0f691888dc56  shtetl:kind=version
 
 proceed? [y/N] y
 '''
@@ -566,7 +572,7 @@ frame("Build",
     after=p(
 	"<b>1</b> <code>make buildworld buildkernel KERNCONF=GENERIC</code> "
 	"with <code>MAKEOBJDIRPREFIX</code> on "
-	"<code>foundation-builds/generic-15.1-releng</code>. The obj tree "
+	"<code>foundation-builds/generic</code>. The obj tree "
 	"stays there after the build, so the next build of this foundation "
 	"starts warm (best with <code>WITH_META_MODE</code>)."))
 
@@ -598,16 +604,20 @@ frame("Snapshot: version v1",
     panel=code(r'''
 zfs snapshot -r \
     -o shtetl:kind=version \
-    -o shtetl:commit="build generic-15.1-releng from releng/15.1 0f691888dc56" \
-    tank/shtetl/foundations/generic-15.1-releng@2026-10-08-0f691888dc56
+    -o shtetl:commit="build generic from releng/15.1 0f691888dc56" \
+    -o shtetl:config=fast/shtetl/config@2026-10-08-140210 \
+    tank/shtetl/foundations/generic@15.1-releng-2026-10-08-0f691888dc56
 '''),
     after=p(
-	"From here on this page calls that snapshot <b>v1</b>. The name is "
-	"for people (<code>{recipe}-{ver}-{branch-type}</code>, then "
-	"<code>@&lt;ISO-date&gt;-&lt;short-sha&gt;</code>, so a listing sorts "
-	"by recipe, version, then date); shtetl itself reads "
-	"<code>shtetl:kind</code>. The foundation lives only in zlake so far. "
-	"Nothing runs yet."))
+	"From here on this page calls that snapshot <b>v1</b>. The dataset is "
+	"named after the recipe and the version is in the snapshot name, "
+	"<code>@{ver}-{branch-type}-{ISO-date}-{short-sha}</code>, so a "
+	"foundation is one dataset for its whole life: a later "
+	"<code>@15.2-releng-...</code> continues the same chain. The names "
+	"are for people; shtetl reads <code>shtetl:kind</code>, and "
+	"<code>shtetl:config</code> points at the exact recipes this was "
+	"built from. The foundation lives only in zlake so far. Nothing runs "
+	"yet."))
 
 # Act II ------------------------------------------------------------------
 
@@ -619,7 +629,7 @@ st.add("C/cn")
 
 NGINX_CONF = r'''
 # containers/nginx.conf
-foundation = "generic";
+ver = ">=15";
 
 pkg = [ "nginx" ];
 
@@ -642,7 +652,8 @@ EOD
 NGINX_SHOW = r'''
 $ shtetl config show containers/nginx
 kind         container
-foundation   generic -> generic-15.1-releng, newest version v1
+foundation   generic (chosen with --on), newest version
+             15.1-releng-2026-10-08-0f691888dc56; ver ">=15" allows it
 datasets     tmp         from the foundation    default.conf:4
              usr         from the foundation    (placeholder)
              usr/local   from the foundation    default.conf:6
@@ -656,17 +667,19 @@ jailconf     2 lines                            containers/nginx.conf:16
 
 frame("The container recipe, checked", diagram=False,
     before=p(
-	"<code>containers/nginx.conf</code> names its foundation, one package, "
-	"one dataset of its own, one command block and its jail settings. "
-	"<code>shtetl create nginx</code> checks it the same three ways, plus "
-	"the checks that only make sense for a container."),
+	"<code>containers/nginx.conf</code> says which FreeBSD versions it "
+	"fits, one package, one dataset of its own, one command block and its "
+	"jail settings. It names no foundation: the admin picks one with "
+	"<code>shtetl create nginx --on generic</code>, and shtetl checks the "
+	"recipe the same three ways, plus the checks that only make sense for "
+	"a container."),
     panel=codes(("containers/nginx.conf (new)", NGINX_CONF)) + checks(
 	"container checks", [
-	("ok", "parse and schema as before; <code>jailconf</code> and "
-	    "<code>foundation</code> are container keys"),
-	("ok", "<code>foundation = \"generic\"</code> names a recipe whose "
-	    "foundation exists: <code>generic-15.1-releng</code>, newest "
-	    "version v1"),
+	("ok", "parse and schema as before; <code>jailconf</code> is a "
+	    "container key"),
+	("ok", "<code>--on generic</code>: the foundation exists, and its "
+	    "newest version, <code>15.1-releng-2026-10-08-0f691888dc56</code>, "
+	    "satisfies <code>ver &gt;= 15</code>"),
 	("ok", "<code>requires</code>: none, so no other container must "
 	    "exist first"),
 	("ok", "datasets: <code>tmp</code>, <code>usr</code>, "
@@ -676,16 +689,15 @@ frame("The container recipe, checked", diagram=False,
 	    "</code>, <code>etc/login.conf</code>)"),
 	("ok", "the name <code>nginx</code> is free on zrun and in the zlake "
 	    "mirror"),
-	("prop", "a container recipe may not drop a dataset its foundation "
-	    "splits (<code>tmp = false</code> would leave <code>/tmp</code> a "
-	    "plain directory with nothing to rebase), nor a package its "
-	    "foundation installed: both are errors"),
+	("ok", "nginx keeps every dataset the foundation splits; a recipe "
+	    "cannot drop one (<code>tmp = false</code> would be an error, "
+	    "ruled 2026-10-09)"),
     ]) + code(NGINX_SHOW),
-    after=callout("finding", "Finding: two keys the schema lacked",
-	p("The plan's recipe keys had no way for a container to name its "
-	"foundation; <code>foundation</code> is now in planning.md 5.5. The "
-	"proposed rule above (no dropping what the foundation provides) is "
-	"open question Q-F.")))
+    after=callout("note", "Recipes are not tied to a foundation",
+	p("A recipe says which versions it fits with <code>ver</code> and "
+	"works on any foundation that satisfies it. The choice is made when "
+	"the container is created, and the clone's <code>origin</code> "
+	"records it from then on: no key, no file.")))
 
 st.add(*T("R/f/G"))
 for r in T("R/f/G"):
@@ -810,14 +822,14 @@ act("III", "A new foundation version", p(
 
 PLAN2 = r'''
 $ shtetl build generic
-foundation generic-15.1-releng, update: v1 -> @2026-11-12-5b2c7e01a9d4
+foundation generic, update: v1 -> @15.1-releng-2026-11-12-5b2c7e01a9d4
 
   recipe   unchanged checks pass (parse, schema, meaning)
   datasets same as v1: tmp usr usr/local var (none added or dropped)
   src      fast/shtetl/src: pull releng/15.1 (0f691888dc56 -> 5b2c7e01a9d4)
   build    buildworld buildkernel, obj reused from foundation-builds
   install  into the same datasets, then delete-old delete-old-libs
-  snapshot -r @2026-11-12-5b2c7e01a9d4  shtetl:kind=version
+  snapshot -r @15.1-releng-2026-11-12-5b2c7e01a9d4  shtetl:kind=version
 
 proceed? [y/N] y
 '''
@@ -825,7 +837,7 @@ proceed? [y/N] y
 frame("Rebuild the same foundation", diagram=False,
     before=p(
 	"The admin runs the same command. Because "
-	"<code>generic-15.1-releng</code> exists, this is an update of it, and "
+	"<code>generic</code> exists, this is an update of it, and "
 	"there is one more check: the recipe's datasets must match the ones "
 	"v1 has, because every container's datasets are clones of those."),
     panel=code(PLAN2),
@@ -833,13 +845,13 @@ frame("Rebuild the same foundation", diagram=False,
 	p("Building v2 into the datasets v1 lives in keeps every version on "
 	"one snapshot chain. zfs_rebase needs that to find a base, and "
 	"zlake can then send zrun an incremental instead of a whole world.")) +
-	callout("finding", "Finding: a new release is a new foundation",
-	p("If the recipe moved to <code>releng/15.2</code>, the name would "
-	"become <code>generic-15.2-releng</code>: a new dataset with no "
-	"lineage shared with 15.1, so no container could be rebased onto it. "
-	"Moving between releases needs its own answer (perhaps building the "
-	"new release into a clone of the old one's newest version). Not part "
-	"of this story; it is open question Q-G.")))
+	callout("note", "A new release is just a new version",
+	p("Had the recipe moved to <code>releng/15.2</code>, the build would "
+	"go into the same dataset and the version would be "
+	"<code>@15.2-releng-...</code>. Installing a newer world over an older "
+	"one and running delete-old is FreeBSD's own source-upgrade path, and "
+	"every container keeps a lineage to rebase along; its recipe's "
+	"<code>ver</code> decides whether it may follow.")))
 
 st.mounted |= set(["B", "L/fb/G"] + T("L/f/G", ["", "/tmp", "/usr/local", "/var"]))
 st.tag("B/t", "5b2c7e01a9d4")
@@ -866,7 +878,8 @@ st.snap(T("L/f/G"), "v2")
 frame("Snapshot: version v2",
     hl={r: "snap" for r in T("L/f/G")},
     after=p(
-	"<code>@2026-11-12-5b2c7e01a9d4</code>, called <b>v2</b> from here on. "
+	"<code>@15.1-releng-2026-11-12-5b2c7e01a9d4</code>, called <b>v2</b> "
+	"from here on. "
 	"zlake's foundation now carries both versions on one chain."))
 
 st.snap(T("R/f/G"), "v2")
@@ -882,102 +895,141 @@ frame("Send v2 to zrun",
 # Act IV ------------------------------------------------------------------
 
 act("IV", "The update", p(
-	"The admin moves nginx onto v2. Nothing in this act writes to the "
-	"running nginx: the update is built beside it, tried, and only then "
-	"swapped in, by the admin's decision."))
+	"The admin moves nginx onto v2. nginx is stopped for the update and "
+	"stays stopped until the admin cuts over or abandons: nothing writes "
+	"to it, so the new tree cannot drift from it, and it is the rollback."))
 
 PREFLIGHT = r'''
 $ shtetl update nginx
-container    nginx on generic-15.1-releng@v1 -> v2 (2026-11-12-5b2c7e01a9d4)
-recipe       containers/nginx.conf: checks pass
-foundation   v2 is on zrun; its datasets match v1's
-staging      fast/shtetl/run/containers/nginx-staging: free
-rebases      none open for nginx
-plan         rebase  nginx, tmp, usr, usr/local, var  (parent first)
-             clone   www                               (container-only)
+container   nginx on generic@15.1-releng-2026-10-08-0f691888dc56
+target      generic@15.1-releng-2026-11-12-5b2c7e01a9d4 (the newest version)
+recipe      containers/nginx.conf: checks pass; ver ">=15" allows 15.1
+foundation  the target is on zrun; its datasets match the current version's
+staging     fast/shtetl/run/containers/nginx-staging: free
+rebases     none open for nginx
+history     update.depth = 0: replay every save zrun holds (s1), then the
+            snapshot taken at the stop
+preview     zfs_rebase --dry-run of step 1, nginx still running:
+            nginx: 6 conflicts; tmp, usr, usr/local, var: none
+plan        stop nginx, snapshot, replay into nginx-staging, clone www,
+            start nginx-staging
 
-WARNING: nginx is running. The update starts from a snapshot taken now;
-anything nginx writes after it will not be in nginx-staging.
-
+nginx will be stopped now and stays stopped until cutover or abandon.
 proceed? [y/N] y
 '''
 
 frame("Preflight", diagram=False,
     before=p(
-	"An update needs nothing from nginx but a snapshot to start from. "
-	"nginx may be running, saved or not."),
-    panel=code(PREFLIGHT))
+	"The recipe's <code>ver</code> decides whether nginx may move to the "
+	"target at all. This errata is still 15.1, so even a recipe pinned "
+	"to <code>\"=15.1\"</code> would allow it; a 15.2 version would need "
+	"a looser <code>ver</code>, which this one has."),
+    panel=code(PREFLIGHT),
+    after=p(
+	"The preview is a proposal (planning.md Q-K): a dry run writes the "
+	"manifest and creates and holds nothing, so the admin knows how much "
+	"will need answering, and so roughly how long nginx will be down, "
+	"before it stops."))
 
+st.tag("R/c/n", "/containers/nginx  stopped")
 st.snap(T("R/c/n", TREEW), "s2")
-frame("The from-snapshot: s2",
+frame("Stop nginx, then snapshot: s2",
     hl={r: "snap" for r in T("R/c/n", TREEW)},
     panel=code(r'''
+service jail stop nginx
 zfs snapshot -r -o shtetl:kind=save \
-    -o shtetl:commit="update to generic-15.1-releng@2026-11-12-5b2c7e01a9d4" \
+    -o shtetl:commit="update to generic@15.1-releng-2026-11-12-5b2c7e01a9d4" \
+    -o shtetl:config=fast/shtetl/config@2026-11-12-090000 \
     fast/shtetl/run/containers/nginx@save-2026-11-12-090000
 '''),
     after=p(
 	"An ordinary save snapshot, atomic across the whole tree, called "
-	"<b>s2</b> (orange: the update starts here). nginx keeps serving."))
+	"<b>s2</b> (orange: the update starts here). Nothing has written to "
+	"nginx since the stop, and nothing will until cutover or abandon."))
 
 
 def lineage_svg():
-	return r'''<svg viewBox="0 0 760 300" role="img" aria-label="How zfs_rebase finds the base">
-<defs><marker id="m-lin" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-muted" d="M0,0 L10,5 L0,10 z"/></marker></defs>
-<text class="rds" x="20" y="44">foundations/generic-15.1-releng</text>
-<line class="lin" x1="40" y1="70" x2="700" y2="70"/>
-<circle class="ldot ldot-version" cx="180" cy="70" r="9"/>
-<text class="ltext" x="180" y="100" text-anchor="middle">v1</text>
-<circle class="ldot ldot-version" cx="560" cy="70" r="9"/>
-<text class="ltext" x="560" y="100" text-anchor="middle">v2</text>
-<path class="lin" d="M180,79 C180,150 220,170 260,170 L470,170"/>
-<text class="rds" x="20" y="174">containers/nginx</text>
-<circle class="ldot ldot-save" cx="320" cy="170" r="8"/>
-<text class="ltext" x="320" y="198" text-anchor="middle">s1</text>
-<circle class="ldot ldot-from" cx="440" cy="170" r="8"/>
-<text class="ltext" x="440" y="198" text-anchor="middle">s2</text>
-<path class="lin lin-new" d="M560,79 C560,200 600,250 640,250 L700,250"/>
-<text class="rds" x="20" y="254">containers/nginx-staging (the result)</text>
-<circle class="ring ring-base" cx="180" cy="70" r="15"/>
-<text class="ltag ltag-base" x="180" y="38" text-anchor="middle">BASE</text>
-<circle class="ring ring-onto" cx="560" cy="70" r="15"/>
-<text class="ltag ltag-onto" x="560" y="38" text-anchor="middle">ONTO</text>
-<circle class="ring ring-from" cx="440" cy="170" r="14"/>
-<text class="ltag ltag-from" x="440" y="142" text-anchor="middle">FROM</text>
+	return r'''<svg viewBox="0 0 760 320" role="img" aria-label="The two replay steps and their bases">
+<defs><marker id="m-lin" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-rebase" d="M0,0 L10,5 L0,10 z"/></marker></defs>
+<text class="rds" x="20" y="44">foundations/generic</text>
+<line class="lin" x1="40" y1="70" x2="720" y2="70"/>
+<path class="lin" d="M170,79 C170,140 200,170 240,170 L470,170"/>
+<text class="rds" x="20" y="200">containers/nginx</text>
+<path class="lin lin-new" d="M430,79 C430,220 470,270 510,270 L720,270"/>
+<text class="rds" x="20" y="300">containers/nginx-staging</text>
+<path class="ar ar-rebase" stroke-dasharray="5 4" d="M290,180 C300,250 470,276 548,272" marker-end="url(#m-lin)"/>
+<path class="ar ar-rebase" stroke-dasharray="5 4" d="M400,180 C420,235 600,232 660,260" marker-end="url(#m-lin)"/>
+<circle class="badge badge-rebase" cx="352" cy="238" r="9"/>
+<text class="badgetext" x="352" y="242" text-anchor="middle">1</text>
+<circle class="badge badge-rebase" cx="520" cy="224" r="9"/>
+<text class="badgetext" x="520" y="228" text-anchor="middle">2</text>
+<circle class="ldot ldot-version" cx="170" cy="70" r="9"/>
+<text class="ltext" x="170" y="52" text-anchor="middle">v1</text>
+<circle class="ldot ldot-version" cx="430" cy="70" r="9"/>
+<text class="ltext" x="430" y="52" text-anchor="middle">v2</text>
+<circle class="ldot ldot-save" cx="290" cy="170" r="8"/>
+<text class="ltext" x="290" y="155" text-anchor="middle">s1</text>
+<circle class="ldot ldot-from" cx="400" cy="170" r="8"/>
+<text class="ltext" x="400" y="155" text-anchor="middle">s2</text>
+<circle class="ldot ldot-save" cx="560" cy="270" r="8"/>
+<text class="ltext" x="560" y="300" text-anchor="middle">s1'</text>
+<circle class="ldot ldot-save" cx="670" cy="270" r="8"/>
+<text class="ltext" x="670" y="300" text-anchor="middle">s2'</text>
 </svg>'''
 
 
-frame("How zfs_rebase finds the base", diagram=False,
+STEPS = '''<div class="tablewrap"><table class="cast">
+<tr><th>step</th><th>from</th><th>onto</th><th>base</th><th>result</th></tr>
+<tr><td>1</td><td><code>nginx@s1</code></td><td><code>generic@v2</code></td>
+<td><code>generic@v1</code>, found from the origins</td>
+<td>a new clone of v2, <code>nginx-staging</code>; snapshotted as
+<b>s1'</b></td></tr>
+<tr><td>2</td><td><code>nginx@s2</code></td><td><code>nginx-staging</code>
+(the dataset)</td><td><code>nginx@s1</code>, named</td>
+<td>the same dataset, rebased in place; snapshotted as <b>s2'</b></td></tr>
+</table></div>'''
+
+frame("Two saves, two steps, two bases", diagram=False,
     before=p(
-	"shtetl names two snapshots and never the base. For the top dataset "
-	"of the tree:"),
-    panel=code(r'''
-zfs_rebase --from fast/shtetl/run/containers/nginx@save-2026-11-12-090000 \
-    --onto fast/shtetl/run/foundations/generic-15.1-releng@2026-11-12-5b2c7e01a9d4 \
-    --result fast/shtetl/run/containers/nginx-staging
-''') + '<div class="diagram">%s</div>' % lineage_svg(),
+	"<code>update.depth</code> is 0 here, so the update keeps the whole "
+	"history zrun holds: it replays s1, then s2, onto v2, one rebase per "
+	"save and dataset. zfs_rebase moves one snapshot at a time, so this "
+	"is how a container's saves survive an update."),
+    panel='<div class="diagram">%s</div>' % lineage_svg() + STEPS,
     after=p(
-	"The tool walks each side's origin chain. From's: <code>nginx@s2"
-	"</code>, then nginx's origin, <code>generic-15.1-releng@v1</code>, "
-	"then that dataset. Onto's: <code>generic-15.1-releng@v2</code>, then "
-	"that same dataset. The nearest dataset both descend from is the "
-	"foundation, and of the two snapshots the walks name there, v1 and "
-	"v2, the older is the base: <b>v1</b>. So the rebase replays "
-	"everything nginx changed since v1 onto v2, and nothing else. This is "
-	"why the pre-split in Act I mattered: <code>nginx/var</code> finds its "
-	"base the same way, through <code>generic-15.1-releng/var</code>."))
+	"<b>1</b> The first step names only from and onto. The tool walks "
+	"each side's origin chain: <code>nginx@s1</code>, then nginx's origin "
+	"<code>generic@v1</code>; <code>generic@v2</code>, the same dataset. "
+	"Of the two snapshots the walks name there, the older is the base: "
+	"v1. So step 1 replays everything nginx changed up to s1 onto v2, and "
+	"that is where the conflicts are.",
+	"<b>2</b> The second step names its base: s1. Left to derive it, the "
+	"tool would find v1 again (both origins still meet at the "
+	"foundation), and every conflict answered in step 1 would come back: "
+	"from still holds the admin's version of the file, onto the merged "
+	"one, and both differ from v1. With base s1, only what the admin "
+	"changed between s1 and s2 is replayed. Naming a base takes "
+	"<code>--allow-unrelated</code> today, which turns the tool's prune "
+	"off, so this step reads every file; planning.md Q-J proposes letting "
+	"the tool keep from's prune when the base is an earlier snapshot of "
+	"from's own dataset."))
 
 st.add("R/c/ns")
 st.tag("R/c/ns", "private mount, exit 1")
-frame("Rebase the top dataset",
+frame("Step 1, the top dataset: s1 onto v2",
     hl={"R/c/ns": "new"},
     arrows=[A("R/f/G", "R/c/ns", "rebase", 1, side="R", bulge=48, t=0.3),
 	A("R/c/n", "R/c/ns", "rebase", 2, side="R", bulge=24, t=0.5)],
     before=p(
 	"Parent first. zfs_rebase clones <b>1</b> onto (v2) as "
-	"<code>nginx-staging</code>, read-only to the world and mounted only "
-	"at its own private directory, and replays <b>2</b> from's changes "
-	"(s2 against the base v1) into it."),
+	"<code>nginx-staging</code>, mounted only at its own private "
+	"directory, and replays <b>2</b> from's changes (s1 against the base "
+	"v1) into it."),
+    panel=code(r'''
+zfs_rebase --from fast/shtetl/run/containers/nginx@save-2026-10-09-101500 \
+    --onto fast/shtetl/run/foundations/generic@15.1-releng-2026-11-12-5b2c7e01a9d4 \
+    --result fast/shtetl/run/containers/nginx-staging
+'''),
     after=p(
 	"Every clean action is applied first: the admin's nginx.conf, rc.conf "
 	"line, home directory and so on, and every file the errata changed "
@@ -990,9 +1042,9 @@ frame("Rebase the top dataset",
 
 RES0 = r'''
 #rebase-resolution 5
-#base fast/shtetl/run/foundations/generic-15.1-releng@2026-10-08-0f691888dc56 ...
-#from fast/shtetl/run/containers/nginx@save-2026-11-12-090000 ...
-#onto fast/shtetl/run/foundations/generic-15.1-releng@2026-11-12-5b2c7e01a9d4 ...
+#base fast/shtetl/run/foundations/generic@15.1-releng-2026-10-08-0f691888dc56 ...
+#from fast/shtetl/run/containers/nginx@save-2026-10-09-101500 ...
+#onto fast/shtetl/run/foundations/generic@15.1-releng-2026-11-12-5b2c7e01a9d4 ...
 #mode strict
 #names 6
 #unanswered 6
@@ -1036,18 +1088,17 @@ frame("At the gate: the derived files step aside", diagram=False,
 	"<code>spwd.db</code> are all generated from "
 	"<code>master.passwd</code>, so nobody should have to choose between "
 	"two versions of them: shtetl answers them <code>keep</code> and "
-	"remembers to regenerate them. But it cannot regenerate them yet, "
-	"because their source is itself still in conflict.") +
-	callout("finding", "Finding: the text has to be resolved first",
+	"remembers to regenerate them. It cannot regenerate them yet, because "
+	"their source is itself still in conflict.") +
+	callout("note", "The text first (ruled 2026-10-08)",
 	p("A derived file almost never conflicts alone: whoever changed the "
 	"binary changed its source too, and a source changed on both sides "
 	"is itself a conflict, since zfs_rebase never merges text on its "
-	"own. So the derivation can only run after the source has been "
-	"merged. Today that takes two passes at the gate (this frame and the "
-	"next two). With the merge drivers already designed in "
-	"future-features.md, a headless text driver that accepts only "
-	"conflict-free merges, followed by the derivation rules in the "
-	"order written, would do it all before the picker opens.")))
+	"own. So the derivation runs after the source has been merged: two "
+	"passes at the gate, this frame and the next two. zfs_rebase's "
+	"planned merge drivers (future-features.md) would do it headless "
+	"whenever the text merges cleanly, given rules that run in the order "
+	"written.")))
 
 PICKER = r'''
  nginx-staging                          3 of 6 unanswered
@@ -1097,108 +1148,130 @@ zfs_rebase --continue fast/shtetl/run/containers/nginx-staging
 	"agree with the merged <code>master.passwd</code>, and their lines "
 	"already say <code>keep</code>, which is exactly \"leave what is in "
 	"the tree\". <code>--continue</code> applies the rest, runs the final "
-	"check and reaches done. The tool hands the result back the way it "
-	"always does: unmounted, read-only, <code>mountpoint=none</code>. "
-	"Where it goes is shtetl's business, not the tool's."))
+	"check and reaches done: <code>nginx-staging</code> now holds s1's "
+	"tree on v2. The tool hands it back unmounted, read-only, "
+	"<code>mountpoint=none</code>; where it goes is shtetl's business."))
+
+st.tag("R/c/ns", "exit 0")
+st.snap(["R/c/ns"], "s1'")
+st.snap(["R/c/ns"], "s2'")
+frame("Step 2, the top dataset: s2 onto the result",
+    hl={"R/c/ns": "snap"},
+    arrows=[A("R/c/n", "R/c/ns", "rebase", 1, side="R", bulge=24)],
+    panel=code(r'''
+zfs_rebase --allow-unrelated \
+    --base fast/shtetl/run/containers/nginx@save-2026-10-09-101500 \
+    --from fast/shtetl/run/containers/nginx@save-2026-11-12-090000 \
+    --onto fast/shtetl/run/containers/nginx-staging \
+    --result save-2026-10-09-101500
+    ... done, verified: exit 0
+
+zfs snapshot -o shtetl:kind=save -o shtetl:replayed-from=<guid of nginx@s2> \
+    -o shtetl:commit="update to generic@15.1-releng-2026-11-12-5b2c7e01a9d4" \
+    fast/shtetl/run/containers/nginx-staging@save-2026-11-12-090000
+'''),
+    after=p(
+	"<b>1</b> The dataset form: onto is <code>nginx-staging</code> "
+	"itself, and the snapshot the tool takes of it before applying "
+	"anything, named by <code>--result</code>, is exactly s1 replayed "
+	"onto v2: <b>s1'</b>, under s1's own name. With base s1, only what "
+	"changed in nginx between s1 and s2 is applied, which in the top "
+	"dataset is nearly nothing (the logs are in <code>var</code>). No "
+	"conflict: the six answered in step 1 are not asked again, because "
+	"the admin did not touch those files after s1. Then shtetl takes "
+	"<b>s2'</b> under s2's name. Both carry the originals' messages and "
+	"<code>shtetl:replayed-from</code>."))
 
 st.tag("R/c/ns", "")
 st.add(*T("R/c/ns", TREEW))
 st.mounted |= set(T("R/c/ns", ["", "/tmp", "/usr/local", "/var", "/www"]))
-st.tag("R/c/ns", "")
 st.tag("R/c/ns/usr", "canmount=off")
 st.tag("R/c/ns/www", "clone of nginx/www@s2")
+st.snap(T("R/c/ns", TREE[1:]), "s1'")
+st.snap(T("R/c/ns", TREE[1:]), "s2'")
 st.snap(T("R/c/ns", TREEW), "v2")
-frame("The children, www, and placing the tree",
+st.tag("R/c/ns", "jail")
+frame("The children, www, and starting the new tree",
     hl={r: "new" for r in T("R/c/ns", TREEW)},
     arrows=[A("R/f/G/var", "R/c/ns/var", "rebase", 1, side="R", bulge=56,
 	t=0.25),
 	A("R/c/n/var", "R/c/ns/var", "rebase", None, side="R", bulge=34),
 	A("R/c/n/www", "R/c/ns/www", "clone", 2, side="R", bulge=20)],
     before=p(
-	"<b>1</b> The children rebase the same way, each into the matching "
+	"<b>1</b> Each child replays the same two steps into the matching "
 	"name under <code>nginx-staging</code>: <code>tmp</code>, "
 	"<code>usr</code>, <code>usr/local</code> and <code>var</code> (one "
-	"drawn; each derives its own base through the foundation's matching "
-	"dataset). None conflicts: the errata did not touch what nginx "
-	"changed there, so each exits 0. Logs and the pkg database in "
-	"<code>var</code> are replayed onto the new base's <code>var</code>."),
+	"drawn). Step 1 finds each child's base through the foundation's "
+	"matching dataset; step 2 names the child's own s1. None conflicts. "
+	"<code>var</code>'s logs and pkg database land on the new base's "
+	"<code>var</code>."),
     after=p(
 	"<b>2</b> <code>www</code> has no foundation counterpart and nothing "
-	"in a foundation update touches it, so its whole \"rebase\" is "
-	"<code>zfs clone nginx/www@s2 nginx-staging/www</code>.",
+	"in a foundation update touches it, so it is never replayed: its "
+	"whole \"rebase\" is <code>zfs clone nginx/www@s2 "
+	"nginx-staging/www</code>.",
 	"Then shtetl places the tree (<code>zfs inherit mountpoint</code>, "
 	"<code>readonly=off</code>) so it mounts at "
-	"<code>/containers/nginx-staging</code>, and snapshots it with the "
-	"version it now sits on: <code>@2026-11-12-5b2c7e01a9d4</code> "
-	"(<b>v2</b>, <code>shtetl:kind=version</code>). Whether a rebase may "
-	"create its result under another rebase's result is probe P4."))
+	"<code>/containers/nginx-staging</code>, snapshots it with the version "
+	"it now sits on (<b>v2</b>, <code>shtetl:kind=version</code>), and "
+	"starts it as a jail with nginx's own settings, address included: "
+	"nginx is stopped, so nothing collides. Whether a rebase may create "
+	"its result under another rebase's result is probe P4; the replay "
+	"step is P14."))
 
-st.tag("R/c/ns", "jail")
 st.snap(T("L/c/n", TREEW), "s2")
 st.add(*T("L/c/ns", TREEW))
-st.snap(T("L/c/ns", TREEW[:-1]), "v2")
+for s in TREE:
+	st.pills["L/c/ns" + s] = ["s1'", "s2'", "v2"]
+st.pills["L/c/ns/www"] = ["v2"]
 st.snap(T("L/c/ns", TREEW), "s3")
 st.snap(T("R/c/ns", TREEW), "s3")
-frame("Soak: old and new side by side",
+frame("Soak",
     hl=dict({r: "new" for r in T("L/c/ns", TREEW)},
 	**{"R/c/ns": "write"}),
     arrows=[A("R/c/n", "L/c/n", "save", 1),
 	A("R/c/ns", "L/c/ns", "save", 2),
 	A("L/c/n/www", "L/c/ns/www", "clone", 3, side="L", bulge=26)],
     before=p(
-	"shtetl writes a jail block for <code>nginx-staging</code> and starts "
-	"it. Both jails run. The admin tries the new one for as long as they "
-	"like; a <code>shtetl pkg-upgrade nginx-staging</code> here would add "
-	"a <code>-pkg</code> snapshot, so the plain and upgraded states would "
-	"both be there to pick from."),
+	"nginx-staging serves; nginx sits stopped and untouched. The admin "
+	"tries the new tree for as long as they like. If it misbehaves, "
+	"<code>shtetl abandon nginx</code> stops and destroys the staging tree "
+	"and starts nginx again exactly as it was. A <code>shtetl pkg-upgrade "
+	"nginx-staging</code> here would add a <code>-pkg</code> snapshot, so "
+	"the plain and upgraded states would both be there to pick from."),
     after=p(
-	"Saving the staging tree mirrors it into zlake. <b>1</b> First "
-	"nginx's from-snapshot s2 goes to zlake if it is not there yet "
-	"(<code>send -i s1 s2</code>), because <b>3</b> the mirror of "
+	"Saving the staging tree, <b>s3</b> \"soak start\", mirrors it into "
+	"zlake. <b>1</b> First nginx's s2 goes to zlake if it is not there "
+	"yet (<code>send -i s1 s2</code>), because <b>3</b> the mirror of "
 	"<code>nginx-staging/www</code> is a clone of zlake's "
-	"<code>nginx/www@s2</code>, exactly as on zrun. <b>2</b> The rebased "
-	"datasets go as clone streams of zlake's foundation <code>@v2</code>. "
-	"The staging save is <b>s3</b>, \"soak start\".") +
-	callout("question", "Open question Q-C",
-	p("Both jails want <code>10.0.0.5</code>. How does the staging jail "
-	"reach the network while the old one holds the address and ports: "
-	"an address from a pool in shtetl.conf, its own vnet, or not started "
-	"automatically?")))
+	"<code>nginx/www@s2</code>, exactly as on zrun. <b>2</b> The replayed "
+	"datasets go as clone streams of zlake's foundation <code>@v2</code>, "
+	"carrying s1', s2' and v2 with them (<code>send -I</code>)."))
 
 CUTWARN = r'''
 $ shtetl cutover nginx
-nginx was written after the update started (written@s2):
-    nginx/var     1.4M     (logs)
-    nginx/www       0
-    nginx           0
-These changes are not in nginx-staging. They will be kept in the archive.
-cut over? [y/N] y
+nginx has not been written since the update started (written@s2 = 0).
+cut over to nginx-staging? [y/N] y
 '''
 
-st.snap(T("R/c/n", TREEW), "s4")
-st.snap(T("L/c/n", TREEW), "s4")
-st.tag("R/c/n", "/containers/nginx  stopped")
 st.tag("R/c/ns", "stopped")
 frame("Cutover on zrun",
     before=p(
 	"The soak went well. Cutover is the admin's decision, made by "
-	"command."),
+	"command. nginx has been stopped since s2, so there is nothing to "
+	"reconcile; had the admin started it again during the soak, shtetl "
+	"would say how much it wrote and ask."),
     panel=code(CUTWARN),
-    hl=dict({r: "gone" for r in T("R/c/n", TREEW)},
-	**{"R/c/ns/www": "write"}),
-    arrows=[A("R/c/n", "L/c/n", "save", 1),
-	A("R/c/n/www", "R/c/ns/www", "promote", 2, side="R", bulge=18),
-	A("R/c/ns", "R/c/n", "rename", 3, side="R", bulge=40)],
+    hl={r: "gone" for r in T("R/c/n", TREEW)},
+    arrows=[A("R/c/n/www", "R/c/ns/www", "promote", 1, side="R", bulge=18),
+	A("R/c/ns", "R/c/n", "rename", 2, side="R", bulge=40)],
     after=p(
-	"shtetl stops both jails. <b>1</b> A final save of the old nginx, "
-	"<b>s4</b>, \"final before cutover\", goes to zlake, so the archive "
-	"will hold what it wrote after s2. <b>2</b> "
-	"<code>zfs promote nginx-staging/www</code>: the clone takes over "
-	"<code>www</code>'s snapshots up to s2, so the site's history moves "
-	"with it, and the old <code>www</code> is left holding only s4 "
-	"(probe P11). Then the old tree is destroyed on zrun; it lives on in "
-	"zlake. <b>3</b> <code>zfs rename nginx-staging nginx</code>. "
-	"Mountpoints follow by inheritance, so the new tree is now at "
+	"shtetl stops the staging jail. <b>1</b> <code>zfs promote "
+	"nginx-staging/www</code>: the clone takes over <code>www</code>'s "
+	"snapshots up to s2, so the site's history moves with it (probe "
+	"P11). Then the old tree is destroyed on zrun; it lives on in zlake. "
+	"<b>2</b> <code>zfs rename nginx-staging nginx</code>. Mountpoints "
+	"follow by inheritance, so the new tree is now at "
 	"<code>/containers/nginx</code>; the jail block is renamed and the "
 	"jail started."))
 
@@ -1209,10 +1282,8 @@ st.pills["R/c/n/www"] = promoted
 st.tag("R/c/n", "/containers/nginx  jail")
 st.tag("R/c/n/www", "promoted")
 
-# zlake, first move: the mirror's www is promoted the same way, then the
-# old mirror becomes the archive.
 st.pills["L/c/ns/www"] = ["s1", "s2"] + st.pills.get("L/c/ns/www", [])
-st.pills["L/c/n/www"] = ["s4"]
+st.pills["L/c/n/www"] = []
 st.add(*T("L/a/c/n", TREEW))
 for s in TREEW:
 	st.pills["L/a/c/n" + s] = list(st.pills.get("L/c/n" + s, []))
@@ -1229,8 +1300,8 @@ frame("Cutover in zlake: the old mirror is archived",
 	"<b>1</b> <code>zfs rename</code> of the old mirror to "
 	"<code>archive/containers/nginx-2026-11-20</code>. Same pool, so it "
 	"is a rename and copies nothing. The archive keeps the old tree "
-	"whole, s4 and its 1.4M of logs included, until "
-	"<code>retention.archive</code> (one year here) prunes it."))
+	"whole, on v1 with s1 and s2, until <code>retention.archive</code> "
+	"(one year here) prunes it."))
 
 st.drop(*T("L/c/n", TREEW))
 st.rename("L/c/ns", "L/c/n", TREEW)
@@ -1245,8 +1316,8 @@ frame("Cutover in zlake: the staging mirror becomes nginx",
 	"<b>1</b> <code>zfs rename</code> of <code>containers/nginx-staging"
 	"</code> to <code>containers/nginx</code>, matching zrun. zlake's "
 	"<code>nginx</code> is now a clone of zlake's foundation "
-	"<code>@v2</code>, and its <code>www</code> carries the site's whole "
-	"history.") +
+	"<code>@v2</code> carrying s1' and s2', and its <code>www</code> "
+	"carries the site's whole history.") +
 	callout("note", "Drawn as done, still to be proven",
 	p("These moves rest on ZFS behaviour this page assumes: that a clone "
 	"stream lands as a clone (probe P1), that a child keeps receiving "
@@ -1260,39 +1331,41 @@ st.snap(T("R/c/n", TREEW), "s5")
 st.snap(T("L/c/n", TREEW), "s5")
 LOG = r'''
 $ shtetl log nginx
-nginx                     on generic-15.1-releng@2026-11-12-5b2c7e01a9d4
-  @save-2026-11-20-181500  cut over to 2026-11-12-5b2c7e01a9d4
-  @save-2026-11-12-094500  soak start
-  @2026-11-12-5b2c7e01a9d4 version
-  www also carries         @save-2026-11-12-090000, @save-2026-10-09-101500
+nginx                          on generic@15.1-releng-2026-11-12-5b2c7e01a9d4
+  @save-2026-11-20-181500      cut over
+  @save-2026-11-12-094500      soak start
+  @15.1-releng-2026-11-12-...  version
+  @save-2026-11-12-090000      update to ...           replayed from nginx@s2
+  @save-2026-10-09-101500      site live, ploni added  replayed from nginx@s1
 archive/containers/nginx-2026-11-20
-                          on generic-15.1-releng@2026-10-08-0f691888dc56
-  @save-2026-11-20-180000  final before cutover
-  @save-2026-11-12-090000  update to generic-15.1-releng@2026-11-12-5b2c7e01a9d4
-  @save-2026-10-09-101500  site live, ploni added
+                               on generic@15.1-releng-2026-10-08-0f691888dc56
+  @save-2026-11-12-090000      update to ...
+  @save-2026-10-09-101500      site live, ploni added
 '''
 frame("Where everything stands",
     hl={r: "snap" for r in T("R/c/n", TREEW) + T("L/c/n", TREEW)},
     arrows=[A("R/c/n", "L/c/n", "save", 1)],
     before=p(
 	"The end of one cycle. nginx runs on v2 with everything the admin "
-	"did, merged with everything the errata did. <b>1</b> Its first save "
-	"after cutover, <b>s5</b>, \"cut over to 2026-11-12-5b2c7e01a9d4\", "
-	"goes to the renamed mirror as an ordinary incremental. zlake holds "
-	"the foundation's two versions, a mirror of nginx as of that save, "
-	"and the old tree in the archive."),
+	"did, merged with everything the errata did, and with its history: "
+	"s1 and s2 replayed as s1' and s2'. <b>1</b> Its first save after "
+	"cutover, <b>s5</b>, \"cut over\", goes to the renamed mirror as an "
+	"ordinary incremental."),
     after=p(
-	"The next errata starts again at Act III: build into the same "
-	"foundation, send the increment, update into staging, soak, cut over. "
-	"Nothing in the cycle needed git beyond the recipes repo, and nothing "
-	"was written into a running tree except by the admin and the jail's "
-	"own <code>pkg</code> and <code>commands</code> at creation.",
-	"A proposal from planning.md section 8, for following a container "
-	"across its updates:") + code(LOG) +
-	callout("question", "Open question Q-E",
-	p("How much of this history to keep: every archive forever (the "
-	"retention default of 0), archives pruned by age as here, or only "
-	"the live tree and the foundation chain?")))
+	"The next errata, or the next release, starts again at Act III: "
+	"build into the same foundation, send the increment, stop, replay "
+	"into staging, soak, cut over. Nothing in the cycle needed git beyond "
+	"sharing recipes, and nothing was written into a running tree except "
+	"by the admin and by the jail's own <code>pkg</code> and "
+	"<code>commands</code> at creation.",
+	"Following a container across its updates (a proposal, planning.md "
+	"section 8):") + code(LOG) +
+	callout("note", "Three policies decide how much of this is kept",
+	p("<code>retention.run</code>: the saves on zrun, and zlake's mirror "
+	"keeps the same. <code>retention.archive</code>: the retired trees. "
+	"<code>update.depth</code>: how many saves an update replays, never "
+	"more than zrun keeps. Each is 0 (everything), a number, or a quoted "
+	"interval such as <code>\"7d\"</code>.")))
 
 
 # -- page ------------------------------------------------------------------
@@ -1459,16 +1532,18 @@ CAST = [
 	("zlake", "<code>tank/shtetl</code>"),
 	("zrun", "<code>fast/shtetl/run</code>; containers at "
 	    "<code>/containers</code>"),
-	("F", "foundation <code>generic-15.1-releng</code>"),
-	("v1", "<code>@2026-10-08-0f691888dc56</code>, first build"),
-	("v2", "<code>@2026-11-12-5b2c7e01a9d4</code>, after an errata"),
+	("F", "foundation <code>generic</code>, named after its recipe"),
+	("v1", "<code>@15.1-releng-2026-10-08-0f691888dc56</code>, first "
+	    "build"),
+	("v2", "<code>@15.1-releng-2026-11-12-5b2c7e01a9d4</code>, after an "
+	    "errata"),
 	("s1", "<code>@save-2026-10-09-101500</code> \"site live, ploni "
 	    "added\""),
 	("s2", "<code>@save-2026-11-12-090000</code>, where the update starts"),
+	("s1', s2'", "s1 and s2 replayed onto v2 by the update, under the "
+	    "same names"),
 	("s3", "<code>@save-2026-11-12-094500</code> \"soak start\" "
 	    "(staging)"),
-	("s4", "<code>@save-2026-11-20-180000</code> \"final before "
-	    "cutover\" (old)"),
 	("s5", "<code>@save-2026-11-20-181500</code> \"cut over\" (new)"),
 ]
 
@@ -1482,8 +1557,8 @@ def page():
 	out.append('<h1>shtetl, one cycle</h1>')
 	out.append('<p class="sub">A foundation is built, a container is made '
 	    'from it, and the container is moved onto the foundation\'s next '
-	    'version: every operation, frame by frame. Draft of 2026-10-08, '
-	    'following planning.md draft 2. Generated by '
+	    'version: every operation, frame by frame. Draft of 2026-10-09, '
+	    'following planning.md draft 3. Generated by '
 	    '<code>tools/story.py</code>.</p>')
 	toc = ['<nav class="toc">']
 	for f in frames:
