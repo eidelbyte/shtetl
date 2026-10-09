@@ -1,6 +1,7 @@
 # shtetl: planning
 
-Status: draft 3, 2026-10-09. Nothing here is built. Drafts 1
+Status: draft 3, 2026-10-09 (amended the same day with the answers to
+H - M). Nothing here is built. Drafts 1
 (2026-10-04) and 2 (2026-10-08) were reviewed and the rulings are
 folded in; section 14 lists them so each can be traced. Sections marked PROPOSAL still need a ruling;
 section 15 collects the open questions.
@@ -552,7 +553,9 @@ A new release is an update like any other: a recipe moved from
 new version is `@15.2-releng-...`. Installing a newer world over an
 older one and running delete-old is FreeBSD's own source-upgrade path.
 The datasets of every version of a foundation must match the previous
-version's (checked; Q-I asks whether they may ever change).
+version's (checked). They are fixed for the foundation's life (ruled
+2026-10-09): a different split is a different foundation recipe, and
+moving containers to it is out of scope (14, L).
 
 Then, separately and optionally, `shtetl pkg-upgrade F`: pkg upgrade
 in a chroot, snapshot `-pkg`. Base and base-plus-packages are both
@@ -580,9 +583,12 @@ mountpoint none.
 `shtetl create X --on F [--version V]`.
 
 1. Checks, beyond parse and schema: X's recipe `ver` allows F's newest
-   version (or V); X keeps every dataset F splits (ruled 2026-10-09: a
-   container or system cannot drop a dataset its foundation provides);
-   X's own datasets do not collide with F's.
+   version (or V); X's own datasets do not collide with F's; and every
+   list F provides is kept. Lists are additive; a recipe that overrides
+   one (`reset`, or `name = false` for an inherited element) must still
+   end with a superset of F's: every dataset F splits and every package
+   F installed (ruled 2026-10-09). F's lists at version V are its recipe
+   as of the config snapshot V records in `shtetl:config`.
 2. The foundation version on zrun (7.3), building it first if asked.
 3. `zfs clone` each dataset of `F@vN` to the matching name under
    `containers/X` (clone is not recursive; one per dataset).
@@ -612,31 +618,27 @@ a 15.2 target at check time.
 
 1. Checks: the target is on zrun (7.3) and its datasets match X's
    current version's; no staging tree for X exists; no open rebase.
-2. Preview (PROPOSAL, Q-K), while X still runs: `zfs_rebase --dry-run`
-   of the first replay step on a fresh snapshot writes the manifest and
-   creates and holds nothing, so the admin sees the conflicts before
-   any downtime.
-3. **Stop X** (ruled 2026-10-09). X stays stopped until cutover or
+2. **Stop X** (ruled 2026-10-09). X stays stopped until cutover or
    abandon. Nothing writes to it during the update, so the staging
    tree cannot drift from it, and X is the rollback.
-4. From-snapshot: a save of X (7.5 step 1), message "update to
+3. From-snapshot: a save of X (7.5 step 1), message "update to
    F@<version>".
-5. Replay, per dataset inherited from F, parent first, into
+4. Replay, per dataset inherited from F, parent first, into
    `containers/X-staging/d` (7.6.1, 7.6.2). Backing out runs `--abort`
    on every rebase this update started.
-6. Container-only datasets: `zfs clone X/www@<from> X-staging/www`.
+5. Container-only datasets: `zfs clone X/www@<from> X-staging/www`.
    Nothing in a foundation update touches them, so a clone is the
    whole of their "rebase"; it is promoted at cutover (7.9).
-7. Place: the tool hands results back unmounted, readonly,
+6. Place: the tool hands results back unmounted, readonly,
    mountpoint none, and never places them. shtetl does `zfs inherit
    mountpoint` and `readonly=off`, so the tree mounts at
    `/containers/X-staging` by inheritance.
-8. Snapshot X-staging with the version name of the target (6.1).
-9. Start X-staging with X's own jail settings, address included: X is
+7. Snapshot X-staging with the version name of the target (6.1).
+8. Start X-staging with X's own jail settings, address included: X is
    stopped, so nothing collides.
-10. Save X-staging (7.10 mirrors it into zlake). This first sends X's
-    from-snapshot to zlake if it is not there yet: the mirror's
-    container-only children are clones of it.
+9. Save X-staging (7.10 mirrors it into zlake). This first sends X's
+   from-snapshot to zlake if it is not there yet: the mirror's
+   container-only children are clones of it.
 
 The suffix is `update.suffix` in shtetl.conf, `staging` by default.
 
@@ -666,15 +668,29 @@ history across an update means replaying its saves in order (ruled
              replayed s(k-1)
     last     snapshot X-staging/d with sn's name
 
-**Why step k names its base.** Left to derive it, the tool would walk
-both origins back to the foundation again and take `F/d@<X's version>`
-every time. Then every conflict answered in step 1 would come back in
-every later step: from still holds the admin's version of the file,
-onto holds the merged one, and both differ from the old foundation's.
-With base `s(k-1)`, a file the admin did not touch between s(k-1) and
-sk is from = base, so onto's (already answered) version stands; only
-files the admin changed in that step can conflict, and those are
-genuine.
+**Why step k names its base** (disputed 2026-10-09, Q-J). The chain
+of from snapshots is the user's scheme unchanged: s1, s2, ... each
+replayed onto the result so far. Only the base of step k is at issue.
+Left to derive it, the tool walks both origins back to the foundation
+and takes `F/d@<X's version>`, the divergence point, at every step.
+That is right for step 1 and wrong after it, because onto is no longer
+the foundation but the result so far, which already holds s1. Two
+cases, with the foundation update leaving `rc.conf` alone:
+
+- A file edited twice. The admin adds line A to `rc.conf` before s1
+  and line B before s2. Step 2 with base v0: base has neither line,
+  from has A and B, onto (s1') has A. Both sides changed the file
+  differently from base: a conflict, though the admin only added B.
+  With base s1: base has A, from A and B, onto A; only from changed,
+  and B goes in cleanly.
+- A conflict already answered. `master.passwd` conflicted in step 1
+  and was merged into M; the admin did not touch it after s1. Step 2
+  with base v0: from holds the admin's version, onto holds M, both
+  differ from v0: the same conflict again, and again at every later
+  step. With base s1: from equals base, so M stands.
+
+This is how git replays a branch: each commit is cherry-picked with its
+own parent as the merge base, not the branch point.
 
 **Cost.** `--allow-unrelated` turns the tool's prune off, so each step
 after the first reads every file of the dataset on all three sides.
@@ -721,7 +737,7 @@ once the source is merged, so the text goes first (ruled 2026-10-08):
 4. `zfs_rebase --continue IDENT`: applying2, the final check, done.
 5. A source answered `from` reaches the tree only in applying2, so its
    derivation runs after done instead, before the result is placed
-   (7.6 step 5).
+   (7.6 step 6).
 
 Derivations run only here. A derived file that is not conflicted is
 consistent with its source already: whichever side changed the text
@@ -795,20 +811,9 @@ The same as containers, except:
 - soak: boot S-staging once (the one-shot mechanism `bectl activate -t`
   uses), and come back to outer space to cut over or abandon.
 
-Two ways to reach outer space, under discussion:
-
-1. `reboot -r` into a root-on-RAM system (the user's doc on this is
-   pending), update and cut over from there.
-2. A shutdown hook: the last thing before power-off, with services
-   stopped. It needs two things. Renaming a root that is still mounted
-   is possible with `zfs rename -u`, which does not remount (checked in
-   OpenZFS's zfs-rename.8; bectl relies on it). And the hook cannot
-   wait for a person at a conflicts gate. So: a trial update while the
-   system runs, with every conflict answered by hand and the answers
-   recorded, keyed by name and the hashes of base, from and onto; then
-   at shutdown the real update replays the recorded answers through a
-   merge driver (zfs_rebase's planned merge drivers), and if anything
-   new conflicts it aborts and the old system boots as before (Q-M).
+Outer space is a root-on-RAM system reached with `reboot -r` (ruled
+2026-10-09; the user's doc on it is pending). A shutdown hook was
+considered and declined.
 
 ### 7.12 Restore
 
@@ -846,7 +851,7 @@ Facts from the tool's README that shape shtetl:
   step 2). The one exception is `--allow-unrelated --base`, which
   history replay uses for every step after the first (7.6.2).
 - Clone form (`--onto` a snapshot) creates `--result` and never places
-  it. shtetl places results in the staging tree (7.6 step 5).
+  it. shtetl places results in the staging tree (7.6 step 6).
 - The resolution document is the interface for 7.7: shtetl writes
   `keep` lines into it and runs `--continue`.
 - The tool holds its input snapshots for the life of the rebase and
@@ -921,8 +926,8 @@ Receive the new X as a clone of F@v2 at a new name, move www under it,
 destroy the old X, rename the new X into place. Does `send -i www@s1
 www@s2` still receive?
 
-P3. P2 on zrun with clone and promote instead of move (7.6 step 4,
-7.9 step 4).
+P3. P2 on zrun with clone and promote instead of move (7.6 step 5,
+7.9 step 3).
 
 P4. zfs_rebase with `--result containers/X-staging/var` while
 X-staging is itself the result of an open rebase: accepted? Do the
@@ -974,7 +979,6 @@ delete-old, then rebase a container from 15.1 onto it.
 - C: a container is stopped for its update; the staging tree takes its
   address; the old tree stays stopped as the rollback.
 - D: systems are updated entirely from outer space, cutover included.
-  A shutdown hook is an idea to explore.
 - E: three policies, `retention.run` (zlake's mirror follows it),
   `retention.archive` and `update.depth`; history moves forward by
   replaying saves one at a time; container-only datasets never need
@@ -985,6 +989,18 @@ delete-old, then rebase a container from 15.1 onto it.
   fit. A foundation dataset is `{recipe}`, and the version is in the
   snapshot name, `@{ver}-{branch-type}-{ISO-date}-{short-sha}[-pkg]`,
   so a new release continues the same dataset.
+
+### 2026-10-09 (questions H - M of draft 3)
+
+- H: lists are additive. A recipe that overrides a list the foundation
+  provides must still end with a superset of it: datasets and packages
+  alike.
+- I: a foundation's datasets are fixed for its life.
+- K: no dry-run preview before an update.
+- L: moving a container to a different foundation recipe is out of
+  scope: there is no common base to rebase on.
+- M: systems use outer space (a RAM root after `reboot -r`); no
+  shutdown hook.
 
 ### 2026-10-08 (questions on the story)
 
@@ -1019,35 +1035,17 @@ delete-old, then rebase a container from 15.1 onto it.
 
 ## 15. Open questions
 
-Q-H. Rule F covers datasets. Should a container recipe that sets
-`pkg { x = false; }` for a package its foundation installed also be an
-error? It cannot uninstall anything from the foundation. Proposal: yes,
-the same rule.
-
-Q-I. May a foundation's datasets change between versions? A version
-that adds a split (say `home`) would leave every existing container
-with `/home` inside its root dataset and nothing to rebase it onto, and
-one that drops a split would leave containers with a dataset whose base
-is gone. Proposal: the datasets are fixed for a foundation's life; a
-different split is a different foundation recipe.
-
-Q-J. History replay (7.6.2) works today with `--allow-unrelated
---base`, at the cost of reading every file in every step after the
-first. Should zfs_rebase learn to take an explicit base from from's own
-lineage and keep from's prune, so a step costs about the size of its own
-changes?
-
-Q-K. The update preview (7.6 step 2): a dry run while the container
-still runs, so the conflicts and the length of the downtime are known
-before it starts. Wanted?
-
-Q-L. Moving a container to a different foundation recipe (generic to
-gaming) shares no lineage, so it is not an update. A new container
-from the same recipe with its data datasets moved across, or out of
-scope?
-
-Q-M. The shutdown hook for systems (7.11, way 2): develop it now, or
-wait for the RAM-root doc?
+Q-J (disputed). History replay: the base of step 2 and later. The user
+holds that the base is always the divergence point, the foundation
+version X was cloned from. This plan holds that the divergence point is
+the base of step 1 only, and that each later step needs the previous
+save as its base, or files the admin edited in more than one save and
+conflicts already answered in step 1 come back as conflicts at every
+later step. 7.6.2 works both cases through. If the plan is right, a
+second question follows: naming a base needs `--allow-unrelated`,
+which turns the prune off; should zfs_rebase accept a base that is an
+earlier snapshot of from's own dataset and keep from's prune, so a
+step costs about its own changes?
 
 ## 16. Dropped from parasa
 

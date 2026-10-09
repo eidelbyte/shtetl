@@ -520,9 +520,8 @@ P14) before this design is committed.</p>
 mountpoint=/</code> and a one-shot boot; children mount at
 <code>/var</code>, <code>/usr/local</code> and so on by inheritance. A
 system is never updated while it runs: everything, cutover included,
-happens from outer space, either a RAM root after <code>reboot -r</code>
-or, under discussion, a shutdown hook. The soak is a one-shot boot into
-the staging tree.</p>
+happens from outer space, a RAM root reached with <code>reboot -r</code>.
+The soak is a one-shot boot into the staging tree.</p>
 
 <h2>Configuration</h2>
 

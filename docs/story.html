@@ -651,7 +651,7 @@ EOD</code></pre></div>
 <li><span class="cs cs-ok">ok</span><span>datasets: <code>tmp</code>, <code>usr</code>, <code>usr/local</code>, <code>var</code> exist in the foundation and will be clones; <code>www</code> is container-only</span></li>
 <li><span class="cs cs-ok">ok</span><span>derivation sources exist in v1 (<code>etc/master.passwd</code>, <code>etc/login.conf</code>)</span></li>
 <li><span class="cs cs-ok">ok</span><span>the name <code>nginx</code> is free on zrun and in the zlake mirror</span></li>
-<li><span class="cs cs-ok">ok</span><span>nginx keeps every dataset the foundation splits; a recipe cannot drop one (<code>tmp = false</code> would be an error, ruled 2026-10-09)</span></li>
+<li><span class="cs cs-ok">ok</span><span>nginx ends with a superset of what the foundation provides: lists are additive, and dropping a dataset the foundation splits (<code>tmp = false</code>) or a package it installed would be an error</span></li>
 </ul></div><pre class=""><code>$ shtetl config show containers/nginx
 kind         container
 foundation   generic (chosen with --on), newest version
@@ -1747,14 +1747,12 @@ staging     fast/shtetl/run/containers/nginx-staging: free
 rebases     none open for nginx
 history     update.depth = 0: replay every save zrun holds (s1), then the
             snapshot taken at the stop
-preview     zfs_rebase --dry-run of step 1, nginx still running:
-            nginx: 6 conflicts; tmp, usr, usr/local, var: none
 plan        stop nginx, snapshot, replay into nginx-staging, clone www,
             start nginx-staging
 
 nginx will be stopped now and stays stopped until cutover or abandon.
 proceed? [y/N] y</code></pre>
-<p>The preview is a proposal (planning.md Q-K): a dry run writes the manifest and creates and holds nothing, so the admin knows how much will need answering, and so roughly how long nginx will be down, before it stops.</p>
+
 </section>
 <section class="frame" id="f20">
 <div class="fnum">Frame 20</div><h3>Stop nginx, then snapshot: s2</h3>
@@ -1970,7 +1968,7 @@ zfs snapshot -r -o shtetl:kind=save \
 <td>the same dataset, rebased in place; snapshotted as <b>s2'</b></td></tr>
 </table></div>
 <p><b>1</b> The first step names only from and onto. The tool walks each side's origin chain: <code>nginx@s1</code>, then nginx's origin <code>generic@v1</code>; <code>generic@v2</code>, the same dataset. Of the two snapshots the walks name there, the older is the base: v1. So step 1 replays everything nginx changed up to s1 onto v2, and that is where the conflicts are.</p>
-<p><b>2</b> The second step names its base: s1. Left to derive it, the tool would find v1 again (both origins still meet at the foundation), and every conflict answered in step 1 would come back: from still holds the admin's version of the file, onto the merged one, and both differ from v1. With base s1, only what the admin changed between s1 and s2 is replayed. Naming a base takes <code>--allow-unrelated</code> today, which turns the tool's prune off, so this step reads every file; planning.md Q-J proposes letting the tool keep from's prune when the base is an earlier snapshot of from's own dataset.</p>
+<p><b>2</b> The second step names its base: s1. Left to derive it, the tool would find v1, the divergence point, again (both origins still meet at the foundation). But onto is now the result so far, which already holds s1: with base v1, a file the admin edited both before s1 and before s2 would look changed on both sides and conflict, and every conflict answered in step 1 would come back, since from still holds the admin's version, onto the merged one, and both differ from v1. With base s1, only what the admin changed between s1 and s2 is replayed, the way git replays each commit against its own parent. This step is disputed (planning.md Q-J). Naming a base takes <code>--allow-unrelated</code> today, which turns the tool's prune off, so this step reads every file.</p>
 </section>
 <section class="frame" id="f22">
 <div class="fnum">Frame 22</div><h3>Step 1, the top dataset: s1 onto v2</h3>

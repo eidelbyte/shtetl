@@ -289,10 +289,10 @@ with the file and line each value came from.
     }
 
 Merged for nginx: pkg = sudo, nginx; datasets = tmp, var, usr/local,
-www; commands = nginx. A container cannot drop a dataset its foundation
-splits, so `tmp = false` here would be an error (planning.md 14, F);
-whether `tmux = false` should be one too, when the foundation installed
-tmux, is planning.md Q-H.
+www; commands = nginx. Lists are additive, and a container must end
+with a superset of what its foundation provides: `tmp = false` here
+would be an error, and so would `tmux = false` if the foundation
+installed tmux (planning.md 14).
 
 A container recipe names no foundation: `ver` says which foundations it
 fits, and the foundation is chosen with `shtetl create nginx --on

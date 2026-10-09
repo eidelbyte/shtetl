@@ -689,9 +689,10 @@ frame("The container recipe, checked", diagram=False,
 	    "</code>, <code>etc/login.conf</code>)"),
 	("ok", "the name <code>nginx</code> is free on zrun and in the zlake "
 	    "mirror"),
-	("ok", "nginx keeps every dataset the foundation splits; a recipe "
-	    "cannot drop one (<code>tmp = false</code> would be an error, "
-	    "ruled 2026-10-09)"),
+	("ok", "nginx ends with a superset of what the foundation provides: "
+	    "lists are additive, and dropping a dataset the foundation splits "
+	    "(<code>tmp = false</code>) or a package it installed would be an "
+	    "error"),
     ]) + code(NGINX_SHOW),
     after=callout("note", "Recipes are not tied to a foundation",
 	p("A recipe says which versions it fits with <code>ver</code> and "
@@ -909,8 +910,6 @@ staging     fast/shtetl/run/containers/nginx-staging: free
 rebases     none open for nginx
 history     update.depth = 0: replay every save zrun holds (s1), then the
             snapshot taken at the stop
-preview     zfs_rebase --dry-run of step 1, nginx still running:
-            nginx: 6 conflicts; tmp, usr, usr/local, var: none
 plan        stop nginx, snapshot, replay into nginx-staging, clone www,
             start nginx-staging
 
@@ -924,12 +923,7 @@ frame("Preflight", diagram=False,
 	"target at all. This errata is still 15.1, so even a recipe pinned "
 	"to <code>\"=15.1\"</code> would allow it; a 15.2 version would need "
 	"a looser <code>ver</code>, which this one has."),
-    panel=code(PREFLIGHT),
-    after=p(
-	"The preview is a proposal (planning.md Q-K): a dry run writes the "
-	"manifest and creates and holds nothing, so the admin knows how much "
-	"will need answering, and so roughly how long nginx will be down, "
-	"before it stops."))
+    panel=code(PREFLIGHT))
 
 st.tag("R/c/n", "/containers/nginx  stopped")
 st.snap(T("R/c/n", TREEW), "s2")
@@ -1004,15 +998,17 @@ frame("Two saves, two steps, two bases", diagram=False,
 	"v1. So step 1 replays everything nginx changed up to s1 onto v2, and "
 	"that is where the conflicts are.",
 	"<b>2</b> The second step names its base: s1. Left to derive it, the "
-	"tool would find v1 again (both origins still meet at the "
-	"foundation), and every conflict answered in step 1 would come back: "
-	"from still holds the admin's version of the file, onto the merged "
-	"one, and both differ from v1. With base s1, only what the admin "
-	"changed between s1 and s2 is replayed. Naming a base takes "
+	"tool would find v1, the divergence point, again (both origins still "
+	"meet at the foundation). But onto is now the result so far, which "
+	"already holds s1: with base v1, a file the admin edited both before "
+	"s1 and before s2 would look changed on both sides and conflict, and "
+	"every conflict answered in step 1 would come back, since from still "
+	"holds the admin's version, onto the merged one, and both differ from "
+	"v1. With base s1, only what the admin changed between s1 and s2 is "
+	"replayed, the way git replays each commit against its own parent. "
+	"This step is disputed (planning.md Q-J). Naming a base takes "
 	"<code>--allow-unrelated</code> today, which turns the tool's prune "
-	"off, so this step reads every file; planning.md Q-J proposes letting "
-	"the tool keep from's prune when the base is an earlier snapshot of "
-	"from's own dataset."))
+	"off, so this step reads every file."))
 
 st.add("R/c/ns")
 st.tag("R/c/ns", "private mount, exit 1")
