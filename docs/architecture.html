@@ -460,7 +460,8 @@ ending in <code>-pkg</code>. Both are versions to rebase onto.</li>
 <li>Clone each dataset of F@vN under <code>zrun/containers/X</code>;
 create the recipe's own datasets.</li>
 <li>Start the jail; packages, then commands. Commands run once and
-never again on update.</li>
+never again on update, and a block the foundation already ran is not
+run again in the container.</li>
 <li>Save: snapshot with a message, then one send per dataset into the
 zlake mirror, as a clone of the zlake foundation where there is
 one.</li>

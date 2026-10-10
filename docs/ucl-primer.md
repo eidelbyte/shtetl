@@ -216,7 +216,10 @@ An array of names is shorthand for an object of `name = true` entries,
 for the common case: `pkg = [ "nginx", "git" ];`.
 
 Order follows the first definition: a `commands` block a later layer
-overrides runs where an earlier layer first put it.
+overrides runs where an earlier layer first put it. A container does
+not run a block its foundation already ran (same label, same text):
+`default.conf` is a layer of both, and its blocks run once, when the
+foundation is built.
 
 Unknown keys, and keys that belong to another kind (`kernconf` in a
 container), are errors, not warnings.

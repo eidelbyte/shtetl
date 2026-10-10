@@ -611,11 +611,12 @@ mountpoint and refuses one that is not mounted (9).
    `containers/X` (clone is not recursive; one per dataset).
 4. Create the recipe's container-only datasets as children of X.
 5. Write the jail.conf block; start the jail.
-6. `pkg -j X install`, then commands. PROPOSAL: a command block the
-   foundation already ran (same label, same text, in the foundation's
-   recipe as of its `shtetl:config`) is not run again; `default.conf`
-   is a layer of both recipes, so without this its blocks would run
-   twice. Packages need no such rule: pkg skips what is installed.
+6. `pkg -j X install`, then commands. A command block the foundation
+   already ran (same label, same text, in the foundation's recipe as of
+   its `shtetl:config`) is not run again (ruled 2026-10-09):
+   `default.conf` is a layer of both recipes, so without this its
+   blocks would run twice. Packages need no such rule: pkg skips what
+   is installed.
 7. Save (7.5).
 
 ### 7.5 Save X
@@ -1074,6 +1075,12 @@ side (expected) and cloned instead.
   fit. A foundation dataset is `{recipe}`, and the version is in the
   snapshot name, `@{ver}-{branch-type}-{ISO-date}-{short-sha}[-pkg]`,
   so a new release continues the same dataset.
+
+### 2026-10-09 (the 7.4 proposal)
+
+- A container does not run a command block its foundation already ran
+  (same label, same text, in the foundation's recipe as of its
+  `shtetl:config`).
 
 ### 2026-10-09 (Q-N)
 
