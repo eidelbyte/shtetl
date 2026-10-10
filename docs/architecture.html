@@ -187,10 +187,10 @@ ol.steps li { margin: 6px 0; }
 <main>
 
 <h1>shtetl</h1>
-<p class="sub">Architecture, draft 3 of 2026-10-09. FreeBSD foundations,
+<p class="sub">Architecture, draft 4 of 2026-10-09. FreeBSD foundations,
 containers and systems kept on ZFS alone, with zfs_rebase in place of
-git. The details, the rulings and the open questions are in
-<code>docs/planning.md</code>.</p>
+git. The details and the rulings are in <code>docs/planning.md</code>;
+<code>docs/story.html</code> walks one cycle frame by frame.</p>
 
 <p>shtetl builds FreeBSD from source into <strong>foundations</strong>,
 runs <strong>containers</strong> (jails) and <strong>systems</strong>
@@ -268,7 +268,7 @@ Layouts are created with the property defaults inherited from parasa
 <text class="label" x="696" y="46" style="fill: var(--run)">zrun</text>
 <text class="small" x="696" y="64">everything that runs</text>
 <text class="item" x="696" y="110">foundations/F</text>
-<text class="small" x="696" y="128">readonly</text>
+<text class="small" x="696" y="128">ro; mounted only for updates</text>
 <text class="item" x="696" y="300">containers/X</text>
 <text class="small" x="696" y="318">clone of F@vN + children</text>
 <text class="item" x="696" y="346">containers/</text>
@@ -359,15 +359,17 @@ archive/
 <div class="space run">
 <h3>zrun</h3>
 <p class="role">Everything that runs. Children mount by inheritance,
-so no fstab for a container's own datasets.</p>
-<pre><code>foundations/
-    F/                readonly
+so no fstab for a container's own datasets. Foundations mount only
+while an update reads them.</p>
+<pre><code>foundations/          /shtetl/foundations
+    F/                readonly, canmount=noauto
         usr/          canmount=off
             local/
         var/
 containers/           /containers
     X/                clone of F@vN
-        usr/local/
+        usr/          placeholder
+            local/
         var/
         www/          from X's recipe
     X-staging/        an update
@@ -395,6 +397,11 @@ zrun; their lineage starts at the first save into zlake. A foundation
 update does not touch them, so the update clones them from the
 from-snapshot into the staging tree, and cutover promotes the clone so
 their history moves with them.</li>
+<li><strong>Placeholders.</strong> <code>usr</code>, which exists so that
+<code>usr/local</code> can mount at <code>/usr/local</code>, has
+<code>canmount=off</code> and holds nothing. zfs_rebase reads every
+side at its mountpoint, so a dataset that never mounts cannot be
+rebased; an update clones it from the new foundation instead.</li>
 <li><strong>Everything is saved.</strong> Data included. There is no
 container-data or system-data tree: a container's datasets are its
 children, and zlake mirrors them the same way.</li>
@@ -548,9 +555,13 @@ machine; a recipe is built from layers, nearest last:</p>
 <p>Nearer layers replace scalars and merge objects. Every collection
 (<code>pkg</code>, <code>datasets</code>, <code>derivations</code>,
 <code>requires</code>, <code>commands</code>) is an object keyed by
-name, so a recipe adds an element by naming it, changes one by naming
-it with new fields, drops one with <code>name = false</code>, and drops
-everything inherited with <code>reset</code>. See
+name, and lists are additive: a recipe adds an element by naming it,
+changes one by naming it with new fields, drops one with
+<code>name = false</code>, and drops everything inherited with
+<code>reset</code>. A container must still end with a superset of what
+its foundation provides. A container recipe names no foundation; its
+<code>ver</code> says which ones it fits, and the foundation is chosen
+at <code>shtetl create X --on F</code>. See
 <code>docs/ucl-primer.md</code>.</p>
 
 <h2>Implementation</h2>

@@ -204,8 +204,13 @@ follow:
 |----|-------|
 | add an element | a new key: `pkg { nginx = true; }` |
 | change one element | the same key with new fields: `datasets { www { readonly = true; } }` |
-| drop one element | set it to `false`: `pkg { tmux = false; }` |
+| drop one element | set it to `false`: `pkg { apache24 = false; }` |
 | drop everything inherited | `reset = [ "pkg" ];` at the top of the layer |
+
+Lists are additive (planning.md 14, H): a layer adds to what the layers
+below gave, and a drop or a `reset` may only take away what the
+container's own layers added. Whatever its foundation provides, the
+container keeps.
 
 An array of names is shorthand for an object of `name = true` entries,
 for the common case: `pkg = [ "nginx", "git" ];`.
@@ -274,11 +279,21 @@ with the file and line each value came from.
     EOD
     }
 
+`common/web.conf`
+
+    pkg = [ "apache24", "py311-certbot" ];
+    commands {
+        certbot = <<EOD
+    sysrc certbot_enable=YES
+    EOD
+    }
+
 `containers/nginx.conf`
 
     ver = ">=15";
+    import = [ "common/web.conf" ];
 
-    pkg { nginx = true; tmux = false; }
+    pkg { nginx = true; apache24 = false; }
     datasets {
         www { readonly = true; }
     }
@@ -288,11 +303,13 @@ with the file and line each value came from.
     EOD
     }
 
-Merged for nginx: pkg = sudo, nginx; datasets = tmp, var, usr/local,
-www; commands = nginx. Lists are additive, and a container must end
-with a superset of what its foundation provides: `tmp = false` here
-would be an error, and so would `tmux = false` if the foundation
-installed tmux (planning.md 14).
+Merged for nginx: pkg = sudo, tmux, py311-certbot, nginx; datasets =
+tmp, var, usr/local, www; commands = certbot, then nginx. Lists are
+additive, and a drop is legal only for what the container's own layers
+added (`apache24` came from `common/web.conf`). A container must end
+with a superset of what its foundation provides, and `default.conf` is a
+layer of the foundation too, so `tmp = false` or `tmux = false` here
+would be errors (planning.md 7.4).
 
 A container recipe names no foundation: `ver` says which foundations it
 fits, and the foundation is chosen with `shtetl create nginx --on

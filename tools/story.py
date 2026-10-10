@@ -350,6 +350,7 @@ st.add("C", "C/sc", "C/dc", "C/f", "C/c", "B", "B/t",
 st.mounted |= {"C", "R/c"}
 st.tag("B/t", "git checkout")
 st.tag("R/c", "/containers")
+st.tag("R/f", "/shtetl/foundations")
 
 frame("After bootstrap",
     before=p(
@@ -359,7 +360,11 @@ frame("After bootstrap",
 	"<code>compression=zstd</code>, <code>aclmode=passthrough</code>, "
 	"<code>mountpoint=none</code>, <code>canmount=noauto</code>), and made "
 	"<code>zrun/containers</code> the one parent that mounts by itself, at "
-	"<code>/containers</code>.",
+	"<code>/containers</code>. <code>zrun/foundations</code> gets a real "
+	"mountpoint, <code>/shtetl/foundations</code>, but nothing under it "
+	"mounts by itself (<code>canmount=noauto</code>): zfs_rebase reads "
+	"every side at its own mountpoint, so shtetl mounts a foundation "
+	"there for the length of an update, and no longer.",
 	"zconfig is a clone of the zshtetl-recipes repo: <code>default.conf</code> "
 	"came from upstream, <code>shtetl.conf</code> was written by bootstrap. "
 	"zbuild is a FreeBSD src checkout the admin already had. From here on "
@@ -913,8 +918,9 @@ staging     fast/shtetl/run/containers/nginx-staging: free
 rebases     none open for nginx
 history     update.depth = 0: replay every save zrun holds (s1), then the
             snapshot taken at the stop
-plan        stop nginx, snapshot, replay into nginx-staging, clone www,
-            start nginx-staging
+plan        stop nginx, snapshot, mount the foundation, replay into
+            nginx-staging (usr cloned, not replayed), clone www, unmount
+            the foundation, start nginx-staging
 
 nginx will be stopped now and stays stopped until cutover or abandon.
 proceed? [y/N] y
@@ -1011,7 +1017,10 @@ frame("Two saves, two steps, two bases", diagram=False,
 	"replayed, the way git replays each commit against its own parent. "
 	"Naming a base takes <code>--allow-unrelated</code> today, which "
 	"turns the tool's prune off, so this step reads every file; the box "
-	"suite has run that flag only as a dry run so far (probe P14)."))
+	"suite has run that flag only as a dry run so far. Probe P14 measures "
+	"it, and the numbers decide whether zfs_rebase should learn to prune "
+	"from's side when the base is an earlier snapshot of from's own "
+	"dataset (planning.md 7.6.2; ruled: not now)."))
 
 st.add("R/c/ns")
 st.tag("R/c/ns", "private mount, exit 1")
@@ -1380,6 +1389,67 @@ frame("Where everything stands",
 	"more than zrun keeps. Each is 0 (everything), a number, or a quoted "
 	"interval such as <code>\"7d\"</code>.")))
 
+act("epilogue", "Still to prove on the box", p(
+	"Everything above is drawn as designed, and some of it rests on ZFS "
+	"and zfs_rebase behaving the way the design assumes. Milestone M0 "
+	"tests each assumption with a standalone probe on a throwaway pool "
+	"before any of shtetl is built (planning.md section 13)."))
+
+PROBES = [
+	("A clone stream from zrun lands in zlake as a clone of zlake's own "
+	    "foundation, so zlake stores only the delta", "P1",
+	    "{{f:Save: s1}}"),
+	("A snapshot's <code>shtetl:commit</code> and <code>shtetl:config"
+	    "</code> travel with <code>zfs send</code>, or are set after the "
+	    "receive", "P10", "{{f:Save: s1}}"),
+	("Each dataset of a foundation can be cloned on its own, and the "
+	    "clones mount by inheritance in the right order", "P7, P9",
+	    "{{f:Clone, dataset by dataset}}"),
+	("installworld over the previous version plus delete-old leaves "
+	    "nothing that matters behind", "P6",
+	    "{{f:Build and install over v1}}"),
+	("Installing with <code>install -C</code> keeps unchanged files "
+	    "untouched, so the rebase can prune them", "P12",
+	    "{{f:Build and install over v1}}"),
+	("A file whose bytes the new version did not change does not conflict "
+	    "with the admin's edit of it", "P5",
+	    "{{f:Step 1, the top dataset: s1 onto v2}}"),
+	("The foundation copy, mounted read-only for the update, is read at "
+	    "its mountpoint; a <code>canmount=off</code> placeholder is "
+	    "refused as a side and can be cloned instead", "P16",
+	    "{{f:Step 1, the top dataset: s1 onto v2}}, "
+	    "{{f:The children, www, and starting the new tree}}"),
+	("A replay step runs with <code>--allow-unrelated --base</code> in "
+	    "the dataset form, its pre-apply snapshot is the replayed save, and "
+	    "its cost is acceptable", "P14",
+	    "{{f:Step 2, the top dataset: s2 onto the result}}"),
+	("A rebase can create its result under an already placed result",
+	    "P4", "{{f:The children, www, and starting the new tree}}"),
+	("<code>written@s2</code> tells cutover whether the old tree was "
+	    "started again during the soak", "P8", "{{f:Cutover on zrun}}"),
+	("Promoting a container-only clone, on zrun and again in zlake, keeps "
+	    "its incremental chain", "P3, P11", "{{f:Cutover on zrun}}, "
+	    "{{f:Cutover in zlake: the old mirror is archived}}"),
+	("A child keeps receiving incremental sends after its parent is "
+	    "renamed or changes lineage", "P2",
+	    "{{f:Cutover in zlake: the staging mirror becomes nginx}}"),
+	("A release change (15.1 to 15.2) built into the same foundation can "
+	    "be rebased onto", "P15", "not drawn; Act III's note"),
+	("Several lake or run roots, and the one-match rule", "P13",
+	    "not drawn: this story has one root per space"),
+]
+
+frame("What each assumption is, and the probe that tests it",
+    diagram=False,
+    panel='<div class="tablewrap"><table class="cast"><tr><th>the story '
+	'assumes</th><th>probe</th><th>where</th></tr>' + "".join(
+	'<tr><td>%s</td><td style="white-space:nowrap"><code>%s</code></td>'
+	'<td>%s</td></tr>' % row
+	for row in PROBES) + '</table></div>',
+    after=p(
+	"The probes come first: if one fails, the frames it supports are "
+	"redesigned before anything is built on them."))
+
 
 # -- page ------------------------------------------------------------------
 
@@ -1571,13 +1641,13 @@ def page():
 	out.append('<p class="sub">A foundation is built, a container is made '
 	    'from it, and the container is moved onto the foundation\'s next '
 	    'version: every operation, frame by frame. Draft of 2026-10-09, '
-	    'following planning.md draft 3. Generated by '
+	    'following planning.md draft 4. Generated by '
 	    '<code>tools/story.py</code>.</p>')
 	toc = ['<nav class="toc">']
 	for f in frames:
 		if f["act"]:
-			toc.append('<a href="#act-%s">Act %s: %s</a>'
-			    % (f["num"], f["num"], esc(f["title"])))
+			toc.append('<a href="#act-%s">%s: %s</a>'
+			    % (f["num"], actname(f["num"]), esc(f["title"])))
 	toc.append("</nav>")
 	out.append("\n".join(toc))
 	out.append('<div class="tablewrap"><table class="cast"><tr><th>name'
@@ -1604,8 +1674,9 @@ def page():
 	for f in frames:
 		if f["act"]:
 			out.append('<section class="act" id="act-%s"><div class="anum">'
-			    'Act %s</div><h2>%s</h2>%s</section>'
-			    % (f["num"], f["num"], esc(f["title"]), f["intro"]))
+			    '%s</div><h2>%s</h2>%s</section>'
+			    % (f["num"], actname(f["num"]), esc(f["title"]),
+			    f["intro"]))
 			continue
 		n += 1
 		out.append('<section class="frame" id="f%d">' % n)
@@ -1620,7 +1691,35 @@ def page():
 		out.append(f["after"])
 		out.append("</section>")
 	out += ["</main>", "</body>", "</html>", ""]
-	return "\n".join(out)
+	return frame_links("\n".join(out))
+
+
+def actname(num):
+	return "Epilogue" if num == "epilogue" else "Act " + num
+
+
+def frame_links(html):
+	"""Turn {{f:Title}} into a link to that frame, by its number."""
+	numbers = {}
+	n = 0
+	for f in frames:
+		if not f["act"]:
+			n += 1
+			numbers[f["title"]] = n
+	out = []
+	i = 0
+	while True:
+		j = html.find("{{f:", i)
+		if j < 0:
+			out.append(html[i:])
+			break
+		k = html.index("}}", j)
+		title = html[j + 4:k]
+		out.append(html[i:j])
+		out.append('<a href="#f%d">frame %d</a>' % (numbers[title],
+		    numbers[title]))
+		i = k + 2
+	return "".join(out)
 
 
 if __name__ == "__main__":

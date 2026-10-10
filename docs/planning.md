@@ -1,10 +1,10 @@
 # shtetl: planning
 
-Status: draft 3, 2026-10-09 (amended the same day with the answers to
-H - M). Nothing here is built. Drafts 1
-(2026-10-04) and 2 (2026-10-08) were reviewed and the rulings are
-folded in; section 14 lists them so each can be traced. Sections marked PROPOSAL still need a ruling;
-section 15 collects the open questions.
+Status: draft 4, 2026-10-09. Nothing here is built. Drafts 1 to 3 were
+reviewed and every ruling is folded in; section 14 lists them so each
+can be traced. No question is open (section 15). A detail marked
+PROPOSAL has not been ruled on but blocks nothing before M1.
+docs/story.html walks one cycle of this design frame by frame.
 
 ## 1. What shtetl is
 
@@ -33,7 +33,9 @@ away:
 - no mtree baseline and no drift classification prompts;
 - no two-commit save; a save is a snapshot carrying a commit message,
   and an incremental send;
-- an update is one `zfs_rebase` per dataset instead of `git rebase`.
+- an update stops the container and replays its saves onto the new
+  foundation, one `zfs_rebase` per dataset and save, instead of
+  `git rebase`.
 
 Recipes stay. They live in their own plain-text git repo,
 zshtetl-recipes, whose clone is zconfig (section 5). That repo is the
@@ -329,7 +331,7 @@ holds (ruled 2026-10-09).
 - Unknown keys, and keys that belong to another kind (`kernconf` in a
   container), are errors with file and line.
 
-### 5.4 Recipe cascade, and replacing lists (Q5)
+### 5.4 Recipe cascade: lists are additive
 
 Layers, nearest last:
 
@@ -339,10 +341,11 @@ Layers, nearest last:
 4. the target recipe (`foundations/F.conf`, `containers/X.conf`,
    `systems/S.conf`)
 
-Q5 asked how a recipe replaces a list instead of appending to it. Look
-at what recipes actually need to do to an inherited list:
+Lists are additive (ruled 2026-10-09, H): each layer adds to what the
+layers below it gave. Q5 of draft 1 asked how a recipe replaces a list
+instead; look at what recipes actually need to do to an inherited list:
 
-- drop one element: no separate `tmp` dataset, no `apache24`;
+- drop one element: no `apache24` from a shared web recipe;
 - change one element: a different command for `etc/pwd.db`, a dataset
   made readonly;
 - add elements: the common case;
@@ -361,9 +364,9 @@ list in the schema already has a natural identity:
 | requires | container name |
 | commands | a label the recipe gives the block |
 
-**Proposal: every collection is an object keyed by that identity**, and
-the cascade merges objects the way it already merges any object, key
-by key, nearer layer winning. Then:
+So every collection is an object keyed by that identity, and the
+cascade merges objects the way it already merges any object, key by
+key, nearer layer winning. Then:
 
 - add: write a new key;
 - change one: write the same key with new fields (fields merge);
@@ -387,16 +390,19 @@ shorthand for an object of `name = true` entries.
         var {}
         "usr/local" {}
     }
+
+    # common/web.conf
+    pkg = [ "apache24", "py311-certbot" ];
     commands {
-        users = <<EOD
-    pw useradd ploni -m
+        certbot = <<EOD
+    sysrc certbot_enable=YES
     EOD
     }
 
     # containers/nginx.conf
-    pkg { nginx = true; tmux = false; }
+    import = [ "common/web.conf" ];
+    pkg { nginx = true; apache24 = false; }
     datasets {
-        tmp = false;
         www { readonly = true; }
     }
     commands {
@@ -405,8 +411,15 @@ shorthand for an object of `name = true` entries.
     EOD
     }
 
-Merged for nginx: pkg = sudo, nginx; datasets = var, usr/local, www;
-commands = users, then nginx.
+Merged for nginx: pkg = sudo, tmux, py311-certbot, nginx; datasets =
+tmp, var, usr/local, www; commands = certbot, then nginx.
+
+A drop is legal only for what the container's own layers added:
+`apache24` came from `common/web.conf`. `tmp = false` or `tmux = false`
+would be errors here, because `default.conf` is a layer of the
+foundation's recipe too, so the foundation already splits `tmp` and
+installs `tmux`, and a container must end with a superset of what its
+foundation provides (7.4).
 
 Alternatives considered:
 
@@ -598,7 +611,11 @@ mountpoint and refuses one that is not mounted (9).
    `containers/X` (clone is not recursive; one per dataset).
 4. Create the recipe's container-only datasets as children of X.
 5. Write the jail.conf block; start the jail.
-6. `pkg -j X install`, then commands.
+6. `pkg -j X install`, then commands. PROPOSAL: a command block the
+   foundation already ran (same label, same text, in the foundation's
+   recipe as of its `shtetl:config`) is not run again; `default.conf`
+   is a layer of both recipes, so without this its blocks would run
+   twice. Packages need no such rule: pkg skips what is installed.
 7. Save (7.5).
 
 ### 7.5 Save X
@@ -954,19 +971,19 @@ Per the project rule: plot each phase's problem space as a matrix
 (dimensions crossed into cells, each cell a test, a mapping or a
 documented deferral) before writing its tests. Phases: config and
 cascade, discovery, bootstrap, foundation build, beam-down, create,
-save, update, gate handling, soak, cutover, abandon, mirror, restore,
-prune. Kill tests at every step of create, save, update and cutover.
+save, update, history replay, gate handling, soak, cutover, abandon,
+mirror, restore, prune. Kill tests at every step of create, save, update and cutover.
 
 ## 12. Milestones
 
 | M  | scope | where |
 |----|-------|-------|
-| M0 | probes (section 13); rulings on section 15 | box |
+| M0 | probes (section 13) | box |
 | M1 | skeleton, UCL loader, schema, cascade, `shtetl config show` | mac |
 | M2 | discovery and multi-rooting, bootstrap, property table | box |
 | M3 | foundation build and update into zlake; pkg-upgrade | box |
 | M4 | beam-down, new container, save with messages, the zlake mirror | box |
-| M5 | update into staging, gate handling and derivations, cutover, abandon | box |
+| M5 | update into staging, history replay, gate handling and derivations, cutover, abandon | box |
 | M6 | systems: outer space, one-shot boot, update | box/VM |
 | M7 | restore, prune, archives | box |
 | M8 | TUI | mac + box |
@@ -1004,7 +1021,8 @@ install: what remains that a fresh install would not have?
 P7. Mountpoint inheritance for clones under containers/ and across
 pools; `zfs mount -a` order.
 
-P8. `written@snap` on a running jail's datasets: the cutover warning.
+P8. `written@<from>` on a container started again during the soak:
+the cutover warning.
 
 P9. Clone per child at creation: does anything require the parent
 clone first?
