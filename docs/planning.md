@@ -726,7 +726,8 @@ never run. Probe P14.
 
 **Cost.** `--allow-unrelated` turns the tool's prune off, so each step
 after the first reads every file of the dataset on all three sides.
-Two possible changes to zfs_rebase, Q-N:
+Two possible changes to zfs_rebase (Q-N, ruled 2026-10-09: neither
+now; P14 measures first):
 
 1. Prune from's side only. The prune's own contract
    (`zr_oracle_prune` in src/yellow.h) says object numbers mean the
@@ -1056,6 +1057,12 @@ side (expected) and cloned instead.
   snapshot name, `@{ver}-{branch-type}-{ISO-date}-{short-sha}[-pkg]`,
   so a new release continues the same dataset.
 
+### 2026-10-09 (Q-N)
+
+- Neither change to zfs_rebase's prune now (7.6.2, "Cost"). Probe P14
+  measures a replay step (`-v` prints the bytes compared); the numbers
+  decide, and change 1 (prune from's side only) comes first if needed.
+
 ### 2026-10-09 (Q-J)
 
 - History replay: step 1's base is the divergence point; every later
@@ -1109,15 +1116,7 @@ side (expected) and cloned instead.
 
 ## 15. Open questions
 
-Q-N (not blocking). History replay reads every file of a replayed
-dataset on all three sides in every step after the first, because
-naming a base needs `--allow-unrelated`, which turns the prune off
-(7.6.2, "Cost"). Two changes to zfs_rebase could reduce it: pruning
-from's side only (small, sound by the prune's own contract, about half
-the reads) and comparing on demand (larger, touches the v4 decision
-rules, down to about the step's own changes). Proposal: neither now;
-measure with probe P14 (`-v` prints the bytes compared) on a realistic
-container, and decide from the numbers.
+None. The next step is M0: the probes of section 13 on the box.
 
 ## 16. Dropped from parasa
 
