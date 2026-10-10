@@ -726,12 +726,33 @@ never run. Probe P14.
 
 **Cost.** `--allow-unrelated` turns the tool's prune off, so each step
 after the first reads every file of the dataset on all three sides.
-Proposal for zfs_rebase (Q-N): accept an explicit `--base` that lies in
-from's own lineage (an earlier snapshot of from's dataset) without
-`--allow-unrelated`, and keep from's prune. Names from did not change
-between base and from need nothing done, since the result already holds
-onto's, so a step would cost the metadata walks plus the content of
-that step's own changes.
+Two possible changes to zfs_rebase, Q-N:
+
+1. Prune from's side only. The prune's own contract
+   (`zr_oracle_prune` in src/yellow.h) says object numbers mean the
+   same thing "when the side really descends from base", and the call
+   site already prunes one side at a time (`zr_oracle_prune(..., 1,
+   ...)` and `(..., 2, ...)` in src/run.c, behind one `r->prune`
+   flag). In a replay step from is a later snapshot of base's own
+   dataset, so from's side qualifies and onto's does not. The change:
+   accept `--base` without `--allow-unrelated` when it is an earlier
+   snapshot of from's dataset, and prune side 1 only. This skips the
+   base-against-from reads, roughly half of what a step reads today.
+2. Compare on demand. `zr_oracle_assign` compares every pair of trees
+   holding one name, up front, so onto would still be read against base
+   for every file. For a name from left unchanged, the outcome is onto's
+   whatever onto holds, and the dataset form already holds it; only
+   names from changed need onto compared. Comparing only what a
+   decision needs would bring a step down to about its own changes. It
+   reaches into the oracle and the decision rules (a hardlink pool
+   from left alone may still need onto's classes), so it must be
+   checked against the v4 theory, whose green-pooling note is frozen.
+
+Onto's side cannot simply be pruned too. Base and onto do share an
+ancestor (the old foundation version), but after it the two lineages
+allocate object numbers independently, and a match would rest on
+generation and ctime coinciding by chance, which the prune does not
+accept as proof.
 
 **Names.** Each replayed snapshot keeps its original's name and
 `shtetl:commit`, plus `shtetl:replayed-from` (the original's guid), so
@@ -1002,7 +1023,8 @@ its foundation.
 
 P14. History replay step k (7.6.2): the dataset form with
 `--allow-unrelated --base X/d@s(k-1)`; the pre-apply snapshot as the
-replayed s(k-1); timing against the dataset's size.
+replayed s(k-1); timing and the bytes compared (`-v`) against the
+dataset's size, for Q-N.
 
 P15. A cross-release update: install 15.2 over a 15.1 foundation with
 delete-old, then rebase a container from 15.1 onto it.
@@ -1087,12 +1109,15 @@ side (expected) and cloned instead.
 
 ## 15. Open questions
 
-Q-N (not blocking). History replay costs a full read of the dataset
-for every step after the first, because naming a base needs
-`--allow-unrelated`, which turns the prune off. Should zfs_rebase
-accept a base that is an earlier snapshot of from's own dataset and
-keep from's prune, so a step costs about its own changes (7.6.2,
-"Cost")? Replay works without it.
+Q-N (not blocking). History replay reads every file of a replayed
+dataset on all three sides in every step after the first, because
+naming a base needs `--allow-unrelated`, which turns the prune off
+(7.6.2, "Cost"). Two changes to zfs_rebase could reduce it: pruning
+from's side only (small, sound by the prune's own contract, about half
+the reads) and comparing on demand (larger, touches the v4 decision
+rules, down to about the step's own changes). Proposal: neither now;
+measure with probe P14 (`-v` prints the bytes compared) on a realistic
+container, and decide from the numbers.
 
 ## 16. Dropped from parasa
 
