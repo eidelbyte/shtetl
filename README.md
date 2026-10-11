@@ -15,11 +15,12 @@ Nothing is built yet. The design:
 - `docs/story.html`: one cycle (build a foundation, create a
   container on it, update the container onto the next version) frame
   by frame. Generated: `python3 tools/story.py > docs/story.html`.
-- `docs/story3d.html`: the same story as slides beside a three.js
-  model of the four spaces that changes in place from slide to slide.
-  Generated from the same story: `python3 tools/story3d.py >
-  docs/story3d.html`. It loads three.js from jsDelivr, so it needs a
-  network connection; without WebGL the slides still work.
+- `docs/slides.html`: the same story as slides beside one diagram
+  that changes in place: datasets arrive and leave, snapshots land on
+  their rows, each step's arrows draw themselves, and the view moves to
+  where the step happens. Generated from the same story:
+  `python3 tools/slides.py > docs/slides.html`. Plain SVG, no
+  libraries.
 - `docs/architecture.html`: the four spaces and the lifecycle on one
   page.
 - `docs/ucl-primer.md`: the configuration format, and the rules
