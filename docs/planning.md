@@ -679,7 +679,8 @@ names the real FreeBSD commit and shows that patches went in.
    installworld ends with `certctl rehash`, and a delete-old after it
    removes the certificates the new release dropped but leaves their
    entries in `/etc/ssl`, where the foundation would go on trusting
-   them (P6 found 56). Ruled 2026-10-11.
+   them (P6 found 56). Ruled 2026-10-11; P6 rerun in this order
+   leaves no `/etc/ssl` entry and no backup (13.1).
 2. The install, every file with `install -C` (ruled 2026-10-11, below).
 3. installworld's own backups deleted, their schg flags cleared first:
    `boot/kernel.old` (installkernel's), the `boot/*.old` loaders,
@@ -1225,8 +1226,10 @@ On KIDON: FreeBSD 15.1-RELEASE-p2, OpenZFS 2.4.2, zfs_rebase fdab53d.
 The world probes installed 16.0-CURRENT (8f02ff221666) and started
 from 15.0-RELEASE's base.txz. Transcripts in `probes/results/`:
 `KIDON-20261011T135848Z` (the ZFS probes), `KIDON-20261011T140103Z`
-(all sixteen, with `--world`) and `KIDON-20261011T141420Z` (P14 on
-865 MiB). Every check came out as the plan expected; the answers
+(all sixteen, with `--world`), `KIDON-20261011T141420Z` (P14 on
+865 MiB), `KIDON-20261012T025426Z` (P6 and P15 again on the old
+order, identical to the first) and `KIDON-20261012T031318Z` (P6 and
+P15 in 7.2's ruled order). Every check came out as the plan expected; the answers
 below that change the plan are folded into the sections named.
 
 | probe | answer | lands in |
@@ -1236,7 +1239,7 @@ below that change the plan are folded into the sections named.
 | P3 | A promoted clone keeps s1 and its guid, and its next incremental is received. | 7.9 as written |
 | P4 | Both forms work on a child under a placed, mounted parent. A dataset form step on a parent with a child mounted below it is refused (exit 2, in use). | 7.6 step 5 |
 | P5 | A rewrite of every file (same bytes, new objects) leaves the admin's rc.conf edit unconflicted. It costs the send (44.1 MiB against 0.2 MiB) and the compare (84.5 MB against 0.5 MB); on 24 MiB, not the time. | 7.2 |
-| P6 | Over 15.0's base.txz, installworld, distribution and delete-old leave 524 paths a fresh install lacks: etcupdate's database of 15.0's `/etc` (428) and the `/sys` link, which come with a release tarball and not with shtetl's builds; certctl's `/etc/ssl` entries (56), left because installworld's rehash ran before delete-old removed the dropped certificates; installworld's backups (`*.old` loaders, `ld-elf.so.1.old`, `init.bak`); about 30 files ObsoleteFiles.inc does not list (LLVM 19's private libraries, lib9p, binutils man pages, headers). Nothing a fresh install has is missing. | 7.2 |
+| P6 | Over 15.0's base.txz, installworld, distribution and delete-old leave 524 paths a fresh install lacks: etcupdate's database of 15.0's `/etc` (428) and the `/sys` link, which come with a release tarball and not with shtetl's builds; certctl's `/etc/ssl` entries (56), left because installworld's rehash ran before delete-old removed the dropped certificates; installworld's backups (`*.old` loaders, `ld-elf.so.1.old`, `init.bak`); about 30 files ObsoleteFiles.inc does not list (LLVM 19's private libraries, lib9p, binutils man pages, headers). Nothing a fresh install has is missing. In 7.2's ruled order (2026-10-12): 461 remain, none in `/etc/ssl` and no backup; what stays is etcupdate's database (429), `/sys`, and 31 files ObsoleteFiles.inc does not list. | 7.2 |
 | P7 | Clones under `containers/` mount by inheritance, the placeholder hides nothing, renames carry mountpoints, an import mounts parents first, a clone cannot cross pools, zlake stays unmounted. `canmount` does not inherit. | 4.3 |
 | P8 | `written@from` stays 0 through a remount and reads with atime off; reads with atime on make it 59,392 bytes; one real write adds 2 KiB. | 7.9 step 1 |
 | P9 | A child needs its parent first; `clone -p` makes a plain parent; a clone keeps none of its origin's local properties, so a placeholder cloned without `-o canmount=off` mounts and hides the root's `usr/`. | 7.4 step 3, 7.6 step 5 |
@@ -1245,7 +1248,7 @@ below that change the plan are folded into the sections named.
 | P12 | `install -C`: 7.2. No conflicts either way, none from the admin's user, hosts and rc.conf either (P5 on a real world). | 7.2, adopted |
 | P13 | Roots found by local `shtetl:space`, pool roots and dataset roots alike; one match and two told apart; a mirror lands only in the root holding its foundation. | 4.1 as written |
 | P14 | The replay works, the dataset form under `--allow-unrelated --base` included; the derived base raises a conflict at step 2, `--base X@s1` none. Costs in 7.6.2. | 7.6.2; Q-N's numbers |
-| P15 | 15.0 to 16.0-CURRENT: one conflict, `/etc/group`, changed by the admin's `pw useradd` and by the new release. `master.passwd`, `passwd`, `pwd.db` and `spwd.db` came from the container cleanly, the release having left them as they were. 5.2 s; the foundation's incremental 1,745 MiB. | 7.7 as written |
+| P15 | 15.0 to 16.0-CURRENT: one conflict, `/etc/group`, changed by the admin's `pw useradd` and by the new release. `master.passwd`, `passwd`, `pwd.db` and `spwd.db` came from the container cleanly, the release having left them as they were. 5.2 s; the foundation's incremental 1,745 MiB. In 7.2's ruled order with `install -C`: the same one conflict, 13.6 MB compared against 26.5 MB, the incremental 1,735 MiB. | 7.7 as written |
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
@@ -1361,12 +1364,7 @@ below that change the plan are folded into the sections named.
 
 ## 15. Open questions
 
-None. The next step is M1 (12).
-
-Still to run on the box, as confirmation and not as a question: P6
-and P15 in 7.2's ruled order (`sudo env OLD_REL=15.0-RELEASE sh
-probes/run.sh P6 P15`). P6 should report no `/etc/ssl` entry and no
-backup left, and P15 one conflict, `/etc/group`, as before.
+None. M0 is done; the next step is M1 (12).
 
 ## 16. Dropped from parasa
 
