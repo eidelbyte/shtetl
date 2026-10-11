@@ -1,0 +1,40 @@
+#rebase-manifest 5
+#result -
+#form clone
+#base shprun/foundations/F@v1 2195314229418887671
+#from shprun/containers/X@s2 15899120603858759134
+#onto shprun/containers/X-staging@dry 17125907479649041183
+#made -
+#tag -
+#take -
+#written 2026-10-11T14:07:22Z
+#mode strict
+#actions 10
+#conflicts 1
+/
+    etc/
+        rc.conf conflict 1
+        ..
+    usr/
+        include/
+            Block.h write /usr/include/Block.h
+            Block_private.h write /usr/include/Block_private.h
+            FlexLexer.h write /usr/include/FlexLexer.h
+            __libunwind_config.h write /usr/include/__libunwind_config.h
+            _ctype.h write /usr/include/_ctype.h
+            _libsys.h write /usr/include/_libsys.h
+            a.out.h write /usr/include/a.out.h
+            alias.h write /usr/include/alias.h
+            ar.h write /usr/include/ar.h
+            archive.h write /usr/include/archive.h
+            ..
+        ..
+    ..
+
+# a pool is one file and all its names: {names}letter; same
+# letter, same bytes
+conflict 1 changed-both
+  why  /etc/rc.conf changed on both sides
+  base ({/etc/rc.conf}x)
+  from ({/etc/rc.conf}y)
+  onto ({/etc/rc.conf}z)

@@ -1,0 +1,56 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+# zfs set shtetl:space=lake shplake
+# zfs create shplake/foundations
+# zfs create shplake/containers
+# zfs create -p shplake/archive/containers
+# zfs create shplake/foundations/F
+# zfs create -o canmount=off shplake/foundations/F/usr
+# zfs create shplake/foundations/F/usr/local
+# zfs create shplake/foundations/F/var
+# zfs set mountpoint=/tmp/shtetl-probe/build/F shplake/foundations/F
+# zfs inherit mountpoint shplake/foundations/F
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v1' shplake/foundations/F@v1
+# zfs send shplake/foundations/F@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F
+# zfs send shplake/foundations/F/usr@v1 | zfs recv -u -o readonly=on -o canmount=off shprun/foundations/F/usr
+# zfs send shplake/foundations/F/usr/local@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/usr/local
+# zfs send shplake/foundations/F/var@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/var
+# zfs clone shprun/foundations/F@v1 shprun/containers/X
+# zfs clone -o canmount=off shprun/foundations/F/usr@v1 shprun/containers/X/usr
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/containers/X/usr/local
+# zfs clone shprun/foundations/F/var@v1 shprun/containers/X/var
+# zfs create shprun/containers/X/www
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=first save' shprun/containers/X@s1
+== a: the root's clone stream, no -o origin
+# zfs send -i shprun/foundations/F@v1 shprun/containers/X@s1 | zfs recv -u shplake/containers/X
+P1 check ok: a: the received root's origin, no -o origin (shplake/foundations/F@v1)
+# zfs destroy -r shplake/containers/X
+== b: the same with -o origin
+# zfs send -i shprun/foundations/F@v1 shprun/containers/X@s1 | zfs recv -u -o origin=shplake/foundations/F@v1 shplake/containers/X
+P1 check ok: b: the received root's origin, -o origin (shplake/foundations/F@v1)
+# zfs destroy -r shplake/containers/X
+== c: the whole save as 7.5 writes it, no -o origin anywhere
+# zfs send -i shprun/foundations/F@v1 shprun/containers/X@s1 | zfs recv -u shplake/containers/X
+# zfs send -i shprun/foundations/F/usr@v1 shprun/containers/X/usr@s1 | zfs recv -u shplake/containers/X/usr
+# zfs send -i shprun/foundations/F/usr/local@v1 shprun/containers/X/usr/local@s1 | zfs recv -u shplake/containers/X/usr/local
+# zfs send -i shprun/foundations/F/var@v1 shprun/containers/X/var@s1 | zfs recv -u shplake/containers/X/var
+# zfs send shprun/containers/X/www@s1 | zfs recv -u shplake/containers/X/www
+P1 check ok: c: zlake X origin (shplake/foundations/F@v1)
+P1 check ok: c: zlake X/usr origin (shplake/foundations/F/usr@v1)
+P1 check ok: c: zlake X/usr/local origin (shplake/foundations/F/usr/local@v1)
+P1 check ok: c: zlake X/var origin (shplake/foundations/F/var@v1)
+P1 check ok: c: zlake X/www origin (-)
+# zfs list -r -o name,used,referenced,origin shplake/containers/X
+NAME                             USED  REFER  ORIGIN
+shplake/containers/X              67K   933K  shplake/foundations/F@v1
+shplake/containers/X/usr          12K    24K  shplake/foundations/F/usr@v1
+shplake/containers/X/usr/local    12K    25K  shplake/foundations/F/usr/local@v1
+shplake/containers/X/var          13K    26K  shplake/foundations/F/var@v1
+shplake/containers/X/www          24K    24K  -
+== d: the next save, -i from s1
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=second save' shprun/containers/X@s2
+# zfs send -i @s1 shprun/containers/X@s2 | zfs recv -u shplake/containers/X
+P1 check ok: d: the second save's incremental (received)
+P1 answer: a clone stream lands as a clone of zlake F@v1 without -o origin: yes; with -o origin: yes
+P1 answer: the whole first save: 5 of 5 datasets landed with the right origin; zlake X uses 0.1 MiB against F's 0.9 MiB

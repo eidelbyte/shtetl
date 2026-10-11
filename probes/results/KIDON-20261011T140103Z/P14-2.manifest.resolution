@@ -1,0 +1,9 @@
+#rebase-resolution 5
+#base shprun/containers/X@s1 17934439056655813037
+#from shprun/containers/X@s2 15899120603858759134
+#onto shprun/containers/X-staging@s1 3728667197231412918
+#mode strict
+#names 0
+#unanswered 0
+/
+    ..

@@ -1,0 +1,130 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+# zfs set shtetl:space=lake shplake
+# zfs create shplake/foundations
+# zfs create shplake/containers
+# zfs create -p shplake/archive/containers
+# zfs create shplake/foundations/F
+# zfs create -o canmount=off shplake/foundations/F/usr
+# zfs create shplake/foundations/F/usr/local
+# zfs create shplake/foundations/F/var
+# zfs set mountpoint=/tmp/shtetl-probe/build/F shplake/foundations/F
+# zfs inherit mountpoint shplake/foundations/F
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v1' shplake/foundations/F@v1
+# zfs send shplake/foundations/F@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F
+# zfs send shplake/foundations/F/usr@v1 | zfs recv -u -o readonly=on -o canmount=off shprun/foundations/F/usr
+# zfs send shplake/foundations/F/usr/local@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/usr/local
+# zfs send shplake/foundations/F/var@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/var
+# zfs clone shprun/foundations/F@v1 shprun/containers/X
+# zfs clone -o canmount=off shprun/foundations/F/usr@v1 shprun/containers/X/usr
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/containers/X/usr/local
+# zfs clone shprun/foundations/F/var@v1 shprun/containers/X/var
+# zfs create shprun/containers/X/www
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=first save' shprun/containers/X@s1
+# zfs send -i shprun/foundations/F@v1 shprun/containers/X@s1 | zfs recv -u shplake/containers/X
+# zfs send -i shprun/foundations/F/usr@v1 shprun/containers/X/usr@s1 | zfs recv -u shplake/containers/X/usr
+# zfs send -i shprun/foundations/F/usr/local@v1 shprun/containers/X/usr/local@s1 | zfs recv -u shplake/containers/X/usr/local
+# zfs send -i shprun/foundations/F/var@v1 shprun/containers/X/var@s1 | zfs recv -u shplake/containers/X/var
+# zfs send shprun/containers/X/www@s1 | zfs recv -u shplake/containers/X/www
+# zfs set mountpoint=/tmp/shtetl-probe/build/F shplake/foundations/F
+# zfs inherit mountpoint shplake/foundations/F
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v2' shplake/foundations/F@v2
+# zfs send -i @v1 shplake/foundations/F@v2 | zfs recv -u shprun/foundations/F
+# zfs send -i @v1 shplake/foundations/F/usr@v2 | zfs recv -u shprun/foundations/F/usr
+# zfs send -i @v1 shplake/foundations/F/usr/local@v2 | zfs recv -u shprun/foundations/F/usr/local
+# zfs send -i @v1 shplake/foundations/F/var@v2 | zfs recv -u shprun/foundations/F/var
+== update and soak: staging on F@v2, www cloned from s1, saved, mirrored
+# zfs clone shprun/foundations/F@v2 shprun/containers/X-staging
+# zfs clone -o canmount=off shprun/foundations/F/usr@v2 shprun/containers/X-staging/usr
+# zfs clone shprun/foundations/F/usr/local@v2 shprun/containers/X-staging/usr/local
+# zfs clone shprun/foundations/F/var@v2 shprun/containers/X-staging/var
+# zfs clone shprun/containers/X/www@s1 shprun/containers/X-staging/www
+# zfs snapshot -r -o shtetl:kind=save -o shtetl:commit=soak shprun/containers/X-staging@soak1
+# zfs send -i shprun/foundations/F@v2 shprun/containers/X-staging@soak1 | zfs recv -u shplake/containers/X-staging
+# zfs send -i shprun/foundations/F/usr@v2 shprun/containers/X-staging/usr@soak1 | zfs recv -u shplake/containers/X-staging/usr
+# zfs send -i shprun/foundations/F/usr/local@v2 shprun/containers/X-staging/usr/local@soak1 | zfs recv -u shplake/containers/X-staging/usr/local
+# zfs send -i shprun/foundations/F/var@v2 shprun/containers/X-staging/var@soak1 | zfs recv -u shplake/containers/X-staging/var
+# zfs send -i shprun/containers/X/www@s1 shprun/containers/X-staging/www@soak1 | zfs recv -u shplake/containers/X-staging/www
+P11 check ok: zlake X-staging is a clone of zlake F@v2 (shplake/foundations/F@v2)
+P11 check ok: zlake X-staging/www is a clone of zlake X/www@s1 (shplake/containers/X/www@s1)
+== cutover on zrun
+# zfs promote shprun/containers/X-staging/www
+# zfs destroy -r shprun/containers/X
+# zfs rename shprun/containers/X-staging shprun/containers/X
+== the same cutover mirrored in zlake
+# zfs promote shplake/containers/X-staging/www
+# zfs rename shplake/containers/X shplake/archive/containers/X-2026-10-11
+# zfs rename shplake/containers/X-staging shplake/containers/X
+# zfs get -r -t filesystem -o name,property,value,source mountpoint,canmount,mounted,readonly,origin shplake/containers/X
+NAME                            PROPERTY    VALUE                               SOURCE
+shplake/containers/X            mountpoint  none                                inherited from shplake
+shplake/containers/X            canmount    on                                  default
+shplake/containers/X            mounted     no                                  -
+shplake/containers/X            readonly    off                                 default
+shplake/containers/X            origin      shplake/foundations/F@v2            -
+shplake/containers/X/usr        mountpoint  none                                inherited from shplake
+shplake/containers/X/usr        canmount    on                                  default
+shplake/containers/X/usr        mounted     no                                  -
+shplake/containers/X/usr        readonly    off                                 default
+shplake/containers/X/usr        origin      shplake/foundations/F/usr@v2        -
+shplake/containers/X/usr/local  mountpoint  none                                inherited from shplake
+shplake/containers/X/usr/local  canmount    on                                  default
+shplake/containers/X/usr/local  mounted     no                                  -
+shplake/containers/X/usr/local  readonly    off                                 default
+shplake/containers/X/usr/local  origin      shplake/foundations/F/usr/local@v2  -
+shplake/containers/X/var        mountpoint  none                                inherited from shplake
+shplake/containers/X/var        canmount    on                                  default
+shplake/containers/X/var        mounted     no                                  -
+shplake/containers/X/var        readonly    off                                 default
+shplake/containers/X/var        origin      shplake/foundations/F/var@v2        -
+shplake/containers/X/www        mountpoint  none                                inherited from shplake
+shplake/containers/X/www        canmount    on                                  default
+shplake/containers/X/www        mounted     no                                  -
+shplake/containers/X/www        readonly    off                                 default
+shplake/containers/X/www        origin      -                                   -
+# zfs get -r -t filesystem -o name,property,value,source mountpoint,canmount,mounted,readonly,origin shplake/archive/containers/X-2026-10-11
+NAME                                               PROPERTY    VALUE                               SOURCE
+shplake/archive/containers/X-2026-10-11            mountpoint  none                                inherited from shplake
+shplake/archive/containers/X-2026-10-11            canmount    on                                  default
+shplake/archive/containers/X-2026-10-11            mounted     no                                  -
+shplake/archive/containers/X-2026-10-11            readonly    off                                 default
+shplake/archive/containers/X-2026-10-11            origin      shplake/foundations/F@v1            -
+shplake/archive/containers/X-2026-10-11/usr        mountpoint  none                                inherited from shplake
+shplake/archive/containers/X-2026-10-11/usr        canmount    on                                  default
+shplake/archive/containers/X-2026-10-11/usr        mounted     no                                  -
+shplake/archive/containers/X-2026-10-11/usr        readonly    off                                 default
+shplake/archive/containers/X-2026-10-11/usr        origin      shplake/foundations/F/usr@v1        -
+shplake/archive/containers/X-2026-10-11/usr/local  mountpoint  none                                inherited from shplake
+shplake/archive/containers/X-2026-10-11/usr/local  canmount    on                                  default
+shplake/archive/containers/X-2026-10-11/usr/local  mounted     no                                  -
+shplake/archive/containers/X-2026-10-11/usr/local  readonly    off                                 default
+shplake/archive/containers/X-2026-10-11/usr/local  origin      shplake/foundations/F/usr/local@v1  -
+shplake/archive/containers/X-2026-10-11/var        mountpoint  none                                inherited from shplake
+shplake/archive/containers/X-2026-10-11/var        canmount    on                                  default
+shplake/archive/containers/X-2026-10-11/var        mounted     no                                  -
+shplake/archive/containers/X-2026-10-11/var        readonly    off                                 default
+shplake/archive/containers/X-2026-10-11/var        origin      shplake/foundations/F/var@v1        -
+shplake/archive/containers/X-2026-10-11/www        mountpoint  none                                inherited from shplake
+shplake/archive/containers/X-2026-10-11/www        canmount    on                                  default
+shplake/archive/containers/X-2026-10-11/www        mounted     no                                  -
+shplake/archive/containers/X-2026-10-11/www        readonly    off                                 default
+shplake/archive/containers/X-2026-10-11/www        origin      shplake/containers/X/www@s1         -
+# zfs list -H -t snapshot -o name,guid,userrefs,clones -r shplake/containers/X/www
+shplake/containers/X/www@s1	4841930197972399156	0	shplake/archive/containers/X-2026-10-11/www
+shplake/containers/X/www@soak1	17233075183609503771	0	-
+# zfs list -H -t snapshot -o name,guid,userrefs,clones -r shplake/archive/containers/X-2026-10-11
+shplake/archive/containers/X-2026-10-11@s1	12614196080432353600	0	-
+shplake/archive/containers/X-2026-10-11/usr@s1	12852892984923508595	0	-
+shplake/archive/containers/X-2026-10-11/usr/local@s1	5813845270857399090	0	-
+shplake/archive/containers/X-2026-10-11/var@s1	15701612125178506630	0	-
+P11 check ok: the archive's www is a clone of the live www@s1 (shplake/containers/X/www@s1)
+== the next save, -i from soak1, dataset by dataset
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=after cutover' shprun/containers/X@s2
+# zfs send -i @soak1 shprun/containers/X@s2 | zfs recv -u shplake/containers/X
+# zfs send -i @soak1 shprun/containers/X/usr@s2 | zfs recv -u shplake/containers/X/usr
+# zfs send -i @soak1 shprun/containers/X/usr/local@s2 | zfs recv -u shplake/containers/X/usr/local
+# zfs send -i @soak1 shprun/containers/X/var@s2 | zfs recv -u shplake/containers/X/var
+# zfs send -i @soak1 shprun/containers/X/www@s2 | zfs recv -u shplake/containers/X/www
+P11 check ok: datasets that took the next incremental (5)
+P11 answer: after a promote mirrored in zlake, the next save received for 5 of 5 datasets; the archive's www has origin shplake/containers/X/www@s1

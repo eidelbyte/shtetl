@@ -1,0 +1,9 @@
+#rebase-resolution 5
+#base shprun/foundations/F/usr/local@v1 56208806814708040
+#from shprun/containers/X/usr/local@s1 11874932791699102422
+#onto shprun/foundations/F/usr/local@v2 14398872465390584921
+#mode strict
+#names 0
+#unanswered 0
+/
+    ..

@@ -1,0 +1,35 @@
+#rebase-manifest 5
+#result shprun/containers/X-c
+#form clone
+#base shprun/foundations/F@v1 3470721130601237657
+#from shprun/containers/X@s1 12409875968689098641
+#onto shprun/foundations/G@v2 12233739982631910085
+#made -
+#tag zr-d5973014df97
+#take -
+#written 2026-10-11T14:07:07Z
+#mode strict
+#actions 16
+#conflicts 0
+/
+    etc/
+        group write /etc/group
+        hosts write /etc/hosts
+        master.passwd write /etc/master.passwd
+        passwd write /etc/passwd
+        pwd.db write /etc/pwd.db
+        rc.conf cp /etc/rc.conf
+        spwd.db write /etc/spwd.db
+        ..
+    home/ cp /home
+        probe/ cp /home/probe
+            .cshrc cp /home/probe/.cshrc
+            .login cp /home/probe/.login
+            .login_conf cp /home/probe/.login_conf
+            .mail_aliases cp /home/probe/.mail_aliases
+            .mailrc cp /home/probe/.mailrc
+            .profile cp /home/probe/.profile
+            .shrc cp /home/probe/.shrc
+            ..
+        ..
+    ..

@@ -1,0 +1,21 @@
+#rebase-manifest 5
+#result shprun/containers/X-staging/var
+#form clone
+#base shprun/foundations/F/var@old 4245105211346429015
+#from shprun/containers/X/var@s1 14816453060933202269
+#onto shprun/foundations/F/var@new 12635923098682604954
+#made -
+#tag zr-d59730c62601
+#take -
+#written 2026-10-11T14:08:35Z
+#mode strict
+#actions 2
+#conflicts 0
+/
+    log/
+        messages cp /log/messages
+        ..
+    mail/
+        probe cp /mail/probe
+        ..
+    ..

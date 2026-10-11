@@ -1,0 +1,28 @@
+#rebase-manifest 5
+#result s2
+#form dataset
+#base shprun/containers/X@s2 7538801412443413046
+#from shprun/containers/X@s3 16553483505664397627
+#onto shprun/containers/X-staging@s2 1690411924273114367
+#presnap shprun/containers/X-staging@s2
+#readonly off
+#canmount on
+#made -
+#tag zr-d5972d7402fd
+#take -
+#written 2026-10-11T14:01:31Z
+#mode strict
+#actions 2
+#conflicts 0
+/
+    etc/
+        rc.conf write /etc/rc.conf
+        ..
+    usr/
+        local/
+            etc/
+                app-s3.conf cp /usr/local/etc/app-s3.conf
+                ..
+            ..
+        ..
+    ..

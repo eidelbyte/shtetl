@@ -1,0 +1,176 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+# zfs create shprun/foundations/F
+# tar -cf - -C /  usr/include usr/share/man | tar -xpf - -C /tmp/shtetl-probe/run/foundations/F
+# zfs snapshot shprun/foundations/F@v1
+# zfs clone shprun/foundations/F@v1 shprun/containers/X
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=line A' shprun/containers/X@s1
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=line B, ten files' shprun/containers/X@s2
+# rm /tmp/shtetl-probe/run/containers/X/usr/include/archive_entry.h
+# mv /tmp/shtetl-probe/run/containers/X/usr/include/arpa/ftp.h /tmp/shtetl-probe/run/containers/X/usr/include/arpa/ftp.h.renamed
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=a file removed, one renamed' shprun/containers/X@s3
+# zfs snapshot shprun/foundations/F@v2
+P14 the dataset: 23.9 MiB,    14549 names
+== step 1: clone form, base derived (F@v1)
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-1.manifest --from shprun/containers/X@s1 --onto shprun/foundations/F@v2 --result shprun/containers/X-staging
+zfs_rebase: the base is shprun/foundations/F@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-1.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d5973030e145
+zfs_rebase: 14890 pools unchanged
+zfs_rebase: 524332 bytes compared
+zfs_rebase: applied 0 rm 0 ln 1 cp 0 dup 1 write, 65 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-staging is at applying1, held under zr-d5973030e145
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-staging: the manifest, 2 actions
+zfs_rebase:   done 2, first /etc/added-s1
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-staging is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-staging or zfs set mountpoint=PATH shprun/containers/X-staging
+zfs_rebase: released zr-d5973030e145 on shprun/foundations/F@v1
+zfs_rebase: released zr-d5973030e145 on shprun/containers/X@s1
+zfs_rebase: released zr-d5973030e145 on shprun/foundations/F@v2
+zfs_rebase: the record is off shprun/containers/X-staging
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-staging
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-1.manifest
+-> exit 0 in 1.40s
+P14 check ok: step 1 exit (0)
+# zfs set readonly=off shprun/containers/X-staging
+# zfs inherit mountpoint shprun/containers/X-staging
+== Q-J: step 2 as a dry run with the base derived instead
+# zfs snapshot shprun/containers/X-staging@dry
+# zfs_rebase -n -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-derived.manifest --from shprun/containers/X@s2 --onto shprun/containers/X-staging@dry
+zfs_rebase: 1 conflict; nothing applied
+-> exit 1 in 0.16s
+# zfs destroy shprun/containers/X-staging@dry
+P14 the derived base is shprun/foundations/F@v1; step 2 against it has 1 conflict groups
+== step 2: dataset form, --base X@s1
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-2.manifest --allow-unrelated --base shprun/containers/X@s1 --from shprun/containers/X@s2 --onto shprun/containers/X-staging --result s1
+zfs_rebase: shprun/containers/X-staging@s1 is what shprun/containers/X-staging was before the rebase
+zfs_rebase: the base is shprun/containers/X@s1, as given
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-2.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d5973034e167
+zfs_rebase: shprun/containers/X-staging is this run's alone, mounted at /var/db/zfs_rebase/shprun/containers/X-staging/mnt
+zfs_rebase: 0 pools unchanged
+zfs_rebase: 168419926 bytes compared
+zfs_rebase: applied 0 rm 0 ln 0 cp 0 dup 11 write, 150685 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-staging is at applying1, held under zr-d5973034e167
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-staging: the manifest, 11 actions
+zfs_rebase:   done 11, first /etc/rc.conf
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-staging is back where it belongs, mounted at /tmp/shtetl-probe/run/containers/X-staging
+zfs_rebase: released zr-d5973034e167 on shprun/containers/X@s1
+zfs_rebase: released zr-d5973034e167 on shprun/containers/X@s2
+zfs_rebase: released zr-d5973034e167 on shprun/containers/X-staging@s1
+zfs_rebase: the record is off shprun/containers/X-staging
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-staging
+zfs_rebase: shprun/containers/X-staging is the rebased tree, and shprun/containers/X-staging@s1 is what it was before
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-2.manifest
+-> exit 0 in 1.70s
+P14 check ok: step 2 exit (0)
+== step 3: dataset form, --base X@s2
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-3.manifest --allow-unrelated --base shprun/containers/X@s2 --from shprun/containers/X@s3 --onto shprun/containers/X-staging --result s2
+zfs_rebase: shprun/containers/X-staging@s2 is what shprun/containers/X-staging was before the rebase
+zfs_rebase: the base is shprun/containers/X@s2, as given
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-3.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d5973036e173
+zfs_rebase: shprun/containers/X-staging is this run's alone, mounted at /var/db/zfs_rebase/shprun/containers/X-staging/mnt
+zfs_rebase: 0 pools unchanged
+zfs_rebase: 168643916 bytes compared
+zfs_rebase: applied 2 rm 0 ln 1 cp 0 dup 0 write, 3437 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-staging is at applying1, held under zr-d5973036e173
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-staging: the manifest, 3 actions
+zfs_rebase:   done 3, first /usr/include/archive_entry.h
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-staging is back where it belongs, mounted at /tmp/shtetl-probe/run/containers/X-staging
+zfs_rebase: released zr-d5973036e173 on shprun/containers/X@s2
+zfs_rebase: released zr-d5973036e173 on shprun/containers/X@s3
+zfs_rebase: released zr-d5973036e173 on shprun/containers/X-staging@s2
+zfs_rebase: the record is off shprun/containers/X-staging
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-staging
+zfs_rebase: shprun/containers/X-staging is the rebased tree, and shprun/containers/X-staging@s2 is what it was before
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-3.manifest
+-> exit 0 in 1.59s
+P14 check ok: step 3 exit (0)
+# zfs snapshot shprun/containers/X-staging@s3
+# zfs list -H -t snapshot -o name,guid,userrefs,clones -r shprun/containers/X-staging
+shprun/containers/X-staging@s1	3728667197231412918	0	-
+shprun/containers/X-staging@s2	8091935533805294485	0	-
+shprun/containers/X-staging@s3	6457547929540595798	0	-
+== the replayed snapshots take the originals' properties
+# zfs set 'shtetl:commit=line A' shtetl:replayed-from=17934439056655813037 shtetl:kind=save shprun/containers/X-staging@s1
+# zfs set 'shtetl:commit=line B, ten files' shtetl:replayed-from=15899120603858759134 shtetl:kind=save shprun/containers/X-staging@s2
+# zfs get -r -t snapshot -o name,property,value shtetl:commit,shtetl:replayed-from shprun/containers/X-staging
+NAME                            PROPERTY              VALUE
+shprun/containers/X-staging@s1  shtetl:commit         line A
+shprun/containers/X-staging@s1  shtetl:replayed-from  17934439056655813037
+shprun/containers/X-staging@s2  shtetl:commit         line B, ten files
+shprun/containers/X-staging@s2  shtetl:replayed-from  15899120603858759134
+shprun/containers/X-staging@s3  shtetl:commit         -
+shprun/containers/X-staging@s3  shtetl:replayed-from  -
+== the result
+P14 check ok: rc.conf has line A once (1)
+P14 check ok: rc.conf has line B once (1)
+P14 check ok: the version is v2's (FreeBSD v2)
+P14 check ok: the removed file is gone (gone)
+P14 check ok: the renamed file is renamed (yes)
+P14 check ok: the ten s2 edits are there (10)
+== update.depth = 1: s3 in one rebase, for the cost of history
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-depth1.manifest --from shprun/containers/X@s3 --onto shprun/foundations/F@v2 --result shprun/containers/X-depth1
+zfs_rebase: the base is shprun/foundations/F@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-depth1.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d597303ae19e
+zfs_rebase: 14876 pools unchanged
+zfs_rebase: 524332 bytes compared
+zfs_rebase: applied 2 rm 0 ln 2 cp 0 dup 11 write, 154134 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-depth1 is at applying1, held under zr-d597303ae19e
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-depth1: the manifest, 15 actions
+zfs_rebase:   done 15, first /etc/added-s1
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-depth1 is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-depth1 or zfs set mountpoint=PATH shprun/containers/X-depth1
+zfs_rebase: released zr-d597303ae19e on shprun/foundations/F@v1
+zfs_rebase: released zr-d597303ae19e on shprun/containers/X@s3
+zfs_rebase: released zr-d597303ae19e on shprun/foundations/F@v2
+zfs_rebase: the record is off shprun/containers/X-depth1
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-depth1
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P14-depth1.manifest
+-> exit 0 in 1.44s
+P14 check ok: depth 1 exit (0)
+P14 answer: the derived base would make 1 conflict groups of step 2; --base X@s1 makes 0 (exit 0)
+P14 answer: step 1 (prune on): 1.40s, 524332 bytes compared, 14890 pools unchanged
+P14 answer: step 2 (prune off): 1.70s, 168419926 bytes compared; step 3: 1.59s, 168643916 bytes compared; the dataset is 23.9 MiB (25111040 bytes)
+P14 answer: depth 1 (one rebase of s3): 1.44s, 524332 bytes compared, 14876 pools unchanged

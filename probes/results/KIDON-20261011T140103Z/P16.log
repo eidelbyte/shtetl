@@ -1,0 +1,244 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+# zfs set shtetl:space=lake shplake
+# zfs create shplake/foundations
+# zfs create shplake/containers
+# zfs create -p shplake/archive/containers
+# zfs create shplake/foundations/F
+# zfs create -o canmount=off shplake/foundations/F/usr
+# zfs create shplake/foundations/F/usr/local
+# zfs create shplake/foundations/F/var
+# zfs set mountpoint=/tmp/shtetl-probe/build/F shplake/foundations/F
+# zfs inherit mountpoint shplake/foundations/F
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v1' shplake/foundations/F@v1
+# zfs send shplake/foundations/F@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F
+# zfs send shplake/foundations/F/usr@v1 | zfs recv -u -o readonly=on -o canmount=off shprun/foundations/F/usr
+# zfs send shplake/foundations/F/usr/local@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/usr/local
+# zfs send shplake/foundations/F/var@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/var
+# zfs get -r -t filesystem -o name,property,value,source mountpoint,canmount,mounted,readonly,origin shprun/foundations/F
+NAME                            PROPERTY    VALUE                                          SOURCE
+shprun/foundations/F            mountpoint  /tmp/shtetl-probe/run/foundations/F            inherited from shprun/foundations
+shprun/foundations/F            canmount    noauto                                         local
+shprun/foundations/F            mounted     no                                             -
+shprun/foundations/F            readonly    on                                             local
+shprun/foundations/F            origin      -                                              -
+shprun/foundations/F/usr        mountpoint  /tmp/shtetl-probe/run/foundations/F/usr        inherited from shprun/foundations
+shprun/foundations/F/usr        canmount    off                                            local
+shprun/foundations/F/usr        mounted     no                                             -
+shprun/foundations/F/usr        readonly    on                                             local
+shprun/foundations/F/usr        origin      -                                              -
+shprun/foundations/F/usr/local  mountpoint  /tmp/shtetl-probe/run/foundations/F/usr/local  inherited from shprun/foundations
+shprun/foundations/F/usr/local  canmount    noauto                                         local
+shprun/foundations/F/usr/local  mounted     no                                             -
+shprun/foundations/F/usr/local  readonly    on                                             local
+shprun/foundations/F/usr/local  origin      -                                              -
+shprun/foundations/F/var        mountpoint  /tmp/shtetl-probe/run/foundations/F/var        inherited from shprun/foundations
+shprun/foundations/F/var        canmount    noauto                                         local
+shprun/foundations/F/var        mounted     no                                             -
+shprun/foundations/F/var        readonly    on                                             local
+shprun/foundations/F/var        origin      -                                              -
+P16 check ok: zrun F is not mounted after the receive (no)
+P16 check ok: zrun F's mountpoint is inherited (inherited from shprun/foundations)
+# zfs clone shprun/foundations/F@v1 shprun/containers/X
+# zfs clone -o canmount=off shprun/foundations/F/usr@v1 shprun/containers/X/usr
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/containers/X/usr/local
+# zfs clone shprun/foundations/F/var@v1 shprun/containers/X/var
+# zfs snapshot -r -o shtetl:kind=save -o shtetl:commit=s1 shprun/containers/X@s1
+# zfs set mountpoint=/tmp/shtetl-probe/build/F shplake/foundations/F
+# zfs inherit mountpoint shplake/foundations/F
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v2' shplake/foundations/F@v2
+# zfs send -i @v1 shplake/foundations/F@v2 | zfs recv -u shprun/foundations/F
+# zfs send -i @v1 shplake/foundations/F/usr@v2 | zfs recv -u shprun/foundations/F/usr
+# zfs send -i @v1 shplake/foundations/F/usr/local@v2 | zfs recv -u shprun/foundations/F/usr/local
+# zfs send -i @v1 shplake/foundations/F/var@v2 | zfs recv -u shprun/foundations/F/var
+== mount the target for reading (7.6 step 4)
+# zfs mount shprun/foundations/F
+# zfs mount shprun/foundations/F/usr/local
+# zfs mount shprun/foundations/F/var
+# zfs get -r -t filesystem -o name,property,value,source mountpoint,canmount,mounted,readonly,origin shprun/foundations/F
+NAME                            PROPERTY    VALUE                                          SOURCE
+shprun/foundations/F            mountpoint  /tmp/shtetl-probe/run/foundations/F            inherited from shprun/foundations
+shprun/foundations/F            canmount    noauto                                         local
+shprun/foundations/F            mounted     yes                                            -
+shprun/foundations/F            readonly    on                                             local
+shprun/foundations/F            origin      -                                              -
+shprun/foundations/F/usr        mountpoint  /tmp/shtetl-probe/run/foundations/F/usr        inherited from shprun/foundations
+shprun/foundations/F/usr        canmount    off                                            local
+shprun/foundations/F/usr        mounted     no                                             -
+shprun/foundations/F/usr        readonly    on                                             local
+shprun/foundations/F/usr        origin      -                                              -
+shprun/foundations/F/usr/local  mountpoint  /tmp/shtetl-probe/run/foundations/F/usr/local  inherited from shprun/foundations
+shprun/foundations/F/usr/local  canmount    noauto                                         local
+shprun/foundations/F/usr/local  mounted     yes                                            -
+shprun/foundations/F/usr/local  readonly    on                                             local
+shprun/foundations/F/usr/local  origin      -                                              -
+shprun/foundations/F/var        mountpoint  /tmp/shtetl-probe/run/foundations/F/var        inherited from shprun/foundations
+shprun/foundations/F/var        canmount    noauto                                         local
+shprun/foundations/F/var        mounted     yes                                            -
+shprun/foundations/F/var        readonly    on                                             local
+shprun/foundations/F/var        origin      -                                              -
+# mount -p
+zbereshit/systems/kidon	/			zfs	rw,noatime,nfsv4acls 	0 0
+devfs			/dev			devfs	rw		0 0
+/dev/gpt/efiboot0	/boot/efi		msdosfs	rw		2 2
+zbereshit/systems/kidon/var /var			zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/tmp		/tmp			zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/containers	/containers		zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/home		/home			zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/mishkan	/zbereshit/mishkan	zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/containers/build123d /containers/build123d	zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/containers/nginx /containers/nginx	zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/containers/recipya /containers/recipya	zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/home/miri	/home/miri		zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/containers/recipya/.git /containers/recipya/.git zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/containers/nginx/.git /containers/nginx/.git	zfs	rw,noatime,nfsv4acls 	0 0
+zrm			/tmp/zrm-mnt		zfs	rw,nfsv4acls 	0 0
+zrm/mb			/tmp/zrm-mnt/mb		zfs	rw,nfsv4acls 	0 0
+zrm/mf			/tmp/zrm-mnt/mf		zfs	rw,nfsv4acls 	0 0
+zrm/mo			/tmp/zrm-mnt/mo		zfs	rw,nfsv4acls 	0 0
+zrm/mrebased		/tmp/zrm-mnt/mrebased	zfs	ro,nfsv4acls 	0 0
+shprun/foundations	/tmp/shtetl-probe/run/foundations zfs	rw,noatime,nfsv4acls 	0 0
+shprun/containers	/tmp/shtetl-probe/run/containers zfs	rw,noatime,nfsv4acls 	0 0
+shprun/containers/X	/tmp/shtetl-probe/run/containers/X zfs	rw,noatime,nfsv4acls 	0 0
+shprun/containers/X/usr/local /tmp/shtetl-probe/run/containers/X/usr/local zfs	rw,noatime,nfsv4acls 	0 0
+shprun/containers/X/var	/tmp/shtetl-probe/run/containers/X/var zfs	rw,noatime,nfsv4acls 	0 0
+shprun/foundations/F	/tmp/shtetl-probe/run/foundations/F zfs	ro,noatime,nfsv4acls 	0 0
+shprun/foundations/F/usr/local /tmp/shtetl-probe/run/foundations/F/usr/local zfs	ro,noatime,nfsv4acls 	0 0
+shprun/foundations/F/var /tmp/shtetl-probe/run/foundations/F/var zfs	ro,noatime,nfsv4acls 	0 0
+P16 zrun F mounted with options: ro,noatime,nfsv4acls
+P16 check ok: zrun F mounted read-only (1)
+P16 check ok: the placeholder stays unmounted (no)
+== the root, clone form, placed
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P16-root.manifest --from shprun/containers/X@s1 --onto shprun/foundations/F@v2 --result shprun/containers/X-staging
+zfs_rebase: the base is shprun/foundations/F@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P16-root.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d59730d026da
+zfs_rebase: 32 pools unchanged
+zfs_rebase: 524332 bytes compared
+zfs_rebase: applied 0 rm 0 ln 0 cp 0 dup 1 write, 55 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-staging is at applying1, held under zr-d59730d026da
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-staging: the manifest, 1 action
+zfs_rebase:   done 1, first /etc/rc.conf
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-staging is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-staging or zfs set mountpoint=PATH shprun/containers/X-staging
+zfs_rebase: released zr-d59730d026da on shprun/foundations/F@v1
+zfs_rebase: released zr-d59730d026da on shprun/containers/X@s1
+zfs_rebase: released zr-d59730d026da on shprun/foundations/F@v2
+zfs_rebase: the record is off shprun/containers/X-staging
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-staging
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P16-root.manifest
+-> exit 0 in 1.09s
+P16 check ok: root exit (0)
+# zfs set readonly=off shprun/containers/X-staging
+# zfs inherit mountpoint shprun/containers/X-staging
+== usr, the placeholder, given to zfs_rebase
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P16-usr.manifest --from shprun/containers/X/usr@s1 --onto shprun/foundations/F/usr@v2 --result shprun/containers/X-staging/usr
+zfs_rebase: the base is shprun/foundations/F/usr@v1
+zfs_rebase: precondition: shprun/foundations/F/usr is not mounted
+-> exit 2 in 0.00s
+P16 check ok: usr as a side: refused (2)
+# zfs clone -o canmount=off shprun/foundations/F/usr@v2 shprun/containers/X-staging/usr
+== usr/local and var, clone form, placed
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P16-usr-local.manifest --from shprun/containers/X/usr/local@s1 --onto shprun/foundations/F/usr/local@v2 --result shprun/containers/X-staging/usr/local
+zfs_rebase: the base is shprun/foundations/F/usr/local@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P16-usr-local.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d59730d226fc
+zfs_rebase: 4 pools unchanged
+zfs_rebase: 0 bytes compared
+zfs_rebase: applied 0 rm 0 ln 1 cp 0 dup 0 write, 7 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-staging/usr/local is at applying1, held under zr-d59730d226fc
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-staging/usr/local: the manifest, 1 action
+zfs_rebase:   done 1, first /etc/app-s1.conf
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-staging/usr/local is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-staging/usr/local or zfs set mountpoint=PATH shprun/containers/X-staging/usr/local
+zfs_rebase: released zr-d59730d226fc on shprun/foundations/F/usr/local@v1
+zfs_rebase: released zr-d59730d226fc on shprun/containers/X/usr/local@s1
+zfs_rebase: released zr-d59730d226fc on shprun/foundations/F/usr/local@v2
+zfs_rebase: the record is off shprun/containers/X-staging/usr/local
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-staging/usr/local
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P16-usr-local.manifest
+-> exit 0 in 1.20s
+P16 check ok: usr/local exit (0)
+# zfs set readonly=off shprun/containers/X-staging/usr/local
+# zfs inherit mountpoint shprun/containers/X-staging/usr/local
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P16-var.manifest --from shprun/containers/X/var@s1 --onto shprun/foundations/F/var@v2 --result shprun/containers/X-staging/var
+zfs_rebase: the base is shprun/foundations/F/var@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P16-var.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d59730d42710
+zfs_rebase: 8 pools unchanged
+zfs_rebase: 0 bytes compared
+zfs_rebase: applied 0 rm 0 ln 1 cp 0 dup 0 write, 9 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-staging/var is at applying1, held under zr-d59730d42710
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-staging/var: the manifest, 1 action
+zfs_rebase:   done 1, first /log/admin-s1.log
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-staging/var is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-staging/var or zfs set mountpoint=PATH shprun/containers/X-staging/var
+zfs_rebase: released zr-d59730d42710 on shprun/foundations/F/var@v1
+zfs_rebase: released zr-d59730d42710 on shprun/containers/X/var@s1
+zfs_rebase: released zr-d59730d42710 on shprun/foundations/F/var@v2
+zfs_rebase: the record is off shprun/containers/X-staging/var
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-staging/var
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P16-var.manifest
+-> exit 0 in 1.12s
+P16 check ok: var exit (0)
+# zfs set readonly=off shprun/containers/X-staging/var
+# zfs inherit mountpoint shprun/containers/X-staging/var
+# zfs get -r -t filesystem -o name,property,value,source mountpoint,canmount,mounted,readonly,origin shprun/containers/X-staging
+NAME                                   PROPERTY    VALUE                                                 SOURCE
+shprun/containers/X-staging            mountpoint  /tmp/shtetl-probe/run/containers/X-staging            inherited from shprun/containers
+shprun/containers/X-staging            canmount    on                                                    default
+shprun/containers/X-staging            mounted     yes                                                   -
+shprun/containers/X-staging            readonly    off                                                   local
+shprun/containers/X-staging            origin      shprun/foundations/F@v2                               -
+shprun/containers/X-staging/usr        mountpoint  /tmp/shtetl-probe/run/containers/X-staging/usr        inherited from shprun/containers
+shprun/containers/X-staging/usr        canmount    off                                                   local
+shprun/containers/X-staging/usr        mounted     no                                                    -
+shprun/containers/X-staging/usr        readonly    off                                                   inherited from shprun/containers/X-staging
+shprun/containers/X-staging/usr        origin      shprun/foundations/F/usr@v2                           -
+shprun/containers/X-staging/usr/local  mountpoint  /tmp/shtetl-probe/run/containers/X-staging/usr/local  inherited from shprun/containers
+shprun/containers/X-staging/usr/local  canmount    on                                                    default
+shprun/containers/X-staging/usr/local  mounted     yes                                                   -
+shprun/containers/X-staging/usr/local  readonly    off                                                   local
+shprun/containers/X-staging/usr/local  origin      shprun/foundations/F/usr/local@v2                     -
+shprun/containers/X-staging/var        mountpoint  /tmp/shtetl-probe/run/containers/X-staging/var        inherited from shprun/containers
+shprun/containers/X-staging/var        canmount    on                                                    default
+shprun/containers/X-staging/var        mounted     yes                                                   -
+shprun/containers/X-staging/var        readonly    off                                                   local
+shprun/containers/X-staging/var        origin      shprun/foundations/F/var@v2                           -
+P16 check ok: usr/local mounted at (/tmp/shtetl-probe/run/containers/X-staging/usr/local)
+P16 check ok: the staging root's usr/bin is visible (yes)
+== unmount the target (7.6 step 7)
+# zfs unmount shprun/foundations/F/var
+# zfs unmount shprun/foundations/F/usr/local
+# zfs unmount shprun/foundations/F
+P16 check ok: zrun F datasets still mounted (0)
+P16 answer: the zrun foundation mounts read-only on demand (ro,noatime,nfsv4acls) and unmounts after: yes
+P16 answer: the canmount=off placeholder as a side: exit 2 (2 expected), and cloning it instead works

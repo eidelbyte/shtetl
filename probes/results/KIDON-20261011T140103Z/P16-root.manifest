@@ -1,0 +1,18 @@
+#rebase-manifest 5
+#result shprun/containers/X-staging
+#form clone
+#base shprun/foundations/F@v1 10789283517910608917
+#from shprun/containers/X@s1 14153906035342397545
+#onto shprun/foundations/F@v2 6305952817917010789
+#made -
+#tag zr-d59730d026da
+#take -
+#written 2026-10-11T14:08:40Z
+#mode strict
+#actions 1
+#conflicts 0
+/
+    etc/
+        rc.conf write /etc/rc.conf
+        ..
+    ..

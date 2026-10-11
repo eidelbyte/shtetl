@@ -1,0 +1,482 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+P12 source: /usr/src, 16.0-CURRENT 8f02ff221666
+# zfs create shprun/foundations/F
+# zfs create -o canmount=off shprun/foundations/F/usr
+# zfs create shprun/foundations/F/usr/local
+# zfs create shprun/foundations/F/var
+# make -C /usr/src installworld DESTDIR=/tmp/shtetl-probe/run/foundations/F  >P12-v1-installworld.log
+-> exit 0 in 42.69s
+# make -C /usr/src distribution DESTDIR=/tmp/shtetl-probe/run/foundations/F  >P12-v1-distribution.log
+-> exit 0 in 13.47s
+P12 v1: installworld and distribution in 56.16s
+# zfs snapshot -r -o shtetl:kind=version shprun/foundations/F@v1
+# zfs clone shprun/foundations/F@v1 shprun/containers/X
+# zfs clone -o canmount=off shprun/foundations/F/usr@v1 shprun/containers/X/usr
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/containers/X/usr/local
+# zfs clone shprun/foundations/F/var@v1 shprun/containers/X/var
+# pw -R /tmp/shtetl-probe/run/containers/X useradd probe -m -c 'probe user' -s /bin/sh
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=a user, hosts, rc.conf' shprun/containers/X@s1
+# zfs clone shprun/foundations/F@v1 shprun/foundations/G
+# zfs clone -o canmount=off shprun/foundations/F/usr@v1 shprun/foundations/G/usr
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/foundations/G/usr/local
+# zfs clone shprun/foundations/F/var@v1 shprun/foundations/G/var
+# make -C /usr/src installworld DESTDIR=/tmp/shtetl-probe/run/foundations/F  >P12-v2-plain-installworld.log
+-> exit 0 in 42.09s
+# make -C /usr/src distribution DESTDIR=/tmp/shtetl-probe/run/foundations/F  >P12-v2-plain-distribution.log
+-> exit 0 in 13.41s
+P12 v2-plain: installworld and distribution in 55.5s
+# zfs snapshot -r -o shtetl:kind=version shprun/foundations/F@v2
+# make -C /usr/src installworld DESTDIR=/tmp/shtetl-probe/run/foundations/G INSTALL_CMD=install -C >P12-v2-C-installworld.log
+-> exit 0 in 40.09s
+# make -C /usr/src distribution DESTDIR=/tmp/shtetl-probe/run/foundations/G INSTALL_CMD=install -C >P12-v2-C-distribution.log
+-> exit 0 in 13.46s
+P12 v2-C: installworld and distribution in 53.55s
+# zfs snapshot -r -o shtetl:kind=version shprun/foundations/G@v2
+  touched  /
+  touched  /root
+  replaced /root/.k5login
+  replaced /var
+  touched  /boot
+  replaced /boot/boot0sio
+  touched  /boot/fonts
+  touched  /boot/lua
+  replaced /boot/mbr
+  added    /boot/loader.kboot.old
+  touched  /boot/userboot.so
+  touched  /boot/defaults
+  touched  /boot/loader.efi
+  replaced /boot/pmbr
+  touched  /boot/loader_lua
+  touched  /boot/zfsloader
+  touched  /boot/userboot_lua.so
+  touched  /boot/firmware
+  replaced /boot/loader.kboot
+  replaced /boot/device.hints
+  touched  /boot/images
+  replaced /boot/cdboot
+  replaced /boot/boot0
+  touched  /boot/loader
+  touched  /boot/loader_lua.efi
+  replaced /COPYRIGHT
+  touched  /sbin
+  replaced /sbin/fastboot
+  replaced /sbin/ipfw
+  replaced /sbin/zpool
+  replaced /sbin/gconcat
+  replaced /sbin/ggated
+  replaced /sbin/mount_fusefs
+  replaced /sbin/sha512sum
+  replaced /sbin/fsck_ffs
+  replaced /sbin/pflowctl
+  replaced /sbin/tunefs
+  replaced /sbin/halt
+  replaced /sbin/geli
+  replaced /sbin/adjkerntz
+  replaced /sbin/natd
+  replaced /sbin/graid
+  replaced /sbin/decryptcore
+  replaced /sbin/dnctl
+  replaced /sbin/rcorder
+  replaced /sbin/hastctl
+  replaced /sbin/sha224sum
+  added    /sbin/init.bak
+  touched  /rescue
+  touched  /lib
+  touched  /lib/librt.so.1
+  touched  /lib/nvmecontrol
+  touched  /lib/geom
+  touched  /lib/libsys.so.7
+  touched  /lib/libc.so.7
+  touched  /lib/libthr.so.3
+  touched  /lib/libcrypt.so.5
+  touched  /bin
+  touched  /usr/share
+  touched  /usr/share/locale/af_ZA.UTF-8
+  touched  /usr/share/locale/ru_RU.CP1251
+  touched  /usr/share/locale/zh_CN.GBK
+plain: 15478 kept, 1541 touched (same object, new ctime), 25448 replaced (new object), 2 added, 0 removed
+  touched  /root
+  replaced /var
+  touched  /boot
+  touched  /boot/fonts
+  touched  /boot/lua
+  touched  /boot/userboot.so
+  touched  /boot/defaults
+  touched  /boot/loader.efi
+  touched  /boot/loader_lua
+  touched  /boot/zfsloader
+  touched  /boot/userboot_lua.so
+  touched  /boot/firmware
+  touched  /boot/images
+  touched  /boot/loader
+  touched  /boot/loader_lua.efi
+  touched  /sbin
+  replaced /sbin/fastboot
+  replaced /sbin/ipfw
+  replaced /sbin/gconcat
+  replaced /sbin/sha512sum
+  replaced /sbin/fsck_ffs
+  replaced /sbin/halt
+  replaced /sbin/geli
+  replaced /sbin/graid
+  replaced /sbin/dnctl
+  replaced /sbin/sha224sum
+  replaced /sbin/glabel
+  replaced /sbin/sha512t256
+  replaced /sbin/mdmfs
+  replaced /sbin/graid3
+  replaced /sbin/gzoned
+  replaced /sbin/skein256
+  replaced /sbin/skein512
+  replaced /sbin/rmd160
+  replaced /sbin/sha256sum
+  replaced /sbin/disklabel
+  replaced /sbin/gstripe
+  replaced /sbin/bsdlabel
+  replaced /sbin/gshsec
+  replaced /sbin/gmountver
+  replaced /sbin/md5sum
+  replaced /sbin/shutdown
+  touched  /sbin/init
+  replaced /sbin/ping
+  replaced /sbin/skein1024sum
+  replaced /sbin/ping6
+  replaced /sbin/sha224
+  replaced /sbin/gvirstor
+  replaced /sbin/gmultipath
+  replaced /sbin/gunion
+  replaced /sbin/gmirror
+  replaced /sbin/rmd160sum
+  replaced /sbin/reboot
+  replaced /sbin/gpart
+  replaced /sbin/geom
+  replaced /sbin/sha512t224sum
+  replaced /sbin/gjournal
+  replaced /sbin/mount_mfs
+  replaced /sbin/swapctl
+  replaced /sbin/dump
+  replaced /sbin/swapoff
+  replaced /sbin/sha384sum
+  replaced /sbin/nextboot
+  replaced /sbin/fsck_ufs
+  replaced /sbin/fsck_4.2bsd
+  replaced /sbin/sha512
+  replaced /sbin/swapon
+  replaced /sbin/sha256
+  replaced /sbin/sha512t256sum
+  replaced /sbin/md5
+  replaced /sbin/gcache
+  replaced /sbin/skein1024
+  replaced /sbin/fasthalt
+  replaced /sbin/sha1sum
+  replaced /sbin/sha512t224
+  replaced /sbin/skein256sum
+  replaced /sbin/sha384
+  replaced /sbin/gnop
+  replaced /sbin/restore
+  replaced /sbin/poweroff
+  replaced /sbin/rdump
+  replaced /sbin/rrestore
+  replaced /sbin/sha1
+  replaced /sbin/nologin
+  replaced /sbin/skein512sum
+  touched  /rescue
+  replaced /rescue/rescue
+  replaced /rescue/glabel
+  replaced /rescue/ln
+  replaced /rescue/zfsbootcfg
+  replaced /rescue/iscsictl
+  replaced /rescue/chroot
+  replaced /rescue/dhclient
+  replaced /rescue/realpath
+  replaced /rescue/rcorder
+  replaced /rescue/[
+  replaced /rescue/pfctl
+  replaced /rescue/rm
+  replaced /rescue/tunefs
+  replaced /rescue/dd
+  replaced /rescue/test
+  replaced /rescue/hostname
+  replaced /rescue/zfs
+  replaced /rescue/chflags
+  replaced /rescue/mt
+  replaced /rescue/cp
+  replaced /rescue/gpart
+  replaced /rescue/sleep
+  replaced /rescue/bectl
+  replaced /rescue/zstdcat
+  replaced /rescue/more
+  replaced /rescue/fsck_ufs
+  replaced /rescue/chmod
+  replaced /rescue/nextboot
+  replaced /rescue/md5
+  replaced /rescue/unlzma
+  replaced /rescue/ipfw
+  replaced /rescue/head
+  replaced /rescue/pwd
+  replaced /rescue/link
+  replaced /rescue/kldunload
+  replaced /rescue/halt
+  replaced /rescue/clri
+  replaced /rescue/expr
+  replaced /rescue/mknod
+  replaced /rescue/rrestore
+  replaced /rescue/ls
+  replaced /rescue/mount_cd9660
+  replaced /rescue/ed
+  replaced /rescue/route
+  replaced /rescue/routed
+  replaced /rescue/mount_nullfs
+  replaced /rescue/gzcat
+  replaced /rescue/devfs
+  replaced /rescue/rdump
+  replaced /rescue/lzma
+  replaced /rescue/date
+  replaced /rescue/poweroff
+  replaced /rescue/unlink
+  replaced /rescue/sysctl
+  replaced /rescue/chown
+  replaced /rescue/bzip2
+  replaced /rescue/init
+  replaced /rescue/groups
+  replaced /rescue/mount_msdosfs
+  replaced /rescue/ping
+  replaced /rescue/pgrep
+  replaced /rescue/tcsh
+  replaced /rescue/umount
+  replaced /rescue/setfacl
+  replaced /rescue/fasthalt
+  replaced /rescue/ldconfig
+  replaced /rescue/ipf
+  replaced /rescue/dumpon
+  replaced /rescue/dumpfs
+  replaced /rescue/disklabel
+  replaced /rescue/rmdir
+  replaced /rescue/savecore
+  replaced /rescue/mount_udf
+  replaced /rescue/tar
+  replaced /rescue/zdb
+  replaced /rescue/getfacl
+  replaced /rescue/bsdlabel
+  replaced /rescue/whoami
+  replaced /rescue/newfs
+  replaced /rescue/less
+  replaced /rescue/kldstat
+  replaced /rescue/sh
+  replaced /rescue/gunzip
+  replaced /rescue/gzip
+  replaced /rescue/rtquery
+  replaced /rescue/reboot
+  replaced /rescue/mount_nfs
+  replaced /rescue/cat
+  replaced /rescue/chgrp
+  replaced /rescue/id
+  replaced /rescue/nc
+  replaced /rescue/dmesg
+  replaced /rescue/dump
+  replaced /rescue/zpool
+  replaced /rescue/ifconfig
+  replaced /rescue/stty
+  replaced /rescue/mdconfig
+  replaced /rescue/xzcat
+  replaced /rescue/newfs_msdos
+  replaced /rescue/fsck
+  replaced /rescue/vi
+  replaced /rescue/zstd
+  replaced /rescue/fastboot
+  replaced /rescue/zcat
+  replaced /rescue/pkill
+  replaced /rescue/swapon
+  replaced /rescue/camcontrol
+  replaced /rescue/geom
+  replaced /rescue/ps
+  replaced /rescue/unxz
+  replaced /rescue/kenv
+  replaced /rescue/mdmfs
+  replaced /rescue/ex
+  replaced /rescue/fsck_ffs
+P12 plain: 15478 kept, 1541 touched (same object, new ctime), 25448 replaced (new object), 2 added, 0 removed
+P12 install -C: 24590 kept, 15959 touched (same object, new ctime), 1918 replaced (new object), 0 added, 0 removed (every name in P12-still-changed.txt)
+== X onto each
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-plain-root.manifest --from shprun/containers/X@s1 --onto shprun/foundations/F@v2 --result shprun/containers/X-p
+zfs_rebase: the base is shprun/foundations/F@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-plain-root.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d5973002df60
+zfs_rebase: 44718 pools unchanged
+zfs_rebase: 2033551030 bytes compared
+zfs_rebase: applied 0 rm 0 ln 10 cp 0 dup 6 write, 90925 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-p is at applying1, held under zr-d5973002df60
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-p: the manifest, 16 actions
+zfs_rebase:   done 16, first /etc/group
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-p is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-p or zfs set mountpoint=PATH shprun/containers/X-p
+zfs_rebase: released zr-d5973002df60 on shprun/foundations/F@v1
+zfs_rebase: released zr-d5973002df60 on shprun/containers/X@s1
+zfs_rebase: released zr-d5973002df60 on shprun/foundations/F@v2
+zfs_rebase: the record is off shprun/containers/X-p
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-p
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-plain-root.manifest
+-> exit 0 in 6.40s
+P12 plain /: exit 0, 6.40s, 2033551030 bytes compared, 44718 pools unchanged, 0 conflicted names
+# zfs clone -o canmount=off shprun/foundations/F/usr@v2 shprun/containers/X-p/usr
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-plain-usr-local.manifest --from shprun/containers/X/usr/local@s1 --onto shprun/foundations/F/usr/local@v2 --result shprun/containers/X-p/usr/local
+zfs_rebase: the base is shprun/foundations/F/usr/local@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-plain-usr-local.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d597300edf74
+zfs_rebase: 1 pools unchanged
+zfs_rebase: 0 bytes compared
+zfs_rebase: applied 0 rm 0 ln 2 cp 0 dup 0 write, 4 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-p/usr/local is at applying1, held under zr-d597300edf74
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-p/usr/local: the manifest, 2 actions
+zfs_rebase:   done 2, first /etc
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-p/usr/local is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-p/usr/local or zfs set mountpoint=PATH shprun/containers/X-p/usr/local
+zfs_rebase: released zr-d597300edf74 on shprun/foundations/F/usr/local@v1
+zfs_rebase: released zr-d597300edf74 on shprun/containers/X/usr/local@s1
+zfs_rebase: released zr-d597300edf74 on shprun/foundations/F/usr/local@v2
+zfs_rebase: the record is off shprun/containers/X-p/usr/local
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-p/usr/local
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-plain-usr-local.manifest
+-> exit 0 in 1.40s
+P12 plain /usr/local: exit 0, 1.40s, 0 bytes compared, 1 pools unchanged, 0 conflicted names
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-plain-var.manifest --from shprun/containers/X/var@s1 --onto shprun/foundations/F/var@v2 --result shprun/containers/X-p/var
+zfs_rebase: the base is shprun/foundations/F/var@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-plain-var.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d5973012df85
+zfs_rebase: 108 pools unchanged
+zfs_rebase: 4195840 bytes compared
+zfs_rebase: applied 0 rm 0 ln 2 cp 0 dup 0 write, 6 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-p/var is at applying1, held under zr-d5973012df85
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-p/var: the manifest, 2 actions
+zfs_rebase:   done 2, first /log/messages
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-p/var is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-p/var or zfs set mountpoint=PATH shprun/containers/X-p/var
+zfs_rebase: released zr-d5973012df85 on shprun/foundations/F/var@v1
+zfs_rebase: released zr-d5973012df85 on shprun/containers/X/var@s1
+zfs_rebase: released zr-d5973012df85 on shprun/foundations/F/var@v2
+zfs_rebase: the record is off shprun/containers/X-p/var
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-p/var
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-plain-var.manifest
+-> exit 0 in 1.20s
+P12 plain /var: exit 0, 1.20s, 4195840 bytes compared, 108 pools unchanged, 0 conflicted names
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-C-root.manifest --from shprun/containers/X@s1 --onto shprun/foundations/G@v2 --result shprun/containers/X-c
+zfs_rebase: the base is shprun/foundations/F@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-C-root.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d5973014df97
+zfs_rebase: 53830 pools unchanged
+zfs_rebase: 93358926 bytes compared
+zfs_rebase: applied 0 rm 0 ln 10 cp 0 dup 6 write, 90925 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-c is at applying1, held under zr-d5973014df97
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-c: the manifest, 16 actions
+zfs_rebase:   done 16, first /etc/group
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-c is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-c or zfs set mountpoint=PATH shprun/containers/X-c
+zfs_rebase: released zr-d5973014df97 on shprun/foundations/F@v1
+zfs_rebase: released zr-d5973014df97 on shprun/containers/X@s1
+zfs_rebase: released zr-d5973014df97 on shprun/foundations/G@v2
+zfs_rebase: the record is off shprun/containers/X-c
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-c
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-C-root.manifest
+-> exit 0 in 5.02s
+P12 C /: exit 0, 5.02s, 93358926 bytes compared, 53830 pools unchanged, 0 conflicted names
+# zfs clone -o canmount=off shprun/foundations/G/usr@v2 shprun/containers/X-c/usr
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-C-usr-local.manifest --from shprun/containers/X/usr/local@s1 --onto shprun/foundations/G/usr/local@v2 --result shprun/containers/X-c/usr/local
+zfs_rebase: the base is shprun/foundations/F/usr/local@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-C-usr-local.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d597301edfab
+zfs_rebase: 1 pools unchanged
+zfs_rebase: 0 bytes compared
+zfs_rebase: applied 0 rm 0 ln 2 cp 0 dup 0 write, 4 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-c/usr/local is at applying1, held under zr-d597301edfab
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-c/usr/local: the manifest, 2 actions
+zfs_rebase:   done 2, first /etc
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-c/usr/local is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-c/usr/local or zfs set mountpoint=PATH shprun/containers/X-c/usr/local
+zfs_rebase: released zr-d597301edfab on shprun/foundations/F/usr/local@v1
+zfs_rebase: released zr-d597301edfab on shprun/containers/X/usr/local@s1
+zfs_rebase: released zr-d597301edfab on shprun/foundations/G/usr/local@v2
+zfs_rebase: the record is off shprun/containers/X-c/usr/local
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-c/usr/local
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-C-usr-local.manifest
+-> exit 0 in 1.17s
+P12 C /usr/local: exit 0, 1.17s, 0 bytes compared, 1 pools unchanged, 0 conflicted names
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-C-var.manifest --from shprun/containers/X/var@s1 --onto shprun/foundations/G/var@v2 --result shprun/containers/X-c/var
+zfs_rebase: the base is shprun/foundations/F/var@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-C-var.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d5973020dfbc
+zfs_rebase: 108 pools unchanged
+zfs_rebase: 4195840 bytes compared
+zfs_rebase: applied 0 rm 0 ln 2 cp 0 dup 0 write, 6 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-c/var is at applying1, held under zr-d5973020dfbc
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-c/var: the manifest, 2 actions
+zfs_rebase:   done 2, first /log/messages
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-c/var is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-c/var or zfs set mountpoint=PATH shprun/containers/X-c/var
+zfs_rebase: released zr-d5973020dfbc on shprun/foundations/F/var@v1
+zfs_rebase: released zr-d5973020dfbc on shprun/containers/X/var@s1
+zfs_rebase: released zr-d5973020dfbc on shprun/foundations/G/var@v2
+zfs_rebase: the record is off shprun/containers/X-c/var
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-c/var
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T140103Z/P12-C-var.manifest
+-> exit 0 in 1.00s
+P12 C /var: exit 0, 1.00s, 4195840 bytes compared, 108 pools unchanged, 0 conflicted names
+P12 answer: plain: install 55.5s, send 1009.9 MiB, rebase 9s, 0 conflicted names, 0 failed
+P12 answer: install -C: install 53.55s, send 38.0 MiB, rebase 7.19s, 0 conflicted names, 0 failed
+P12 answer: what -C still changes: 24590 kept, 15959 touched (same object, new ctime), 1918 replaced (new object), 0 added, 0 removed
+P12 answer: P5 on a real world: X's edited hosts and passwd files over an unchanged reinstall gave 0 conflicted names

@@ -1,0 +1,21 @@
+#rebase-manifest 5
+#result s1
+#form dataset
+#base shprun/containers/X/var@s1 4332448633723275779
+#from shprun/containers/X/var@s2 9159763478831258269
+#onto shprun/containers/X-staging/var@s1 8583550765907638378
+#presnap shprun/containers/X-staging/var@s1
+#readonly off
+#canmount on
+#made -
+#tag zr-d5972d7002e3
+#take -
+#written 2026-10-11T14:01:29Z
+#mode strict
+#actions 1
+#conflicts 0
+/
+    log/
+        admin-s2.log cp /log/admin-s2.log
+        ..
+    ..

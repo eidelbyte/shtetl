@@ -1,0 +1,103 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+# zfs set shtetl:space=lake shplake
+# zfs create shplake/foundations
+# zfs create shplake/containers
+# zfs create -p shplake/archive/containers
+# zfs create shplake/foundations/F
+# zfs create -o canmount=off shplake/foundations/F/usr
+# zfs create shplake/foundations/F/usr/local
+# zfs create shplake/foundations/F/var
+# zfs set mountpoint=/tmp/shtetl-probe/build/F shplake/foundations/F
+# zfs inherit mountpoint shplake/foundations/F
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v1' shplake/foundations/F@v1
+# zfs send shplake/foundations/F@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F
+# zfs send shplake/foundations/F/usr@v1 | zfs recv -u -o readonly=on -o canmount=off shprun/foundations/F/usr
+# zfs send shplake/foundations/F/usr/local@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/usr/local
+# zfs send shplake/foundations/F/var@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/var
+# zfs set shtetl:probe=on-the-origin shprun/foundations/F
+== a: a child cloned before its parent exists
+# zfs clone shprun/foundations/F/var@v1 shprun/containers/A/var
+cannot create 'shprun/containers/A/var': parent does not exist
+-> exit 1
+P9 check ok: a: child before parent (refused)
+== b: zfs clone -p makes the missing parent
+# zfs clone -p shprun/foundations/F/var@v1 shprun/containers/B/var
+P9 b: clone -p made shprun/containers/B with origin '-'; it is a plain dataset, not a clone
+== c: the placeholder cloned without -o canmount=off
+# zfs clone shprun/foundations/F@v1 shprun/containers/P
+# zfs clone shprun/foundations/F/usr@v1 shprun/containers/P/usr
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/containers/P/usr/local
+# zfs get -r -t filesystem -o name,property,value,source mountpoint,canmount,mounted,readonly,origin shprun/containers/P
+NAME                           PROPERTY    VALUE                                         SOURCE
+shprun/containers/P            mountpoint  /tmp/shtetl-probe/run/containers/P            inherited from shprun/containers
+shprun/containers/P            canmount    on                                            default
+shprun/containers/P            mounted     yes                                           -
+shprun/containers/P            readonly    off                                           default
+shprun/containers/P            origin      shprun/foundations/F@v1                       -
+shprun/containers/P/usr        mountpoint  /tmp/shtetl-probe/run/containers/P/usr        inherited from shprun/containers
+shprun/containers/P/usr        canmount    on                                            default
+shprun/containers/P/usr        mounted     yes                                           -
+shprun/containers/P/usr        readonly    off                                           default
+shprun/containers/P/usr        origin      shprun/foundations/F/usr@v1                   -
+shprun/containers/P/usr/local  mountpoint  /tmp/shtetl-probe/run/containers/P/usr/local  inherited from shprun/containers
+shprun/containers/P/usr/local  canmount    on                                            default
+shprun/containers/P/usr/local  mounted     yes                                           -
+shprun/containers/P/usr/local  readonly    off                                           default
+shprun/containers/P/usr/local  origin      shprun/foundations/F/usr/local@v1             -
+# ls /tmp/shtetl-probe/run/containers/P/usr
+local
+P9 c: P/usr has canmount=on and the root's usr/bin is hidden
+== d: the same with -o canmount=off (shtetl's way)
+# zfs clone shprun/foundations/F@v1 shprun/containers/D
+# zfs clone -o canmount=off shprun/foundations/F/usr@v1 shprun/containers/D/usr
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/containers/D/usr/local
+# zfs clone shprun/foundations/F/var@v1 shprun/containers/D/var
+# zfs get -r -t filesystem -o name,property,value,source mountpoint,canmount,mounted,readonly,origin shprun/containers/D
+NAME                           PROPERTY    VALUE                                         SOURCE
+shprun/containers/D            mountpoint  /tmp/shtetl-probe/run/containers/D            inherited from shprun/containers
+shprun/containers/D            canmount    on                                            default
+shprun/containers/D            mounted     yes                                           -
+shprun/containers/D            readonly    off                                           default
+shprun/containers/D            origin      shprun/foundations/F@v1                       -
+shprun/containers/D/usr        mountpoint  /tmp/shtetl-probe/run/containers/D/usr        inherited from shprun/containers
+shprun/containers/D/usr        canmount    off                                           local
+shprun/containers/D/usr        mounted     no                                            -
+shprun/containers/D/usr        readonly    off                                           default
+shprun/containers/D/usr        origin      shprun/foundations/F/usr@v1                   -
+shprun/containers/D/usr/local  mountpoint  /tmp/shtetl-probe/run/containers/D/usr/local  inherited from shprun/containers
+shprun/containers/D/usr/local  canmount    on                                            default
+shprun/containers/D/usr/local  mounted     yes                                           -
+shprun/containers/D/usr/local  readonly    off                                           default
+shprun/containers/D/usr/local  origin      shprun/foundations/F/usr/local@v1             -
+shprun/containers/D/var        mountpoint  /tmp/shtetl-probe/run/containers/D/var        inherited from shprun/containers
+shprun/containers/D/var        canmount    on                                            default
+shprun/containers/D/var        mounted     yes                                           -
+shprun/containers/D/var        readonly    off                                           default
+shprun/containers/D/var        origin      shprun/foundations/F/var@v1                   -
+P9 check ok: d: the root's usr/bin with the placeholder canmount=off (visible)
+== e: usr/local cloned before usr
+# zfs clone shprun/foundations/F@v1 shprun/containers/E
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/containers/E/usr/local
+cannot create 'shprun/containers/E/usr/local': parent does not exist
+-> exit 1
+P9 check ok: e: usr/local before usr (refused)
+== f: what a clone keeps of its origin
+# zfs get -o name,property,value,source readonly,canmount,mountpoint,compression,atime,shtetl:probe shprun/foundations/F shprun/containers/D
+NAME                  PROPERTY      VALUE                                SOURCE
+shprun/containers/D   readonly      off                                  default
+shprun/containers/D   canmount      on                                   default
+shprun/containers/D   mountpoint    /tmp/shtetl-probe/run/containers/D   inherited from shprun/containers
+shprun/containers/D   compression   zstd                                 inherited from shprun
+shprun/containers/D   atime         off                                  inherited from shprun
+shprun/containers/D   shtetl:probe  -                                    -
+shprun/foundations/F  readonly      on                                   local
+shprun/foundations/F  canmount      noauto                               local
+shprun/foundations/F  mountpoint    /tmp/shtetl-probe/run/foundations/F  inherited from shprun/foundations
+shprun/foundations/F  compression   zstd                                 inherited from shprun
+shprun/foundations/F  atime         off                                  inherited from shprun
+shprun/foundations/F  shtetl:probe  on-the-origin                        local
+P9 f: D (a clone of readonly, noauto F carrying shtetl:probe): readonly off default;canmount on default;shtetl:probe - -
+P9 answer: children need the parent first (a: refused, e: refused); clone -p makes a plain parent ('-'); the placeholder cloned without canmount=off is canmount=on and the root's usr/bin is hidden
+P9 answer: a clone keeps none of the origin's local properties: readonly off default;canmount on default;shtetl:probe - -
