@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>shtetl, one cycle in 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<style>
+:root {
+	--paper: #f6f7f6;
+	--ink: #1d2126;
+	--muted: #5e656d;
+	--line: #d3d7db;
+	--code-bg: #e9ecee;
+	--accent: #2f4fc9;
+	--version: #2f4fc9;
+	--save: #5e646c;
+	--from: #d9a300;
+	--build: #b8740f;
+	--send: #2f4fc9;
+	--clone: #2f7a4f;
+	--rebase: #b3246b;
+	--ok: #2f7a4f;
+	--warn: #b8740f;
+	--fail: #b3246b;
+	--prop: #6a52b0;
+	--stage: #d9dde1;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		--paper: #1f2328;
+		--ink: #e5e8eb;
+		--muted: #a2a9b0;
+		--line: #353b42;
+		--code-bg: #2a2f35;
+		--accent: #8aa0ff;
+		--version: #6f8cff;
+		--save: #9aa1a9;
+		--from: #f0c02a;
+		--build: #e5a14a;
+		--send: #6f8cff;
+		--clone: #6cc495;
+		--rebase: #ef6aa6;
+		--ok: #6cc495;
+		--warn: #e5a14a;
+		--fail: #ef6aa6;
+		--prop: #b6a4f0;
+		--stage: #171a1e;
+	}
+}
+:root[data-theme="dark"] {
+	--paper: #1f2328;
+	--ink: #e5e8eb;
+	--muted: #a2a9b0;
+	--line: #353b42;
+	--code-bg: #2a2f35;
+	--accent: #8aa0ff;
+	--version: #6f8cff;
+	--save: #9aa1a9;
+	--from: #f0c02a;
+	--build: #e5a14a;
+	--send: #6f8cff;
+	--clone: #6cc495;
+	--rebase: #ef6aa6;
+	--ok: #6cc495;
+	--warn: #e5a14a;
+	--fail: #ef6aa6;
+	--prop: #b6a4f0;
+	--stage: #171a1e;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+	margin: 0;
+	background: var(--stage);
+	color: var(--ink);
+	font: 17px/1.55 "Newsreader", Georgia, serif;
+	display: grid;
+	grid-template-columns: minmax(330px, 31rem) 1fr;
+	overflow: hidden;
+}
+code, pre, .mono { font-family: "IBM Plex Mono", Menlo, monospace; }
+code { font-size: 0.8em; background: var(--code-bg); padding: 1px 4px;
+	border-radius: 3px; }
+pre { font-size: 12px; line-height: 1.5; background: var(--code-bg);
+	padding: 10px 12px; border-radius: 4px; overflow-x: auto;
+	margin: 10px 0 14px; }
+pre code { background: none; padding: 0; font-size: inherit; }
+pre.sketch { outline: 1px dashed var(--line); }
+a { color: var(--accent); }
+
+/* the placard */
+.placard {
+	background: var(--paper);
+	border-right: 1px solid var(--line);
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	min-width: 0;
+}
+.placard header { padding: 22px 26px 10px; }
+.where {
+	font: 600 13px/1.3 "Archivo", "Helvetica Neue", Arial, sans-serif;
+	color: var(--muted);
+	margin: 0 0 6px;
+	min-height: 1em;
+}
+.placard h1, .placard h2 {
+	font-family: "Archivo", "Helvetica Neue", Arial, sans-serif;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	margin: 0;
+	line-height: 1.15;
+}
+.placard h1 { font-size: 30px; }
+.placard h2 { font-size: 23px; }
+.slide-body {
+	flex: 1;
+	overflow-y: auto;
+	padding: 4px 26px 20px;
+}
+.slide-body p { margin: 0 0 12px; max-width: 62ch; }
+.slide-body p code { overflow-wrap: anywhere; }
+.placard footer {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 12px 26px 16px;
+	border-top: 1px solid var(--line);
+	font-family: "Archivo", "Helvetica Neue", Arial, sans-serif;
+}
+.counter { flex: 1; text-align: center; color: var(--muted); font-size: 14px;
+	font-variant-numeric: tabular-nums; }
+button {
+	font: 600 15px "Archivo", "Helvetica Neue", Arial, sans-serif;
+	color: var(--ink);
+	background: transparent;
+	border: 1.5px solid var(--ink);
+	border-radius: 999px;
+	padding: 7px 16px;
+	cursor: pointer;
+}
+button.primary { background: var(--ink); color: var(--paper); }
+button:disabled { opacity: 0.3; cursor: default; }
+button:focus-visible, a:focus-visible, .tick:focus-visible {
+	outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* the story's own panels */
+.tablewrap { overflow-x: auto; }
+.cast { width: 100%; border-collapse: collapse; font-size: 14px; margin: 6px 0 14px; }
+.cast td, .cast th { text-align: left; vertical-align: top; padding: 4px 6px;
+	border-bottom: 1px solid var(--line); }
+.cast th { font: 600 12px "Archivo", sans-serif; color: var(--muted); }
+.codes { display: grid; gap: 4px; }
+.fname { font: 600 12px "Archivo", sans-serif; color: var(--muted); margin-top: 8px; }
+.checks { border-top: 1px solid var(--line); padding: 8px 0; margin: 8px 0; }
+.checks .ctitle { font: 600 13px "Archivo", sans-serif; color: var(--muted);
+	margin-bottom: 4px; }
+.checks ul { list-style: none; margin: 0; padding: 0; }
+.checks li { display: grid; grid-template-columns: 44px 1fr; gap: 8px;
+	padding: 3px 0; font-size: 15px; }
+.cs { font: 600 10.5px "IBM Plex Mono", monospace; color: var(--paper);
+	border-radius: 3px; text-align: center; height: 17px; line-height: 17px;
+	margin-top: 4px; }
+.cs-ok { background: var(--ok); } .cs-warn { background: var(--warn); }
+.cs-fail { background: var(--fail); } .cs-note { background: var(--muted); }
+.cs-prop { background: var(--prop); }
+.callout { border-left: 3px solid var(--c); padding: 4px 0 4px 12px; margin: 12px 0; }
+.callout .ctitle { font: 700 14px "Archivo", sans-serif; color: var(--c); }
+.callout p { margin: 4px 0; font-size: 15.5px; }
+.callout-finding { --c: var(--build); }
+.callout-question { --c: var(--prop); }
+.callout-note { --c: var(--accent); }
+.diagram { margin: 10px 0; overflow-x: auto; }
+.diagram svg { width: 100%; min-width: 520px; height: auto; display: block; }
+.diagram svg text { font-family: "Archivo", sans-serif; fill: var(--ink); }
+.diagram svg .rds, .diagram svg .ltext { font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+.diagram svg .lin { fill: none; stroke: var(--muted); stroke-width: 3; }
+.diagram svg .lin-new { stroke: var(--clone); stroke-dasharray: 6 4; }
+.diagram svg .ldot { stroke: var(--paper); stroke-width: 2; }
+.diagram svg .ldot-version { fill: var(--version); }
+.diagram svg .ldot-save { fill: var(--save); }
+.diagram svg .ldot-from { fill: var(--from); }
+.diagram svg .ar { fill: none; stroke-width: 2.4; }
+.diagram svg .ar-rebase { stroke: var(--rebase); }
+.diagram svg .mk-rebase { fill: var(--rebase); }
+.diagram svg .badge-rebase { fill: var(--rebase); }
+.diagram svg .badgetext { font-size: 11px; font-weight: 700; fill: var(--paper); }
+
+/* the model */
+#stage { position: relative; overflow: hidden; min-width: 0; }
+#stage canvas { display: block; }
+.labels { position: absolute; inset: 0; pointer-events: none; }
+.lbl { width: 0; height: 0; }
+.lbl > div {
+	position: absolute; left: 0; top: -9px; white-space: nowrap;
+	font: 500 11.5px/1.2 "IBM Plex Mono", Menlo, monospace;
+	color: var(--ink);
+	display: flex; gap: 5px; align-items: center;
+	text-shadow: 0 0 3px var(--stage), 0 0 6px var(--stage);
+}
+.lbl .tg { font: 400 10.5px "Archivo", sans-serif; color: var(--muted); }
+.lbl .ch { font: 600 9.5px "IBM Plex Mono", monospace; color: #fff;
+	border-radius: 6px; padding: 1px 4px; text-shadow: none; }
+.lbl .ch-version { background: var(--version); }
+.lbl .ch-save { background: var(--save); }
+.lbl .ch-from { background: var(--from); color: #1d2126; }
+.lbl.file > div { color: var(--muted); font-style: italic; }
+.plate-lbl > div {
+	position: absolute; left: 0; top: -14px; white-space: nowrap;
+	font: 700 17px "Archivo", sans-serif; color: var(--ink);
+	text-shadow: 0 0 4px var(--stage);
+}
+.plate-lbl span { display: block; font: 400 11px "Archivo", sans-serif;
+	color: var(--muted); }
+.badge3 { width: 0; height: 0; }
+.badge3 > div {
+	position: absolute; left: -11px; top: -11px; width: 22px; height: 22px;
+	border-radius: 50%; color: #fff;
+	font: 700 12px/22px "Archivo", sans-serif; text-align: center;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.tools { position: absolute; top: 14px; right: 16px; display: flex; gap: 8px; }
+.tools button { background: var(--paper); border-color: var(--line); font-size: 13px;
+	padding: 6px 12px; }
+.tools button[aria-pressed="true"] { border-color: var(--ink); }
+.key {
+	position: absolute; right: 16px; top: 56px; width: 270px;
+	background: var(--paper); border: 1px solid var(--line); border-radius: 6px;
+	padding: 12px 14px; font: 13px/1.45 "Archivo", sans-serif; display: none;
+}
+.key.open { display: block; }
+.key h3 { font-size: 13px; margin: 8px 0 4px; }
+.key h3:first-child { margin-top: 0; }
+.key ul { list-style: none; margin: 0; padding: 0; }
+.key li { display: flex; align-items: center; gap: 8px; }
+.sw { width: 14px; height: 10px; border-radius: 2px; flex: none; }
+.timeline {
+	position: absolute; left: 16px; right: 16px; bottom: 14px;
+	display: flex; align-items: flex-end; gap: 2px; overflow-x: auto;
+	padding: 4px 2px;
+}
+.tick {
+	flex: 1 0 8px; height: 14px; border: 0; padding: 0; border-radius: 2px;
+	background: var(--line); cursor: pointer;
+}
+.tick.act { height: 22px; background: var(--muted); margin-left: 6px; }
+.tick.act:first-child { margin-left: 0; }
+.tick.done { background: var(--muted); opacity: 0.55; }
+.tick.act.done { opacity: 0.8; }
+.tick.current { background: var(--accent); opacity: 1; height: 24px; }
+.nogl {
+	position: absolute; inset: 0; display: none; align-items: center;
+	justify-content: center; padding: 40px; text-align: center;
+	font: 16px/1.5 "Archivo", sans-serif; color: var(--muted);
+}
+.nogl.show { display: flex; }
+@media (max-width: 820px) {
+	body { grid-template-columns: minmax(0, 1fr); grid-template-rows: 50vh 50vh; }
+	#stage { grid-row: 1; }
+	.placard { grid-row: 2; height: 50vh; border-right: 0;
+		border-top: 1px solid var(--line); }
+	.placard header { padding: 14px 16px 6px; }
+	.slide-body { padding: 4px 16px 14px; }
+	.placard footer { padding: 10px 16px 12px; }
+	.placard h1 { font-size: 24px; }
+	.placard h2 { font-size: 19px; }
+	.key { left: 16px; right: 16px; width: auto; }
+}
+</style>
+<script type="importmap">
+{ "imports": {
+	"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+	"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<aside class="placard" aria-live="polite">
+	<header>
+		<p class="where" id="where"></p>
+		<h1 id="title"></h1>
+	</header>
+	<div class="slide-body" id="body"></div>
+	<footer>
+		<button id="prev">Previous</button>
+		<span class="counter" id="counter"></span>
+		<button id="next" class="primary">Next</button>
+	</footer>
+</aside>
+<main id="stage" aria-label="A model of the four ZFS spaces, changing with each slide">
+	<div class="tools">
+		<button id="follow" aria-pressed="true">Follow the story</button>
+		<button id="keybtn" aria-expanded="false" aria-controls="key">Key</button>
+	</div>
+	<div class="key" id="key">
+		<h3>The model</h3>
+		<ul>
+			<li><span class="sw" style="background:#f4f1ea;border:1px solid #9aa"></span>a building is a dataset; a sheet is a file</li>
+			<li><span class="sw" style="background:#ffd27a"></span>a lit base means mounted</li>
+			<li><span class="sw" style="border:1px solid #888"></span>a bare frame holds nothing (canmount=off)</li>
+		</ul>
+		<h3>Floors on a roof are snapshots</h3>
+		<ul>
+			<li><span class="sw" style="background:var(--version)"></span>a foundation version</li>
+			<li><span class="sw" style="background:var(--save)"></span>a save</li>
+			<li><span class="sw" style="background:var(--from)"></span>where an update starts</li>
+		</ul>
+		<h3>A glow says what this step did</h3>
+		<ul>
+			<li><span class="sw" style="background:#2f9e5a"></span>created</li>
+			<li><span class="sw" style="background:#e39b16"></span>written</li>
+			<li><span class="sw" style="background:#7b5cc4"></span>read</li>
+			<li><span class="sw" style="background:#2f4fc9"></span>snapshotted</li>
+			<li><span class="sw" style="background:#c8372d"></span>destroyed</li>
+			<li><span class="sw" style="background:#9097a0"></span>renamed away</li>
+		</ul>
+		<h3>Threads are operations, numbered as in the text</h3>
+		<ul>
+			<li><span class="sw" style="background:var(--build)"></span>build, install</li>
+			<li><span class="sw" style="background:var(--send)"></span>send, save</li>
+			<li><span class="sw" style="background:var(--clone)"></span>clone</li>
+			<li><span class="sw" style="background:var(--rebase)"></span>rebase</li>
+			<li><span class="sw" style="background:#8b9097"></span>rename, promote</li>
+		</ul>
+	</div>
+	<div class="nogl" id="nogl">This page draws its model with WebGL, which this browser
+	did not provide. The slides still work; the same story, drawn flat, is story.html.</div>
+	<nav class="timeline" id="timeline" aria-label="Slides"></nav>
+</main>
+<script type="application/json" id="story-data">{"spaces":[{"key":"C","label":"zconfig","sub":"shtetl:space=config","rows":[["C","fast/shtetl/config",0,"root"],["C/sc","shtetl.conf",1,"file"],["C/dc","default.conf",1,"file"],["C/f","foundations/",1,"dir"],["C/fg","generic.conf",2,"file"],["C/c","containers/",1,"dir"],["C/cn","nginx.conf",2,"file"]]},{"key":"B","label":"zbuild","sub":"shtetl:space=build","rows":[["B","fast/shtetl/src",0,"root"],["B/t","freebsd-src",1,"file"]]},{"key":"L","label":"zlake","sub":"shtetl:space=lake  pool tank (HDD)","rows":[["L","tank/shtetl",0,"root"],["L/f","foundations",1,"ds"],["L/f/G","generic",2,"ds"],["L/f/G/tmp","tmp",3,"ds"],["L/f/G/usr","usr",3,"ds"],["L/f/G/usr/local","local",4,"ds"],["L/f/G/var","var",3,"ds"],["L/fb","foundation-builds",1,"ds"],["L/fb/G","generic",2,"ds"],["L/c","containers",1,"ds"],["L/c/n","nginx",2,"ds"],["L/c/n/tmp","tmp",3,"ds"],["L/c/n/usr","usr",3,"ds"],["L/c/n/usr/local","local",4,"ds"],["L/c/n/var","var",3,"ds"],["L/c/n/www","www",3,"ds"],["L/c/ns","nginx-staging",2,"ds"],["L/c/ns/tmp","tmp",3,"ds"],["L/c/ns/usr","usr",3,"ds"],["L/c/ns/usr/local","local",4,"ds"],["L/c/ns/var","var",3,"ds"],["L/c/ns/www","www",3,"ds"],["L/s","systems",1,"ds"],["L/a","archive",1,"ds"],["L/a/c","containers",2,"ds"],["L/a/c/n","nginx-2026-11-20",3,"ds"],["L/a/c/n/tmp","tmp",4,"ds"],["L/a/c/n/usr","usr",4,"ds"],["L/a/c/n/usr/local","local",5,"ds"],["L/a/c/n/var","var",4,"ds"],["L/a/c/n/www","www",4,"ds"]]},{"key":"R","label":"zrun","sub":"shtetl:space=run  pool fast (NVMe, boot)","rows":[["R","fast/shtetl/run",0,"root"],["R/f","foundations",1,"ds"],["R/f/G","generic",2,"ds"],["R/f/G/tmp","tmp",3,"ds"],["R/f/G/usr","usr",3,"ds"],["R/f/G/usr/local","local",4,"ds"],["R/f/G/var","var",3,"ds"],["R/c","containers",1,"ds"],["R/c/n","nginx",2,"ds"],["R/c/n/tmp","tmp",3,"ds"],["R/c/n/usr","usr",3,"ds"],["R/c/n/usr/local","local",4,"ds"],["R/c/n/var","var",3,"ds"],["R/c/n/www","www",3,"ds"],["R/c/ns","nginx-staging",2,"ds"],["R/c/ns/tmp","tmp",3,"ds"],["R/c/ns/usr","usr",3,"ds"],["R/c/ns/usr/local","local",4,"ds"],["R/c/ns/var","var",3,"ds"],["R/c/ns/www","www",3,"ds"],["R/s","systems",1,"ds"]]}],"slides":[{"kind":"title","where":"","title":"shtetl, one cycle","html":"<p>One machine, one foundation, one container. The model on the right is the machine's four ZFS spaces; every slide changes it in place, the way the cycle changes the datasets: a foundation is built, a container is made from it, and the container is moved onto the foundation's next version.<\/p>\n<p>Move with the buttons below, the arrow keys, or the marks along the bottom of the model. Drag to turn the model, scroll to zoom; the view follows the story until you move it, and <b>Follow the story<\/b> hands it back.<\/p><div class=\"tablewrap\"><table class=\"cast\"><tr><th>name<\/th><th>what it is in this story<\/th><\/tr><tr><td><code>machine<\/code><\/td><td><code>kfar<\/code>: pools <code>fast<\/code> (NVMe, boot) and <code>tank<\/code> (HDD)<\/td><\/tr><tr><td><code>zconfig<\/code><\/td><td><code>fast/shtetl/config<\/code>, the zshtetl-recipes clone, at <code>/shtetl/config<\/code><\/td><\/tr><tr><td><code>zbuild<\/code><\/td><td><code>fast/shtetl/src<\/code>, a freebsd-src checkout<\/td><\/tr><tr><td><code>zlake<\/code><\/td><td><code>tank/shtetl<\/code><\/td><\/tr><tr><td><code>zrun<\/code><\/td><td><code>fast/shtetl/run<\/code>; containers at <code>/containers<\/code><\/td><\/tr><tr><td><code>F<\/code><\/td><td>foundation <code>generic<\/code>, named after its recipe<\/td><\/tr><tr><td><code>v1<\/code><\/td><td><code>@15.1-releng-2026-10-08-0f691888dc56<\/code>, first build<\/td><\/tr><tr><td><code>v2<\/code><\/td><td><code>@15.1-releng-2026-11-12-5b2c7e01a9d4<\/code>, after an errata<\/td><\/tr><tr><td><code>s1<\/code><\/td><td><code>@save-2026-10-09-101500<\/code> \"site live, ploni added\"<\/td><\/tr><tr><td><code>s2<\/code><\/td><td><code>@save-2026-11-12-090000<\/code>, where the update starts<\/td><\/tr><tr><td><code>s1', s2'<\/code><\/td><td>s1 and s2 replayed onto v2 by the update, under the same names<\/td><\/tr><tr><td><code>s3<\/code><\/td><td><code>@save-2026-11-12-094500<\/code> \"soak start\" (staging)<\/td><\/tr><tr><td><code>s5<\/code><\/td><td><code>@save-2026-11-20-181500<\/code> \"cut over\" (new)<\/td><\/tr><\/table><\/div><p>The same story, drawn as a long page of flat diagrams, is <code>story.html<\/code>.<\/p>","state":{"present":[],"mounted":[],"pills":{},"tags":{}},"hl":{},"arrows":[],"frame":0},{"kind":"act","where":"Act 0","title":"The stage","html":"<p>One machine, <code>kfar<\/code>, with two pools: <code>fast<\/code>, an NVMe mirror it boots from, and <code>tank<\/code>, a raidz of large disks. Its admin installed shtetl and ran <code>shtetl bootstrap<\/code>, naming one existing dataset for each of the four spaces.<\/p>","state":{"present":[],"mounted":[],"pills":{},"tags":{}},"hl":{},"arrows":[],"frame":0},{"kind":"frame","where":"Act 0, frame 1","title":"After bootstrap","html":"<p>Bootstrap touched no device. It set a local user property, <code>shtetl:space<\/code>, on each root, created the empty parents under zlake and zrun with parasa's defaults (<code>atime=off<\/code>, <code>compression=zstd<\/code>, <code>aclmode=passthrough<\/code>, <code>mountpoint=none<\/code>, <code>canmount=noauto<\/code>), and made <code>zrun/containers<\/code> the one parent that mounts by itself, at <code>/containers<\/code>. <code>zrun/foundations<\/code> gets a real mountpoint, <code>/shtetl/foundations<\/code>, but nothing under it mounts by itself (<code>canmount=noauto<\/code>): zfs_rebase reads every side at its own mountpoint, so shtetl mounts a foundation there for the length of an update, and no longer.<\/p>\n<p>zconfig is a clone of the zshtetl-recipes repo: <code>default.conf<\/code> came from upstream, <code>shtetl.conf<\/code> was written by bootstrap. zbuild is a FreeBSD src checkout the admin already had. From here on every frame shows the same four boxes; only what the story does changes.<\/p><p>How to read a frame: a dot before a name means mounted. Pills on the right are snapshots (blue a foundation version, grey a save, orange the snapshot an update starts from). A tinted row was created, written, read or removed in that frame, as the legend at the top says. Numbered arrows are the operations, listed under the diagram.<\/p>","state":{"present":["B","B/t","C","C/c","C/dc","C/f","C/sc","L","L/a","L/a/c","L/c","L/f","L/fb","L/s","R","R/c","R/f","R/s"],"mounted":["C","R/c"],"pills":{},"tags":{"B/t":"git checkout","R/c":"/containers","R/f":"/shtetl/foundations"}},"hl":{},"frame":1,"arrows":[]},{"kind":"act","where":"Act I","title":"A foundation","html":"<p>A foundation is FreeBSD built from source by a recipe. Every container and system is a clone of one, so it is built first.<\/p>","state":{"present":["B","B/t","C","C/c","C/dc","C/f","C/sc","L","L/a","L/a/c","L/c","L/f","L/fb","L/s","R","R/c","R/f","R/s"],"mounted":["C","R/c"],"pills":{},"tags":{"B/t":"git checkout","R/c":"/containers","R/f":"/shtetl/foundations"}},"hl":{},"arrows":[],"frame":0},{"kind":"frame","where":"Act I, frame 2","title":"The admin writes a foundation recipe","html":"<p>The admin adds <code>foundations/generic.conf<\/code> to the recipes clone. It is three lines: everything else comes from <code>default.conf<\/code>, the base layer every recipe is built on. <code>shtetl.conf<\/code> is not part of any recipe; it holds what is about this machine.<\/p><div class=\"codes\">\n<div class=\"codebox\"><div class=\"fname\">foundations/generic.conf (new)<\/div><pre class=\"\"><code># foundations/generic.conf: a GENERIC kernel and world\nver = &quot;&gt;=15&quot;;\nsrc_branch = &quot;releng/15.1&quot;;\nkernconf = &quot;GENERIC&quot;;<\/code><\/pre><\/div>\n<div class=\"codebox\"><div class=\"fname\">default.conf<\/div><pre class=\"\"><code># default.conf: the base layer of every recipe (from upstream)\n\ndatasets {\n    tmp {}\n    var {}\n    &quot;usr/local&quot; {}\n}\n\nderivations {\n    &quot;etc/passwd&quot; {\n        source = &quot;etc/master.passwd&quot;;\n        command = &quot;pwd_mkdb -p -d /etc /etc/master.passwd&quot;;\n    }\n    &quot;etc/pwd.db&quot; {\n        source = &quot;etc/master.passwd&quot;;\n        command = &quot;pwd_mkdb -p -d /etc /etc/master.passwd&quot;;\n    }\n    &quot;etc/spwd.db&quot; {\n        source = &quot;etc/master.passwd&quot;;\n        command = &quot;pwd_mkdb -p -d /etc /etc/master.passwd&quot;;\n    }\n    &quot;etc/login.conf.db&quot; {\n        source = &quot;etc/login.conf&quot;;\n        command = &quot;cap_mkdb /etc/login.conf&quot;;\n    }\n}<\/code><\/pre><\/div>\n<div class=\"codebox\"><div class=\"fname\">shtetl.conf<\/div><pre class=\"\"><code># shtetl.conf: about this machine (bootstrap&#x27;s starter)\nupdate {\n    suffix = &quot;staging&quot;;\n}\nretention {\n    run = 10;\n    lake = 0;\n    archive = &quot;1y&quot;;\n}<\/code><\/pre><\/div>\n<\/div><div class=\"callout callout-note\"><div class=\"ctitle\">ZFS is the record; git is for sharing<\/div><p>Upstream's <code>.gitignore<\/code> ignores everything upstream does not ship, so <code>shtetl.conf<\/code> and <code>generic.conf<\/code> stay local unless the admin shares one on purpose (<code>git add -f<\/code>). Their history is zconfig's snapshots, and every snapshot shtetl takes records the config snapshot it was made with. One hazard, tested: git overwrites ignored files without a word when a pull brings a file at the same path, so shtetl snapshots zconfig before any pull and refuses one that would collide.<\/p><\/div>","state":{"present":["B","B/t","C","C/c","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/fb","L/s","R","R/c","R/f","R/s"],"mounted":["C","R/c"],"pills":{},"tags":{"B/t":"git checkout","R/c":"/containers","R/f":"/shtetl/foundations"}},"hl":{},"frame":2,"arrows":[]},{"kind":"frame","where":"Act I, frame 3","title":"shtetl checks the recipe","html":"<p><code>shtetl build generic<\/code> reads the recipe before it touches anything. The checks run in three rounds; any failure stops the command with the file and line.<\/p><div class=\"checks\"><div class=\"ctitle\">parse (each file alone)<\/div><ul>\n<li><span class=\"cs cs-ok\">ok<\/span><span>default.conf, foundations/generic.conf: UCL, ASCII only<\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span>no key written twice in one file (parsed with <code>UCL_DUPLICATE_ERROR<\/code>)<\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span>no macros (<code>.include<\/code>, <code>.priority<\/code>, ...) and no <code>$variables<\/code><\/span><\/li>\n<\/ul><\/div><div class=\"checks\"><div class=\"ctitle\">schema<\/div><ul>\n<li><span class=\"cs cs-ok\">ok<\/span><span>every key is known, and allowed for a foundation (<code>kernconf<\/code> yes; <code>jailconf<\/code>, <code>requires<\/code>, <code>foundation<\/code> no)<\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span>types: <code>ver<\/code> and <code>src_branch<\/code> are strings; <code>datasets<\/code> and <code>derivations<\/code> are keyed collections<\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span>dataset names are valid ZFS components; <code>usr/local<\/code> implies a placeholder <code>usr<\/code><\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span>every derivation has a <code>source<\/code> and a <code>command<\/code><\/span><\/li>\n<\/ul><\/div><div class=\"checks\"><div class=\"ctitle\">meaning<\/div><ul>\n<li><span class=\"cs cs-ok\">ok<\/span><span><code>releng/15.1<\/code> is version 15.1, branch type releng; it satisfies <code>ver &gt;= 15<\/code><\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span>a foundation is named after its recipe: <code>generic<\/code>; no dataset of that name exists in any lake root, so this is a new foundation<\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span>spaces: one root each for config, build, lake and run<\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span>after checkout: <code>sys/amd64/conf/GENERIC<\/code> exists in the src tree<\/span><\/li>\n<\/ul><\/div><p>What a failure looks like:<\/p><pre class=\"\"><code>foundations/generic.conf:2: ver must be a string; write &quot;15.10&quot;\n    (UCL read the float 15.1)\ndefault.conf:1: macros are not allowed; use import\nfoundations/generic.conf:5: jailconf is a container key; a foundation\n    cannot set it<\/code><\/pre>","state":{"present":["B","B/t","C","C/c","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/fb","L/s","R","R/c","R/f","R/s"],"mounted":["C","R/c"],"pills":{},"tags":{"B/t":"git checkout","R/c":"/containers","R/f":"/shtetl/foundations"}},"hl":{},"frame":3,"arrows":[]},{"kind":"frame","where":"Act I, frame 4","title":"The merged recipe, and the plan","html":"<p>The layers merge (default.conf, then the target) and shtetl can show where every value came from. Then it prints the plan and asks.<\/p><pre class=\"\"><code>$ shtetl config show foundations/generic\nkind         foundation\nname         generic                        (the recipe)\nversion      15.1-releng                    (from src_branch)\nver          &quot;&gt;=15&quot;                         foundations/generic.conf:2\nsrc_branch   &quot;releng/15.1&quot;                  foundations/generic.conf:3\nkernconf     &quot;GENERIC&quot;                      foundations/generic.conf:4\ndatasets     tmp                            default.conf:4\n             usr        placeholder         implied by usr/local\n             usr/local                      default.conf:6\n             var                            default.conf:5\nderivations  etc/passwd        &lt;- etc/master.passwd   default.conf:10\n             etc/pwd.db        &lt;- etc/master.passwd   default.conf:14\n             etc/spwd.db       &lt;- etc/master.passwd   default.conf:18\n             etc/login.conf.db &lt;- etc/login.conf      default.conf:22<\/code><\/pre><pre class=\"\"><code>$ shtetl build generic\nfoundation generic (new), version @15.1-releng-2026-10-08-0f691888dc56\n\n  create   tank/shtetl/foundations/generic\n  create     .../tmp\n  create     .../usr                    canmount=off (placeholder)\n  create     .../usr/local\n  create     .../var\n  create   tank/shtetl/foundation-builds/generic\n  src      fast/shtetl/src: checkout releng/15.1 (0f691888dc56)\n  build    buildworld buildkernel KERNCONF=GENERIC\n           MAKEOBJDIRPREFIX=&lt;foundation-builds/generic&gt;\n  install  installworld installkernel distribution\n           DESTDIR=&lt;foundations/generic&gt;\n  snapshot -r @15.1-releng-2026-10-08-0f691888dc56  shtetl:kind=version\n\nproceed? [y/N] y<\/code><\/pre><div class=\"callout callout-finding\"><div class=\"ctitle\">Finding: usr/local is two datasets<\/div><p>Children mount by inheritance, and an inherited mountpoint is the parent's plus the child's name. A dataset called <code>usr-local<\/code> (parasa's name) would mount at <code>.../usr-local<\/code>, not <code>/usr/local<\/code>. So <code>usr/local<\/code> becomes <code>usr<\/code> with <code>canmount=off<\/code>, holding nothing, and <code>usr/local<\/code> under it, the way FreeBSD's own zroot does it. planning.md and the architecture page are corrected to match.<\/p><\/div>","state":{"present":["B","B/t","C","C/c","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/fb","L/s","R","R/c","R/f","R/s"],"mounted":["C","R/c"],"pills":{},"tags":{"B/t":"git checkout","R/c":"/containers","R/f":"/shtetl/foundations"}},"hl":{},"frame":4,"arrows":[]},{"kind":"frame","where":"Act I, frame 5","title":"Pre-split: the datasets exist before any file does","html":"<p>shtetl creates the foundation and one child per recipe dataset, all empty, and an obj cache for this foundation.<\/p><p>Creating the children first is what makes everything later work. A container cloned from this foundation will have its own <code>var<\/code>, <code>usr/local<\/code> and <code>tmp<\/code>, each a clone of the foundation's, and so each one will have a base to rebase from when the foundation moves. A directory split into a dataset after the fact would have no such lineage.<\/p>","state":{"present":["B","B/t","C","C/c","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/f","R/s"],"mounted":["C","R/c"],"pills":{},"tags":{"B/t":"git checkout","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off"}},"hl":{"L/f/G":"new","L/f/G/tmp":"new","L/f/G/usr":"new","L/f/G/usr/local":"new","L/f/G/var":"new","L/fb/G":"new","C/dc":"read","C/fg":"read","C/sc":"read"},"frame":5,"arrows":[]},{"kind":"frame","where":"Act I, frame 6","title":"Build","html":"<p>The src checkout, the obj cache and the foundation tree are mounted (the foundation's children follow by inheritance). The checkout moves to <code>releng/15.1<\/code>.<\/p><p><b>1<\/b> <code>make buildworld buildkernel KERNCONF=GENERIC<\/code> with <code>MAKEOBJDIRPREFIX<\/code> on <code>foundation-builds/generic<\/code>. The obj tree stays there after the build, so the next build of this foundation starts warm (best with <code>WITH_META_MODE<\/code>).<\/p>","state":{"present":["B","B/t","C","C/c","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/f","R/s"],"mounted":["B","C","L/f/G","L/f/G/tmp","L/f/G/usr/local","L/f/G/var","L/fb/G","R/c"],"pills":{},"tags":{"B/t":"0f691888dc56","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off"}},"hl":{"B/t":"write","L/fb/G":"write"},"frame":6,"arrows":[{"a":"B/t","b":"L/fb/G","kind":"build","num":1}]},{"kind":"frame","where":"Act I, frame 7","title":"Install into the foundation","html":"<p>There is no separate DESTDIR: the build installs straight into the mounted foundation.<\/p><p><b>2<\/b> <code>make installworld installkernel distribution DESTDIR=<\/code>the foundation's mountpoint. Files land in whichever dataset owns their path: <code>/var<\/code> in <code>var<\/code>, the <code>/usr/local<\/code> skeleton in <code>usr/local<\/code>, everything else (<code>/usr<\/code> included, since <code>usr<\/code> is a placeholder) in the foundation's own dataset. A foundation recipe with <code>pkg<\/code> or <code>commands<\/code> would run them now, in a chroot of the tree; this one has neither.<\/p>","state":{"present":["B","B/t","C","C/c","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/f","R/s"],"mounted":["B","C","L/f/G","L/f/G/tmp","L/f/G/usr/local","L/f/G/var","L/fb/G","R/c"],"pills":{},"tags":{"B/t":"0f691888dc56","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off"}},"hl":{"L/f/G":"write","L/f/G/var":"write","L/f/G/tmp":"write","L/f/G/usr/local":"write"},"frame":7,"arrows":[{"a":"L/fb/G","b":"L/f/G","kind":"install","num":2}]},{"kind":"frame","where":"Act I, frame 8","title":"Snapshot: version v1","html":"<p>Everything is unmounted again and the foundation is snapshotted recursively, in one atomic step, with its properties set at creation.<\/p><pre class=\"\"><code>zfs snapshot -r \\\n    -o shtetl:kind=version \\\n    -o shtetl:commit=&quot;build generic from releng/15.1 0f691888dc56&quot; \\\n    -o shtetl:config=fast/shtetl/config@2026-10-08-140210 \\\n    tank/shtetl/foundations/generic@15.1-releng-2026-10-08-0f691888dc56<\/code><\/pre><p>From here on this page calls that snapshot <b>v1<\/b>. The dataset is named after the recipe and the version is in the snapshot name, <code>@{ver}-{branch-type}-{ISO-date}-{short-sha}<\/code>, so a foundation is one dataset for its whole life: a later <code>@15.2-releng-...<\/code> continues the same chain. The names are for people; shtetl reads <code>shtetl:kind<\/code>, and <code>shtetl:config<\/code> points at the exact recipes this was built from. The foundation lives only in zlake so far. Nothing runs yet.<\/p>","state":{"present":["B","B/t","C","C/c","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/f","R/s"],"mounted":["C","R/c"],"pills":{"L/f/G":["v1"],"L/f/G/tmp":["v1"],"L/f/G/usr":["v1"],"L/f/G/usr/local":["v1"],"L/f/G/var":["v1"]},"tags":{"B/t":"0f691888dc56","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off"}},"hl":{"L/f/G":"snap","L/f/G/tmp":"snap","L/f/G/usr":"snap","L/f/G/usr/local":"snap","L/f/G/var":"snap"},"frame":8,"arrows":[]},{"kind":"act","where":"Act II","title":"A container","html":"<p>The admin wants a web server: nginx, in a jail, on this foundation.<\/p>","state":{"present":["B","B/t","C","C/c","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/f","R/s"],"mounted":["C","R/c"],"pills":{"L/f/G":["v1"],"L/f/G/tmp":["v1"],"L/f/G/usr":["v1"],"L/f/G/usr/local":["v1"],"L/f/G/var":["v1"]},"tags":{"B/t":"0f691888dc56","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off"}},"hl":{},"arrows":[],"frame":0},{"kind":"frame","where":"Act II, frame 9","title":"The container recipe, checked","html":"<p><code>containers/nginx.conf<\/code> says which FreeBSD versions it fits, one package, one dataset of its own, one command block and its jail settings. It names no foundation: the admin picks one with <code>shtetl create nginx --on generic<\/code>, and shtetl checks the recipe the same three ways, plus the checks that only make sense for a container.<\/p><div class=\"codes\">\n<div class=\"codebox\"><div class=\"fname\">containers/nginx.conf (new)<\/div><pre class=\"\"><code># containers/nginx.conf\nver = &quot;&gt;=15&quot;;\n\npkg = [ &quot;nginx&quot; ];\n\ndatasets {\n    www {}\n}\n\ncommands {\n    nginx = &lt;&lt;EOD\nsysrc nginx_enable=YES\nEOD\n}\n\njailconf = &lt;&lt;EOD\nhost.hostname = &quot;nginx&quot;;\nip4.addr = &quot;10.0.0.5&quot;;\nEOD<\/code><\/pre><\/div>\n<\/div><div class=\"checks\"><div class=\"ctitle\">container checks<\/div><ul>\n<li><span class=\"cs cs-ok\">ok<\/span><span>parse and schema as before; <code>jailconf<\/code> is a container key<\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span><code>--on generic<\/code>: the foundation exists, and its newest version, <code>15.1-releng-2026-10-08-0f691888dc56<\/code>, satisfies <code>ver &gt;= 15<\/code><\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span><code>requires<\/code>: none, so no other container must exist first<\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span>datasets: <code>tmp<\/code>, <code>usr<\/code>, <code>usr/local<\/code>, <code>var<\/code> exist in the foundation and will be clones; <code>www<\/code> is container-only<\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span>derivation sources exist in v1 (<code>etc/master.passwd<\/code>, <code>etc/login.conf<\/code>)<\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span>the name <code>nginx<\/code> is free on zrun and in the zlake mirror<\/span><\/li>\n<li><span class=\"cs cs-ok\">ok<\/span><span>nginx ends with a superset of what the foundation provides: lists are additive, and dropping a dataset the foundation splits (<code>tmp = false<\/code>) or a package it installed would be an error<\/span><\/li>\n<\/ul><\/div><pre class=\"\"><code>$ shtetl config show containers/nginx\nkind         container\nfoundation   generic (chosen with --on), newest version\n             15.1-releng-2026-10-08-0f691888dc56; ver &quot;&gt;=15&quot; allows it\ndatasets     tmp         from the foundation    default.conf:4\n             usr         from the foundation    (placeholder)\n             usr/local   from the foundation    default.conf:6\n             var         from the foundation    default.conf:5\n             www         container-only         containers/nginx.conf:7\npkg          nginx                              containers/nginx.conf:4\ncommands     nginx                              containers/nginx.conf:11\nderivations  (4, as the foundation)             default.conf\njailconf     2 lines                            containers/nginx.conf:16<\/code><\/pre><div class=\"callout callout-note\"><div class=\"ctitle\">Recipes are not tied to a foundation<\/div><p>A recipe says which versions it fits with <code>ver<\/code> and works on any foundation that satisfies it. The choice is made when the container is created, and the clone's <code>origin<\/code> records it from then on: no key, no file.<\/p><\/div>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/f","R/s"],"mounted":["C","R/c"],"pills":{"L/f/G":["v1"],"L/f/G/tmp":["v1"],"L/f/G/usr":["v1"],"L/f/G/usr/local":["v1"],"L/f/G/var":["v1"]},"tags":{"B/t":"0f691888dc56","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off"}},"hl":{},"frame":9,"arrows":[]},{"kind":"frame","where":"Act II, frame 10","title":"Bring the foundation to zrun","html":"<p>Clones cannot cross pools, so the foundation first goes where containers run.<\/p><p><b>1<\/b> One <code>zfs send<\/code> per dataset of v1, received under <code>fast/shtetl/run/foundations<\/code> with <code>readonly=on<\/code> and <code>canmount=noauto<\/code>. A full stream this first time; every later version goes as an incremental. The copy has a real mountpoint, <code>/shtetl/foundations/generic<\/code>, but is never mounted except while an update reads it: zfs_rebase reads every side at its own mountpoint and refuses one that is not mounted.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c"],"pills":{"L/f/G":["v1"],"L/f/G/tmp":["v1"],"L/f/G/usr":["v1"],"L/f/G/usr/local":["v1"],"L/f/G/var":["v1"],"R/f/G":["v1"],"R/f/G/tmp":["v1"],"R/f/G/usr":["v1"],"R/f/G/usr/local":["v1"],"R/f/G/var":["v1"]},"tags":{"B/t":"0f691888dc56","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro"}},"hl":{"R/f/G":"new","R/f/G/tmp":"new","R/f/G/usr":"new","R/f/G/usr/local":"new","R/f/G/var":"new","C/cn":"read"},"frame":10,"arrows":[{"a":"L/f/G","b":"R/f/G","kind":"send","num":1},{"a":"L/f/G/tmp","b":"R/f/G/tmp","kind":"send","num":null},{"a":"L/f/G/usr","b":"R/f/G/usr","kind":"send","num":null},{"a":"L/f/G/usr/local","b":"R/f/G/usr/local","kind":"send","num":null},{"a":"L/f/G/var","b":"R/f/G/var","kind":"send","num":null}]},{"kind":"frame","where":"Act II, frame 11","title":"Clone, dataset by dataset","html":"<p><code>zfs clone<\/code> is not recursive, so shtetl clones each dataset of v1 to the matching name under <code>containers/nginx<\/code>, then creates the recipe's own <code>www<\/code>.<\/p><p><b>1<\/b> <code>zfs clone<\/code> of each <code>@v1<\/code>. Nothing is copied: the clones share every block with the foundation until something writes. Mountpoints are inherited, so the tree mounts at <code>/containers/nginx<\/code>, <code>/containers/nginx/var<\/code>, and so on, with no fstab. <code>www<\/code> has no origin: its history will start at the first save.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1"],"L/f/G/tmp":["v1"],"L/f/G/usr":["v1"],"L/f/G/usr/local":["v1"],"L/f/G/var":["v1"],"R/f/G":["v1"],"R/f/G/tmp":["v1"],"R/f/G/usr":["v1"],"R/f/G/usr/local":["v1"],"R/f/G/var":["v1"]},"tags":{"B/t":"0f691888dc56","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{"R/c/n":"new","R/c/n/tmp":"new","R/c/n/usr":"new","R/c/n/usr/local":"new","R/c/n/var":"new","R/c/n/www":"new"},"frame":11,"arrows":[{"a":"R/f/G","b":"R/c/n","kind":"clone","num":1},{"a":"R/f/G/tmp","b":"R/c/n/tmp","kind":"clone","num":null},{"a":"R/f/G/usr","b":"R/c/n/usr","kind":"clone","num":null},{"a":"R/f/G/usr/local","b":"R/c/n/usr/local","kind":"clone","num":null},{"a":"R/f/G/var","b":"R/c/n/var","kind":"clone","num":null}]},{"kind":"frame","where":"Act II, frame 12","title":"Start the jail, install, run the commands","html":"<p>shtetl writes the jail's block to <code>/etc/jail.conf.d/nginx.conf<\/code> on the host, from the recipe's <code>jailconf<\/code> and the path, and starts it.<\/p><pre class=\"\"><code>nginx {\n    path = &quot;/containers/nginx&quot;;\n    host.hostname = &quot;nginx&quot;;\n    ip4.addr = &quot;10.0.0.5&quot;;\n    exec.start = &quot;/bin/sh /etc/rc&quot;;\n    exec.stop = &quot;/bin/sh /etc/rc.shutdown&quot;;\n}\n\nservice jail start nginx\npkg -j nginx install -y nginx            # usr/local, and var/db/pkg in var\njexec nginx /bin/sh -c &#x27;sysrc nginx_enable=YES&#x27;   # etc/rc.conf in nginx<\/code><\/pre><p>Commands run once, here, at creation. They never run again: an update carries what they did along with everything else.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1"],"L/f/G/tmp":["v1"],"L/f/G/usr":["v1"],"L/f/G/usr/local":["v1"],"L/f/G/var":["v1"],"R/f/G":["v1"],"R/f/G/tmp":["v1"],"R/f/G/usr":["v1"],"R/f/G/usr/local":["v1"],"R/f/G/var":["v1"]},"tags":{"B/t":"0f691888dc56","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{"R/c/n":"write","R/c/n/usr/local":"write","R/c/n/var":"write"},"frame":12,"arrows":[]},{"kind":"frame","where":"Act II, frame 13","title":"Life happens","html":"<p>Weeks of ordinary administration. Each change lands in whichever dataset owns its path:<\/p><pre class=\"\"><code>pw useradd ploni -m             etc/master.passwd etc/passwd etc/group\n                                etc/pwd.db etc/spwd.db     -&gt; nginx\nvi /etc/ssh/sshd_config         PermitRootLogin no         -&gt; nginx\nvi /usr/local/etc/nginx/nginx.conf                         -&gt; nginx/usr/local\nsite content                                               -&gt; nginx/www\nlogs, pkg database                                         -&gt; nginx/var<\/code><\/pre><p>None of this is in any recipe, and none of it needs to be. There is no drift tracking and nothing to classify: the datasets are the record.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1"],"L/f/G/tmp":["v1"],"L/f/G/usr":["v1"],"L/f/G/usr/local":["v1"],"L/f/G/var":["v1"],"R/f/G":["v1"],"R/f/G/tmp":["v1"],"R/f/G/usr":["v1"],"R/f/G/usr/local":["v1"],"R/f/G/var":["v1"]},"tags":{"B/t":"0f691888dc56","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{"R/c/n":"write","R/c/n/usr/local":"write","R/c/n/var":"write","R/c/n/www":"write"},"frame":13,"arrows":[]},{"kind":"frame","where":"Act II, frame 14","title":"Save: s1","html":"<p><code>shtetl save nginx -m \"site live, ploni added\"<\/code><\/p><pre class=\"\"><code>zfs snapshot -r -o shtetl:kind=save -o shtetl:commit=&quot;site live, ploni added&quot; \\\n    fast/shtetl/run/containers/nginx@save-2026-10-09-101500<\/code><\/pre><p><b>1<\/b> Each foundation-inherited dataset goes as a clone stream (<code>zfs send -i &lt;run foundation&gt;@v1 nginx@s1<\/code>) and is received in zlake as a clone of zlake's own foundation <code>@v1<\/code>, so zlake stores only what nginx changed. One arrow per kind is drawn; every dataset of the tree goes the same way. <b>2<\/b> <code>www<\/code> has no origin, so its first save is a full stream. From now on zlake mirrors nginx as of its last save: same names, same clone relationships, one pool over. Whether the clone streams land as clones without help is probe P1.<\/p>\n<p>This snapshot is <b>s1<\/b>; its message travels in <code>shtetl:commit<\/code> (whether <code>zfs send<\/code> carries it is probe P10).<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1"],"L/f/G/tmp":["v1"],"L/f/G/usr":["v1"],"L/f/G/usr/local":["v1"],"L/f/G/var":["v1"],"R/f/G":["v1"],"R/f/G/tmp":["v1"],"R/f/G/usr":["v1"],"R/f/G/usr/local":["v1"],"R/f/G/var":["v1"],"R/c/n":["s1"],"R/c/n/tmp":["s1"],"R/c/n/usr":["s1"],"R/c/n/usr/local":["s1"],"R/c/n/var":["s1"],"R/c/n/www":["s1"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"0f691888dc56","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{"R/c/n":"snap","R/c/n/tmp":"snap","R/c/n/usr":"snap","R/c/n/usr/local":"snap","R/c/n/var":"snap","R/c/n/www":"snap","L/c/n":"new","L/c/n/tmp":"new","L/c/n/usr":"new","L/c/n/usr/local":"new","L/c/n/var":"new","L/c/n/www":"new"},"frame":14,"arrows":[{"a":"R/c/n","b":"L/c/n","kind":"save","num":1},{"a":"R/c/n/usr/local","b":"L/c/n/usr/local","kind":"save","num":null},{"a":"R/c/n/www","b":"L/c/n/www","kind":"save","num":2}]},{"kind":"act","where":"Act III","title":"A new foundation version","html":"<p>Five weeks later FreeBSD publishes an errata notice for 15.1. The fix lands on <code>releng/15.1<\/code>. For this story, suppose it also changed <code>/etc/ssh/sshd_config<\/code> and added a system user to <code>/etc/master.passwd<\/code> and <code>/etc/group<\/code>: exactly the files the admin edited too.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1"],"L/f/G/tmp":["v1"],"L/f/G/usr":["v1"],"L/f/G/usr/local":["v1"],"L/f/G/var":["v1"],"R/f/G":["v1"],"R/f/G/tmp":["v1"],"R/f/G/usr":["v1"],"R/f/G/usr/local":["v1"],"R/f/G/var":["v1"],"R/c/n":["s1"],"R/c/n/tmp":["s1"],"R/c/n/usr":["s1"],"R/c/n/usr/local":["s1"],"R/c/n/var":["s1"],"R/c/n/www":["s1"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"0f691888dc56","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{},"arrows":[],"frame":0},{"kind":"frame","where":"Act III, frame 15","title":"Rebuild the same foundation","html":"<p>The admin runs the same command. Because <code>generic<\/code> exists, this is an update of it, and there is one more check: the recipe's datasets must match the ones v1 has, because every container's datasets are clones of those.<\/p><pre class=\"\"><code>$ shtetl build generic\nfoundation generic, update: v1 -&gt; @15.1-releng-2026-11-12-5b2c7e01a9d4\n\n  recipe   unchanged checks pass (parse, schema, meaning)\n  datasets same as v1: tmp usr usr/local var (none added or dropped)\n  src      fast/shtetl/src: pull releng/15.1 (0f691888dc56 -&gt; 5b2c7e01a9d4)\n  build    buildworld buildkernel, obj reused from foundation-builds\n  install  into the same datasets, then delete-old delete-old-libs\n  snapshot -r @15.1-releng-2026-11-12-5b2c7e01a9d4  shtetl:kind=version\n\nproceed? [y/N] y<\/code><\/pre><div class=\"callout callout-note\"><div class=\"ctitle\">Why the same datasets<\/div><p>Building v2 into the datasets v1 lives in keeps every version on one snapshot chain. zfs_rebase needs that to find a base, and zlake can then send zrun an incremental instead of a whole world.<\/p><\/div><div class=\"callout callout-note\"><div class=\"ctitle\">A new release is just a new version<\/div><p>Had the recipe moved to <code>releng/15.2<\/code>, the build would go into the same dataset and the version would be <code>@15.2-releng-...<\/code>. Installing a newer world over an older one and running delete-old is FreeBSD's own source-upgrade path, and every container keeps a lineage to rebase along; its recipe's <code>ver<\/code> decides whether it may follow.<\/p><\/div>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1"],"L/f/G/tmp":["v1"],"L/f/G/usr":["v1"],"L/f/G/usr/local":["v1"],"L/f/G/var":["v1"],"R/f/G":["v1"],"R/f/G/tmp":["v1"],"R/f/G/usr":["v1"],"R/f/G/usr/local":["v1"],"R/f/G/var":["v1"],"R/c/n":["s1"],"R/c/n/tmp":["s1"],"R/c/n/usr":["s1"],"R/c/n/usr/local":["s1"],"R/c/n/var":["s1"],"R/c/n/www":["s1"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"0f691888dc56","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{},"frame":15,"arrows":[]},{"kind":"frame","where":"Act III, frame 16","title":"Build and install over v1","html":"<p>The same mounts as before; the obj cache is already warm.<\/p><p><b>1<\/b> <code>buildworld buildkernel<\/code>, reusing the obj tree. <b>2<\/b> <code>installworld installkernel distribution<\/code> over v1, then <code>make delete-old delete-old-libs DESTDIR=...<\/code> to remove anything the new build no longer installs.<\/p>\n<p>Known cost: installworld rewrites every file, so to zfs_rebase every file of the foundation looks changed between v1 and v2 and is decided on content. <code>install -C<\/code> leaves a byte-identical file untouched (FreeBSD already installs libraries that way); using it for everything would let the rebase skip unchanged files without reading them (probe P12).<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["B","C","L/f/G","L/f/G/tmp","L/f/G/usr/local","L/f/G/var","L/fb/G","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1"],"L/f/G/tmp":["v1"],"L/f/G/usr":["v1"],"L/f/G/usr/local":["v1"],"L/f/G/var":["v1"],"R/f/G":["v1"],"R/f/G/tmp":["v1"],"R/f/G/usr":["v1"],"R/f/G/usr/local":["v1"],"R/f/G/var":["v1"],"R/c/n":["s1"],"R/c/n/tmp":["s1"],"R/c/n/usr":["s1"],"R/c/n/usr/local":["s1"],"R/c/n/var":["s1"],"R/c/n/www":["s1"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{"B/t":"write","L/fb/G":"write","L/f/G":"write","L/f/G/var":"write"},"frame":16,"arrows":[{"a":"B/t","b":"L/fb/G","kind":"build","num":1},{"a":"L/fb/G","b":"L/f/G","kind":"install","num":2}]},{"kind":"frame","where":"Act III, frame 17","title":"Snapshot: version v2","html":"<p><code>@15.1-releng-2026-11-12-5b2c7e01a9d4<\/code>, called <b>v2<\/b> from here on. zlake's foundation now carries both versions on one chain.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1"],"R/f/G/tmp":["v1"],"R/f/G/usr":["v1"],"R/f/G/usr/local":["v1"],"R/f/G/var":["v1"],"R/c/n":["s1"],"R/c/n/tmp":["s1"],"R/c/n/usr":["s1"],"R/c/n/usr/local":["s1"],"R/c/n/var":["s1"],"R/c/n/www":["s1"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{"L/f/G":"snap","L/f/G/tmp":"snap","L/f/G/usr":"snap","L/f/G/usr/local":"snap","L/f/G/var":"snap"},"frame":17,"arrows":[]},{"kind":"frame","where":"Act III, frame 18","title":"Send v2 to zrun","html":"<p><b>1<\/b> <code>zfs send -i @v1 @v2<\/code> per dataset: only the blocks that changed. nginx is untouched; it is still a clone of <code>@v1<\/code> and still running.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1"],"R/c/n/tmp":["s1"],"R/c/n/usr":["s1"],"R/c/n/usr/local":["s1"],"R/c/n/var":["s1"],"R/c/n/www":["s1"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{"R/f/G":"snap","R/f/G/tmp":"snap","R/f/G/usr":"snap","R/f/G/usr/local":"snap","R/f/G/var":"snap"},"frame":18,"arrows":[{"a":"L/f/G","b":"R/f/G","kind":"send","num":1},{"a":"L/f/G/tmp","b":"R/f/G/tmp","kind":"send","num":null},{"a":"L/f/G/usr","b":"R/f/G/usr","kind":"send","num":null},{"a":"L/f/G/usr/local","b":"R/f/G/usr/local","kind":"send","num":null},{"a":"L/f/G/var","b":"R/f/G/var","kind":"send","num":null}]},{"kind":"act","where":"Act IV","title":"The update","html":"<p>The admin moves nginx onto v2. nginx is stopped for the update and stays stopped until the admin cuts over or abandons: nothing writes to it, so the new tree cannot drift from it, and it is the rollback.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1"],"R/c/n/tmp":["s1"],"R/c/n/usr":["s1"],"R/c/n/usr/local":["s1"],"R/c/n/var":["s1"],"R/c/n/www":["s1"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{},"arrows":[],"frame":0},{"kind":"frame","where":"Act IV, frame 19","title":"Preflight","html":"<p>The recipe's <code>ver<\/code> decides whether nginx may move to the target at all. This errata is still 15.1, so even a recipe pinned to <code>\"=15.1\"<\/code> would allow it; a 15.2 version would need a looser <code>ver<\/code>, which this one has.<\/p><pre class=\"\"><code>$ shtetl update nginx\ncontainer   nginx on generic@15.1-releng-2026-10-08-0f691888dc56\ntarget      generic@15.1-releng-2026-11-12-5b2c7e01a9d4 (the newest version)\nrecipe      containers/nginx.conf: checks pass; ver &quot;&gt;=15&quot; allows 15.1\nfoundation  the target is on zrun; its datasets match the current version&#x27;s\nstaging     fast/shtetl/run/containers/nginx-staging: free\nrebases     none open for nginx\nhistory     update.depth = 0: replay every save zrun holds (s1), then the\n            snapshot taken at the stop\nplan        stop nginx, snapshot, mount the foundation, replay into\n            nginx-staging (usr cloned, not replayed), clone www, unmount\n            the foundation, start nginx-staging\n\nnginx will be stopped now and stays stopped until cutover or abandon.\nproceed? [y/N] y<\/code><\/pre>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1"],"R/c/n/tmp":["s1"],"R/c/n/usr":["s1"],"R/c/n/usr/local":["s1"],"R/c/n/var":["s1"],"R/c/n/www":["s1"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{},"frame":19,"arrows":[]},{"kind":"frame","where":"Act IV, frame 20","title":"Stop nginx, then snapshot: s2","html":"<pre class=\"\"><code>service jail stop nginx\nzfs snapshot -r -o shtetl:kind=save \\\n    -o shtetl:commit=&quot;update to generic@15.1-releng-2026-11-12-5b2c7e01a9d4&quot; \\\n    -o shtetl:config=fast/shtetl/config@2026-11-12-090000 \\\n    fast/shtetl/run/containers/nginx@save-2026-11-12-090000<\/code><\/pre><p>An ordinary save snapshot, atomic across the whole tree, called <b>s2<\/b> (orange: the update starts here). Nothing has written to nginx since the stop, and nothing will until cutover or abandon.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1","s2"],"R/c/n/tmp":["s1","s2"],"R/c/n/usr":["s1","s2"],"R/c/n/usr/local":["s1","s2"],"R/c/n/var":["s1","s2"],"R/c/n/www":["s1","s2"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  stopped","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{"R/c/n":"snap","R/c/n/tmp":"snap","R/c/n/usr":"snap","R/c/n/usr/local":"snap","R/c/n/var":"snap","R/c/n/www":"snap"},"frame":20,"arrows":[]},{"kind":"frame","where":"Act IV, frame 21","title":"Two saves, two steps, two bases","html":"<p><code>update.depth<\/code> is 0 here, so the update keeps the whole history zrun holds: it replays s1, then s2, onto v2, one rebase per save and dataset. zfs_rebase moves one snapshot at a time, so this is how a container's saves survive an update.<\/p><div class=\"diagram\"><svg viewBox=\"0 0 760 320\" role=\"img\" aria-label=\"The two replay steps and their bases\">\n<defs><marker id=\"m-lin\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto-start-reverse\"><path class=\"mk mk-rebase\" d=\"M0,0 L10,5 L0,10 z\"/><\/marker><\/defs>\n<text class=\"rds\" x=\"20\" y=\"44\">foundations/generic<\/text>\n<line class=\"lin\" x1=\"40\" y1=\"70\" x2=\"720\" y2=\"70\"/>\n<path class=\"lin\" d=\"M170,79 C170,140 200,170 240,170 L470,170\"/>\n<text class=\"rds\" x=\"20\" y=\"200\">containers/nginx<\/text>\n<path class=\"lin lin-new\" d=\"M430,79 C430,220 470,270 510,270 L720,270\"/>\n<text class=\"rds\" x=\"20\" y=\"300\">containers/nginx-staging<\/text>\n<path class=\"ar ar-rebase\" stroke-dasharray=\"5 4\" d=\"M290,180 C300,250 470,276 548,272\" marker-end=\"url(#m-lin)\"/>\n<path class=\"ar ar-rebase\" stroke-dasharray=\"5 4\" d=\"M400,180 C420,235 600,232 660,260\" marker-end=\"url(#m-lin)\"/>\n<circle class=\"badge badge-rebase\" cx=\"352\" cy=\"238\" r=\"9\"/>\n<text class=\"badgetext\" x=\"352\" y=\"242\" text-anchor=\"middle\">1<\/text>\n<circle class=\"badge badge-rebase\" cx=\"520\" cy=\"224\" r=\"9\"/>\n<text class=\"badgetext\" x=\"520\" y=\"228\" text-anchor=\"middle\">2<\/text>\n<circle class=\"ldot ldot-version\" cx=\"170\" cy=\"70\" r=\"9\"/>\n<text class=\"ltext\" x=\"170\" y=\"52\" text-anchor=\"middle\">v1<\/text>\n<circle class=\"ldot ldot-version\" cx=\"430\" cy=\"70\" r=\"9\"/>\n<text class=\"ltext\" x=\"430\" y=\"52\" text-anchor=\"middle\">v2<\/text>\n<circle class=\"ldot ldot-save\" cx=\"290\" cy=\"170\" r=\"8\"/>\n<text class=\"ltext\" x=\"290\" y=\"155\" text-anchor=\"middle\">s1<\/text>\n<circle class=\"ldot ldot-from\" cx=\"400\" cy=\"170\" r=\"8\"/>\n<text class=\"ltext\" x=\"400\" y=\"155\" text-anchor=\"middle\">s2<\/text>\n<circle class=\"ldot ldot-save\" cx=\"560\" cy=\"270\" r=\"8\"/>\n<text class=\"ltext\" x=\"560\" y=\"300\" text-anchor=\"middle\">s1'<\/text>\n<circle class=\"ldot ldot-save\" cx=\"670\" cy=\"270\" r=\"8\"/>\n<text class=\"ltext\" x=\"670\" y=\"300\" text-anchor=\"middle\">s2'<\/text>\n<\/svg><\/div><div class=\"tablewrap\"><table class=\"cast\">\n<tr><th>step<\/th><th>from<\/th><th>onto<\/th><th>base<\/th><th>result<\/th><\/tr>\n<tr><td>1<\/td><td><code>nginx@s1<\/code><\/td><td><code>generic@v2<\/code><\/td>\n<td><code>generic@v1<\/code>, found from the origins<\/td>\n<td>a new clone of v2, <code>nginx-staging<\/code>; snapshotted as\n<b>s1'<\/b><\/td><\/tr>\n<tr><td>2<\/td><td><code>nginx@s2<\/code><\/td><td><code>nginx-staging<\/code>\n(the dataset)<\/td><td><code>nginx@s1<\/code>, named<\/td>\n<td>the same dataset, rebased in place; snapshotted as <b>s2'<\/b><\/td><\/tr>\n<\/table><\/div><p><b>1<\/b> The first step names only from and onto. The tool walks each side's origin chain: <code>nginx@s1<\/code>, then nginx's origin <code>generic@v1<\/code>; <code>generic@v2<\/code>, the same dataset. Of the two snapshots the walks name there, the older is the base: v1. So step 1 replays everything nginx changed up to s1 onto v2, and that is where the conflicts are.<\/p>\n<p><b>2<\/b> The second step names its base: s1. Left to derive it, the tool would find v1, the divergence point, again (both origins still meet at the foundation). But onto is now the result so far, which already holds s1: with base v1, a file the admin edited both before s1 and before s2 would look changed on both sides and conflict, and every conflict answered in step 1 would come back, since from still holds the admin's version, onto the merged one, and both differ from v1. With base s1, only what the admin changed between s1 and s2 is replayed, the way git replays each commit against its own parent. Naming a base takes <code>--allow-unrelated<\/code> today, which turns the tool's prune off, so this step reads every file; the box suite has run that flag only as a dry run so far. Probe P14 measures it, and the numbers decide whether zfs_rebase should learn to prune from's side when the base is an earlier snapshot of from's own dataset (planning.md 7.6.2; ruled: not now).<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1","s2"],"R/c/n/tmp":["s1","s2"],"R/c/n/usr":["s1","s2"],"R/c/n/usr/local":["s1","s2"],"R/c/n/var":["s1","s2"],"R/c/n/www":["s1","s2"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  stopped","R/c/n/usr":"canmount=off","R/c/n/www":"container-only"}},"hl":{},"frame":21,"arrows":[]},{"kind":"frame","where":"Act IV, frame 22","title":"Step 1, the top dataset: s1 onto v2","html":"<p>First shtetl mounts the foundation's datasets on zrun, read-only, at <code>/shtetl/foundations/generic<\/code>: zfs_rebase reads base, from and onto at their own mountpoints. Then, parent first, zfs_rebase clones <b>1<\/b> onto (v2) as <code>nginx-staging<\/code>, mounted only at its own private directory, and replays <b>2<\/b> from's changes (s1 against the base v1) into it.<\/p><pre class=\"\"><code>zfs_rebase --from fast/shtetl/run/containers/nginx@save-2026-10-09-101500 \\\n    --onto fast/shtetl/run/foundations/generic@15.1-releng-2026-11-12-5b2c7e01a9d4 \\\n    --result fast/shtetl/run/containers/nginx-staging<\/code><\/pre><p>Every clean action is applied first: the admin's nginx.conf, rc.conf line, home directory and so on, and every file the errata changed that the admin did not. Then the tool stops at its conflicts gate and exits 1. Six names were changed on both sides: <code>etc/group<\/code>, <code>etc/master.passwd<\/code>, <code>etc/passwd<\/code>, <code>etc/pwd.db<\/code>, <code>etc/spwd.db<\/code>, <code>etc/ssh/sshd_config<\/code>. The tool merges nothing by itself, however far apart the two edits are.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/c/ns","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f/G","R/f/G/tmp","R/f/G/usr/local","R/f/G/var"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1","s2"],"R/c/n/tmp":["s1","s2"],"R/c/n/usr":["s1","s2"],"R/c/n/usr/local":["s1","s2"],"R/c/n/var":["s1","s2"],"R/c/n/www":["s1","s2"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  stopped","R/c/n/usr":"canmount=off","R/c/n/www":"container-only","R/c/ns":"private mount, exit 1"}},"hl":{"R/c/ns":"new"},"frame":22,"arrows":[{"a":"R/f/G","b":"R/c/ns","kind":"rebase","num":1},{"a":"R/c/n","b":"R/c/ns","kind":"rebase","num":2}]},{"kind":"frame","where":"Act IV, frame 23","title":"At the gate: the derived files step aside","html":"<p>The tool has written a resolution document beside its manifest: one line per conflicted name, each waiting for <code>keep<\/code>, <code>onto<\/code> or <code>from<\/code>. (Shown schematically; the grammar is v4-manifest.md section 8.)<\/p><div class=\"codes\">\n<div class=\"codebox\"><div class=\"fname\">the resolution, as the tool wrote it<\/div><pre class=\"\"><code>#rebase-resolution 5\n#base fast/shtetl/run/foundations/generic@15.1-releng-2026-10-08-0f691888dc56 ...\n#from fast/shtetl/run/containers/nginx@save-2026-10-09-101500 ...\n#onto fast/shtetl/run/foundations/generic@15.1-releng-2026-11-12-5b2c7e01a9d4 ...\n#mode strict\n#names 6\n#unanswered 6\n/\n    etc/\n        group conflict 1 -\n        master.passwd conflict 2 -\n        passwd conflict 3 -\n        pwd.db conflict 4 -\n        spwd.db conflict 5 -\n        ssh/\n            sshd_config conflict 6 -\n            ..\n        ..\n    ..<\/code><\/pre><\/div>\n<div class=\"codebox\"><div class=\"fname\">after shtetl&#x27;s pass<\/div><pre class=\"\"><code>#unanswered 3\n...\n        group conflict 1 -\n        master.passwd conflict 2 -\n        passwd conflict 3 keep        &lt;- derivation, regenerated later\n        pwd.db conflict 4 keep        &lt;- derivation, regenerated later\n        spwd.db conflict 5 keep       &lt;- derivation, regenerated later\n        ...\n            sshd_config conflict 6 -<\/code><\/pre><\/div>\n<\/div><p>shtetl matches the conflicted names against the recipe's <code>derivations<\/code>. <code>passwd<\/code>, <code>pwd.db<\/code> and <code>spwd.db<\/code> are all generated from <code>master.passwd<\/code>, so nobody should have to choose between two versions of them: shtetl answers them <code>keep<\/code> and remembers to regenerate them. It cannot regenerate them yet, because their source is itself still in conflict.<\/p><div class=\"callout callout-note\"><div class=\"ctitle\">The text first (ruled 2026-10-08)<\/div><p>A derived file almost never conflicts alone: whoever changed the binary changed its source too, and a source changed on both sides is itself a conflict, since zfs_rebase never merges text on its own. So the derivation runs after the source has been merged: two passes at the gate, this frame and the next two. zfs_rebase's planned merge drivers (future-features.md) would do it headless whenever the text merges cleanly, given rules that run in the order written.<\/p><\/div>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/c/ns","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f/G","R/f/G/tmp","R/f/G/usr/local","R/f/G/var"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1","s2"],"R/c/n/tmp":["s1","s2"],"R/c/n/usr":["s1","s2"],"R/c/n/usr/local":["s1","s2"],"R/c/n/var":["s1","s2"],"R/c/n/www":["s1","s2"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  stopped","R/c/n/usr":"canmount=off","R/c/n/www":"container-only","R/c/ns":"private mount, exit 1"}},"hl":{},"frame":23,"arrows":[]},{"kind":"frame","where":"Act IV, frame 24","title":"At the gate: the admin merges the text","html":"<p>shtetl opens the picker and holds the rebase at the gate:<\/p><pre class=\"\"><code>zfs_rebase --continue -i --no-merge fast/shtetl/run/containers/nginx-staging<\/code><\/pre><pre class=\"sketch\"><code> nginx-staging                          3 of 6 unanswered\n   etc/group               conflict   -\n   etc/master.passwd       conflict   -\n   etc/passwd              conflict   keep\n   etc/pwd.db              conflict   keep\n   etc/spwd.db             conflict   keep\n   etc/ssh/sshd_config     conflict   -<\/code><\/pre><p>(a sketch of the list screen, not the tool's exact drawing)<\/p><p><code>etc/group<\/code> and <code>etc/master.passwd<\/code>: the admin opens each into the merge screen. The errata added a system user near the top, the admin added <code>ploni<\/code> at the end; the three-way merge has no conflict chunk, so <code>w<\/code> writes the merged file into the tree and the line becomes <code>keep<\/code>.<\/p>\n<p><code>etc/ssh/sshd_config<\/code>: the errata rewrote the commented <code>#PermitRootLogin<\/code> default, the very line the admin had replaced with <code>PermitRootLogin no<\/code>. That is one conflict chunk; the admin picks their own side for it, the errata's other changes to the file come along as onto-only chunks, <code>w<\/code> writes, and the line becomes <code>keep<\/code>.<\/p>\n<p>The picker exits. <code>--no-merge<\/code> means the gate stands even though the document is complete, which is what shtetl needs for the next step.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/c/ns","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f/G","R/f/G/tmp","R/f/G/usr/local","R/f/G/var"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1","s2"],"R/c/n/tmp":["s1","s2"],"R/c/n/usr":["s1","s2"],"R/c/n/usr/local":["s1","s2"],"R/c/n/var":["s1","s2"],"R/c/n/www":["s1","s2"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  stopped","R/c/n/usr":"canmount=off","R/c/n/www":"container-only","R/c/ns":"private mount, exit 1"}},"hl":{},"frame":24,"arrows":[]},{"kind":"frame","where":"Act IV, frame 25","title":"At the gate: regenerate, then finish","html":"<p>Now the source is merged in the tree, so the derivation can run. The three conflicted outputs share one command, so it runs once, in a chroot of the result's private mount:<\/p><pre class=\"\"><code>chroot &lt;private mount of nginx-staging&gt; pwd_mkdb -p -d /etc /etc/master.passwd\n\nzfs_rebase --continue fast/shtetl/run/containers/nginx-staging\n    applying2 ... done, verified: exit 0<\/code><\/pre><p><code>passwd<\/code>, <code>pwd.db<\/code> and <code>spwd.db<\/code> now agree with the merged <code>master.passwd<\/code>, and their lines already say <code>keep<\/code>, which is exactly \"leave what is in the tree\". <code>--continue<\/code> applies the rest, runs the final check and reaches done: <code>nginx-staging<\/code> now holds s1's tree on v2. The tool hands it back unmounted, read-only, <code>mountpoint=none<\/code>, and shtetl places it at once (<code>zfs inherit mountpoint<\/code>, <code>readonly=off<\/code>): step 2 takes it as a dataset, and the dataset form takes only a mounted one.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/c/ns","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f/G","R/f/G/tmp","R/f/G/usr/local","R/f/G/var"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1","s2"],"R/c/n/tmp":["s1","s2"],"R/c/n/usr":["s1","s2"],"R/c/n/usr/local":["s1","s2"],"R/c/n/var":["s1","s2"],"R/c/n/www":["s1","s2"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  stopped","R/c/n/usr":"canmount=off","R/c/n/www":"container-only","R/c/ns":"private mount, exit 1"}},"hl":{},"frame":25,"arrows":[]},{"kind":"frame","where":"Act IV, frame 26","title":"Step 2, the top dataset: s2 onto the result","html":"<pre class=\"\"><code>zfs_rebase --allow-unrelated \\\n    --base fast/shtetl/run/containers/nginx@save-2026-10-09-101500 \\\n    --from fast/shtetl/run/containers/nginx@save-2026-11-12-090000 \\\n    --onto fast/shtetl/run/containers/nginx-staging \\\n    --result save-2026-10-09-101500\n    ... done, verified: exit 0\n\nzfs snapshot -o shtetl:kind=save -o shtetl:replayed-from=&lt;guid of nginx@s2&gt; \\\n    -o shtetl:commit=&quot;update to generic@15.1-releng-2026-11-12-5b2c7e01a9d4&quot; \\\n    fast/shtetl/run/containers/nginx-staging@save-2026-11-12-090000<\/code><\/pre><p><b>1<\/b> The dataset form: onto is <code>nginx-staging<\/code> itself, and the snapshot the tool takes of it before applying anything, named by <code>--result<\/code>, is exactly s1 replayed onto v2: <b>s1'<\/b>, under s1's own name. With base s1, only what changed in nginx between s1 and s2 is applied, which in the top dataset is nearly nothing (the logs are in <code>var<\/code>). No conflict: the six answered in step 1 are not asked again, because the admin did not touch those files after s1. Then shtetl takes <b>s2'<\/b> under s2's name. Both carry the originals' messages and <code>shtetl:replayed-from<\/code>.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/c/ns","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/c/ns","R/f/G","R/f/G/tmp","R/f/G/usr/local","R/f/G/var"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1","s2"],"R/c/n/tmp":["s1","s2"],"R/c/n/usr":["s1","s2"],"R/c/n/usr/local":["s1","s2"],"R/c/n/var":["s1","s2"],"R/c/n/www":["s1","s2"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"],"R/c/ns":["s1'","s2'"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  stopped","R/c/n/usr":"canmount=off","R/c/n/www":"container-only","R/c/ns":"exit 0"}},"hl":{"R/c/ns":"snap"},"frame":26,"arrows":[{"a":"R/c/n","b":"R/c/ns","kind":"rebase","num":1}]},{"kind":"frame","where":"Act IV, frame 27","title":"The children, www, and starting the new tree","html":"<p><b>1<\/b> Each child replays the same two steps into the matching name under <code>nginx-staging<\/code>: <code>tmp<\/code>, <code>usr/local<\/code> and <code>var<\/code> (one drawn), each placed after its step 1 so that step 2 can take it. Step 1 finds each child's base through the foundation's matching dataset; step 2 names the child's own s1. None conflicts. <code>var<\/code>'s logs and pkg database land on the new base's <code>var<\/code>.<\/p>\n<p><b>3<\/b> <code>usr<\/code> is a placeholder with <code>canmount=off<\/code>: never mounted, so it can never be a rebase's side, and it holds nothing anyway. shtetl clones it from <code>generic/usr@v2<\/code> before <code>usr/local<\/code>'s result is created under it.<\/p><p><b>2<\/b> <code>www<\/code> has no foundation counterpart and nothing in a foundation update touches it, so it is never replayed: its whole \"rebase\" is <code>zfs clone nginx/www@s2 nginx-staging/www<\/code>.<\/p>\n<p>Then shtetl unmounts the foundation's datasets, snapshots the tree, mounted at <code>/containers/nginx-staging<\/code>, with the version it now sits on (<b>v2<\/b>, <code>shtetl:kind=version<\/code>), and starts it as a jail with nginx's own settings, address included: nginx is stopped, so nothing collides. Creating a result under a placed result is probe P4, the replay step P14, and the mounts P16.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/c/ns","R/c/ns/tmp","R/c/ns/usr","R/c/ns/usr/local","R/c/ns/var","R/c/ns/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/c/ns","R/c/ns/tmp","R/c/ns/usr/local","R/c/ns/var","R/c/ns/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1","s2"],"R/c/n/tmp":["s1","s2"],"R/c/n/usr":["s1","s2"],"R/c/n/usr/local":["s1","s2"],"R/c/n/var":["s1","s2"],"R/c/n/www":["s1","s2"],"L/c/n":["s1"],"L/c/n/tmp":["s1"],"L/c/n/usr":["s1"],"L/c/n/usr/local":["s1"],"L/c/n/var":["s1"],"L/c/n/www":["s1"],"R/c/ns":["s1'","s2'","v2"],"R/c/ns/tmp":["s1'","s2'","v2"],"R/c/ns/usr/local":["s1'","s2'","v2"],"R/c/ns/var":["s1'","s2'","v2"],"R/c/ns/usr":["v2"],"R/c/ns/www":["v2"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  stopped","R/c/n/usr":"canmount=off","R/c/n/www":"container-only","R/c/ns/usr":"clone of generic/usr@v2","R/c/ns/www":"clone of nginx/www@s2","R/c/ns":"jail"}},"hl":{"R/c/ns":"new","R/c/ns/tmp":"new","R/c/ns/usr":"new","R/c/ns/usr/local":"new","R/c/ns/var":"new","R/c/ns/www":"new"},"frame":27,"arrows":[{"a":"R/f/G/var","b":"R/c/ns/var","kind":"rebase","num":1},{"a":"R/c/n/var","b":"R/c/ns/var","kind":"rebase","num":null},{"a":"R/c/n/www","b":"R/c/ns/www","kind":"clone","num":2},{"a":"R/f/G/usr","b":"R/c/ns/usr","kind":"clone","num":3}]},{"kind":"frame","where":"Act IV, frame 28","title":"Soak","html":"<p>nginx-staging serves; nginx sits stopped and untouched. The admin tries the new tree for as long as they like. If it misbehaves, <code>shtetl abandon nginx<\/code> stops and destroys the staging tree and starts nginx again exactly as it was. A <code>shtetl pkg-upgrade nginx-staging<\/code> here would add a <code>-pkg<\/code> snapshot, so the plain and upgraded states would both be there to pick from.<\/p><p>Saving the staging tree, <b>s3<\/b> \"soak start\", mirrors it into zlake. <b>1<\/b> First nginx's s2 goes to zlake if it is not there yet (<code>send -i s1 s2<\/code>), because <b>3<\/b> the mirror of <code>nginx-staging/www<\/code> is a clone of zlake's <code>nginx/www@s2<\/code>, exactly as on zrun. <b>2<\/b> The replayed datasets go as clone streams of zlake's foundation <code>@v2<\/code>, carrying s1', s2' and v2 with them (<code>send -I<\/code>).<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/c/ns","L/c/ns/tmp","L/c/ns/usr","L/c/ns/usr/local","L/c/ns/var","L/c/ns/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/c/ns","R/c/ns/tmp","R/c/ns/usr","R/c/ns/usr/local","R/c/ns/var","R/c/ns/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/c/ns","R/c/ns/tmp","R/c/ns/usr/local","R/c/ns/var","R/c/ns/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1","s2"],"R/c/n/tmp":["s1","s2"],"R/c/n/usr":["s1","s2"],"R/c/n/usr/local":["s1","s2"],"R/c/n/var":["s1","s2"],"R/c/n/www":["s1","s2"],"L/c/n":["s1","s2"],"L/c/n/tmp":["s1","s2"],"L/c/n/usr":["s1","s2"],"L/c/n/usr/local":["s1","s2"],"L/c/n/var":["s1","s2"],"L/c/n/www":["s1","s2"],"R/c/ns":["s1'","s2'","v2","s3"],"R/c/ns/tmp":["s1'","s2'","v2","s3"],"R/c/ns/usr/local":["s1'","s2'","v2","s3"],"R/c/ns/var":["s1'","s2'","v2","s3"],"R/c/ns/usr":["v2","s3"],"R/c/ns/www":["v2","s3"],"L/c/ns":["s1'","s2'","v2","s3"],"L/c/ns/tmp":["s1'","s2'","v2","s3"],"L/c/ns/usr":["s1'","s2'","v2","s3"],"L/c/ns/usr/local":["s1'","s2'","v2","s3"],"L/c/ns/var":["s1'","s2'","v2","s3"],"L/c/ns/www":["v2","s3"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  stopped","R/c/n/usr":"canmount=off","R/c/n/www":"container-only","R/c/ns/usr":"clone of generic/usr@v2","R/c/ns/www":"clone of nginx/www@s2","R/c/ns":"jail"}},"hl":{"L/c/ns":"new","L/c/ns/tmp":"new","L/c/ns/usr":"new","L/c/ns/usr/local":"new","L/c/ns/var":"new","L/c/ns/www":"new","R/c/ns":"write"},"frame":28,"arrows":[{"a":"R/c/n","b":"L/c/n","kind":"save","num":1},{"a":"R/c/ns","b":"L/c/ns","kind":"save","num":2},{"a":"L/c/n/www","b":"L/c/ns/www","kind":"clone","num":3}]},{"kind":"frame","where":"Act IV, frame 29","title":"Cutover on zrun","html":"<p>The soak went well. Cutover is the admin's decision, made by command. nginx has been stopped since s2, so there is nothing to reconcile; had the admin started it again during the soak, shtetl would say how much it wrote and ask.<\/p><pre class=\"\"><code>$ shtetl cutover nginx\nnginx has not been written since the update started (written@s2 = 0).\ncut over to nginx-staging? [y/N] y<\/code><\/pre><p>shtetl stops the staging jail. <b>1<\/b> <code>zfs promote nginx-staging/www<\/code>: the clone takes over <code>www<\/code>'s snapshots up to s2, so the site's history moves with it (probe P11). Then the old tree is destroyed on zrun; it lives on in zlake. <b>2<\/b> <code>zfs rename nginx-staging nginx<\/code>. Mountpoints follow by inheritance, so the new tree is now at <code>/containers/nginx<\/code>; the jail block is renamed and the jail started.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/c/ns","L/c/ns/tmp","L/c/ns/usr","L/c/ns/usr/local","L/c/ns/var","L/c/ns/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/c/ns","R/c/ns/tmp","R/c/ns/usr","R/c/ns/usr/local","R/c/ns/var","R/c/ns/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/c/ns","R/c/ns/tmp","R/c/ns/usr/local","R/c/ns/var","R/c/ns/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1","s2"],"R/c/n/tmp":["s1","s2"],"R/c/n/usr":["s1","s2"],"R/c/n/usr/local":["s1","s2"],"R/c/n/var":["s1","s2"],"R/c/n/www":["s1","s2"],"L/c/n":["s1","s2"],"L/c/n/tmp":["s1","s2"],"L/c/n/usr":["s1","s2"],"L/c/n/usr/local":["s1","s2"],"L/c/n/var":["s1","s2"],"L/c/n/www":["s1","s2"],"R/c/ns":["s1'","s2'","v2","s3"],"R/c/ns/tmp":["s1'","s2'","v2","s3"],"R/c/ns/usr/local":["s1'","s2'","v2","s3"],"R/c/ns/var":["s1'","s2'","v2","s3"],"R/c/ns/usr":["v2","s3"],"R/c/ns/www":["v2","s3"],"L/c/ns":["s1'","s2'","v2","s3"],"L/c/ns/tmp":["s1'","s2'","v2","s3"],"L/c/ns/usr":["s1'","s2'","v2","s3"],"L/c/ns/usr/local":["s1'","s2'","v2","s3"],"L/c/ns/var":["s1'","s2'","v2","s3"],"L/c/ns/www":["v2","s3"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  stopped","R/c/n/usr":"canmount=off","R/c/n/www":"container-only","R/c/ns/usr":"clone of generic/usr@v2","R/c/ns/www":"clone of nginx/www@s2","R/c/ns":"stopped"}},"hl":{"R/c/n":"gone","R/c/n/tmp":"gone","R/c/n/usr":"gone","R/c/n/usr/local":"gone","R/c/n/var":"gone","R/c/n/www":"gone"},"frame":29,"arrows":[{"a":"R/c/n/www","b":"R/c/ns/www","kind":"promote","num":1},{"a":"R/c/ns","b":"R/c/n","kind":"rename","num":2}]},{"kind":"frame","where":"Act IV, frame 30","title":"Cutover in zlake: the old mirror is archived","html":"<p>zlake follows, so its mirror matches zrun again. First the same promote of <code>www<\/code> in the mirror, so zlake's <code>nginx-staging/www<\/code> now carries s1 and s2 as well.<\/p><p><b>1<\/b> <code>zfs rename<\/code> of the old mirror to <code>archive/containers/nginx-2026-11-20<\/code>. Same pool, so it is a rename and copies nothing. The archive keeps the old tree whole, on v1 with s1 and s2, until <code>retention.archive<\/code> (one year here) prunes it.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/a/c/n","L/a/c/n/tmp","L/a/c/n/usr","L/a/c/n/usr/local","L/a/c/n/var","L/a/c/n/www","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/c/ns","L/c/ns/tmp","L/c/ns/usr","L/c/ns/usr/local","L/c/ns/var","L/c/ns/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"L/c/n":["s1","s2"],"L/c/n/tmp":["s1","s2"],"L/c/n/usr":["s1","s2"],"L/c/n/usr/local":["s1","s2"],"L/c/n/var":["s1","s2"],"L/c/n/www":[],"L/c/ns":["s1'","s2'","v2","s3"],"L/c/ns/tmp":["s1'","s2'","v2","s3"],"L/c/ns/usr":["s1'","s2'","v2","s3"],"L/c/ns/usr/local":["s1'","s2'","v2","s3"],"L/c/ns/var":["s1'","s2'","v2","s3"],"L/c/ns/www":["s1","s2","v2","s3"],"R/c/n":["s1'","s2'","v2","s3"],"R/c/n/tmp":["s1'","s2'","v2","s3"],"R/c/n/usr":["v2","s3"],"R/c/n/usr/local":["s1'","s2'","v2","s3"],"R/c/n/var":["s1'","s2'","v2","s3"],"R/c/n/www":["s1","s2","v2","s3"],"L/a/c/n":["s1","s2"],"L/a/c/n/tmp":["s1","s2"],"L/a/c/n/usr":["s1","s2"],"L/a/c/n/usr/local":["s1","s2"],"L/a/c/n/var":["s1","s2"],"L/a/c/n/www":[]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"clone of generic/usr@v2","R/c/n/www":"promoted"}},"hl":{"L/c/n":"move","L/c/n/tmp":"move","L/c/n/usr":"move","L/c/n/usr/local":"move","L/c/n/var":"move","L/c/n/www":"move","L/a/c/n":"new","L/a/c/n/tmp":"new","L/a/c/n/usr":"new","L/a/c/n/usr/local":"new","L/a/c/n/var":"new","L/a/c/n/www":"new","L/c/ns/www":"write"},"frame":30,"arrows":[{"a":"L/c/n","b":"L/a/c/n","kind":"rename","num":1}]},{"kind":"frame","where":"Act IV, frame 31","title":"Cutover in zlake: the staging mirror becomes nginx","html":"<p><b>1<\/b> <code>zfs rename<\/code> of <code>containers/nginx-staging<\/code> to <code>containers/nginx<\/code>, matching zrun. zlake's <code>nginx<\/code> is now a clone of zlake's foundation <code>@v2<\/code> carrying s1' and s2', and its <code>www<\/code> carries the site's whole history.<\/p><div class=\"callout callout-note\"><div class=\"ctitle\">Drawn as done, still to be proven<\/div><p>These moves rest on ZFS behaviour this page assumes: that a clone stream lands as a clone (probe P1), that a child keeps receiving incremental sends after its parent changes lineage or name (P2), and that a promote can be mirrored across pools (P11). The probes run on the box before the design is relied on.<\/p><\/div>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/a/c/n","L/a/c/n/tmp","L/a/c/n/usr","L/a/c/n/usr/local","L/a/c/n/var","L/a/c/n/www","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/c/ns","L/c/ns/tmp","L/c/ns/usr","L/c/ns/usr/local","L/c/ns/var","L/c/ns/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1'","s2'","v2","s3"],"R/c/n/tmp":["s1'","s2'","v2","s3"],"R/c/n/usr":["v2","s3"],"R/c/n/usr/local":["s1'","s2'","v2","s3"],"R/c/n/var":["s1'","s2'","v2","s3"],"R/c/n/www":["s1","s2","v2","s3"],"L/a/c/n":["s1","s2"],"L/a/c/n/tmp":["s1","s2"],"L/a/c/n/usr":["s1","s2"],"L/a/c/n/usr/local":["s1","s2"],"L/a/c/n/var":["s1","s2"],"L/a/c/n/www":[],"L/c/n":["s1'","s2'","v2","s3"],"L/c/n/tmp":["s1'","s2'","v2","s3"],"L/c/n/usr":["s1'","s2'","v2","s3"],"L/c/n/usr/local":["s1'","s2'","v2","s3"],"L/c/n/var":["s1'","s2'","v2","s3"],"L/c/n/www":["s1","s2","v2","s3"],"L/c/ns":["s1'","s2'","v2","s3"],"L/c/ns/tmp":["s1'","s2'","v2","s3"],"L/c/ns/usr":["s1'","s2'","v2","s3"],"L/c/ns/usr/local":["s1'","s2'","v2","s3"],"L/c/ns/var":["s1'","s2'","v2","s3"],"L/c/ns/www":["s1","s2","v2","s3"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"clone of generic/usr@v2","R/c/n/www":"promoted"}},"hl":{"L/c/ns":"move","L/c/ns/tmp":"move","L/c/ns/usr":"move","L/c/ns/usr/local":"move","L/c/ns/var":"move","L/c/ns/www":"move","L/c/n":"new","L/c/n/tmp":"new","L/c/n/usr":"new","L/c/n/usr/local":"new","L/c/n/var":"new","L/c/n/www":"new"},"frame":31,"arrows":[{"a":"L/c/ns","b":"L/c/n","kind":"rename","num":1}]},{"kind":"frame","where":"Act IV, frame 32","title":"Where everything stands","html":"<p>The end of one cycle. nginx runs on v2 with everything the admin did, merged with everything the errata did, and with its history: s1 and s2 replayed as s1' and s2'. <b>1<\/b> Its first save after cutover, <b>s5<\/b>, \"cut over\", goes to the renamed mirror as an ordinary incremental.<\/p><p>The next errata, or the next release, starts again at Act III: build into the same foundation, send the increment, stop, replay into staging, soak, cut over. Nothing in the cycle needed git beyond sharing recipes, and nothing was written into a running tree except by the admin and by the jail's own <code>pkg<\/code> and <code>commands<\/code> at creation.<\/p>\n<p>Following a container across its updates (a proposal, planning.md section 8):<\/p><pre class=\"\"><code>$ shtetl log nginx\nnginx                          on generic@15.1-releng-2026-11-12-5b2c7e01a9d4\n  @save-2026-11-20-181500      cut over\n  @save-2026-11-12-094500      soak start\n  @15.1-releng-2026-11-12-...  version\n  @save-2026-11-12-090000      update to ...           replayed from nginx@s2\n  @save-2026-10-09-101500      site live, ploni added  replayed from nginx@s1\narchive/containers/nginx-2026-11-20\n                               on generic@15.1-releng-2026-10-08-0f691888dc56\n  @save-2026-11-12-090000      update to ...\n  @save-2026-10-09-101500      site live, ploni added<\/code><\/pre><div class=\"callout callout-note\"><div class=\"ctitle\">Three policies decide how much of this is kept<\/div><p><code>retention.run<\/code>: the saves on zrun, and zlake's mirror keeps the same. <code>retention.archive<\/code>: the retired trees. <code>update.depth<\/code>: how many saves an update replays, never more than zrun keeps. Each is 0 (everything), a number, or a quoted interval such as <code>\"7d\"<\/code>.<\/p><\/div>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/a/c/n","L/a/c/n/tmp","L/a/c/n/usr","L/a/c/n/usr/local","L/a/c/n/var","L/a/c/n/www","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1'","s2'","v2","s3","s5"],"R/c/n/tmp":["s1'","s2'","v2","s3","s5"],"R/c/n/usr":["v2","s3","s5"],"R/c/n/usr/local":["s1'","s2'","v2","s3","s5"],"R/c/n/var":["s1'","s2'","v2","s3","s5"],"R/c/n/www":["s1","s2","v2","s3","s5"],"L/a/c/n":["s1","s2"],"L/a/c/n/tmp":["s1","s2"],"L/a/c/n/usr":["s1","s2"],"L/a/c/n/usr/local":["s1","s2"],"L/a/c/n/var":["s1","s2"],"L/a/c/n/www":[],"L/c/n":["s1'","s2'","v2","s3","s5"],"L/c/n/tmp":["s1'","s2'","v2","s3","s5"],"L/c/n/usr":["s1'","s2'","v2","s3","s5"],"L/c/n/usr/local":["s1'","s2'","v2","s3","s5"],"L/c/n/var":["s1'","s2'","v2","s3","s5"],"L/c/n/www":["s1","s2","v2","s3","s5"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"clone of generic/usr@v2"}},"hl":{"R/c/n":"snap","R/c/n/tmp":"snap","R/c/n/usr":"snap","R/c/n/usr/local":"snap","R/c/n/var":"snap","R/c/n/www":"snap","L/c/n":"snap","L/c/n/tmp":"snap","L/c/n/usr":"snap","L/c/n/usr/local":"snap","L/c/n/var":"snap","L/c/n/www":"snap"},"frame":32,"arrows":[{"a":"R/c/n","b":"L/c/n","kind":"save","num":1}]},{"kind":"act","where":"Epilogue","title":"Still to prove on the box","html":"<p>Everything above is drawn as designed, and some of it rests on ZFS and zfs_rebase behaving the way the design assumes. Milestone M0 tests each assumption with a standalone probe on a throwaway pool before any of shtetl is built (planning.md section 13).<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/a/c/n","L/a/c/n/tmp","L/a/c/n/usr","L/a/c/n/usr/local","L/a/c/n/var","L/a/c/n/www","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1'","s2'","v2","s3","s5"],"R/c/n/tmp":["s1'","s2'","v2","s3","s5"],"R/c/n/usr":["v2","s3","s5"],"R/c/n/usr/local":["s1'","s2'","v2","s3","s5"],"R/c/n/var":["s1'","s2'","v2","s3","s5"],"R/c/n/www":["s1","s2","v2","s3","s5"],"L/a/c/n":["s1","s2"],"L/a/c/n/tmp":["s1","s2"],"L/a/c/n/usr":["s1","s2"],"L/a/c/n/usr/local":["s1","s2"],"L/a/c/n/var":["s1","s2"],"L/a/c/n/www":[],"L/c/n":["s1'","s2'","v2","s3","s5"],"L/c/n/tmp":["s1'","s2'","v2","s3","s5"],"L/c/n/usr":["s1'","s2'","v2","s3","s5"],"L/c/n/usr/local":["s1'","s2'","v2","s3","s5"],"L/c/n/var":["s1'","s2'","v2","s3","s5"],"L/c/n/www":["s1","s2","v2","s3","s5"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"clone of generic/usr@v2"}},"hl":{},"arrows":[],"frame":0},{"kind":"frame","where":"Epilogue, frame 33","title":"What each assumption is, and the probe that tests it","html":"<div class=\"tablewrap\"><table class=\"cast\"><tr><th>the story assumes<\/th><th>probe<\/th><th>where<\/th><\/tr><tr><td>A clone stream from zrun lands in zlake as a clone of zlake's own foundation, so zlake stores only the delta<\/td><td style=\"white-space:nowrap\"><code>P1<\/code><\/td><td><a href=\"#slide-18\" data-slide=\"18\">frame 14<\/a><\/td><\/tr><tr><td>A snapshot's <code>shtetl:commit<\/code> and <code>shtetl:config<\/code> travel with <code>zfs send<\/code>, or are set after the receive<\/td><td style=\"white-space:nowrap\"><code>P10<\/code><\/td><td><a href=\"#slide-18\" data-slide=\"18\">frame 14<\/a><\/td><\/tr><tr><td>Each dataset of a foundation can be cloned on its own, and the clones mount by inheritance in the right order<\/td><td style=\"white-space:nowrap\"><code>P7, P9<\/code><\/td><td><a href=\"#slide-15\" data-slide=\"15\">frame 11<\/a><\/td><\/tr><tr><td>installworld over the previous version plus delete-old leaves nothing that matters behind<\/td><td style=\"white-space:nowrap\"><code>P6<\/code><\/td><td><a href=\"#slide-21\" data-slide=\"21\">frame 16<\/a><\/td><\/tr><tr><td>Installing with <code>install -C<\/code> keeps unchanged files untouched, so the rebase can prune them<\/td><td style=\"white-space:nowrap\"><code>P12<\/code><\/td><td><a href=\"#slide-21\" data-slide=\"21\">frame 16<\/a><\/td><\/tr><tr><td>A file whose bytes the new version did not change does not conflict with the admin's edit of it<\/td><td style=\"white-space:nowrap\"><code>P5<\/code><\/td><td><a href=\"#slide-28\" data-slide=\"28\">frame 22<\/a><\/td><\/tr><tr><td>The foundation copy, mounted read-only for the update, is read at its mountpoint; a <code>canmount=off<\/code> placeholder is refused as a side and can be cloned instead<\/td><td style=\"white-space:nowrap\"><code>P16<\/code><\/td><td><a href=\"#slide-28\" data-slide=\"28\">frame 22<\/a>, <a href=\"#slide-33\" data-slide=\"33\">frame 27<\/a><\/td><\/tr><tr><td>A replay step runs with <code>--allow-unrelated --base<\/code> in the dataset form, its pre-apply snapshot is the replayed save, and its cost is acceptable<\/td><td style=\"white-space:nowrap\"><code>P14<\/code><\/td><td><a href=\"#slide-32\" data-slide=\"32\">frame 26<\/a><\/td><\/tr><tr><td>A rebase can create its result under an already placed result<\/td><td style=\"white-space:nowrap\"><code>P4<\/code><\/td><td><a href=\"#slide-33\" data-slide=\"33\">frame 27<\/a><\/td><\/tr><tr><td><code>written@s2<\/code> tells cutover whether the old tree was started again during the soak<\/td><td style=\"white-space:nowrap\"><code>P8<\/code><\/td><td><a href=\"#slide-35\" data-slide=\"35\">frame 29<\/a><\/td><\/tr><tr><td>Promoting a container-only clone, on zrun and again in zlake, keeps its incremental chain<\/td><td style=\"white-space:nowrap\"><code>P3, P11<\/code><\/td><td><a href=\"#slide-35\" data-slide=\"35\">frame 29<\/a>, <a href=\"#slide-36\" data-slide=\"36\">frame 30<\/a><\/td><\/tr><tr><td>A child keeps receiving incremental sends after its parent is renamed or changes lineage<\/td><td style=\"white-space:nowrap\"><code>P2<\/code><\/td><td><a href=\"#slide-37\" data-slide=\"37\">frame 31<\/a><\/td><\/tr><tr><td>A release change (15.1 to 15.2) built into the same foundation can be rebased onto<\/td><td style=\"white-space:nowrap\"><code>P15<\/code><\/td><td>not drawn; Act III's note<\/td><\/tr><tr><td>Several lake or run roots, and the one-match rule<\/td><td style=\"white-space:nowrap\"><code>P13<\/code><\/td><td>not drawn: this story has one root per space<\/td><\/tr><\/table><\/div><p>The probes come first: if one fails, the frames it supports are redesigned before anything is built on them.<\/p>","state":{"present":["B","B/t","C","C/c","C/cn","C/dc","C/f","C/fg","C/sc","L","L/a","L/a/c","L/a/c/n","L/a/c/n/tmp","L/a/c/n/usr","L/a/c/n/usr/local","L/a/c/n/var","L/a/c/n/www","L/c","L/c/n","L/c/n/tmp","L/c/n/usr","L/c/n/usr/local","L/c/n/var","L/c/n/www","L/f","L/f/G","L/f/G/tmp","L/f/G/usr","L/f/G/usr/local","L/f/G/var","L/fb","L/fb/G","L/s","R","R/c","R/c/n","R/c/n/tmp","R/c/n/usr","R/c/n/usr/local","R/c/n/var","R/c/n/www","R/f","R/f/G","R/f/G/tmp","R/f/G/usr","R/f/G/usr/local","R/f/G/var","R/s"],"mounted":["C","R/c","R/c/n","R/c/n/tmp","R/c/n/usr/local","R/c/n/var","R/c/n/www"],"pills":{"L/f/G":["v1","v2"],"L/f/G/tmp":["v1","v2"],"L/f/G/usr":["v1","v2"],"L/f/G/usr/local":["v1","v2"],"L/f/G/var":["v1","v2"],"R/f/G":["v1","v2"],"R/f/G/tmp":["v1","v2"],"R/f/G/usr":["v1","v2"],"R/f/G/usr/local":["v1","v2"],"R/f/G/var":["v1","v2"],"R/c/n":["s1'","s2'","v2","s3","s5"],"R/c/n/tmp":["s1'","s2'","v2","s3","s5"],"R/c/n/usr":["v2","s3","s5"],"R/c/n/usr/local":["s1'","s2'","v2","s3","s5"],"R/c/n/var":["s1'","s2'","v2","s3","s5"],"R/c/n/www":["s1","s2","v2","s3","s5"],"L/a/c/n":["s1","s2"],"L/a/c/n/tmp":["s1","s2"],"L/a/c/n/usr":["s1","s2"],"L/a/c/n/usr/local":["s1","s2"],"L/a/c/n/var":["s1","s2"],"L/a/c/n/www":[],"L/c/n":["s1'","s2'","v2","s3","s5"],"L/c/n/tmp":["s1'","s2'","v2","s3","s5"],"L/c/n/usr":["s1'","s2'","v2","s3","s5"],"L/c/n/usr/local":["s1'","s2'","v2","s3","s5"],"L/c/n/var":["s1'","s2'","v2","s3","s5"],"L/c/n/www":["s1","s2","v2","s3","s5"]},"tags":{"B/t":"5b2c7e01a9d4","R/c":"/containers","R/f":"/shtetl/foundations","L/f/G/usr":"canmount=off","R/f/G":"ro","R/f/G/tmp":"ro","R/f/G/usr":"ro, canmount=off","R/f/G/usr/local":"ro","R/f/G/var":"ro","R/c/n":"/containers/nginx  jail","R/c/n/usr":"clone of generic/usr@v2"}},"hl":{},"frame":33,"arrows":[]}],"pillKind":{"v1":"version","v2":"version","s1":"save","s2":"from","s3":"save","s5":"save","s1'":"save","s2'":"save"},"arrowClass":{"build":"build","install":"build","checkout":"build","send":"lake","save":"lake","clone":"run","rebase":"rebase","rename":"muted","promote":"muted"}}</script>
+<script type="module">
+const DATA = JSON.parse(document.getElementById('story-data').textContent);
+const SLIDES = DATA.slides;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+
+/* ---- the placard: works with or without WebGL ---- */
+
+const el = (id) => document.getElementById(id);
+let current = -1;
+let model = null;
+
+function slideFromHash() {
+	const m = /^#slide-(\d+)$/.exec(location.hash);
+	const n = m ? parseInt(m[1], 10) - 1 : 0;
+	return Math.min(Math.max(n, 0), SLIDES.length - 1);
+}
+
+function render(k, instant) {
+	if (k < 0 || k >= SLIDES.length) return;
+	current = k;
+	const s = SLIDES[k];
+	el('where').textContent = s.where;
+	const title = el('title');
+	title.textContent = s.title;
+	el('body').innerHTML = s.html;
+	el('body').scrollTop = 0;
+	el('counter').textContent = (k + 1) + ' of ' + SLIDES.length;
+	el('prev').disabled = k === 0;
+	el('next').disabled = k === SLIDES.length - 1;
+	el('next').textContent = k === 0 ? 'Begin' : 'Next';
+	document.querySelectorAll('.tick').forEach((t, i) => {
+		t.classList.toggle('current', i === k);
+		t.classList.toggle('done', i < k);
+		if (i === k) t.setAttribute('aria-current', 'step');
+		else t.removeAttribute('aria-current');
+	});
+	const tick = document.querySelectorAll('.tick')[k];
+	if (tick && tick.scrollIntoView) tick.scrollIntoView({block: 'nearest', inline: 'nearest'});
+	history.replaceState(null, '', '#slide-' + (k + 1));
+	if (model) model.show(s, instant);
+}
+
+function buildTimeline() {
+	const tl = el('timeline');
+	SLIDES.forEach((s, i) => {
+		const b = document.createElement('button');
+		b.className = 'tick' + (s.kind !== 'frame' ? ' act' : '');
+		const label = (s.where ? s.where + ': ' : '') + s.title;
+		b.title = label;
+		b.setAttribute('aria-label', label);
+		b.addEventListener('click', () => render(i, false));
+		tl.appendChild(b);
+	});
+}
+
+el('prev').addEventListener('click', () => render(current - 1, false));
+el('next').addEventListener('click', () => render(current + 1, false));
+el('body').addEventListener('click', (e) => {
+	const a = e.target.closest('a[data-slide]');
+	if (!a) return;
+	e.preventDefault();
+	render(parseInt(a.dataset.slide, 10) - 1, false);
+});
+document.addEventListener('keydown', (e) => {
+	if (e.altKey || e.ctrlKey || e.metaKey) return;
+	if (e.key === 'ArrowRight' || e.key === 'PageDown') { render(current + 1, false); e.preventDefault(); }
+	else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { render(current - 1, false); e.preventDefault(); }
+	else if (e.key === 'Home') { render(0, false); e.preventDefault(); }
+	else if (e.key === 'End') { render(SLIDES.length - 1, false); e.preventDefault(); }
+});
+window.addEventListener('hashchange', () => {
+	const k = slideFromHash();
+	if (k !== current) render(k, false);
+});
+el('keybtn').addEventListener('click', () => {
+	const open = el('key').classList.toggle('open');
+	el('keybtn').setAttribute('aria-expanded', String(open));
+});
+
+buildTimeline();
+
+/* ---- the model ---- */
+
+async function start() {
+	let THREE, OrbitControls, CSS2DRenderer, CSS2DObject;
+	try {
+		THREE = await import('three');
+		({ OrbitControls } = await import('three/addons/controls/OrbitControls.js'));
+		({ CSS2DRenderer, CSS2DObject } = await import('three/addons/renderers/CSS2DRenderer.js'));
+	} catch (err) {
+		el('nogl').classList.add('show');
+		return null;
+	}
+	const stage = el('stage');
+	let renderer;
+	try {
+		renderer = new THREE.WebGLRenderer({ antialias: true });
+	} catch (err) {
+		el('nogl').classList.add('show');
+		return null;
+	}
+	renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+	renderer.shadowMap.enabled = true;
+	renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+	stage.insertBefore(renderer.domElement, stage.firstChild);
+	const labels = new CSS2DRenderer();
+	labels.domElement.className = 'labels';
+	stage.insertBefore(labels.domElement, renderer.domElement.nextSibling);
+
+	const THEMES = {
+		light: {
+			bg: 0xd9dde1, table: 0xcdd2d7, building: 0xf6f3ec, root: 0x9aa3ad,
+			paper: 0xfbfbfa, dir: 0xe2e5e8, wire: 0x6b727a, tree: 0x8e959d,
+			lamp: 0xffc65a,
+			plates: { C: 0xcdc6dc, B: 0xddd0bf, L: 0xc2cedb, R: 0xc5d6cb },
+			hl: { new: 0x2f9e5a, write: 0xe39b16, read: 0x7b5cc4,
+				snap: 0x2f4fc9, gone: 0xc8372d, move: 0x9097a0 },
+			pill: { version: 0x2f4fc9, save: 0x5e646c, from: 0xe0aa00 },
+			arrow: { build: 0xb8740f, lake: 0x2f4fc9, run: 0x2f7a4f,
+				rebase: 0xb3246b, muted: 0x8b9097 },
+			hemiSky: 0xffffff, hemiGround: 0x9aa3ad, hemi: 1.05, key: 1.6,
+		},
+		dark: {
+			bg: 0x171a1e, table: 0x1e2227, building: 0xcfd2d4, root: 0x5c636b,
+			paper: 0xb9bec3, dir: 0x6d747b, wire: 0xa2a9b0, tree: 0x59606a,
+			lamp: 0xffc65a,
+			plates: { C: 0x332c42, B: 0x3d3428, L: 0x24323f, R: 0x26362c },
+			hl: { new: 0x41c27a, write: 0xf0a92a, read: 0x9b80e8,
+				snap: 0x6f8cff, gone: 0xef5a4d, move: 0x7a828b },
+			pill: { version: 0x5f7dff, save: 0x8d949c, from: 0xf0c02a },
+			arrow: { build: 0xe5a14a, lake: 0x6f8cff, run: 0x6cc495,
+				rebase: 0xef6aa6, muted: 0x8b9097 },
+			hemiSky: 0xbfc8d6, hemiGround: 0x20252b, hemi: 0.75, key: 1.25,
+		},
+	};
+	const forced = document.documentElement.getAttribute('data-theme');
+	let theme = THEMES[forced || (darkQuery.matches ? 'dark' : 'light')];
+
+	const scene = new THREE.Scene();
+	scene.background = new THREE.Color(theme.bg);
+	const camera = new THREE.PerspectiveCamera(32, 1, 0.5, 600);
+	const controls = new OrbitControls(camera, renderer.domElement);
+	controls.enableDamping = !reduced;
+	controls.dampingFactor = 0.08;
+	controls.maxPolarAngle = 1.32;
+	controls.minDistance = 8;
+	controls.maxDistance = 220;
+
+	const hemi = new THREE.HemisphereLight(theme.hemiSky, theme.hemiGround, theme.hemi);
+	scene.add(hemi);
+	const key = new THREE.DirectionalLight(0xffffff, theme.key);
+	key.position.set(-30, 60, 40);
+	key.castShadow = true;
+	key.shadow.mapSize.set(2048, 2048);
+	Object.assign(key.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 200 });
+	key.shadow.bias = -0.0005;
+	scene.add(key);
+
+	const table = new THREE.Mesh(new THREE.PlaneGeometry(400, 400),
+		new THREE.MeshStandardMaterial({ color: theme.table, roughness: 1 }));
+	table.rotation.x = -Math.PI / 2;
+	table.position.y = -0.41;
+	table.receiveShadow = true;
+	scene.add(table);
+
+	/* layout */
+	const ROW_Z = 1.5, HEAD_Z = 3.0, PLATE_Y = 0.0, FH = 0.16, MAXF = 8;
+	const LAYOUT = {
+		C: { x0: -27, z0: -4, w: 12 },
+		B: { x0: -27, z0: 13, w: 12 },
+		L: { x0: -12, z0: -4, w: 20 },
+		R: { x0: 11, z0: -4, w: 20 },
+	};
+	const SIZE = {
+		root: { w: 2.0, h: 0.32, d: 1.0 },
+		ds: { w: 1.4, h: 0.85, d: 0.85 },
+		file: { w: 1.4, h: 0.06, d: 0.85 },
+		dir: { w: 1.4, h: 0.025, d: 0.85 },
+	};
+	const unit = new THREE.BoxGeometry(1, 1, 1);
+	const unitEdges = new THREE.EdgesGeometry(unit);
+	const plates = {};
+	const rows = {};
+	const rowList = [];
+
+	for (const sp of DATA.spaces) {
+		const L = LAYOUT[sp.key];
+		const depth = HEAD_Z + sp.rows.length * ROW_Z + 0.6;
+		const plate = new THREE.Mesh(unit, new THREE.MeshStandardMaterial({
+			color: theme.plates[sp.key], roughness: 0.95 }));
+		plate.scale.set(L.w, 0.8, depth);
+		plate.position.set(L.x0 + L.w / 2, PLATE_Y - 0.4, L.z0 + depth / 2);
+		plate.receiveShadow = true;
+		scene.add(plate);
+		plates[sp.key] = plate;
+		const pl = document.createElement('div');
+		pl.className = 'plate-lbl';
+		const inner = document.createElement('div');
+		inner.innerHTML = '';
+		inner.textContent = sp.label;
+		const sub = document.createElement('span');
+		sub.textContent = sp.sub;
+		inner.appendChild(sub);
+		pl.appendChild(inner);
+		const plo = new CSS2DObject(pl);
+		plo.position.set(L.x0 + 0.6, 0.05, L.z0 + 1.2);
+		scene.add(plo);
+
+		sp.rows.forEach(([id, label, depthLevel, kind], i) => {
+			const size = SIZE[kind];
+			const g = new THREE.Group();
+			const x = L.x0 + 1.0 + depthLevel * 1.05 + size.w / 2;
+			const z = L.z0 + HEAD_Z + i * ROW_Z;
+			g.position.set(x, PLATE_Y, z);
+			scene.add(g);
+			const placeholder = /\/usr$/.test(id);
+			const baseColor = kind === 'root' ? theme.root : kind === 'file' ? theme.paper
+				: kind === 'dir' ? theme.dir : theme.building;
+			const bodyMat = new THREE.MeshStandardMaterial({ color: baseColor,
+				roughness: 0.85, transparent: true, opacity: 1 });
+			const body = new THREE.Mesh(unit, bodyMat);
+			body.castShadow = true;
+			body.receiveShadow = true;
+			g.add(body);
+			const wire = new THREE.LineSegments(unitEdges,
+				new THREE.LineBasicMaterial({ color: theme.wire, transparent: true }));
+			wire.visible = false;
+			g.add(wire);
+			const band = new THREE.Mesh(unit, new THREE.MeshStandardMaterial({
+				color: theme.lamp, emissive: theme.lamp, emissiveIntensity: 0.9 }));
+			band.visible = false;
+			g.add(band);
+			const floors = [];
+			for (let f = 0; f < MAXF; f++) {
+				const m = new THREE.Mesh(unit, new THREE.MeshStandardMaterial({
+					color: 0x888888, roughness: 0.6, transparent: true }));
+				m.castShadow = true;
+				m.visible = false;
+				g.add(m);
+				floors.push(m);
+			}
+			const outline = new THREE.LineSegments(unitEdges,
+				new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
+			g.add(outline);
+			const lab = document.createElement('div');
+			lab.className = 'lbl' + (kind === 'file' || kind === 'dir' ? ' file' : '');
+			const labInner = document.createElement('div');
+			lab.appendChild(labInner);
+			const labObj = new CSS2DObject(lab);
+			labObj.position.set(size.w / 2 + 0.3, 0.1, 0);
+			g.add(labObj);
+			const r = {
+				id, label, kind, size, g, body, wire, band, floors, outline,
+				lab: labObj, labInner, placeholder, baseColor,
+				parent: null, conn: null, labelKey: '',
+				cur: { appear: 0, floors: 0, mounted: 0, ghost: 0, red: 0, hl: 0 },
+				tgt: { appear: 0, floors: 0, mounted: 0, ghost: 0, red: 0, hl: 0 },
+				hlKind: null, pills: [],
+			};
+			rows[id] = r;
+			rowList.push(r);
+		});
+	}
+	/* tree connectors */
+	const treeMat = new THREE.LineBasicMaterial({ color: theme.tree, transparent: true });
+	for (const r of rowList) {
+		const pid = r.id.includes('/') ? r.id.slice(0, r.id.lastIndexOf('/')) : null;
+		const p = pid && rows[pid];
+		if (!p) continue;
+		r.parent = p;
+		const px = p.g.position.x - p.size.w / 2 + 0.35;
+		const y = PLATE_Y + 0.01;
+		const pts = [
+			new THREE.Vector3(px, y, p.g.position.z + p.size.d / 2),
+			new THREE.Vector3(px, y, r.g.position.z),
+			new THREE.Vector3(px, y, r.g.position.z),
+			new THREE.Vector3(r.g.position.x - r.size.w / 2, y, r.g.position.z),
+		];
+		const conn = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), treeMat.clone());
+		conn.visible = false;
+		scene.add(conn);
+		r.conn = conn;
+	}
+
+	/* arrows */
+	const arrowGroup = new THREE.Group();
+	scene.add(arrowGroup);
+	let beads = [];
+
+	function clearArrows() {
+		for (const o of [...arrowGroup.children]) {
+			arrowGroup.remove(o);
+			o.traverse((c) => {
+				if (c.geometry && c.geometry !== unit) c.geometry.dispose();
+				if (c.material) c.material.dispose();
+				if (c.isCSS2DObject && c.element.parentNode) c.element.parentNode.removeChild(c.element);
+			});
+		}
+		beads = [];
+	}
+
+	function topOf(r) {
+		const a = r.tgt.appear;
+		const n = Math.min(r.tgt.floors, MAXF);
+		return new THREE.Vector3(r.g.position.x, PLATE_Y + r.size.h * a + FH * n + 0.25, r.g.position.z);
+	}
+
+	function cssColor(hex) {
+		return '#' + hex.toString(16).padStart(6, '0');
+	}
+
+	function buildArrows(s) {
+		clearArrows();
+		for (const a of s.arrows) {
+			const ra = rows[a.a], rb = rows[a.b];
+			if (!ra || !rb) continue;
+			const cls = DATA.arrowClass[a.kind];
+			const color = theme.arrow[cls];
+			const p0 = topOf(ra), p3 = topOf(rb);
+			const dist = p0.distanceTo(p3);
+			const lift = 2.0 + dist * 0.2;
+			const c1 = p0.clone().add(new THREE.Vector3(0, lift, 0));
+			const c2 = p3.clone().add(new THREE.Vector3(0, lift, 0));
+			const curve = new THREE.CubicBezierCurve3(p0, c1, c2, p3);
+			const dashed = cls === 'muted';
+			const mat = new THREE.MeshStandardMaterial({ color, emissive: color,
+				emissiveIntensity: 0.25, transparent: dashed, opacity: dashed ? 0.6 : 1 });
+			const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 64, cls === 'rebase' ? 0.08 : 0.055, 6, false), mat);
+			arrowGroup.add(tube);
+			const tan = curve.getTangentAt(1).normalize();
+			const head = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.65, 14), mat.clone());
+			head.position.copy(p3).addScaledVector(tan, -0.3);
+			head.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tan);
+			arrowGroup.add(head);
+			if (!reduced) {
+				for (let i = 0; i < 3; i++) {
+					const bead = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8),
+						new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.6 }));
+					arrowGroup.add(bead);
+					beads.push({ bead, curve, phase: i / 3 });
+				}
+			}
+			if (a.num != null) {
+				const b = document.createElement('div');
+				b.className = 'badge3';
+				const inner = document.createElement('div');
+				inner.textContent = String(a.num);
+				inner.style.background = cssColor(color);
+				b.appendChild(inner);
+				const bo = new CSS2DObject(b);
+				bo.position.copy(curve.getPoint(0.5));
+				arrowGroup.add(bo);
+			}
+		}
+	}
+
+	/* camera */
+	let follow = true;
+	let camTween = null;
+	camera.position.set(-40, 62, 92);
+	controls.target.set(2, 0, 20);
+	controls.update();
+	controls.addEventListener('start', () => {
+		if (!follow) return;
+		follow = false;
+		camTween = null;
+		el('follow').setAttribute('aria-pressed', 'false');
+	});
+	el('follow').addEventListener('click', () => {
+		follow = !follow;
+		el('follow').setAttribute('aria-pressed', String(follow));
+		if (follow && current >= 0) focus(SLIDES[current], false);
+	});
+
+	function focus(s, instant) {
+		if (!follow) return;
+		const pts = [];
+		for (const id of Object.keys(s.hl)) if (rows[id]) pts.push(rows[id].g.position);
+		for (const a of s.arrows) {
+			if (rows[a.a]) pts.push(rows[a.a].g.position);
+			if (rows[a.b]) pts.push(rows[a.b].g.position);
+		}
+		if (pts.length === 0) {
+			for (const id of s.state.present) if (rows[id]) pts.push(rows[id].g.position);
+		}
+		const box = new THREE.Box3();
+		if (pts.length === 0) {
+			for (const k of Object.keys(plates)) box.expandByObject(plates[k]);
+			box.expandByScalar(4);
+		} else {
+			box.setFromPoints(pts);
+			box.expandByScalar(4);
+		}
+		const center = box.getCenter(new THREE.Vector3());
+		const size = box.getSize(new THREE.Vector3());
+		const radius = Math.max(size.length() / 2, 9);
+		const fov = camera.fov * Math.PI / 180;
+		const aspect = Math.max(camera.aspect, 0.6);
+		const fit = radius / Math.tan(fov / 2) / Math.min(1, aspect);
+		const dist = Math.min(Math.max(fit * 0.85, 24), 150);
+		const dir = new THREE.Vector3(-0.38, 0.6, 0.7).normalize();
+		const toT = center, toP = center.clone().addScaledVector(dir, dist);
+		if (instant || reduced) {
+			controls.target.copy(toT);
+			camera.position.copy(toP);
+			controls.update();
+			camTween = null;
+		} else {
+			camTween = { fromT: controls.target.clone(), toT, fromP: camera.position.clone(), toP, t: 0 };
+		}
+	}
+
+	/* a slide */
+	function labelHTML(r, s) {
+		const tag = s.state.tags[r.id];
+		const pills = (s.state.pills[r.id] || []).slice(-3);
+		let h = '<span class="nm">' + r.label + '</span>';
+		if (tag) h += '<span class="tg">' + tag.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span>';
+		for (const p of pills) h += '<span class="ch ch-' + DATA.pillKind[p] + '">' + p + '</span>';
+		return h;
+	}
+
+	function show(s, instant) {
+		const present = new Set(s.state.present);
+		const mounted = new Set(s.state.mounted);
+		for (const r of rowList) {
+			const on = present.has(r.id);
+			const hl = s.hl[r.id] || null;
+			r.hlKind = hl;
+			r.pills = on ? (s.state.pills[r.id] || []).slice(-MAXF) : [];
+			r.tgt.appear = on ? (hl === 'gone' ? 0.35 : 1) : 0;
+			r.tgt.floors = r.pills.length;
+			r.tgt.mounted = on && mounted.has(r.id) ? 1 : 0;
+			r.tgt.ghost = hl === 'move' ? 1 : 0;
+			r.tgt.red = hl === 'gone' ? 1 : 0;
+			r.tgt.hl = hl ? 1 : 0;
+			r.outline.material.color.setHex(hl ? theme.hl[hl] : 0xffffff);
+			r.pills.forEach((p, i) => r.floors[i].material.color.setHex(theme.pill[DATA.pillKind[p]]));
+			const html = on ? labelHTML(r, s) : '';
+			if (html !== r.labelKey) { r.labInner.innerHTML = html; r.labelKey = html; }
+			if (instant || reduced) Object.assign(r.cur, r.tgt);
+		}
+		buildArrows(s);
+		focus(s, instant);
+	}
+
+	/* theme follows the system */
+	function applyTheme() {
+		theme = THEMES[darkQuery.matches ? 'dark' : 'light'];
+		scene.background.setHex(theme.bg);
+		table.material.color.setHex(theme.table);
+		hemi.color.setHex(theme.hemiSky);
+		hemi.groundColor.setHex(theme.hemiGround);
+		hemi.intensity = theme.hemi;
+		key.intensity = theme.key;
+		for (const k of Object.keys(plates)) plates[k].material.color.setHex(theme.plates[k]);
+		for (const r of rowList) {
+			r.baseColor = r.kind === 'root' ? theme.root : r.kind === 'file' ? theme.paper
+				: r.kind === 'dir' ? theme.dir : theme.building;
+			r.wire.material.color.setHex(theme.wire);
+			if (r.conn) r.conn.material.color.setHex(theme.tree);
+		}
+		if (current >= 0) show(SLIDES[current], true);
+	}
+	if (!forced) darkQuery.addEventListener('change', applyTheme);
+
+	/* frame loop */
+	const tmp = new THREE.Color(), red = new THREE.Color(), base = new THREE.Color();
+	let last = performance.now();
+	function frame(now) {
+		const dt = Math.min((now - last) / 1000, 0.1);
+		last = now;
+		const k = reduced ? 1 : 1 - Math.exp(-dt * 6);
+		const pulse = 0.65 + 0.35 * Math.sin(now / 260);
+		for (const r of rowList) {
+			const c = r.cur, t = r.tgt;
+			for (const p in c) c[p] += (t[p] - c[p]) * k;
+			const vis = c.appear > 0.01;
+			const h = Math.max(r.size.h * c.appear, 0.001);
+			const solid = vis && !r.placeholder;
+			r.body.visible = solid;
+			r.body.scale.set(r.size.w, h, r.size.d);
+			r.body.position.y = PLATE_Y + h / 2;
+			base.setHex(r.baseColor);
+			red.setHex(theme.hl.gone);
+			r.body.material.color.copy(base).lerp(red, c.red * 0.75);
+			r.body.material.opacity = 1 - 0.72 * c.ghost;
+			r.body.material.depthWrite = c.ghost < 0.5;
+			const glow = r.hlKind && r.hlKind !== 'gone' ? theme.hl[r.hlKind] : 0x000000;
+			tmp.setHex(glow);
+			r.body.material.emissive.copy(tmp);
+			r.body.material.emissiveIntensity = 0.32 * c.hl * (r.hlKind === 'write' ? pulse : 1);
+			r.wire.visible = vis && r.placeholder;
+			r.wire.scale.set(r.size.w, h, r.size.d);
+			r.wire.position.y = PLATE_Y + h / 2;
+			r.band.visible = vis && c.mounted > 0.03;
+			r.band.scale.set(r.size.w + 0.06, 0.1, r.size.d + 0.06);
+			r.band.position.y = PLATE_Y + 0.05;
+			r.band.material.emissiveIntensity = 0.95 * c.mounted;
+			let top = PLATE_Y + h;
+			for (let i = 0; i < MAXF; i++) {
+				const f = r.floors[i];
+				const amt = Math.min(Math.max(c.floors - i, 0), 1);
+				f.visible = vis && amt > 0.02 && i < r.pills.length;
+				if (!f.visible) continue;
+				const drop = (1 - amt) * 3;
+				f.scale.set(r.size.w + 0.08, FH * 0.86, r.size.d + 0.08);
+				f.position.y = top + FH * i + FH / 2 + drop;
+				f.material.opacity = amt * (1 - 0.6 * c.red);
+			}
+			const total = h + FH * Math.min(c.floors, r.pills.length);
+			r.outline.visible = vis && c.hl > 0.02;
+			r.outline.scale.set(r.size.w + 0.24, total + 0.16, r.size.d + 0.24);
+			r.outline.position.y = PLATE_Y + total / 2;
+			r.outline.material.opacity = c.hl;
+			r.lab.visible = c.appear > 0.2;
+			r.lab.element.style.opacity = String(Math.min(1, 1 - 0.6 * c.ghost));
+			if (r.conn) {
+				const on = vis && r.parent.cur.appear > 0.01;
+				r.conn.visible = on;
+				r.conn.material.opacity = Math.min(c.appear, r.parent.cur.appear);
+			}
+		}
+		for (const b of beads) {
+			const t = ((now / 2600) + b.phase) % 1;
+			b.bead.position.copy(b.curve.getPointAt(t));
+		}
+		if (camTween) {
+			camTween.t = Math.min(1, camTween.t + dt / 0.9);
+			const e = camTween.t < 0.5 ? 4 * camTween.t ** 3 : 1 - Math.pow(-2 * camTween.t + 2, 3) / 2;
+			controls.target.lerpVectors(camTween.fromT, camTween.toT, e);
+			camera.position.lerpVectors(camTween.fromP, camTween.toP, e);
+			if (camTween.t >= 1) camTween = null;
+		}
+		controls.update();
+		renderer.render(scene, camera);
+		labels.render(scene, camera);
+		requestAnimationFrame(frame);
+	}
+
+	function resize() {
+		const w = stage.clientWidth, h = stage.clientHeight;
+		renderer.setSize(w, h);
+		labels.setSize(w, h);
+		camera.aspect = w / Math.max(h, 1);
+		camera.updateProjectionMatrix();
+	}
+	window.addEventListener('resize', resize);
+	resize();
+	requestAnimationFrame(frame);
+	return { show };
+}
+
+render(slideFromHash(), true);
+start().then((m) => {
+	model = m;
+	if (model && current >= 0) model.show(SLIDES[current], true);
+});
+</script>
+</body>
+</html>
