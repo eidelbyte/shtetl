@@ -216,7 +216,8 @@ root that holds its foundation, because a clone cannot cross pools.
 Layouts are created with the property defaults inherited from parasa
 (<code>atime=off</code>, <code>compression=zstd</code>,
 <code>aclmode=passthrough</code>, <code>mountpoint=none</code>,
-<code>canmount=noauto</code>), each overridable in
+and <code>canmount=noauto</code> on the root itself, since ZFS never
+inherits <code>canmount</code>), each overridable in
 <code>shtetl.conf</code>.</p>
 
 <div class="diagram">
@@ -401,7 +402,10 @@ their history moves with them.</li>
 <code>usr/local</code> can mount at <code>/usr/local</code>, has
 <code>canmount=off</code> and holds nothing. zfs_rebase reads every
 side at its mountpoint, so a dataset that never mounts cannot be
-rebased; an update clones it from the new foundation instead.</li>
+rebased; an update clones it from the new foundation instead, with
+<code>-o canmount=off</code> every time: a clone keeps none of its
+origin's properties, and a <code>usr</code> clone that mounts hides the
+tree's own <code>/usr</code>.</li>
 <li><strong>Everything is saved.</strong> Data included. There is no
 container-data or system-data tree: a container's datasets are its
 children, and zlake mirrors them the same way.</li>
@@ -523,9 +527,9 @@ staging tree and starts X again as it was.</p>
 
 <p class="note">The lineage moves in zlake (a child keeping its
 incremental sends while its parent changes lineage, and promotes
-mirrored across pools) and the replay step's explicit base are the
-first things to test on the box (planning.md, probes P1 - P3, P11 and
-P14) before this design is committed.</p>
+mirrored across pools) and the replay step's explicit base were tested
+on the box on 2026-10-11 and hold (planning.md 13.1, probes P1 - P3,
+P11 and P14).</p>
 
 <h3>System</h3>
 <p>The same as a container, deployed with <code>zfs set -u

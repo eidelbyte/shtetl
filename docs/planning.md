@@ -137,7 +137,10 @@ Pool properties (reported, set only where `zpool set` can):
 | ashift   | 12      | fixed at pool creation; report only |
 | autotrim | on      | settable |
 
-Dataset properties on each space root (inherited below):
+Dataset properties on each space root, inherited below except for
+`canmount`, which ZFS never inherits (P7): on a root it keeps the root
+itself unmounted and nothing more, and every other dataset that must
+not mount is given its own (below, 7.3, 7.4):
 
 | property  | default     |
 |-----------|-------------|
@@ -145,7 +148,7 @@ Dataset properties on each space root (inherited below):
 | compression | zstd      |
 | aclmode   | passthrough |
 | mountpoint | none       |
-| canmount  | noauto      |
+| canmount  | noauto (the root only) |
 
 Per-role overrides inside the layout:
 
@@ -155,7 +158,7 @@ Per-role overrides inside the layout:
 | zrun/foundations | mountpoint=/shtetl/foundations, inherited below |
 | zrun/foundations/F and children | canmount=noauto, readonly=on; mounted only while an update reads them (9) |
 | zrun/systems/S | mountpoint=none until deployed; then `zfs set -u mountpoint=/` |
-| zlake/** | mountpoint=none, canmount=noauto; mounted only while built into |
+| zlake/** | mountpoint=none, inherited from the root: this is what keeps zlake unmounted; mounted only while built into |
 | config root, build root | a mountpoint; config is read on every run |
 
 Not carried over from parasa: GELI (`-B none -l 256 -s 4096`), glabel,
@@ -582,16 +585,24 @@ Then, separately and optionally, `shtetl pkg-upgrade F`: pkg upgrade
 in a chroot, snapshot `-pkg`. Base and base-plus-packages are both
 versions to rebase onto.
 
-Known cost, accepted: installworld rewrites every file, so on the onto
-side every file has a new object, generation and ctime, and the rebase
+Known cost: installworld rewrites every file, so on the onto side
+every file has a new object, generation and ctime, and the rebase
 decides each one on content instead of pruning it. A fix exists:
-`install -C` leaves a byte-identical target alone, mtime and ctime
-included (install(1)), and FreeBSD already installs every library that
-way (`INSTALLFLAGS+= -C` in `share/mk/bsd.lib.mk`). Programs and other
-files do not get `-C`. Extending it to the whole install keeps
-unchanged files' object, generation and ctime, so zfs_rebase prunes
-them without reading a byte. Probe P12 tries it; files that
-ObsoleteFiles.inc does not list survive delete-old either way (P6).
+`install -C` leaves a byte-identical target alone (install(1)), and
+FreeBSD already installs every library that way (`INSTALLFLAGS+= -C`
+in `share/mk/bsd.lib.mk`). P12 measured it on a 16.0-CURRENT world
+installed over itself (13.1). `INSTALL_CMD="install -C"` on the make
+line of installworld and distribution needs no change to the tree; it
+keeps 24,590 objects as they were (15,478 without it), cuts the
+incremental send from 1,010 MiB to 38 MiB and what the rebase compares
+from 2.0 GB to 93 MB, and the install takes the same 55 s. What it
+still changes is links: install remakes every hardlink (15,959 objects
+keep their identity and take a new ctime, nearly all under
+`/usr/share`) and every symlink (1,918 new objects: `lib*.so` links,
+`/usr/bin` aliases, certctl's hash links). Adopting it is Q-O (15).
+
+What installworld and delete-old leave behind that a fresh install
+would not have is P6, and what to do about it Q-P (15).
 
 ### 7.3 Bring a foundation to zrun
 
@@ -616,7 +627,11 @@ mountpoint and refuses one that is not mounted (9).
    as of the config snapshot V records in `shtetl:config`.
 2. The foundation version on zrun (7.3), building it first if asked.
 3. `zfs clone` each dataset of `F@vN` to the matching name under
-   `containers/X` (clone is not recursive; one per dataset).
+   `containers/X` (clone is not recursive; one per dataset), parent
+   first. A clone keeps none of its origin's local properties, so a
+   placeholder is cloned `-o canmount=off`; without it `usr` mounts
+   and hides the root dataset's `usr/` (P9). Never `zfs clone -p`: it
+   makes a missing parent as a plain dataset, not a clone (P9).
 4. Create the recipe's container-only datasets as children of X.
 5. Write the jail.conf block; start the jail.
 6. `pkg -j X install`, then commands. A command block the foundation
@@ -662,14 +677,18 @@ a 15.2 target at check time.
 5. Per dataset inherited from F, parent first:
    - a placeholder (`canmount=off`, like `usr`) is never mounted, so it
      can never be a rebase's side; it holds nothing, and shtetl clones
-     it from the target instead: `zfs clone F/usr@<target>
-     X-staging/usr`;
+     it from the target instead: `zfs clone -o canmount=off
+     F/usr@<target> X-staging/usr`;
    - any other dataset is replayed (7.6.1, 7.6.2). Step 1 is a clone
      form rebase that creates `X-staging/d`; shtetl then places it
      (`zfs inherit mountpoint`, `readonly=off`, mounted at
      `/containers/X-staging/...`), because steps 2 and on are dataset
      form rebases of it, and the dataset form takes only a mounted
      dataset.
+   Each dataset's whole replay, its conflicts gate included, ends
+   before any child of it is made: a dataset form step on a parent with
+   a child mounted below it is refused (exit 2, in use), while both
+   forms work on a child under a mounted parent (P4).
    Backing out runs `--abort` on every rebase this update started.
 6. Container-only datasets: `zfs clone X/www@<from> X-staging/www`.
    Nothing in a foundation update touches them, so a clone is the
@@ -748,13 +767,20 @@ zfs_rebase does this today: `--allow-unrelated --base` takes any
 snapshot no newer than either side (`createtxg`), and the dataset form
 takes the pre-apply snapshot under the name `--result` gives
 (`unrelated_base()`, `preconditions()`, `onto_open()` in src/run.c).
-It is lightly tested: the box suite runs `--allow-unrelated --base`
-only as a dry run (tests/box/run-fixture.sh step 0a); a real apply
-under it (matrix row ZX5) is planned, and the dataset form under it has
-never run. Probe P14.
+The tool's own box suite runs `--allow-unrelated --base` only as a dry
+run (tests/box/run-fixture.sh step 0a); P14 ran the real thing, the
+dataset form included, and it works (13.1). It also showed the ruling
+above on a real run: the base the tool would derive raised a conflict
+at step 2 that `--base X@s1` does not.
 
 **Cost.** `--allow-unrelated` turns the tool's prune off, so each step
 after the first reads every file of the dataset on all three sides.
+P14 measured it on an 865 MiB tree of 31,358 names: step 1, pruning,
+compared 0.5 MB in 5.9 s, nearly all of it the three walks; steps 2
+and 3 compared 10.3 GB each, in 8.6 s and 8.9 s; one rebase of the
+newest save alone (depth 1) took 6.1 s. That is with the tree in the
+ARC. Read from disk, 10 GB a step is the cost that matters, times
+`update.depth`, times the container's datasets.
 Two possible changes to zfs_rebase (Q-N, ruled 2026-10-09: neither
 now; P14 measures first):
 
@@ -854,7 +880,10 @@ Destroying the old tree is the user's decision, made after the soak.
 
 1. If any dataset of X has `written@<from>` above zero (X was started
    again during the soak), say how much and ask; on yes, take a final
-   save of X so its archive holds those writes.
+   save of X so its archive holds those writes. `written@` counts
+   atime updates too: with `atime=off` (4.3) it stays 0 through
+   remounts and reads, but a dataset with `atime=on` shows bytes after
+   reads alone (P8).
 2. Stop X-staging.
 3. `zfs promote` each container-only clone in X-staging; it takes over
    the snapshots up to `<from>`, so its history continues (probe P11).
@@ -1067,6 +1096,35 @@ P16. The mount requirement end to end: a zrun foundation with
 update and unmounted after; a `canmount=off` placeholder refused as a
 side (expected) and cloned instead.
 
+### 13.1 Results (2026-10-11)
+
+On KIDON: FreeBSD 15.1-RELEASE-p2, OpenZFS 2.4.2, zfs_rebase fdab53d.
+The world probes installed 16.0-CURRENT (8f02ff221666) and started
+from 15.0-RELEASE's base.txz. Transcripts in `probes/results/`:
+`KIDON-20261011T135848Z` (the ZFS probes), `KIDON-20261011T140103Z`
+(all sixteen, with `--world`) and `KIDON-20261011T141420Z` (P14 on
+865 MiB). Every check came out as the plan expected; the answers
+below that change the plan are folded into the sections named.
+
+| probe | answer | lands in |
+|-------|--------|----------|
+| P1 | A first save's clone streams land in zlake as clones of the zlake foundation without `-o origin`; zlake holds only the delta (0.1 MiB against F's 0.9 MiB). | 7.5 as written |
+| P2 | A child moved under a parent of another lineage still takes its incrementals. | 7.10 as written |
+| P3 | A promoted clone keeps s1 and its guid, and its next incremental is received. | 7.9 as written |
+| P4 | Both forms work on a child under a placed, mounted parent. A dataset form step on a parent with a child mounted below it is refused (exit 2, in use). | 7.6 step 5 |
+| P5 | A rewrite of every file (same bytes, new objects) leaves the admin's rc.conf edit unconflicted. It costs the send (44.1 MiB against 0.2 MiB) and the compare (84.5 MB against 0.5 MB); on 24 MiB, not the time. | 7.2 |
+| P6 | Over 15.0's base.txz, installworld, distribution and delete-old leave 524 paths a fresh install lacks: etcupdate's database of 15.0's `/etc` (428) and the `/sys` link, which come with a release tarball and not with shtetl's builds; certctl's `/etc/ssl` entries (56); installworld's backups (`*.old` loaders, `ld-elf.so.1.old`, `init.bak`); about 30 files ObsoleteFiles.inc does not list (LLVM 19's private libraries, lib9p, binutils man pages, headers). Nothing a fresh install has is missing. | Q-P |
+| P7 | Clones under `containers/` mount by inheritance, the placeholder hides nothing, renames carry mountpoints, an import mounts parents first, a clone cannot cross pools, zlake stays unmounted. `canmount` does not inherit. | 4.3 |
+| P8 | `written@from` stays 0 through a remount and reads with atime off; reads with atime on make it 59,392 bytes; one real write adds 2 KiB. | 7.9 step 1 |
+| P9 | A child needs its parent first; `clone -p` makes a plain parent; a clone keeps none of its origin's local properties, so a placeholder cloned without `-o canmount=off` mounts and hides the root's `usr/`. | 7.4 step 3, 7.6 step 5 |
+| P10 | `shtetl:*` travel only with `send -p`, which carries the dataset's local properties too; `zfs set` on a received snapshot works. | ruled, 6.2 |
+| P11 | The whole cutover mirrored in zlake: the next save received for every dataset. The archive's `www` is a clone of the live `www@s1`, so s1 stays while the archive does (6.3 already keeps a clone's origin). | 7.9, 7.10 as written |
+| P12 | `install -C`: 7.2. No conflicts either way, none from the admin's user, hosts and rc.conf either (P5 on a real world). | Q-O |
+| P13 | Roots found by local `shtetl:space`, pool roots and dataset roots alike; one match and two told apart; a mirror lands only in the root holding its foundation. | 4.1 as written |
+| P14 | The replay works, the dataset form under `--allow-unrelated --base` included; the derived base raises a conflict at step 2, `--base X@s1` none. Costs in 7.6.2. | 7.6.2; Q-N's numbers |
+| P15 | 15.0 to 16.0-CURRENT: one conflict, `/etc/group`, changed by the admin's `pw useradd` and by the new release. `master.passwd`, `passwd`, `pwd.db` and `spwd.db` came from the container cleanly, the release having left them as they were. 5.2 s; the foundation's incremental 1,745 MiB. | 7.7 as written |
+| P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
+
 ## 14. Rulings
 
 ### 2026-10-11 (P10)
@@ -1160,7 +1218,36 @@ side (expected) and cloned instead.
 
 ## 15. Open questions
 
-None. The next step is M0: the probes of section 13 on the box.
+Q-O. Should every foundation build and update install with `install
+-C`? It would overturn the 2026-10-08 ruling that the rewrite cost is
+accepted, now that P12 shows the fix costs nothing: shtetl passes
+`INSTALL_CMD="install -C"` to installworld and distribution, with no
+change to the tree; the send drops from 1,010 MiB to 38 MiB, the
+rebase compares 93 MB instead of 2.0 GB, and the install takes as
+long (7.2). Recommendation: yes.
+
+Q-P. What should a foundation update do with what installworld and
+delete-old leave behind (P6)? By kind:
+
+- installworld's backups (`*.old` loaders, `ld-elf.so.1.old`,
+  `init.bak`): insurance on a live system, clutter in a foundation.
+  Recommendation: delete them after the install.
+- Files ObsoleteFiles.inc does not list (LLVM 19's private libraries,
+  lib9p, old man pages and headers): FreeBSD's own source upgrade
+  leaves them too. Recommendation: leave them for now. A sweep against
+  a fresh install's file list is possible later (installworld with
+  `-DNO_ROOT` into scratch writes a METALOG naming every file).
+- certctl's entries under `/etc/ssl` (19 in `certs/`, 37 in
+  `untrusted/`): the current certctl deletes entries that match no
+  certificate when installworld runs its rehash, so these should not
+  have survived, and an entry left in `certs/` for a CA the new
+  release dropped would still be trusted. Recommendation: look before
+  deciding; on the box,
+  `zcat probes/results/KIDON-20261011T140103Z/P6-new-installworld.log.gz | grep -n -A5 certctl`
+  shows whether the rehash ran.
+- etcupdate's database and the `/sys` link come only from starting
+  with a release tarball, which shtetl's builds never do: nothing to
+  do.
 
 ## 16. Dropped from parasa
 

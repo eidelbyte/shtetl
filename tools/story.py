@@ -746,8 +746,11 @@ frame("Clone, dataset by dataset",
 	"copied: the clones share every block with the foundation until "
 	"something writes. Mountpoints are inherited, so the tree mounts at "
 	"<code>/containers/nginx</code>, <code>/containers/nginx/var</code>, "
-	"and so on, with no fstab. <code>www</code> has no origin: its "
-	"history will start at the first save."))
+	"and so on, with no fstab. <code>usr</code>, the placeholder, is "
+	"cloned <code>-o canmount=off</code>: a clone keeps none of its "
+	"origin's properties, and without it <code>usr</code> would mount over "
+	"the tree's own <code>/usr</code> (P9). <code>www</code> has no origin: "
+	"its history will start at the first save."))
 
 st.tag("R/c/n", "/containers/nginx  jail")
 frame("Start the jail, install, run the commands",
@@ -815,7 +818,7 @@ zfs snapshot -r -o shtetl:kind=save -o shtetl:commit="site live, ploni added" \
 	"<b>2</b> <code>www</code> has no origin, so its first save is a full "
 	"stream. From now on zlake mirrors nginx as of its last save: same "
 	"names, same clone relationships, one pool over. Whether the clone "
-	"streams land as clones without help is probe P1.",
+	"streams land as clones without help: they do (P1).",
 	"This snapshot is <b>s1</b>; its message is in "
 	"<code>shtetl:commit</code>. The sends carry no properties (no "
 	"<code>-p</code>, which would carry the dataset's local ones too), so "
@@ -882,7 +885,8 @@ frame("Build and install over v1",
 	"decided on content. <code>install -C</code> leaves a byte-identical "
 	"file untouched (FreeBSD already installs libraries that way); using "
 	"it for everything would let the rebase skip unchanged files without "
-	"reading them (probe P12)."))
+	"reading them. On a real world it cut the send from 1,010 MiB to "
+	"38 MiB (P12); adopting it is planning.md's Q-O."))
 
 st.mounted -= set(["B", "L/fb/G"] + T("L/f/G"))
 st.snap(T("L/f/G"), "v2")
@@ -1229,8 +1233,8 @@ frame("The children, www, and starting the new tree",
 	"<b>3</b> <code>usr</code> is a placeholder with "
 	"<code>canmount=off</code>: never mounted, so it can never be a "
 	"rebase's side, and it holds nothing anyway. shtetl clones it from "
-	"<code>generic/usr@v2</code> before <code>usr/local</code>'s result is "
-	"created under it."),
+	"<code>generic/usr@v2</code>, <code>-o canmount=off</code>, before "
+	"<code>usr/local</code>'s result is created under it."),
     after=p(
 	"<b>2</b> <code>www</code> has no foundation counterpart and nothing "
 	"in a foundation update touches it, so it is never replayed: its "
@@ -1240,8 +1244,10 @@ frame("The children, www, and starting the new tree",
 	"mounted at <code>/containers/nginx-staging</code>, with the version "
 	"it now sits on (<b>v2</b>, <code>shtetl:kind=version</code>), and "
 	"starts it as a jail with nginx's own settings, address included: "
-	"nginx is stopped, so nothing collides. Creating a result under a "
-	"placed result is probe P4, the replay step P14, and the mounts P16."))
+	"nginx is stopped, so nothing collides. The order matters: each "
+	"dataset's whole replay finishes before any child of it is made, "
+	"because zfs_rebase refuses a step on a parent while a child is "
+	"mounted below it (P4)."))
 
 st.snap(T("L/c/n", TREEW), "s2")
 st.add(*T("L/c/ns", TREEW))
@@ -1342,12 +1348,11 @@ frame("Cutover in zlake: the staging mirror becomes nginx",
 	"<code>nginx</code> is now a clone of zlake's foundation "
 	"<code>@v2</code> carrying s1' and s2', and its <code>www</code> "
 	"carries the site's whole history.") +
-	callout("note", "Drawn as done, still to be proven",
-	p("These moves rest on ZFS behaviour this page assumes: that a clone "
-	"stream lands as a clone (probe P1), that a child keeps receiving "
-	"incremental sends after its parent changes lineage or name (P2), "
-	"and that a promote can be mirrored across pools (P11). The probes "
-	"run on the box before the design is relied on.")))
+	callout("note", "Drawn as done, and proven on the box",
+	p("These moves rest on ZFS behaviour: a clone stream lands as a "
+	"clone (P1), a child keeps receiving incremental sends after its "
+	"parent changes lineage or name (P2), and a promote can be mirrored "
+	"across pools (P11). The box confirmed all three on 2026-10-11.")))
 st.drop(*T("L/c/ns", TREEW))
 
 st.tag("R/c/n/www", "")
@@ -1391,66 +1396,82 @@ frame("Where everything stands",
 	"more than zrun keeps. Each is 0 (everything), a number, or a quoted "
 	"interval such as <code>\"7d\"</code>.")))
 
-act("epilogue", "Still to prove on the box", p(
+act("epilogue", "What the box said", p(
 	"Everything above is drawn as designed, and some of it rests on ZFS "
 	"and zfs_rebase behaving the way the design assumes. Milestone M0 "
-	"tests each assumption with a standalone probe on a throwaway pool "
-	"before any of shtetl is built (planning.md section 13)."))
+	"tested each assumption with a standalone probe on a throwaway pool "
+	"before any of shtetl is built (planning.md section 13); the box "
+	"answered on 2026-10-11."))
 
 PROBES = [
 	("A clone stream from zrun lands in zlake as a clone of zlake's own "
 	    "foundation, so zlake stores only the delta", "P1",
-	    "{{f:Save: s1}}"),
+	    "{{f:Save: s1}}", "Yes, without <code>-o origin</code>"),
 	("A snapshot's <code>shtetl:commit</code> and <code>shtetl:config"
-	    "</code> travel with <code>zfs send</code>, or are set after the "
-	    "receive", "P10", "{{f:Save: s1}}"),
+	    "</code> reach zlake", "P10", "{{f:Save: s1}}",
+	    "Only with <code>send -p</code>, which carries local properties "
+	    "too; shtetl copies them after the receive (ruled)"),
 	("Each dataset of a foundation can be cloned on its own, and the "
 	    "clones mount by inheritance in the right order", "P7, P9",
-	    "{{f:Clone, dataset by dataset}}"),
+	    "{{f:Clone, dataset by dataset}}",
+	    "Yes, parent first, the placeholder cloned "
+	    "<code>-o canmount=off</code>"),
 	("installworld over the previous version plus delete-old leaves "
 	    "nothing that matters behind", "P6",
-	    "{{f:Build and install over v1}}"),
+	    "{{f:Build and install over v1}}",
+	    "Not quite: backups, unlisted old files, certificate links; "
+	    "open (Q-P)"),
 	("Installing with <code>install -C</code> keeps unchanged files "
 	    "untouched, so the rebase can prune them", "P12",
-	    "{{f:Build and install over v1}}"),
+	    "{{f:Build and install over v1}}",
+	    "Yes: the send 38 MiB against 1,010; open (Q-O)"),
 	("A file whose bytes the new version did not change does not conflict "
 	    "with the admin's edit of it", "P5",
-	    "{{f:Step 1, the top dataset: s1 onto v2}}"),
+	    "{{f:Step 1, the top dataset: s1 onto v2}}",
+	    "Yes, synthetic and on a real world"),
 	("The foundation copy, mounted read-only for the update, is read at "
 	    "its mountpoint; a <code>canmount=off</code> placeholder is "
 	    "refused as a side and can be cloned instead", "P16",
 	    "{{f:Step 1, the top dataset: s1 onto v2}}, "
-	    "{{f:The children, www, and starting the new tree}}"),
+	    "{{f:The children, www, and starting the new tree}}", "Yes"),
 	("A replay step runs with <code>--allow-unrelated --base</code> in "
 	    "the dataset form, its pre-apply snapshot is the replayed save, and "
 	    "its cost is acceptable", "P14",
-	    "{{f:Step 2, the top dataset: s2 onto the result}}"),
+	    "{{f:Step 2, the top dataset: s2 onto the result}}",
+	    "Yes; a step compares about 10 GB on an 865 MiB tree"),
 	("A rebase can create its result under an already placed result",
-	    "P4", "{{f:The children, www, and starting the new tree}}"),
+	    "P4", "{{f:The children, www, and starting the new tree}}",
+	    "Yes; a parent's step waits until no child is mounted below it"),
 	("<code>written@s2</code> tells cutover whether the old tree was "
-	    "started again during the soak", "P8", "{{f:Cutover on zrun}}"),
+	    "started again during the soak", "P8", "{{f:Cutover on zrun}}",
+	    "Yes with atime off; with atime on, reads alone count"),
 	("Promoting a container-only clone, on zrun and again in zlake, keeps "
 	    "its incremental chain", "P3, P11", "{{f:Cutover on zrun}}, "
-	    "{{f:Cutover in zlake: the old mirror is archived}}"),
+	    "{{f:Cutover in zlake: the old mirror is archived}}", "Yes"),
 	("A child keeps receiving incremental sends after its parent is "
 	    "renamed or changes lineage", "P2",
-	    "{{f:Cutover in zlake: the staging mirror becomes nginx}}"),
-	("A release change (15.1 to 15.2) built into the same foundation can "
-	    "be rebased onto", "P15", "not drawn; Act III's note"),
+	    "{{f:Cutover in zlake: the staging mirror becomes nginx}}", "Yes"),
+	("A release change built into the same foundation can be rebased "
+	    "onto", "P15", "not drawn; Act III's note",
+	    "Yes, 15.0 to 16.0-CURRENT: one conflict, <code>/etc/group</code>"),
 	("Several lake or run roots, and the one-match rule", "P13",
-	    "not drawn: this story has one root per space"),
+	    "not drawn: this story has one root per space", "Yes"),
 ]
 
-frame("What each assumption is, and the probe that tests it",
+frame("What each assumption was, and what the box said",
     diagram=False,
     panel='<div class="tablewrap"><table class="cast"><tr><th>the story '
-	'assumes</th><th>probe</th><th>where</th></tr>' + "".join(
+	'assumes</th><th>probe</th><th>where</th><th>the box</th></tr>' +
+	"".join(
 	'<tr><td>%s</td><td style="white-space:nowrap"><code>%s</code></td>'
-	'<td>%s</td></tr>' % row
+	'<td>%s</td><td>%s</td></tr>' % row
 	for row in PROBES) + '</table></div>',
     after=p(
-	"The probes come first: if one fails, the frames it supports are "
-	"redesigned before anything is built on them."))
+	"Every frame above stands. Three details changed: the placeholder is "
+	"cloned <code>-o canmount=off</code>, a dataset is replayed whole "
+	"before its children, and sends go without <code>-p</code>. Two "
+	"questions are open: <code>install -C</code> for every install, and "
+	"what an update leaves behind (planning.md section 15)."))
 
 
 # -- page ------------------------------------------------------------------
