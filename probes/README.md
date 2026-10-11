@@ -105,7 +105,7 @@ The lines:
 | P3  | 7.6, 7.9 | on zrun, after clone and promote, does the promoted www keep s1 and its incrementals? | |
 | P4  | 7.6, 7.6.2 | rebases on children of a placed, mounted X-staging; a dataset form step on a parent with a child mounted | zfs_rebase |
 | P5  | 7.2 | a synthetic installworld rewrite: is rc.conf, edited in X and untouched by v1 -> v2, a conflict? the time, the bytes, the send | zfs_rebase |
-| P6  | 7.2 | installworld and delete-old over an older release: what remains that a fresh install lacks? | `--world` |
+| P6  | 7.2 | an update over an older release, in 7.2's order: what remains that a fresh install lacks? | `--world` |
 | P7  | 4.3, 4.7, 7.9 | mountpoints by inheritance, canmount's inheritance, a clone across pools, zlake's mountpoints, a rename, the import order | |
 | P8  | 7.9 | what moves `written@<from>` on a stopped container: a remount, reads with atime on, a write | |
 | P9  | 7.4 | cloning children: parent first, `clone -p`, the placeholder's canmount, what a clone keeps of its origin | |
@@ -114,7 +114,7 @@ The lines:
 | P12 | 7.2 | installworld over itself, plain and with `install -C`: what changes, the send, the rebase (and P5 on a real world) | `--world`, zfs_rebase |
 | P13 | 4.1 | discovery of roots, the exactly-one-match rule, a mirror in the root holding its foundation | |
 | P14 | 7.6.2 | history replay: step 1 clone form, steps 2-3 with `--allow-unrelated --base`; the derived base's conflicts; the cost per step | zfs_rebase |
-| P15 | 7.2, 7.6 | a container on an older release rebased onto the new world installed over it: which names conflict, and the time | `--world`, zfs_rebase |
+| P15 | 7.2, 7.6 | a container on an older release rebased onto the new world, updated over it in 7.2's order: which names conflict, and the time | `--world`, zfs_rebase |
 | P16 | 7.3, 9 | the zrun foundation mounted read-only for an update and unmounted after; the usr placeholder refused as a side and cloned | zfs_rebase |
 
 Each `P<n>-*.sh` says in its header comment what it builds and what it

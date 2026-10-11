@@ -528,7 +528,7 @@ foundation generic (new), version @15.1-releng-2026-10-08-0f691888dc56
   build    buildworld buildkernel KERNCONF=GENERIC
            MAKEOBJDIRPREFIX=<foundation-builds/generic>
   install  installworld installkernel distribution
-           DESTDIR=<foundations/generic>
+           DESTDIR=<foundations/generic> INSTALL_CMD="install -C"
   snapshot -r @15.1-releng-2026-10-08-0f691888dc56  shtetl:kind=version
 
 proceed? [y/N] y
@@ -590,7 +590,8 @@ frame("Install into the foundation",
 	"mounted foundation."),
     after=p(
 	"<b>2</b> <code>make installworld installkernel distribution "
-	"DESTDIR=</code>the foundation's mountpoint. Files land in whichever "
+	"DESTDIR=</code>the foundation's mountpoint, every file with "
+	"<code>install -C</code> (it matters from v2 on). Files land in whichever "
 	"dataset owns their path: <code>/var</code> in <code>var</code>, the "
 	"<code>/usr/local</code> skeleton in <code>usr/local</code>, "
 	"everything else (<code>/usr</code> included, since <code>usr</code> "
@@ -842,7 +843,9 @@ foundation generic, update: v1 -> @15.1-releng-2026-11-12-5b2c7e01a9d4
   datasets same as v1: tmp usr usr/local var (none added or dropped)
   src      fast/shtetl/src: pull releng/15.1 (0f691888dc56 -> 5b2c7e01a9d4)
   build    buildworld buildkernel, obj reused from foundation-builds
-  install  into the same datasets, then delete-old delete-old-libs
+  delete   delete-old delete-old-libs, the new tree's list
+  install  into the same datasets, install -C
+  cleanup  installworld's backups (*.old, init.bak)
   snapshot -r @15.1-releng-2026-11-12-5b2c7e01a9d4  shtetl:kind=version
 
 proceed? [y/N] y
@@ -877,16 +880,17 @@ frame("Build and install over v1",
     before=p("The same mounts as before; the obj cache is already warm."),
     after=p(
 	"<b>1</b> <code>buildworld buildkernel</code>, reusing the obj tree. "
-	"<b>2</b> <code>installworld installkernel distribution</code> over "
-	"v1, then <code>make delete-old delete-old-libs DESTDIR=...</code> to "
-	"remove anything the new build no longer installs.",
-	"Known cost: installworld rewrites every file, so to zfs_rebase every "
-	"file of the foundation looks changed between v1 and v2 and is "
-	"decided on content. <code>install -C</code> leaves a byte-identical "
-	"file untouched (FreeBSD already installs libraries that way); using "
-	"it for everything would let the rebase skip unchanged files without "
-	"reading them. On a real world it cut the send from 1,010 MiB to "
-	"38 MiB (P12); adopting it is planning.md's Q-O."))
+	"<b>2</b> First <code>make delete-old delete-old-libs DESTDIR=...</code> "
+	"with the new tree's list of obsolete files, then "
+	"<code>installworld installkernel distribution</code> over v1, then "
+	"installworld's own backups deleted. A live system deletes after "
+	"installing, because it runs on its old files; a foundation runs "
+	"nothing, and deleting first lets installworld's closing "
+	"<code>certctl rehash</code> see only the new release's certificates "
+	"(P6).",
+	"Every install uses <code>install -C</code>: a byte-identical file is "
+	"left as it was, so the rebase can skip it without reading it. On a "
+	"real world it cut the send from 1,010 MiB to 38 MiB (P12)."))
 
 st.mounted -= set(["B", "L/fb/G"] + T("L/f/G"))
 st.snap(T("L/f/G"), "v2")
@@ -1419,12 +1423,12 @@ PROBES = [
 	("installworld over the previous version plus delete-old leaves "
 	    "nothing that matters behind", "P6",
 	    "{{f:Build and install over v1}}",
-	    "Not quite: backups, unlisted old files, certificate links; "
-	    "open (Q-P)"),
+	    "Not quite: installworld's backups and stale certificate entries, "
+	    "both now handled; unlisted old files stay"),
 	("Installing with <code>install -C</code> keeps unchanged files "
 	    "untouched, so the rebase can prune them", "P12",
 	    "{{f:Build and install over v1}}",
-	    "Yes: the send 38 MiB against 1,010; open (Q-O)"),
+	    "Yes: the send 38 MiB against 1,010; adopted"),
 	("A file whose bytes the new version did not change does not conflict "
 	    "with the admin's edit of it", "P5",
 	    "{{f:Step 1, the top dataset: s1 onto v2}}",
@@ -1467,11 +1471,11 @@ frame("What each assumption was, and what the box said",
 	'<td>%s</td><td>%s</td></tr>' % row
 	for row in PROBES) + '</table></div>',
     after=p(
-	"Every frame above stands. Three details changed: the placeholder is "
-	"cloned <code>-o canmount=off</code>, a dataset is replayed whole "
-	"before its children, and sends go without <code>-p</code>. Two "
-	"questions are open: <code>install -C</code> for every install, and "
-	"what an update leaves behind (planning.md section 15)."))
+	"Every frame above stands, with five details changed: the placeholder "
+	"is cloned <code>-o canmount=off</code>, a dataset is replayed whole "
+	"before its children, sends go without <code>-p</code>, every install "
+	"uses <code>install -C</code>, and an update deletes the obsolete "
+	"files before installing and the backups after (planning.md 7.2)."))
 
 
 # -- page ------------------------------------------------------------------

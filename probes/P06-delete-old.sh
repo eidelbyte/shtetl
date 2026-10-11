@@ -1,14 +1,16 @@
 # P6. delete-old after an install over an older release (planning.md
 # 13; 7.2).
-# title: installworld + delete-old over an older release: what remains that a fresh install lacks?
+# title: an update over an older release in 7.2's order: what remains that a fresh install lacks?
 # pools: run
 # size: 40g
 # tier: world
 #
 # F starts as an older release's base.txz (OLD_REL or OLD_BASE). SRC's
-# world goes over it with installworld, distribution, delete-old and
-# delete-old-libs, as FreeBSD's source upgrade does. H gets the same
-# world fresh. Every path F has and H does not is written down.
+# world goes over it as a foundation update does (planning.md 7.2):
+# delete-old and delete-old-libs first, then installworld and
+# distribution with install -C, then installworld's backups deleted.
+# H gets the same world fresh. Every path F has and H does not is
+# written down; none should be a certificate entry or a backup.
 
 probe() {
 	world_src
@@ -19,8 +21,7 @@ probe() {
 	xt tar -xpf "$OLDTXZ" -C "$PR/foundations/F" ||
 	    die "could not extract $OLDTXZ"
 	m zfs snapshot -r $F@old
-	world_install new "$PR/foundations/F"
-	world_delete_old new "$PR/foundations/F"
+	world_update new "$PR/foundations/F"
 	m zfs snapshot -r $F@new
 	world_make new-check-old check-old "$PR/foundations/F"
 
@@ -32,6 +33,10 @@ probe() {
 	treelist $H fresh "$SCR/f.lst"
 	paths_only "$SCR/u.lst" "$SCR/f.lst" >"$OUT/P6-remains.txt"
 	paths_only "$SCR/f.lst" "$SCR/u.lst" >"$OUT/P6-missing.txt"
+	check "certificate entries left in /etc/ssl" \
+	    "$(grep -c '^/etc/ssl/' "$OUT/P6-remains.txt")" 0
+	check "installworld's backups left" \
+	    "$(grep -c -E '[.]old$|/init[.]bak$' "$OUT/P6-remains.txt")" 0
 	nr=$(wc -l <"$OUT/P6-remains.txt" | tr -d ' ')
 	nm=$(wc -l <"$OUT/P6-missing.txt" | tr -d ' ')
 	say "== what remains, by directory"

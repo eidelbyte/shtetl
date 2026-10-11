@@ -449,8 +449,12 @@ empty.</li>
 <li>Mount F, <code>foundation-builds/F</code> and the src checkout;
 <code>buildworld buildkernel</code> with the obj tree on
 foundation-builds/F.</li>
-<li><code>installworld installkernel distribution DESTDIR=</code> the
-mounted F; on an update, then <code>delete-old delete-old-libs</code>.</li>
+<li>On an update, <code>delete-old delete-old-libs</code> first, so
+installworld's closing <code>certctl rehash</code> sees only the new
+release's certificates. Then <code>installworld installkernel
+distribution DESTDIR=</code> the mounted F, every file with
+<code>install -C</code>; on an update, then installworld's own backups
+(<code>*.old</code>, <code>init.bak</code>) deleted.</li>
 <li>Foundation packages and commands; snapshot <code>-r</code> with the
 version name. Every version of F is one snapshot chain, which
 zfs_rebase and incremental send both need.</li>

@@ -509,7 +509,7 @@ world_make() {	# TAG TARGET DESTDIR [ARGS]
 	_wt=$2
 	_wd=$3
 	shift 3
-	echo "# make -C $SRC ${WORLD_J:+-j$WORLD_J }$_wt DESTDIR=$_wd $* >$(basename "$_wl")"
+	echo "# make -C $SRC ${WORLD_J:+-j$WORLD_J }$_wt DESTDIR=$_wd$(quote "$@") >$(basename "$_wl")"
 	$TIMEBIN -p -o "$SCR/time" make -C "$SRC" ${WORLD_J:+-j$WORLD_J} \
 	    "$_wt" DESTDIR="$_wd" "$@" >"$_wl" 2>&1
 	_rc=$?
@@ -539,6 +539,21 @@ world_delete_old() {	# TAG DESTDIR
 	world_make "$1-delete-old" delete-old "$2" BATCH_DELETE_OLD_FILES=yes
 	world_make "$1-delete-old-libs" delete-old-libs "$2" \
 	    BATCH_DELETE_OLD_FILES=yes
+}
+
+# A foundation update in planning.md 7.2's order: the new tree's
+# obsolete files deleted first, so installworld's closing certctl
+# rehash sees only the new release's certificates; the install with
+# install -C; installworld's own backups deleted after.
+world_update() {	# TAG DESTDIR
+	world_delete_old "$1" "$2"
+	world_install "$1" "$2" INSTALL_CMD="install -C"
+	for _wb in "$2"/boot/kernel.old "$2"/boot/*.old \
+	    "$2"/libexec/ld-elf*.so.1.old "$2/sbin/init.bak"; do
+		[ -e "$_wb" ] || continue
+		m chflags -R noschg "$_wb"
+		m rm -rf "$_wb"
+	done
 }
 
 # What an admin does to a whole-world container: a user (pw rewrites

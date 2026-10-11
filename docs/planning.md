@@ -559,15 +559,37 @@ F is named after its recipe (6.1): `foundations/generic.conf` builds
    root.
 4. In the src root: check out `src_branch`; `make buildworld
    buildkernel` with `MAKEOBJDIRPREFIX` on foundation-builds/F.
-5. `make installworld installkernel distribution DESTDIR=<F mount>`.
+5. `make installworld installkernel distribution DESTDIR=<F mount>
+   INSTALL_CMD="install -C"` (7.2).
 6. Foundation pkg and commands, in a chroot of F.
 7. Unmount; `zfs snapshot -r` F with the version name (6.1).
 8. Unmount foundation-builds/F and src.
 
 ### 7.2 Update foundation F
 
-7.1 steps 3 - 8 on the **same** datasets, plus
-`make delete-old delete-old-libs DESTDIR=<F mount>` after the install.
+7.1 steps 3 - 8 on the **same** datasets, with step 5 in three parts:
+
+1. `make delete-old delete-old-libs DESTDIR=<F mount>
+   BATCH_DELETE_OLD_FILES=yes`, the new tree's list of obsolete files,
+   applied **before** the install. FreeBSD's live upgrade deletes after
+   installing because the running system needs its old files while the
+   new ones go in; nothing runs from a foundation, and installworld's
+   tools come from the build. Deleting first matters for one thing:
+   installworld ends with `certctl rehash`, and a delete-old after it
+   removes the certificates the new release dropped but leaves their
+   entries in `/etc/ssl`, where the foundation would go on trusting
+   them (P6 found 56). Proposed 2026-10-11, to be confirmed by a P6
+   rerun (15).
+2. The install, every file with `install -C` (ruled 2026-10-11, below).
+3. installworld's own backups deleted, their schg flags cleared first:
+   `boot/kernel.old` (installkernel's), the `boot/*.old` loaders,
+   `libexec/ld-elf*.so.1.old`, `sbin/init.bak`. Insurance on a live
+   system, clutter in a foundation (ruled 2026-10-11).
+
+Files ObsoleteFiles.inc does not list stay, as they do after FreeBSD's
+own source upgrade (ruled 2026-10-11; P6 found about 30, LLVM 19's
+private libraries among them).
+
 One dataset per foundation keeps every version on one snapshot chain,
 which is what zfs_rebase needs to derive a base and what makes
 zlake -> zrun an incremental send.
@@ -575,7 +597,8 @@ zlake -> zrun an incremental send.
 A new release is an update like any other: a recipe moved from
 `releng/15.1` to `releng/15.2` builds into the same datasets, and the
 new version is `@15.2-releng-...`. Installing a newer world over an
-older one and running delete-old is FreeBSD's own source-upgrade path.
+older one and running delete-old is FreeBSD's own source-upgrade path,
+in the other order (1 above).
 The datasets of every version of a foundation must match the previous
 version's (checked). They are fixed for the foundation's life (ruled
 2026-10-09): a different split is a different foundation recipe, and
@@ -585,12 +608,12 @@ Then, separately and optionally, `shtetl pkg-upgrade F`: pkg upgrade
 in a chroot, snapshot `-pkg`. Base and base-plus-packages are both
 versions to rebase onto.
 
-Known cost: installworld rewrites every file, so on the onto side
-every file has a new object, generation and ctime, and the rebase
-decides each one on content instead of pruning it. A fix exists:
-`install -C` leaves a byte-identical target alone (install(1)), and
-FreeBSD already installs every library that way (`INSTALLFLAGS+= -C`
-in `share/mk/bsd.lib.mk`). P12 measured it on a 16.0-CURRENT world
+**`install -C`** (ruled 2026-10-11, Q-O). Left to itself, installworld
+rewrites every file, so on the onto side every file has a new object,
+generation and ctime, and the rebase decides each one on content
+instead of pruning it. `install -C` leaves a byte-identical target
+alone (install(1)), and FreeBSD already installs every library that
+way (`INSTALLFLAGS+= -C` in `share/mk/bsd.lib.mk`). P12 measured it on a 16.0-CURRENT world
 installed over itself (13.1). `INSTALL_CMD="install -C"` on the make
 line of installworld and distribution needs no change to the tree; it
 keeps 24,590 objects as they were (15,478 without it), cuts the
@@ -599,10 +622,9 @@ from 2.0 GB to 93 MB, and the install takes the same 55 s. What it
 still changes is links: install remakes every hardlink (15,959 objects
 keep their identity and take a new ctime, nearly all under
 `/usr/share`) and every symlink (1,918 new objects: `lib*.so` links,
-`/usr/bin` aliases, certctl's hash links). Adopting it is Q-O (15).
-
-What installworld and delete-old leave behind that a fresh install
-would not have is P6, and what to do about it Q-P (15).
+`/usr/bin` aliases, certctl's hash links). So every install shtetl
+runs passes `INSTALL_CMD="install -C"`: installworld, installkernel and
+distribution alike.
 
 ### 7.3 Bring a foundation to zrun
 
@@ -1113,19 +1135,31 @@ below that change the plan are folded into the sections named.
 | P3 | A promoted clone keeps s1 and its guid, and its next incremental is received. | 7.9 as written |
 | P4 | Both forms work on a child under a placed, mounted parent. A dataset form step on a parent with a child mounted below it is refused (exit 2, in use). | 7.6 step 5 |
 | P5 | A rewrite of every file (same bytes, new objects) leaves the admin's rc.conf edit unconflicted. It costs the send (44.1 MiB against 0.2 MiB) and the compare (84.5 MB against 0.5 MB); on 24 MiB, not the time. | 7.2 |
-| P6 | Over 15.0's base.txz, installworld, distribution and delete-old leave 524 paths a fresh install lacks: etcupdate's database of 15.0's `/etc` (428) and the `/sys` link, which come with a release tarball and not with shtetl's builds; certctl's `/etc/ssl` entries (56); installworld's backups (`*.old` loaders, `ld-elf.so.1.old`, `init.bak`); about 30 files ObsoleteFiles.inc does not list (LLVM 19's private libraries, lib9p, binutils man pages, headers). Nothing a fresh install has is missing. | Q-P |
+| P6 | Over 15.0's base.txz, installworld, distribution and delete-old leave 524 paths a fresh install lacks: etcupdate's database of 15.0's `/etc` (428) and the `/sys` link, which come with a release tarball and not with shtetl's builds; certctl's `/etc/ssl` entries (56), left because installworld's rehash ran before delete-old removed the dropped certificates; installworld's backups (`*.old` loaders, `ld-elf.so.1.old`, `init.bak`); about 30 files ObsoleteFiles.inc does not list (LLVM 19's private libraries, lib9p, binutils man pages, headers). Nothing a fresh install has is missing. | 7.2 |
 | P7 | Clones under `containers/` mount by inheritance, the placeholder hides nothing, renames carry mountpoints, an import mounts parents first, a clone cannot cross pools, zlake stays unmounted. `canmount` does not inherit. | 4.3 |
 | P8 | `written@from` stays 0 through a remount and reads with atime off; reads with atime on make it 59,392 bytes; one real write adds 2 KiB. | 7.9 step 1 |
 | P9 | A child needs its parent first; `clone -p` makes a plain parent; a clone keeps none of its origin's local properties, so a placeholder cloned without `-o canmount=off` mounts and hides the root's `usr/`. | 7.4 step 3, 7.6 step 5 |
 | P10 | `shtetl:*` travel only with `send -p`, which carries the dataset's local properties too; `zfs set` on a received snapshot works. | ruled, 6.2 |
 | P11 | The whole cutover mirrored in zlake: the next save received for every dataset. The archive's `www` is a clone of the live `www@s1`, so s1 stays while the archive does (6.3 already keeps a clone's origin). | 7.9, 7.10 as written |
-| P12 | `install -C`: 7.2. No conflicts either way, none from the admin's user, hosts and rc.conf either (P5 on a real world). | Q-O |
+| P12 | `install -C`: 7.2. No conflicts either way, none from the admin's user, hosts and rc.conf either (P5 on a real world). | 7.2, adopted |
 | P13 | Roots found by local `shtetl:space`, pool roots and dataset roots alike; one match and two told apart; a mirror lands only in the root holding its foundation. | 4.1 as written |
 | P14 | The replay works, the dataset form under `--allow-unrelated --base` included; the derived base raises a conflict at step 2, `--base X@s1` none. Costs in 7.6.2. | 7.6.2; Q-N's numbers |
 | P15 | 15.0 to 16.0-CURRENT: one conflict, `/etc/group`, changed by the admin's `pw useradd` and by the new release. `master.passwd`, `passwd`, `pwd.db` and `spwd.db` came from the container cleanly, the release having left them as they were. 5.2 s; the foundation's incremental 1,745 MiB. | 7.7 as written |
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-11 (Q-O, Q-P)
+
+- Q-O: every foundation install uses `install -C`
+  (`INSTALL_CMD="install -C"`), overturning the 2026-10-08 acceptance
+  of the rewrite cost (7.2).
+- Q-P: installworld's backups are deleted after the install; files
+  ObsoleteFiles.inc does not list stay; etcupdate's database and the
+  `/sys` link need nothing, since they come only with a release
+  tarball. The certificate entries: the cause is found (installworld's
+  closing rehash runs before delete-old), and the fix is proposed in
+  7.2 (15).
 
 ### 2026-10-11 (P10)
 
@@ -1214,40 +1248,18 @@ below that change the plan are folded into the sections named.
 - A system is never updated while it runs; updates run from a RAM root
   after `reboot -r`.
 - The install-rewrite cost is accepted; compare-before-write is a
-  later improvement.
+  later improvement. Overturned 2026-10-11 (Q-O): every install uses
+  `install -C`.
 
 ## 15. Open questions
 
-Q-O. Should every foundation build and update install with `install
--C`? It would overturn the 2026-10-08 ruling that the rewrite cost is
-accepted, now that P12 shows the fix costs nothing: shtetl passes
-`INSTALL_CMD="install -C"` to installworld and distribution, with no
-change to the tree; the send drops from 1,010 MiB to 38 MiB, the
-rebase compares 93 MB instead of 2.0 GB, and the install takes as
-long (7.2). Recommendation: yes.
-
-Q-P. What should a foundation update do with what installworld and
-delete-old leave behind (P6)? By kind:
-
-- installworld's backups (`*.old` loaders, `ld-elf.so.1.old`,
-  `init.bak`): insurance on a live system, clutter in a foundation.
-  Recommendation: delete them after the install.
-- Files ObsoleteFiles.inc does not list (LLVM 19's private libraries,
-  lib9p, old man pages and headers): FreeBSD's own source upgrade
-  leaves them too. Recommendation: leave them for now. A sweep against
-  a fresh install's file list is possible later (installworld with
-  `-DNO_ROOT` into scratch writes a METALOG naming every file).
-- certctl's entries under `/etc/ssl` (19 in `certs/`, 37 in
-  `untrusted/`): the current certctl deletes entries that match no
-  certificate when installworld runs its rehash, so these should not
-  have survived, and an entry left in `certs/` for a CA the new
-  release dropped would still be trusted. Recommendation: look before
-  deciding; on the box,
-  `zcat probes/results/KIDON-20261011T140103Z/P6-new-installworld.log.gz | grep -n -A5 certctl`
-  shows whether the rehash ran.
-- etcupdate's database and the `/sys` link come only from starting
-  with a release tarball, which shtetl's builds never do: nothing to
-  do.
+Q-P's certificates, proposed: a foundation update runs delete-old
+before installworld (7.2), so that installworld's closing `certctl
+rehash` sees only the certificates the new release ships. P6 and P15
+now follow that order. A rerun on the box (`sudo env
+OLD_REL=15.0-RELEASE sh probes/run.sh P6 P15`) should show no
+`/etc/ssl` entries and no backups left in P6, and P15 working as
+before; on that, it is ruled.
 
 ## 16. Dropped from parasa
 
