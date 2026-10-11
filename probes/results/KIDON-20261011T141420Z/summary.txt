@@ -1,0 +1,26 @@
+shtetl probes 2026-10-11T14:14:20Z
+host:      FreeBSD KIDON 15.1-RELEASE-p2 FreeBSD 15.1-RELEASE-p2 libzfs_core-get-zprops-n283597-cced9a573b46 GENERIC amd64
+zfs:       zfs-2.4.2-1-FreeBSD_g6330a45b0 zfs-kmod-2.4.2-1-FreeBSD_g6330a45b0 
+shtetl:    b2fc533
+zfs_rebase: /home/miri/zfs_rebase_tool/zfs_rebase fdab53d
+
+P14 replay s1..s3 onto F@v2: step 1 clone form, steps 2-3 dataset form with --allow-unrelated --base
+P14 the dataset: 865.4 MiB,    31358 names
+P14 check ok: step 1 exit (0)
+P14 the derived base is shprun/foundations/F@v1; step 2 against it has 1 conflict groups
+P14 check ok: step 2 exit (0)
+P14 check ok: step 3 exit (0)
+P14 check ok: rc.conf has line A once (1)
+P14 check ok: rc.conf has line B once (1)
+P14 check ok: the version is v2's (FreeBSD v2)
+P14 check ok: the removed file is gone (gone)
+P14 check ok: the renamed file is renamed (yes)
+P14 check ok: the ten s2 edits are there (10)
+P14 check ok: depth 1 exit (0)
+P14 answer: the derived base would make 1 conflict groups of step 2; --base X@s1 makes 0 (exit 0)
+P14 answer: step 1 (prune on): 5.85s, 524332 bytes compared, 37500 pools unchanged
+P14 answer: step 2 (prune off): 8.64s, 10305584042 bytes compared; step 3: 8.94s, 10305808032 bytes compared; the dataset is 865.4 MiB (907459072 bytes)
+P14 answer: depth 1 (one rebase of s3): 6.11s, 524332 bytes compared, 37486 pools unchanged
+P14 ran in 41s
+
+1 ran, 0 errors, 0 skipped

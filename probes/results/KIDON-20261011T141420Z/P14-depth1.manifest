@@ -1,0 +1,38 @@
+#rebase-manifest 5
+#result shprun/containers/X-depth1
+#form clone
+#base shprun/foundations/F@v1 10996542939969460943
+#from shprun/containers/X@s3 9650915499271199232
+#onto shprun/foundations/F@v2 16392782199532581432
+#made -
+#tag zr-d59733bc2830
+#take -
+#written 2026-10-11T14:14:55Z
+#mode strict
+#actions 15
+#conflicts 0
+/
+    etc/
+        added-s1 cp /etc/added-s1
+        rc.conf write /etc/rc.conf
+        ..
+    usr/
+        include/
+            Block.h write /usr/include/Block.h
+            Block_private.h write /usr/include/Block_private.h
+            FlexLexer.h write /usr/include/FlexLexer.h
+            __libunwind_config.h write /usr/include/__libunwind_config.h
+            _ctype.h write /usr/include/_ctype.h
+            _libsys.h write /usr/include/_libsys.h
+            a.out.h write /usr/include/a.out.h
+            alias.h write /usr/include/alias.h
+            ar.h write /usr/include/ar.h
+            archive.h write /usr/include/archive.h
+            archive_entry.h rm
+            arpa/
+                ftp.h rm
+                ftp.h.renamed cp /usr/include/arpa/ftp.h.renamed
+                ..
+            ..
+        ..
+    ..

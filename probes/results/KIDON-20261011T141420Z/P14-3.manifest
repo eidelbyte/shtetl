@@ -1,0 +1,27 @@
+#rebase-manifest 5
+#result s2
+#form dataset
+#base shprun/containers/X@s2 11711485043053633980
+#from shprun/containers/X@s3 9650915499271199232
+#onto shprun/containers/X-staging@s2 9086456953819628826
+#presnap shprun/containers/X-staging@s2
+#readonly off
+#canmount on
+#made -
+#tag zr-d59733aa2805
+#take -
+#written 2026-10-11T14:14:49Z
+#mode strict
+#actions 3
+#conflicts 0
+/
+    usr/
+        include/
+            archive_entry.h rm
+            arpa/
+                ftp.h rm
+                ftp.h.renamed cp /usr/include/arpa/ftp.h.renamed
+                ..
+            ..
+        ..
+    ..
