@@ -578,8 +578,7 @@ F is named after its recipe (6.1): `foundations/generic.conf` builds
    installworld ends with `certctl rehash`, and a delete-old after it
    removes the certificates the new release dropped but leaves their
    entries in `/etc/ssl`, where the foundation would go on trusting
-   them (P6 found 56). Proposed 2026-10-11, to be confirmed by a P6
-   rerun (15).
+   them (P6 found 56). Ruled 2026-10-11.
 2. The install, every file with `install -C` (ruled 2026-10-11, below).
 3. installworld's own backups deleted, their schg flags cleared first:
    `boot/kernel.old` (installkernel's), the `boot/*.old` loaders,
@@ -1157,9 +1156,9 @@ below that change the plan are folded into the sections named.
 - Q-P: installworld's backups are deleted after the install; files
   ObsoleteFiles.inc does not list stay; etcupdate's database and the
   `/sys` link need nothing, since they come only with a release
-  tarball. The certificate entries: the cause is found (installworld's
-  closing rehash runs before delete-old), and the fix is proposed in
-  7.2 (15).
+  tarball. The certificate entries: installworld's closing rehash ran
+  before delete-old removed the dropped certificates, so a foundation
+  update runs delete-old before installworld (7.2).
 
 ### 2026-10-11 (P10)
 
@@ -1253,13 +1252,12 @@ below that change the plan are folded into the sections named.
 
 ## 15. Open questions
 
-Q-P's certificates, proposed: a foundation update runs delete-old
-before installworld (7.2), so that installworld's closing `certctl
-rehash` sees only the certificates the new release ships. P6 and P15
-now follow that order. A rerun on the box (`sudo env
-OLD_REL=15.0-RELEASE sh probes/run.sh P6 P15`) should show no
-`/etc/ssl` entries and no backups left in P6, and P15 working as
-before; on that, it is ruled.
+None. The next step is M1 (12).
+
+Still to run on the box, as confirmation and not as a question: P6
+and P15 in 7.2's ruled order (`sudo env OLD_REL=15.0-RELEASE sh
+probes/run.sh P6 P15`). P6 should report no `/etc/ssl` entry and no
+backup left, and P15 one conflict, `/etc/group`, as before.
 
 ## 16. Dropped from parasa
 
