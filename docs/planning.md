@@ -366,6 +366,7 @@ list in the schema already has a natural identity:
 | derivations | derived file path |
 | requires | container name |
 | commands | a label the recipe gives the block |
+| patches | the source's location |
 
 So every collection is an object keyed by that identity, and the
 cascade merges objects the way it already merges any object, key by
@@ -447,6 +448,7 @@ Alternatives considered:
 | src_branch | foundation | string | FreeBSD branch |
 | kernconf | foundation | string or heredoc | config name, or an inline kernel config |
 | buildopts | foundation | heredoc | make(1) variables / src.conf |
+| patches | foundation | keyed by location: {ref, dir} | patch files applied to the src tree before the build (7.1.1) |
 | datasets | all | keyed | child datasets, created before anything is installed |
 | pkg | all | keyed | packages, installed at creation |
 | commands | all | keyed heredocs, sh | run once at creation, after pkg; never on update |
@@ -554,16 +556,109 @@ F is named after its recipe (6.1): `foundations/generic.conf` builds
 2. Create `zlake/foundations/F` and one child per recipe dataset, all
    empty, **before anything is installed**. This pre-split gives every
    container dataset a foundation counterpart to rebase onto.
-3. Create `zlake/foundation-builds/F` if missing. Mount it and F
-   (children follow by inheritance) at build paths; mount the src
-   root.
-4. In the src root: check out `src_branch`; `make buildworld
-   buildkernel` with `MAKEOBJDIRPREFIX` on foundation-builds/F.
+3. Mount the src root; check out `src_branch`; apply the recipe's
+   patches (7.1.1). A patch that does not apply cleanly pauses the
+   build here, before anything is built or installed. Then create
+   `zlake/foundation-builds/F` if missing, and mount it and F
+   (children follow by inheritance) at build paths.
+4. In the src root: `make buildworld buildkernel` with
+   `MAKEOBJDIRPREFIX` on foundation-builds/F.
 5. `make installworld installkernel distribution DESTDIR=<F mount>
    INSTALL_CMD="install -C"` (7.2).
 6. Foundation pkg and commands, in a chroot of F.
-7. Unmount; `zfs snapshot -r` F with the version name (6.1).
-8. Unmount foundation-builds/F and src.
+7. Unmount; `zfs snapshot -r` F with the version name (6.1),
+   carrying `shtetl:patches` (7.1.1).
+8. Unmount foundation-builds/F; roll the src root back to before the
+   patches (7.1.1) and unmount it.
+
+### 7.1.1 Patches
+
+Requested 2026-10-11. A foundation recipe may name patches for the src
+tree, applied after the checkout and before the build:
+
+    patches = [ "github.com/eidelbyte/freebsd-patches" ];
+
+or, with options:
+
+    patches {
+        "github.com/eidelbyte/freebsd-patches" {
+            ref = "releng-15.1";    # branch, tag or commit; default: the remote's HEAD
+            dir = "15.1";           # a subdirectory; default: the top level
+        }
+        "patches/generic" {}        # a directory in zconfig
+    }
+
+A source is keyed by its location, like every collection (5.4), so a
+layer drops an inherited one with `"github.com/..." = false`. A
+location with no scheme is https (`github.com/eidelbyte/freebsd-patches`
+is `https://github.com/eidelbyte/freebsd-patches`); a relative path is
+a directory in zconfig, which zconfig's snapshot (`shtetl:config`)
+already records. `patches` is a foundation key: it changes the src
+tree, and only a foundation builds one.
+
+**What is applied.** Every file ending in `.patch` at the top of the
+source (or of its `dir`), in natural order: runs of digits compare as
+numbers, everything else byte by byte. So `0-first.patch`,
+`1-second.patch`, ..., `9-...`, `10-...`. Sources go in the order the
+cascade gives them, each source's files in its own order (Q-Q).
+
+**How** (7.1 step 3):
+
+1. Fetch. Each git source is cloned shallow at its `ref` into the
+   build's run directory (`/var/db/shtetl/build/F`), and its commit
+   noted. The list of patches is fixed there, so a resumed build
+   applies exactly what it started with.
+2. Snapshot the src root after the checkout (`@shtetl-patch-0`). Each
+   patch N is applied with `git apply`, after a snapshot of its own
+   (`@shtetl-patch-N`).
+3. A patch that applies cleanly: on to the next. A patch whose reverse
+   applies cleanly (`git apply -R --check`) is already in the tree,
+   typically merged upstream since it was written: skipped, and the
+   build says so.
+4. Anything else pauses the build (below).
+5. When the build is done (step 8) or abandoned, the src root is
+   rolled back to `@shtetl-patch-0` and the patch snapshots destroyed,
+   so the checkout is clean for the next build. The fetched sources
+   were brought in before the snapshot, so nothing is fetched twice.
+
+**The pause.** shtetl applies the failing patch as far as it can:
+`git apply --3way`, which merges against the patch's base blobs and
+leaves conflict markers where it cannot, or, where the checkout lacks
+those blobs, `git apply --reject`, which leaves `.rej` files. It prints
+the patch, the files left to fix and the three commands below, and
+stops. Nothing has been built or installed, and F is not mounted: the
+mounts of step 3 come after the patches. The src root stays mounted for the person to work in, and
+the paused build is recorded on it (`shtetl:build=F`) and in its run
+directory. No other build starts while one is paused; there is one src
+checkout.
+
+The person fixes the tree, then:
+
+- `shtetl build F --continue`: checked first, no conflict marker left
+  in the files the patch touches and no `.rej` file in the tree. The
+  patch counts as applied by hand, and the build goes on with the next
+  patch, then builds. The person's fix is written out as a replacement
+  patch (`<run dir>/<name>.fixed`: the tree's difference from
+  `@shtetl-patch-N` to the fixed tree), ready to commit to the patch
+  source. A fix made only in the tree lasts only for this build; the
+  next update applies the source's patch again and pauses again.
+- `shtetl build F --skip`: the tree goes back to `@shtetl-patch-N`,
+  the patch is left out, and the build goes on.
+- `shtetl build F --abort`: the src root goes back to
+  `@shtetl-patch-0` and the run directory is removed; nothing was
+  built.
+
+A fix made in the patch source itself: `--abort`, then build again, and
+the fetch takes the new patch.
+
+**The record.** The version snapshot carries `shtetl:patches`: each
+source with the commit it was fetched at, and each patch that was
+skipped as already applied, skipped by hand or fixed by hand. A patch
+fixed by hand also keeps its `.fixed` file in the foundation's obj
+cache (`foundation-builds/F/patches/<version>/`), since the run
+directory goes when the build ends. A patched tree is uncommitted
+changes to the checkout, so the build's version string says
+`<sha>-dirty` (newvers.sh); Q-R.
 
 ### 7.2 Update foundation F
 
@@ -1032,9 +1127,10 @@ Pain points to settle early (M1/M2):
 Per the project rule: plot each phase's problem space as a matrix
 (dimensions crossed into cells, each cell a test, a mapping or a
 documented deferral) before writing its tests. Phases: config and
-cascade, discovery, bootstrap, foundation build, beam-down, create,
-save, update, history replay, gate handling, soak, cutover, abandon,
-mirror, restore, prune. Kill tests at every step of create, save, update and cutover.
+cascade, discovery, bootstrap, patches and the pause, foundation build,
+beam-down, create, save, update, history replay, gate handling, soak,
+cutover, abandon, mirror, restore, prune. Kill tests at every step of
+patching, create, save, update and cutover.
 
 ## 12. Milestones
 
@@ -1043,7 +1139,7 @@ mirror, restore, prune. Kill tests at every step of create, save, update and cut
 | M0 | probes (section 13) | box |
 | M1 | skeleton, UCL loader, schema, cascade, `shtetl config show` | mac |
 | M2 | discovery and multi-rooting, bootstrap, property table | box |
-| M3 | foundation build and update into zlake; pkg-upgrade | box |
+| M3 | foundation build and update into zlake, patches and the pause included; pkg-upgrade | box |
 | M4 | beam-down, new container, save with messages, the zlake mirror | box |
 | M5 | update into staging, history replay, gate handling and derivations, cutover, abandon | box |
 | M6 | systems: outer space, one-shot boot, update | box/VM |
@@ -1252,7 +1348,25 @@ below that change the plan are folded into the sections named.
 
 ## 15. Open questions
 
-None. The next step is M1 (12).
+Q-Q. With patches from several sources, in what order do they go?
+Proposed: source by source, in the order the cascade gives the sources,
+each source's files in its own natural order, so each source's
+numbering stands on its own (7.1.1). The alternative is every patch of
+every source in one natural order by file name, which lets a site's
+`0-...` patch go first whichever source it sits in, but makes two
+sources' numbers collide.
+
+Q-R. A patched tree builds with a version string ending in `-dirty`
+(`newvers.sh` appends it when the checkout has uncommitted changes),
+so `uname` on every container of a patched foundation says `-dirty`.
+Proposed: shtetl commits the applied patches to a local branch, one
+commit per patch with a fixed author and date (the src commit's), so
+the same patches on the same commit always give the same commit id.
+The build then names that commit and is not dirty, `shtetl:patches`
+records it, and step 8's rollback removes the branch with the rest.
+The alternative is to leave the tree uncommitted and accept `-dirty`.
+
+The next step after these is M1 (12).
 
 Still to run on the box, as confirmation and not as a question: P6
 and P15 in 7.2's ruled order (`sudo env OLD_REL=15.0-RELEASE sh
