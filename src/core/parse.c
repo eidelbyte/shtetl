@@ -1,0 +1,447 @@
+/*
+ * The parse: libucl under the rules of planning.md 5.3, and what it
+ * built turned into the format-free tree.
+ *
+ * The flags, and what each is for:
+ *
+ * - UCL_DUPLICATE_ERROR, per chunk: a key written twice in one file
+ *   is an error, never an implicit array and never a merge of two
+ *   objects.
+ * - UCL_PARSER_DISABLE_MACRO: in libucl 0.9.4 a macro is then a key
+ *   that does not begin with a letter, refused at its '.', and
+ *   variable expansion is off altogether, so $ is literal. libucl's
+ *   header says such a macro is read as a comment instead, which
+ *   would drop a recipe's .include without a word. So the parse
+ *   does not trust either reading: sh_parse_selfcheck tries the
+ *   linked library before the first file, and shtetl reads nothing
+ *   with a libucl that takes a macro, expands a variable or takes a
+ *   key twice.
+ * - UCL_PARSER_NO_FILEVARS: libucl sets no FILENAME or CURDIR of its
+ *   own. The file's name is given with ucl_parser_set_filevars so
+ *   that libucl's messages name it; that registers the same two
+ *   variables, which the self-check shows are never expanded.
+ *
+ * Times are libucl's (no UCL_PARSER_NO_TIME): an unquoted 30d
+ * arrives as a number of seconds, and the schema says to quote it.
+ *
+ * libucl keeps no line on the objects it builds, only on an error,
+ * so a later refusal names its file and key path rather than a line.
+ * Keys are unique within a file, so the path names one place.
+ */
+
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#include <errno.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <ucl.h>
+
+#include "core/err.h"
+#include "core/parse.h"
+#include "core/tree.h"
+
+#define	PA_FLAGS	(UCL_PARSER_NO_FILEVARS | UCL_PARSER_DISABLE_MACRO)
+#define	PA_NONE		((size_t)-1)
+
+/* The self-check: 0 not yet run, 1 passed, -1 failed. */
+static int pa_checked;
+
+/*
+ * One libucl parse of BUF under the flags above. Returns the parser
+ * for the caller to free, or NULL when out of memory; *OKP says
+ * whether libucl took the input.
+ */
+static struct ucl_parser *
+pa_ucl(const char *buf, size_t len, const char *name, int *okp)
+{
+	struct ucl_parser *p;
+
+	*okp = 0;
+	if ((p = ucl_parser_new(PA_FLAGS)) == NULL)
+		return (NULL);
+	if (!ucl_parser_set_filevars(p, name, false)) {
+		ucl_parser_free(p);
+		return (NULL);
+	}
+	*okp = ucl_parser_add_chunk_full(p, (const unsigned char *)buf, len,
+	    0, UCL_DUPLICATE_ERROR, UCL_PARSE_UCL);
+	return (p);
+}
+
+/* The line, from 1, that byte OFF of BUF is on. */
+static unsigned
+pa_line(const char *buf, size_t off)
+{
+	unsigned line;
+	size_t i;
+
+	line = 1;
+	for (i = 0; i < off; i++) {
+		if (buf[i] == '\n')
+			line++;
+	}
+	return (line);
+}
+
+/*
+ * The offset of LINE (from 1) and COL (from 0) in BUF, as libucl
+ * counts them, or PA_NONE if that is not a byte of that line.
+ */
+static size_t
+pa_offset(const char *buf, size_t len, unsigned line, unsigned col)
+{
+	const char *nl;
+	size_t i;
+	unsigned l;
+
+	i = 0;
+	for (l = 1; l < line; l++) {
+		nl = memchr(buf + i, '\n', len - i);
+		if (nl == NULL)
+			return (PA_NONE);
+		i = (size_t)(nl - buf) + 1;
+	}
+	if (col >= len - i || memchr(buf + i, '\n', col) != NULL)
+		return (PA_NONE);
+	return (i + col);
+}
+
+static enum sh_type
+pa_type(const ucl_object_t *o)
+{
+	switch (ucl_object_type(o)) {
+	case UCL_OBJECT:
+		return (SH_OBJECT);
+	case UCL_ARRAY:
+		return (SH_ARRAY);
+	case UCL_INT:
+		return (SH_INT);
+	case UCL_FLOAT:
+	case UCL_TIME:
+		return (SH_NUM);
+	case UCL_STRING:
+		return (SH_STR);
+	case UCL_BOOLEAN:
+		return (SH_BOOL);
+	default:
+		return (SH_NULL);
+	}
+}
+
+/*
+ * Tries one rule on the linked libucl: TEXT parsed, and whether the
+ * outcome is the one 5.3 needs. WANT_OK: taken, with key a holding
+ * WANT_A; or refused, and with AT_START refused at its first byte,
+ * where a macro's '.' is. 1 kept, 0 broken, -1 out of memory.
+ */
+static int
+pa_try(const char *text, int want_ok, const char *want_a, int at_start)
+{
+	struct ucl_parser *p;
+	ucl_object_t *top;
+	const ucl_object_t *a;
+	const char *s;
+	int ok, kept;
+
+	if ((p = pa_ucl(text, strlen(text), "(self-check)", &ok)) == NULL)
+		return (-1);
+	kept = 0;
+	if (!want_ok) {
+		kept = !ok && (!at_start ||
+		    (ucl_parser_get_linenum(p) == 1 &&
+		    ucl_parser_get_column(p) == 0));
+	} else if (ok && (top = ucl_parser_get_object(p)) != NULL) {
+		a = ucl_object_lookup(top, "a");
+		s = a != NULL ? ucl_object_tostring(a) : NULL;
+		kept = s != NULL && strcmp(s, want_a) == 0;
+		ucl_object_unref(top);
+	}
+	ucl_parser_free(p);
+	return (kept);
+}
+
+int
+sh_parse_selfcheck(struct sh_err *e)
+{
+	static const struct {
+		const char	*t_text;
+		int		t_ok;
+		const char	*t_a;
+		int		t_at_start;
+		const char	*t_broken;
+	} tries[] = {
+		{ ".include \"/nonexistent/shtetl\"\n", 0, NULL, 1,
+		    "takes a UCL macro" },
+		{ "a = \"$FILENAME ${CURDIR} $X\";\n", 1,
+		    "$FILENAME ${CURDIR} $X", 0, "expands a $ variable" },
+		{ "a = 1;\na = 2;\n", 0, NULL, 0, "takes a key written twice" }
+	};
+	size_t i;
+	int r;
+
+	if (pa_checked != 0)
+		return (pa_checked > 0 ? 0 : -1);
+	for (i = 0; i < sizeof (tries) / sizeof (tries[0]); i++) {
+		r = pa_try(tries[i].t_text, tries[i].t_ok, tries[i].t_a,
+		    tries[i].t_at_start);
+		if (r < 0) {
+			sh_err_nomem(e);
+			return (-1);
+		}
+		if (r == 0) {
+			sh_errf(e, "the linked libucl %s, which shtetl's "
+			    "configuration must never do: shtetl reads none "
+			    "with it", tries[i].t_broken);
+			pa_checked = -1;
+			return (-1);
+		}
+	}
+	pa_checked = 1;
+	return (0);
+}
+
+/*
+ * What libucl built, as a tree whose every node is from NAME. PATH is
+ * where O sits, for messages; DEPTH counts from 1 at the top.
+ */
+static struct sh_node *
+pa_conv(const ucl_object_t *o, const char *name, struct sh_path *path,
+    int depth, struct sh_err *e)
+{
+	struct sh_node *n, *c;
+	const ucl_object_t *cur;
+	ucl_object_iter_t it;
+	const char *s;
+	char *key;
+	size_t len, was, i;
+
+	if (depth > SH_PARSE_DEPTH) {
+		sh_err_at(e, name, path, "nested more than %d deep",
+		    SH_PARSE_DEPTH);
+		return (NULL);
+	}
+	/*
+	 * libucl's safe iterator, freed on every way out: the plain one
+	 * allocates its state on the first step of an object and frees
+	 * it only at the end, so a walk left early on an error leaked it.
+	 */
+	it = NULL;
+	if ((n = sh_node_new(pa_type(o), name)) == NULL ||
+	    ((ucl_object_type(o) == UCL_OBJECT ||
+	    ucl_object_type(o) == UCL_ARRAY) &&
+	    (it = ucl_object_iterate_new(o)) == NULL))
+		goto nomem;
+	switch (ucl_object_type(o)) {
+	case UCL_OBJECT:
+		while ((cur = ucl_object_iterate_safe(it, true)) != NULL) {
+			s = ucl_object_keyl(cur, &len);
+			if (s == NULL || memchr(s, '\0', len) != NULL) {
+				sh_err_at(e, name, path,
+				    "a key with a NUL byte");
+				goto fail;
+			}
+			if ((key = malloc(len + 1)) == NULL)
+				goto nomem;
+			(void) memcpy(key, s, len);
+			key[len] = '\0';
+			was = sh_path_push(path, key);
+			/* UCL_DUPLICATE_ERROR leaves no implicit array */
+			if (cur->next != NULL || sh_obj_find(n, key) != NULL) {
+				sh_err_at(e, name, path, "written twice");
+				free(key);
+				goto fail;
+			}
+			c = pa_conv(cur, name, path, depth + 1, e);
+			sh_path_pop(path, was);
+			if (c == NULL) {
+				free(key);
+				goto fail;
+			}
+			if (sh_obj_set(n, key, c, name) != 0) {
+				free(key);
+				goto nomem;
+			}
+			free(key);
+		}
+		break;
+	case UCL_ARRAY:
+		i = 0;
+		while ((cur = ucl_object_iterate_safe(it, true)) != NULL) {
+			was = sh_path_index(path, i++);
+			c = pa_conv(cur, name, path, depth + 1, e);
+			sh_path_pop(path, was);
+			if (c == NULL)
+				goto fail;
+			if (sh_arr_push(n, c) != 0)
+				goto nomem;
+		}
+		break;
+	case UCL_INT:
+		n->sn_int = ucl_object_toint(o);
+		break;
+	case UCL_FLOAT:
+	case UCL_TIME:
+		n->sn_num = ucl_object_todouble(o);
+		break;
+	case UCL_STRING:
+		s = ucl_object_tolstring(o, &len);
+		if (s == NULL || memchr(s, '\0', len) != NULL) {
+			sh_err_at(e, name, path, "a string with a NUL byte");
+			goto fail;
+		}
+		sh_node_free(n);
+		if ((n = sh_node_str(s, len, name)) == NULL)
+			goto nomem;
+		break;
+	case UCL_BOOLEAN:
+		n->sn_bool = ucl_object_toboolean(o);
+		break;
+	case UCL_NULL:
+		break;
+	default:
+		sh_err_at(e, name, path, "a value of a kind shtetl does not "
+		    "read");
+		goto fail;
+	}
+	if (it != NULL)
+		ucl_object_iterate_free(it);
+	return (n);
+nomem:
+	sh_err_nomem(e);
+fail:
+	if (it != NULL)
+		ucl_object_iterate_free(it);
+	sh_node_free(n);
+	return (NULL);
+}
+
+struct sh_node *
+sh_parse_buf(const char *buf, size_t len, const char *name, struct sh_err *e)
+{
+	struct ucl_parser *p;
+	ucl_object_t *top;
+	struct sh_node *n;
+	struct sh_path path;
+	const char *nul, *msg;
+	size_t off, mlen;
+	unsigned line;
+	int ok;
+
+	if (sh_parse_selfcheck(e) != 0)
+		return (NULL);
+	if (len > SH_PARSE_MAX) {
+		sh_errf(e, "%s: larger than %d MiB, the most shtetl reads of "
+		    "one file", name, SH_PARSE_MAX / (1024 * 1024));
+		return (NULL);
+	}
+	if ((nul = memchr(buf, '\0', len)) != NULL) {
+		sh_errf(e, "%s:%u: a NUL byte", name,
+		    pa_line(buf, (size_t)(nul - buf)));
+		return (NULL);
+	}
+	if ((p = pa_ucl(buf, len, name, &ok)) == NULL) {
+		sh_err_nomem(e);
+		return (NULL);
+	}
+	if (!ok) {
+		line = ucl_parser_get_linenum(p);
+		off = pa_offset(buf, len, line, ucl_parser_get_column(p));
+		if (off != PA_NONE && buf[off] == '.') {
+			sh_errf(e, "%s:%u: a UCL macro (.include, .priority "
+			    "and the like): shtetl's configuration takes none",
+			    name, line);
+		} else {
+			msg = ucl_parser_get_error(p);
+			if (msg == NULL)
+				msg = "libucl refused it";
+			mlen = strlen(msg);
+			while (mlen > 0 && (msg[mlen - 1] == ' ' ||
+			    msg[mlen - 1] == ';' || msg[mlen - 1] == '\n'))
+				mlen--;
+			if (strstr(msg, name) != NULL)
+				sh_errf(e, "%.*s", (int)mlen, msg);
+			else
+				sh_errf(e, "%s: %.*s", name, (int)mlen, msg);
+		}
+		ucl_parser_free(p);
+		return (NULL);
+	}
+	top = ucl_parser_get_object(p);
+	sh_path_init(&path);
+	if (top == NULL) {
+		if ((n = sh_node_new(SH_OBJECT, name)) == NULL)
+			sh_err_nomem(e);
+	} else if (ucl_object_type(top) != UCL_OBJECT) {
+		sh_errf(e, "%s: the file must hold keys, not %s", name,
+		    sh_type_name(pa_type(top)));
+		n = NULL;
+	} else {
+		n = pa_conv(top, name, &path, 1, e);
+	}
+	if (top != NULL)
+		ucl_object_unref(top);
+	ucl_parser_free(p);
+	return (n);
+}
+
+struct sh_node *
+sh_parse_file(const char *path, const char *name, struct sh_err *e)
+{
+	struct sh_node *n;
+	struct stat st;
+	char *buf;
+	ssize_t r;
+	size_t got, size;
+	int fd;
+
+	if ((fd = open(path, O_RDONLY | O_CLOEXEC)) == -1) {
+		sh_errf(e, "%s: %s", name, strerror(errno));
+		return (NULL);
+	}
+	if (fstat(fd, &st) == -1) {
+		sh_errf(e, "%s: %s", name, strerror(errno));
+		(void) close(fd);
+		return (NULL);
+	}
+	if (!S_ISREG(st.st_mode)) {
+		sh_errf(e, "%s: not a regular file", name);
+		(void) close(fd);
+		return (NULL);
+	}
+	if (st.st_size > SH_PARSE_MAX) {
+		sh_errf(e, "%s: larger than %d MiB, the most shtetl reads of "
+		    "one file", name, SH_PARSE_MAX / (1024 * 1024));
+		(void) close(fd);
+		return (NULL);
+	}
+	size = (size_t)st.st_size;
+	if ((buf = malloc(size + 1)) == NULL) {
+		sh_err_nomem(e);
+		(void) close(fd);
+		return (NULL);
+	}
+	for (got = 0; got < size; got += (size_t)r) {
+		r = read(fd, buf + got, size - got);
+		if (r == -1 && errno == EINTR) {
+			r = 0;
+			continue;
+		}
+		if (r <= 0)
+			break;
+	}
+	if (got < size) {
+		sh_errf(e, "%s: %s", name, r == -1 ? strerror(errno) :
+		    "shorter than when it was opened");
+		free(buf);
+		(void) close(fd);
+		return (NULL);
+	}
+	(void) close(fd);
+	n = sh_parse_buf(buf, size, name, e);
+	free(buf);
+	return (n);
+}

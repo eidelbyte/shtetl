@@ -43,34 +43,36 @@ duplicate rule {scalar, object, nested, keys differing in case};
 macros {top level, nested, each built-in name, an unknown name, the
 same text where no macro can be}; variables {$NAME, ${NAME}, the
 file variables}; failures {syntax, NUL byte, missing, not a regular
-file, too large}; the library itself {the start-up check}.
+file, too large, nested too deep}; the library itself {the start-up
+check}.
 
 | cell | scenario | disposition |
 |------|----------|-------------|
-| CP1 | an empty file is an empty object | planned: check_parse.c |
-| CP2 | a top-level array or scalar is refused | planned: check_parse.c |
-| CP3 | every scalar kind arrives typed: bool (true, false, yes, off), int (10, 0x10, 1k), float (15.10), string, null | planned: check_parse.c |
-| CP4 | an unquoted time (30d, 10min) arrives as a number, never a string | planned: check_parse.c |
-| CP5 | a heredoc is verbatim: no escapes, no expansion, a `.include` line inside is text | planned: check_parse.c |
-| CP6 | nesting: objects, arrays, arrays of objects; keys in the order written | planned: check_parse.c |
-| CP7 | a scalar key written twice is refused, with its line | planned: check_parse.c |
-| CP8 | an object key written twice is refused (libucl's default would merge them) | planned: check_parse.c |
-| CP9 | a duplicate inside a nested object is refused | planned: check_parse.c |
-| CP10 | keys differing only in case are two keys | planned: check_parse.c |
-| CP11 | `.include` at the top is refused as a macro, with its line, and no file is read | planned: check_parse.c |
-| CP12 | `.priority` inside an object is refused as a macro, with its line | planned: check_parse.c |
-| CP13 | `.try_include`, `.includes`, `.load` and `.inherit` are each refused | planned: check_parse.c |
-| CP14 | an unknown `.foo` is refused as a macro | planned: check_parse.c |
-| CP15 | `.include` as an array element or as a value is plain text | planned: check_parse.c |
-| CP16 | `$FOO`, `${CURDIR}` and `$FILENAME` stay literal, in strings and heredocs | planned: check_parse.c |
-| CP17 | a syntax error is refused, naming the file | planned: check_parse.c |
-| CP18 | a NUL byte in the input is refused | planned: check_parse.c |
-| CP19 | a missing file is refused, naming it | planned: check_parse.c |
-| CP20 | a directory is refused: not a regular file | planned: check_parse.c |
-| CP21 | a file over the size limit is refused | planned: check_parse.c |
-| CP22 | every node of a parsed tree names its file as its layer | planned: check_parse.c |
-| CP23 | the start-up check passes on the linked libucl: a macro refused at line 1, `$` literal, a duplicate refused | planned: check_parse.c |
-| CP24 | every refusal names the file | planned: check_parse.c |
+| CP1 | an empty file is an empty object | covered: check_parse.c |
+| CP2 | a top-level array or scalar is refused | covered: check_parse.c |
+| CP3 | every scalar kind arrives typed: bool (true, false, yes, off), int (10, 0x10, 1k), float (15.10), string, null | covered: check_parse.c |
+| CP4 | an unquoted time (30d, 10min) arrives as a number, never a string | covered: check_parse.c |
+| CP5 | a heredoc is verbatim: no escapes, no expansion, a `.include` line inside is text | covered: check_parse.c |
+| CP6 | nesting: objects, arrays, arrays of objects; keys in the order written | covered: check_parse.c |
+| CP7 | a scalar key written twice is refused, with its line | covered: check_parse.c |
+| CP8 | an object key written twice is refused (libucl's default would merge them) | covered: check_parse.c |
+| CP9 | a duplicate inside a nested object is refused | covered: check_parse.c |
+| CP10 | keys differing only in case are two keys | covered: check_parse.c |
+| CP11 | `.include` at the top is refused as a macro, with its line, and no file is read | covered: check_parse.c |
+| CP12 | `.priority` inside an object is refused as a macro, with its line | covered: check_parse.c |
+| CP13 | `.try_include`, `.includes`, `.load` and `.inherit` are each refused | covered: check_parse.c |
+| CP14 | an unknown `.foo` is refused as a macro | covered: check_parse.c |
+| CP15 | `.include` as an array element or as a value is plain text | covered: check_parse.c |
+| CP16 | `$FOO`, `${CURDIR}` and `$FILENAME` stay literal, in strings and heredocs | covered: check_parse.c |
+| CP17 | a syntax error is refused, naming the file | covered: check_parse.c |
+| CP18 | a NUL byte in the input is refused | covered: check_parse.c |
+| CP19 | a missing file is refused, naming it | covered: check_parse.c |
+| CP20 | a directory is refused: not a regular file | covered: check_parse.c |
+| CP21 | a file over the size limit is refused | covered: check_parse.c |
+| CP22 | every node of a parsed tree names its file as its layer | covered: check_parse.c |
+| CP23 | the start-up check passes on the linked libucl: a macro refused at line 1, `$` literal, a duplicate refused | covered: check_parse.c |
+| CP24 | every refusal names the file | covered: check_parse.c |
+| CP25 | a value nested more than 64 deep is refused, naming its key path | covered: check_parse.c |
 
 ## CK: a recipe layer against its kind (planning.md 5.5; src/core/schema.c)
 

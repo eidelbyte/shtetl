@@ -57,9 +57,9 @@ UCL_CHECK = @test -f $(UCL_SRC)/src/ucl_parser.c || { \
 FLAVOR = portable
 BUILD = build
 
-CORE_OBJS =
+CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(UCL_OBJS)
-TESTS =
+TESTS = check_parse
 
 all: build shtetl
 
@@ -84,6 +84,13 @@ check-freebsd:
 
 $(BUILD)/main.o: src/main.c
 	$(CC) $(CFLAGS) -c -o $@ src/main.c
+$(BUILD)/err.o: src/core/err.c src/core/err.h src/core/tree.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/err.c
+$(BUILD)/tree.o: src/core/tree.c src/core/tree.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/tree.c
+$(BUILD)/parse.o: src/core/parse.c src/core/parse.h src/core/err.h \
+	src/core/tree.h
+	$(CC) $(CFLAGS) $(UCL_INC) -c -o $@ src/core/parse.c
 
 $(BUILD)/ucl/ucl_emitter_streamline.o:
 	$(UCL_CHECK)
