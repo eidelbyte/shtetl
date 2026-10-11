@@ -25,5 +25,7 @@ Nothing is built yet. The design:
   page.
 - `docs/ucl-primer.md`: the configuration format, and the rules
   shtetl adds to it.
+- `probes/`: the M0 probes as scripts for the box: `sudo sh
+  probes/run.sh`. See `probes/README.md`.
 
 BSD 3-Clause; see `LICENSE`.

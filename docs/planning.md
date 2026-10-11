@@ -992,7 +992,9 @@ mirror, restore, prune. Kill tests at every step of create, save, update and cut
 ## 13. Probes (M0): standalone tests before the design commits
 
 Each probe is a script on a throwaway pool on the box, written down
-with what it printed.
+with what it printed. The scripts are in `probes/` (`probes/README.md`):
+`sudo sh probes/run.sh` runs the ZFS ones, `--world` adds P6, P12 and
+P15, and the transcripts land in `probes/results/`.
 
 P1. Clone-stream receive: `zfs send -i zrun/foundations/F@v1
 zrun/containers/X@s1 | zfs recv zlake/containers/X` where
