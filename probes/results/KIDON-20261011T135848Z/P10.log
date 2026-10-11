@@ -1,0 +1,69 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+# zfs set shtetl:space=lake shplake
+# zfs create shplake/foundations
+# zfs create shplake/containers
+# zfs create -p shplake/archive/containers
+# zfs create shplake/foundations/F
+# zfs create -o canmount=off shplake/foundations/F/usr
+# zfs create shplake/foundations/F/usr/local
+# zfs create shplake/foundations/F/var
+# zfs set mountpoint=/tmp/shtetl-probe/build/F shplake/foundations/F
+# zfs inherit mountpoint shplake/foundations/F
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v1' shplake/foundations/F@v1
+# zfs send shplake/foundations/F@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F
+# zfs send shplake/foundations/F/usr@v1 | zfs recv -u -o readonly=on -o canmount=off shprun/foundations/F/usr
+# zfs send shplake/foundations/F/usr/local@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/usr/local
+# zfs send shplake/foundations/F/var@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/var
+# zfs clone shprun/foundations/F@v1 shprun/containers/X
+# zfs clone -o canmount=off shprun/foundations/F/usr@v1 shprun/containers/X/usr
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/containers/X/usr/local
+# zfs clone shprun/foundations/F/var@v1 shprun/containers/X/var
+# zfs create shprun/containers/X/www
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=first save' shprun/containers/X@s1
+== the first save: clone stream, then www full
+# zfs send -i shprun/foundations/F@v1 shprun/containers/X@s1 | zfs recv -u shplake/containers/X1
+# zfs send -p -i shprun/foundations/F@v1 shprun/containers/X@s1 | zfs recv -u shplake/containers/X2
+# zfs send shprun/containers/X/www@s1 | zfs recv -u shplake/containers/X1/www
+# zfs send -p shprun/containers/X/www@s1 | zfs recv -u shplake/containers/X2/www
+== the next save: -i from s1
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=second save' shprun/containers/X@s2
+# zfs send -i @s1 shprun/containers/X@s2 | zfs recv -u shplake/containers/X1
+# zfs send -p -i @s1 shprun/containers/X@s2 | zfs recv -u shplake/containers/X2
+# zfs send -i @s1 shprun/containers/X/www@s2 | zfs recv -u shplake/containers/X1/www
+# zfs send -p -i @s1 shprun/containers/X/www@s2 | zfs recv -u shplake/containers/X2/www
+# zfs get -r -t snapshot -o name,property,value,source shtetl:commit,shtetl:kind shplake/containers/X1 shplake/containers/X2
+NAME                          PROPERTY       VALUE          SOURCE
+shplake/containers/X1@s1      shtetl:commit  -              -
+shplake/containers/X1@s1      shtetl:kind    -              -
+shplake/containers/X1@s2      shtetl:commit  -              -
+shplake/containers/X1@s2      shtetl:kind    -              -
+shplake/containers/X1/www@s1  shtetl:commit  -              -
+shplake/containers/X1/www@s1  shtetl:kind    -              -
+shplake/containers/X1/www@s2  shtetl:commit  -              -
+shplake/containers/X1/www@s2  shtetl:kind    -              -
+shplake/containers/X2@s1      shtetl:commit  first save     received
+shplake/containers/X2@s1      shtetl:kind    save           received
+shplake/containers/X2@s2      shtetl:commit  second save    received
+shplake/containers/X2@s2      shtetl:kind    save           received
+shplake/containers/X2/www@s1  shtetl:commit  first save     received
+shplake/containers/X2/www@s1  shtetl:kind    save           received
+shplake/containers/X2/www@s2  shtetl:commit  second save    received
+shplake/containers/X2/www@s2  shtetl:kind    save           received
+== what -p brought with the datasets
+# zfs get -r -s local,received -o name,property,value,source all shplake/containers/X1 shplake/containers/X2
+NAME                          PROPERTY                VALUE                     SOURCE
+shplake/containers/X2         encryption              off                       local
+shplake/containers/X2@s1      shtetl:commit           first save                received
+shplake/containers/X2@s1      shtetl:kind             save                      received
+shplake/containers/X2@s2      shtetl:commit           second save               received
+shplake/containers/X2@s2      shtetl:kind             save                      received
+shplake/containers/X2/www@s1  shtetl:commit           first save                received
+shplake/containers/X2/www@s1  shtetl:kind             save                      received
+shplake/containers/X2/www@s2  shtetl:commit           second save               received
+shplake/containers/X2/www@s2  shtetl:kind             save                      received
+P10 shtetl:commit arrived: clone stream no / with -p yes; incremental no / yes; full no / yes
+== the fallback: set it on the received snapshot
+# zfs set 'shtetl:commit=first save' shplake/containers/X1@s1
+P10 answer: without -p: clone no, incremental no, full no; with -p: clone yes, incremental yes, full yes; zfs set on the received snapshot works

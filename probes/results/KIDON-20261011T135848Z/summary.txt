@@ -1,0 +1,168 @@
+shtetl probes 2026-10-11T13:58:48Z
+host:      FreeBSD KIDON 15.1-RELEASE-p2 FreeBSD 15.1-RELEASE-p2 libzfs_core-get-zprops-n283597-cced9a573b46 GENERIC amd64
+zfs:       zfs-2.4.2-1-FreeBSD_g6330a45b0 zfs-kmod-2.4.2-1-FreeBSD_g6330a45b0 
+shtetl:    972314c
+zfs_rebase: /home/miri/zfs_rebase_tool/zfs_rebase fdab53d
+
+P1 a container's first save lands in zlake as a clone of the zlake foundation
+P1 check ok: a: the received root's origin, no -o origin (shplake/foundations/F@v1)
+P1 check ok: b: the received root's origin, -o origin (shplake/foundations/F@v1)
+P1 check ok: c: zlake X origin (shplake/foundations/F@v1)
+P1 check ok: c: zlake X/usr origin (shplake/foundations/F/usr@v1)
+P1 check ok: c: zlake X/usr/local origin (shplake/foundations/F/usr/local@v1)
+P1 check ok: c: zlake X/var origin (shplake/foundations/F/var@v1)
+P1 check ok: c: zlake X/www origin (-)
+P1 check ok: d: the second save's incremental (received)
+P1 answer: a clone stream lands as a clone of zlake F@v1 without -o origin: yes; with -o origin: yes
+P1 answer: the whole first save: 5 of 5 datasets landed with the right origin; zlake X uses 0.1 MiB against F's 0.9 MiB
+P1 ran in 5s
+
+P2 zlake: www moved under a new X (a clone of F@v2) still takes send -i www@s1 www@s2
+P2 check ok: the new X in zlake is a clone of F@v2 (shplake/foundations/F@v2)
+P2 check ok: send -i www@s1 www@s2 into the moved www (received)
+P2 answer: a child moved under a parent of another lineage still takes its incrementals: received
+P2 ran in 6s
+
+P3 zrun: a promoted www clone keeps sending -i www@s1 www@s2 to zlake
+P3 check ok: s1 is on the promoted www with its guid (3678671255569042139)
+P3 check ok: send -i www@s1 www@s2 from the promoted www (received)
+P3 answer: promote keeps s1 (guid kept) and the next incremental is received
+P3 ran in 6s
+
+P4 clone and dataset form rebases on children of a mounted X-staging, and on a parent with a child mounted
+P4 check ok: a: root step 1 exit (0)
+P4 check ok: b: root step 2 exit (0)
+P4 check ok: c: var step 1 exit (0)
+P4 check ok: c: X-staging still mounted (yes)
+P4 check ok: c: var placed at (/tmp/shtetl-probe/run/containers/X-staging/var)
+P4 check ok: d: var step 2 exit (0)
+P4 check ok: d: X-staging still mounted (yes)
+P4 check ok: d: var back at its mountpoint (yes)
+P4 e: root step 3 with var mounted beneath exited 2 (2 is 'in use', refused before anything was touched)
+P4 check ok: e2: root step 3, var unmounted (0)
+P4 check ok: f: var step 3 exit (0)
+P4 check ok: rc.conf carries each save's line once (3)
+P4 check ok: the version is v2's (FreeBSD v2)
+P4 check ok: var has the admin's three logs (3)
+P4 check ok: var has v2's new file (yes)
+P4 answer: a clone form rebase under a mounted parent: works; a dataset form step on a child with its parent mounted: works
+P4 answer: a dataset form step on a parent with a child mounted beneath: exit 2; so each dataset is replayed whole before its children are made, or children are unmounted for it
+P4 ran in 10s
+
+P5 synthetic installworld rewrite: rc.conf edited in X, untouched by v1 -> v2; conflict? time? send size?
+P5 F@v1 -> F@v2 (rewritten): 233 kept, 13 touched (same object, new ctime), 14303 replaced (new object), 2 added, 0 removed
+P5 F@v1 -> G@v2 (changes only): 14544 kept, 5 touched (same object, new ctime), 0 replaced (new object), 2 added, 0 removed
+P5 check ok: rc.conf's bytes the same in F@v1 and F@v2 (yes)
+P5 send -i F@v1 F@v2: 44.1 MiB; send -i F@v1 G@v2: 0.2 MiB
+P5 check ok: A: exit (no conflict expected) (0)
+P5 check ok: B: exit (no conflict expected) (0)
+P5 check ok: A: the result's rc.conf has the admin's line (1)
+P5 check ok: A: the result's version is v2's (FreeBSD v2)
+P5 answer: rewritten v2: exit 0, 0 conflicts, 1.38s, 84512148 bytes compared, 7448 pools unchanged; send 44.1 MiB
+P5 answer: changes-only v2: exit 0, 0 conflicts, 1.34s, 524332 bytes compared, 14894 pools unchanged; send 0.2 MiB
+P5 ran in 5s
+
+P7 clones under containers/ inherit their mountpoints; canmount does not inherit; zlake never collides; import order
+P7 check ok: X (/tmp/shtetl-probe/run/containers/X)
+P7 check ok: X/var (/tmp/shtetl-probe/run/containers/X/var)
+P7 check ok: X/usr mounted (placeholder) (no)
+P7 check ok: X/usr/local mounted (yes)
+P7 check ok: X/usr/local (/tmp/shtetl-probe/run/containers/X/usr/local)
+P7 check ok: X's usr/bin (the root dataset's) visible (yes)
+P7 check ok: zrun F mounted (no)
+P7 the zrun root has canmount=noauto; zrun/foundations has 'on default'; zlake F/var has 'on default'
+P7 answer: canmount=noauto on a space root reaches its children: no (on default); 4.3's 'inherited below' holds for mountpoint, not canmount
+P7 check ok: clone of a zlake snapshot into zrun (refused)
+P7 check ok: zlake datasets mounted (0)
+P7 check ok: zlake X's mountpoint (none)
+P7 check ok: renamed X/var (/tmp/shtetl-probe/run/containers/X/var)
+P7 check ok: renamed X/var mounted (yes)
+P7 check ok: renamed X/usr/local mounted (yes)
+P7 check ok: a child mounted before its parent (none)
+P7 check ok: X/usr/local mounted after import (yes)
+P7 check ok: zrun F mounted after import (no)
+P7 answer: clones under containers/ mount by inheritance, the placeholder hides nothing, renames carry mountpoints, and an import mounts parents first: see the checks
+P7 ran in 6s
+
+P8 written@from on a stopped container: mounts, reads with atime on, one real write
+P8 check ok: a: written@from right after the snapshot (0)
+P8 check ok: b: after a remount (0)
+P8 check ok: c: after reads, atime off (0)
+P8 d: after reads with atime on, written@from sums to 59392 bytes
+P8 e: after one real write, written@from sums to 61440 bytes
+P8 answer: written@from stays 0 through a remount (0) and reads with atime off (0); reads with atime on make it 59392; one real write makes it 61440
+P8 ran in 3s
+
+P9 cloning a foundation's children: parent first? zfs clone -p? the placeholder's canmount? what a clone keeps
+P9 check ok: a: child before parent (refused)
+P9 b: clone -p made shprun/containers/B with origin '-'; it is a plain dataset, not a clone
+P9 c: P/usr has canmount=on and the root's usr/bin is hidden
+P9 check ok: d: the root's usr/bin with the placeholder canmount=off (visible)
+P9 check ok: e: usr/local before usr (refused)
+P9 f: D (a clone of readonly, noauto F carrying shtetl:probe): readonly off default;canmount on default;shtetl:probe - -
+P9 answer: children need the parent first (a: refused, e: refused); clone -p makes a plain parent ('-'); the placeholder cloned without canmount=off is canmount=on and the root's usr/bin is hidden
+P9 answer: a clone keeps none of the origin's local properties: readonly off default;canmount on default;shtetl:probe - -
+P9 ran in 3s
+
+P10 shtetl:commit on a save snapshot, sent -i with and without -p; what else -p brings
+P10 shtetl:commit arrived: clone stream no / with -p yes; incremental no / yes; full no / yes
+P10 answer: without -p: clone no, incremental no, full no; with -p: clone yes, incremental yes, full yes; zfs set on the received snapshot works
+P10 ran in 4s
+
+P11 the whole cutover on zrun and its mirror in zlake; does the next save still receive?
+P11 check ok: zlake X-staging is a clone of zlake F@v2 (shplake/foundations/F@v2)
+P11 check ok: zlake X-staging/www is a clone of zlake X/www@s1 (shplake/containers/X/www@s1)
+P11 check ok: the archive's www is a clone of the live www@s1 (shplake/containers/X/www@s1)
+P11 check ok: datasets that took the next incremental (5)
+P11 answer: after a promote mirrored in zlake, the next save received for 5 of 5 datasets; the archive's www has origin shplake/containers/X/www@s1
+P11 ran in 8s
+
+P13 two lake roots in two pools: discovery, the exactly-one-match rule, a mirror in the root holding its foundation
+P13 a: the roots of every imported pool, found in 0.00s
+P13 check ok: run roots (shprun)
+P13 check ok: lake roots (shplake shplake2/shtetl)
+P13 check ok: inherited values are not roots (inherited from shplake2/shtetl)
+P13 check ok: b: matches for foundations/F (1)
+P13 check ok: c: matches for foundations/F (2)
+P13 check ok: d: Y's mirror is a clone of G in the second root (shplake2/shtetl/foundations/G@v1)
+P13 check ok: e: a clone stream into a root without its origin (refused)
+P13 answer: discovery by local shtetl:space finds pool and dataset roots alike; one match and two are told apart; a mirror lands only in the root holding its foundation (elsewhere: refused)
+P13 ran in 4s
+
+P14 replay s1..s3 onto F@v2: step 1 clone form, steps 2-3 dataset form with --allow-unrelated --base
+P14 the dataset: 24.0 MiB,    14549 names
+P14 check ok: step 1 exit (0)
+P14 the derived base is shprun/foundations/F@v1; step 2 against it has 1 conflict groups
+P14 check ok: step 2 exit (0)
+P14 check ok: step 3 exit (0)
+P14 check ok: rc.conf has line A once (1)
+P14 check ok: rc.conf has line B once (1)
+P14 check ok: the version is v2's (FreeBSD v2)
+P14 check ok: the removed file is gone (gone)
+P14 check ok: the renamed file is renamed (yes)
+P14 check ok: the ten s2 edits are there (10)
+P14 check ok: depth 1 exit (0)
+P14 answer: the derived base would make 1 conflict groups of step 2; --base X@s1 makes 0 (exit 0)
+P14 answer: step 1 (prune on): 1.41s, 524332 bytes compared, 14890 pools unchanged
+P14 answer: step 2 (prune off): 1.65s, 168419926 bytes compared; step 3: 1.68s, 168643916 bytes compared; the dataset is 24.0 MiB (25118208 bytes)
+P14 answer: depth 1 (one rebase of s3): 1.38s, 524332 bytes compared, 14876 pools unchanged
+P14 ran in 8s
+
+P16 zrun F (noauto, readonly, inherited mountpoint) mounted for an update and unmounted after; the usr placeholder refused as a side and cloned
+P16 check ok: zrun F is not mounted after the receive (no)
+P16 check ok: zrun F's mountpoint is inherited (inherited from shprun/foundations)
+P16 zrun F mounted with options: ro,noatime,nfsv4acls
+P16 check ok: zrun F mounted read-only (1)
+P16 check ok: the placeholder stays unmounted (no)
+P16 check ok: root exit (0)
+P16 check ok: usr as a side: refused (2)
+P16 check ok: usr/local exit (0)
+P16 check ok: var exit (0)
+P16 check ok: usr/local mounted at (/tmp/shtetl-probe/run/containers/X-staging/usr/local)
+P16 check ok: the staging root's usr/bin is visible (yes)
+P16 check ok: zrun F datasets still mounted (0)
+P16 answer: the zrun foundation mounts read-only on demand (ro,noatime,nfsv4acls) and unmounts after: yes
+P16 answer: the canmount=off placeholder as a side: exit 2 (2 expected), and cloning it instead works
+P16 ran in 8s
+
+13 ran, 0 errors, 0 skipped

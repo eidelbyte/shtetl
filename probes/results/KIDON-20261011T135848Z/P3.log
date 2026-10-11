@@ -1,0 +1,84 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+# zfs set shtetl:space=lake shplake
+# zfs create shplake/foundations
+# zfs create shplake/containers
+# zfs create -p shplake/archive/containers
+# zfs create shplake/foundations/F
+# zfs create -o canmount=off shplake/foundations/F/usr
+# zfs create shplake/foundations/F/usr/local
+# zfs create shplake/foundations/F/var
+# zfs set mountpoint=/tmp/shtetl-probe/build/F shplake/foundations/F
+# zfs inherit mountpoint shplake/foundations/F
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v1' shplake/foundations/F@v1
+# zfs send shplake/foundations/F@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F
+# zfs send shplake/foundations/F/usr@v1 | zfs recv -u -o readonly=on -o canmount=off shprun/foundations/F/usr
+# zfs send shplake/foundations/F/usr/local@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/usr/local
+# zfs send shplake/foundations/F/var@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/var
+# zfs clone shprun/foundations/F@v1 shprun/containers/X
+# zfs clone -o canmount=off shprun/foundations/F/usr@v1 shprun/containers/X/usr
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/containers/X/usr/local
+# zfs clone shprun/foundations/F/var@v1 shprun/containers/X/var
+# zfs create shprun/containers/X/www
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=first save' shprun/containers/X@s1
+# zfs send -i shprun/foundations/F@v1 shprun/containers/X@s1 | zfs recv -u shplake/containers/X
+# zfs send -i shprun/foundations/F/usr@v1 shprun/containers/X/usr@s1 | zfs recv -u shplake/containers/X/usr
+# zfs send -i shprun/foundations/F/usr/local@v1 shprun/containers/X/usr/local@s1 | zfs recv -u shplake/containers/X/usr/local
+# zfs send -i shprun/foundations/F/var@v1 shprun/containers/X/var@s1 | zfs recv -u shplake/containers/X/var
+# zfs send shprun/containers/X/www@s1 | zfs recv -u shplake/containers/X/www
+# zfs set mountpoint=/tmp/shtetl-probe/build/F shplake/foundations/F
+# zfs inherit mountpoint shplake/foundations/F
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v2' shplake/foundations/F@v2
+# zfs send -i @v1 shplake/foundations/F@v2 | zfs recv -u shprun/foundations/F
+# zfs send -i @v1 shplake/foundations/F/usr@v2 | zfs recv -u shprun/foundations/F/usr
+# zfs send -i @v1 shplake/foundations/F/usr/local@v2 | zfs recv -u shprun/foundations/F/usr/local
+# zfs send -i @v1 shplake/foundations/F/var@v2 | zfs recv -u shprun/foundations/F/var
+== the update: a stand-in staging tree on F@v2, www cloned from s1
+# zfs clone shprun/foundations/F@v2 shprun/containers/X-staging
+# zfs clone -o canmount=off shprun/foundations/F/usr@v2 shprun/containers/X-staging/usr
+# zfs clone shprun/foundations/F/usr/local@v2 shprun/containers/X-staging/usr/local
+# zfs clone shprun/foundations/F/var@v2 shprun/containers/X-staging/var
+# zfs clone shprun/containers/X/www@s1 shprun/containers/X-staging/www
+== cutover: promote, destroy the old X, rename
+# zfs promote shprun/containers/X-staging/www
+# zfs list -H -t snapshot -o name,guid,userrefs,clones -r shprun/containers/X-staging/www
+shprun/containers/X-staging/www@s1	3678671255569042139	0	shprun/containers/X/www
+# zfs destroy -r shprun/containers/X
+# zfs rename shprun/containers/X-staging shprun/containers/X
+# zfs get -r -t filesystem -o name,property,value,source mountpoint,canmount,mounted,readonly,origin shprun/containers/X
+NAME                           PROPERTY    VALUE                                         SOURCE
+shprun/containers/X            mountpoint  /tmp/shtetl-probe/run/containers/X            inherited from shprun/containers
+shprun/containers/X            canmount    on                                            default
+shprun/containers/X            mounted     yes                                           -
+shprun/containers/X            readonly    off                                           default
+shprun/containers/X            origin      shprun/foundations/F@v2                       -
+shprun/containers/X/usr        mountpoint  /tmp/shtetl-probe/run/containers/X/usr        inherited from shprun/containers
+shprun/containers/X/usr        canmount    off                                           local
+shprun/containers/X/usr        mounted     no                                            -
+shprun/containers/X/usr        readonly    off                                           default
+shprun/containers/X/usr        origin      shprun/foundations/F/usr@v2                   -
+shprun/containers/X/usr/local  mountpoint  /tmp/shtetl-probe/run/containers/X/usr/local  inherited from shprun/containers
+shprun/containers/X/usr/local  canmount    on                                            default
+shprun/containers/X/usr/local  mounted     yes                                           -
+shprun/containers/X/usr/local  readonly    off                                           default
+shprun/containers/X/usr/local  origin      shprun/foundations/F/usr/local@v2             -
+shprun/containers/X/var        mountpoint  /tmp/shtetl-probe/run/containers/X/var        inherited from shprun/containers
+shprun/containers/X/var        canmount    on                                            default
+shprun/containers/X/var        mounted     yes                                           -
+shprun/containers/X/var        readonly    off                                           default
+shprun/containers/X/var        origin      shprun/foundations/F/var@v2                   -
+shprun/containers/X/www        mountpoint  /tmp/shtetl-probe/run/containers/X/www        inherited from shprun/containers
+shprun/containers/X/www        canmount    on                                            default
+shprun/containers/X/www        mounted     yes                                           -
+shprun/containers/X/www        readonly    off                                           default
+shprun/containers/X/www        origin      -                                             -
+P3 check ok: s1 is on the promoted www with its guid (3678671255569042139)
+== the next save, sent -i from s1 into zlake's www
+# zfs snapshot -o shtetl:kind=save shprun/containers/X/www@s2
+# zfs send -i @s1 shprun/containers/X/www@s2 | zfs recv -u shplake/containers/X/www
+P3 check ok: send -i www@s1 www@s2 from the promoted www (received)
+# zfs list -H -t snapshot -o name,guid,userrefs,clones -r shplake/containers/X/www
+shplake/containers/X/www@s1	3678671255569042139	0	-
+shplake/containers/X/www@s2	7905513891349144782	0	-
+P3 answer: promote keeps s1 (guid kept) and the next incremental is received

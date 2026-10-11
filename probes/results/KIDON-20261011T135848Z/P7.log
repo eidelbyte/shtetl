@@ -1,0 +1,237 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+# zfs set shtetl:space=lake shplake
+# zfs create shplake/foundations
+# zfs create shplake/containers
+# zfs create -p shplake/archive/containers
+# zfs create shplake/foundations/F
+# zfs create -o canmount=off shplake/foundations/F/usr
+# zfs create shplake/foundations/F/usr/local
+# zfs create shplake/foundations/F/var
+# zfs set mountpoint=/tmp/shtetl-probe/build/F shplake/foundations/F
+# zfs inherit mountpoint shplake/foundations/F
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v1' shplake/foundations/F@v1
+# zfs send shplake/foundations/F@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F
+# zfs send shplake/foundations/F/usr@v1 | zfs recv -u -o readonly=on -o canmount=off shprun/foundations/F/usr
+# zfs send shplake/foundations/F/usr/local@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/usr/local
+# zfs send shplake/foundations/F/var@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/var
+# zfs clone shprun/foundations/F@v1 shprun/containers/X
+# zfs clone -o canmount=off shprun/foundations/F/usr@v1 shprun/containers/X/usr
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/containers/X/usr/local
+# zfs clone shprun/foundations/F/var@v1 shprun/containers/X/var
+# zfs create shprun/containers/X/www
+# zfs get -r -t filesystem -o name,property,value,source mountpoint,canmount,mounted,readonly,origin shprun
+NAME                            PROPERTY    VALUE                                          SOURCE
+shprun                          mountpoint  none                                           local
+shprun                          canmount    noauto                                         local
+shprun                          mounted     no                                             -
+shprun                          readonly    off                                            default
+shprun                          origin      -                                              -
+shprun/containers               mountpoint  /tmp/shtetl-probe/run/containers               local
+shprun/containers               canmount    on                                             local
+shprun/containers               mounted     yes                                            -
+shprun/containers               readonly    off                                            default
+shprun/containers               origin      -                                              -
+shprun/containers/X             mountpoint  /tmp/shtetl-probe/run/containers/X             inherited from shprun/containers
+shprun/containers/X             canmount    on                                             default
+shprun/containers/X             mounted     yes                                            -
+shprun/containers/X             readonly    off                                            default
+shprun/containers/X             origin      shprun/foundations/F@v1                        -
+shprun/containers/X/usr         mountpoint  /tmp/shtetl-probe/run/containers/X/usr         inherited from shprun/containers
+shprun/containers/X/usr         canmount    off                                            local
+shprun/containers/X/usr         mounted     no                                             -
+shprun/containers/X/usr         readonly    off                                            default
+shprun/containers/X/usr         origin      shprun/foundations/F/usr@v1                    -
+shprun/containers/X/usr/local   mountpoint  /tmp/shtetl-probe/run/containers/X/usr/local   inherited from shprun/containers
+shprun/containers/X/usr/local   canmount    on                                             default
+shprun/containers/X/usr/local   mounted     yes                                            -
+shprun/containers/X/usr/local   readonly    off                                            default
+shprun/containers/X/usr/local   origin      shprun/foundations/F/usr/local@v1              -
+shprun/containers/X/var         mountpoint  /tmp/shtetl-probe/run/containers/X/var         inherited from shprun/containers
+shprun/containers/X/var         canmount    on                                             default
+shprun/containers/X/var         mounted     yes                                            -
+shprun/containers/X/var         readonly    off                                            default
+shprun/containers/X/var         origin      shprun/foundations/F/var@v1                    -
+shprun/containers/X/www         mountpoint  /tmp/shtetl-probe/run/containers/X/www         inherited from shprun/containers
+shprun/containers/X/www         canmount    on                                             default
+shprun/containers/X/www         mounted     yes                                            -
+shprun/containers/X/www         readonly    off                                            default
+shprun/containers/X/www         origin      -                                              -
+shprun/foundations              mountpoint  /tmp/shtetl-probe/run/foundations              local
+shprun/foundations              canmount    on                                             default
+shprun/foundations              mounted     yes                                            -
+shprun/foundations              readonly    off                                            default
+shprun/foundations              origin      -                                              -
+shprun/foundations/F            mountpoint  /tmp/shtetl-probe/run/foundations/F            inherited from shprun/foundations
+shprun/foundations/F            canmount    noauto                                         local
+shprun/foundations/F            mounted     no                                             -
+shprun/foundations/F            readonly    on                                             local
+shprun/foundations/F            origin      -                                              -
+shprun/foundations/F/usr        mountpoint  /tmp/shtetl-probe/run/foundations/F/usr        inherited from shprun/foundations
+shprun/foundations/F/usr        canmount    off                                            local
+shprun/foundations/F/usr        mounted     no                                             -
+shprun/foundations/F/usr        readonly    on                                             local
+shprun/foundations/F/usr        origin      -                                              -
+shprun/foundations/F/usr/local  mountpoint  /tmp/shtetl-probe/run/foundations/F/usr/local  inherited from shprun/foundations
+shprun/foundations/F/usr/local  canmount    noauto                                         local
+shprun/foundations/F/usr/local  mounted     no                                             -
+shprun/foundations/F/usr/local  readonly    on                                             local
+shprun/foundations/F/usr/local  origin      -                                              -
+shprun/foundations/F/var        mountpoint  /tmp/shtetl-probe/run/foundations/F/var        inherited from shprun/foundations
+shprun/foundations/F/var        canmount    noauto                                         local
+shprun/foundations/F/var        mounted     no                                             -
+shprun/foundations/F/var        readonly    on                                             local
+shprun/foundations/F/var        origin      -                                              -
+# zfs get -r -t filesystem -o name,property,value,source canmount shprun shplake
+NAME                             PROPERTY  VALUE     SOURCE
+shplake                          canmount  noauto    local
+shplake/archive                  canmount  on        default
+shplake/archive/containers       canmount  on        default
+shplake/containers               canmount  on        default
+shplake/foundations              canmount  on        default
+shplake/foundations/F            canmount  on        default
+shplake/foundations/F/usr        canmount  off       local
+shplake/foundations/F/usr/local  canmount  on        default
+shplake/foundations/F/var        canmount  on        default
+shprun                           canmount  noauto    local
+shprun/containers                canmount  on        local
+shprun/containers/X              canmount  on        default
+shprun/containers/X/usr          canmount  off       local
+shprun/containers/X/usr/local    canmount  on        default
+shprun/containers/X/var          canmount  on        default
+shprun/containers/X/www          canmount  on        default
+shprun/foundations               canmount  on        default
+shprun/foundations/F             canmount  noauto    local
+shprun/foundations/F/usr         canmount  off       local
+shprun/foundations/F/usr/local   canmount  noauto    local
+shprun/foundations/F/var         canmount  noauto    local
+== a: where X's datasets mount
+P7 check ok: X (/tmp/shtetl-probe/run/containers/X)
+P7 check ok: X/var (/tmp/shtetl-probe/run/containers/X/var)
+P7 check ok: X/usr mounted (placeholder) (no)
+P7 check ok: X/usr/local mounted (yes)
+P7 check ok: X/usr/local (/tmp/shtetl-probe/run/containers/X/usr/local)
+P7 check ok: X's usr/bin (the root dataset's) visible (yes)
+P7 check ok: zrun F mounted (no)
+== b: canmount on a space root and its children
+P7 the zrun root has canmount=noauto; zrun/foundations has 'on default'; zlake F/var has 'on default'
+P7 answer: canmount=noauto on a space root reaches its children: no (on default); 4.3's 'inherited below' holds for mountpoint, not canmount
+== c: a clone across pools
+# zfs clone shplake/foundations/F@v1 shprun/containers/Y
+cannot create 'shprun/containers/Y': source and target pools differ
+-> exit 1
+P7 check ok: clone of a zlake snapshot into zrun (refused)
+== d: zlake's mirror
+# zfs snapshot -r -o shtetl:kind=save -o shtetl:commit=s1 shprun/containers/X@s1
+# zfs send -i shprun/foundations/F@v1 shprun/containers/X@s1 | zfs recv -u shplake/containers/X
+# zfs send -i shprun/foundations/F/usr@v1 shprun/containers/X/usr@s1 | zfs recv -u shplake/containers/X/usr
+# zfs send -i shprun/foundations/F/usr/local@v1 shprun/containers/X/usr/local@s1 | zfs recv -u shplake/containers/X/usr/local
+# zfs send -i shprun/foundations/F/var@v1 shprun/containers/X/var@s1 | zfs recv -u shplake/containers/X/var
+# zfs send shprun/containers/X/www@s1 | zfs recv -u shplake/containers/X/www
+# zfs get -r -t filesystem -o name,property,value,source mountpoint,canmount,mounted,readonly,origin shplake/containers/X
+NAME                            PROPERTY    VALUE                               SOURCE
+shplake/containers/X            mountpoint  none                                inherited from shplake
+shplake/containers/X            canmount    on                                  default
+shplake/containers/X            mounted     no                                  -
+shplake/containers/X            readonly    off                                 default
+shplake/containers/X            origin      shplake/foundations/F@v1            -
+shplake/containers/X/usr        mountpoint  none                                inherited from shplake
+shplake/containers/X/usr        canmount    on                                  default
+shplake/containers/X/usr        mounted     no                                  -
+shplake/containers/X/usr        readonly    off                                 default
+shplake/containers/X/usr        origin      shplake/foundations/F/usr@v1        -
+shplake/containers/X/usr/local  mountpoint  none                                inherited from shplake
+shplake/containers/X/usr/local  canmount    on                                  default
+shplake/containers/X/usr/local  mounted     no                                  -
+shplake/containers/X/usr/local  readonly    off                                 default
+shplake/containers/X/usr/local  origin      shplake/foundations/F/usr/local@v1  -
+shplake/containers/X/var        mountpoint  none                                inherited from shplake
+shplake/containers/X/var        canmount    on                                  default
+shplake/containers/X/var        mounted     no                                  -
+shplake/containers/X/var        readonly    off                                 default
+shplake/containers/X/var        origin      shplake/foundations/F/var@v1        -
+shplake/containers/X/www        mountpoint  none                                inherited from shplake
+shplake/containers/X/www        canmount    on                                  default
+shplake/containers/X/www        mounted     no                                  -
+shplake/containers/X/www        readonly    off                                 default
+shplake/containers/X/www        origin      -                                   -
+P7 check ok: zlake datasets mounted (0)
+P7 check ok: zlake X's mountpoint (none)
+== e: a rename carries the mountpoints (7.9 step 5)
+# zfs clone shprun/foundations/F@v1 shprun/containers/X-staging
+# zfs clone -o canmount=off shprun/foundations/F/usr@v1 shprun/containers/X-staging/usr
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/containers/X-staging/usr/local
+# zfs clone shprun/foundations/F/var@v1 shprun/containers/X-staging/var
+# zfs create shprun/containers/X-staging/www
+# zfs destroy -r shprun/containers/X
+# zfs rename shprun/containers/X-staging shprun/containers/X
+# zfs get -r -t filesystem -o name,property,value,source mountpoint,canmount,mounted,readonly,origin shprun/containers/X
+NAME                           PROPERTY    VALUE                                         SOURCE
+shprun/containers/X            mountpoint  /tmp/shtetl-probe/run/containers/X            inherited from shprun/containers
+shprun/containers/X            canmount    on                                            default
+shprun/containers/X            mounted     yes                                           -
+shprun/containers/X            readonly    off                                           default
+shprun/containers/X            origin      shprun/foundations/F@v1                       -
+shprun/containers/X/usr        mountpoint  /tmp/shtetl-probe/run/containers/X/usr        inherited from shprun/containers
+shprun/containers/X/usr        canmount    off                                           local
+shprun/containers/X/usr        mounted     no                                            -
+shprun/containers/X/usr        readonly    off                                           default
+shprun/containers/X/usr        origin      shprun/foundations/F/usr@v1                   -
+shprun/containers/X/usr/local  mountpoint  /tmp/shtetl-probe/run/containers/X/usr/local  inherited from shprun/containers
+shprun/containers/X/usr/local  canmount    on                                            default
+shprun/containers/X/usr/local  mounted     yes                                           -
+shprun/containers/X/usr/local  readonly    off                                           default
+shprun/containers/X/usr/local  origin      shprun/foundations/F/usr/local@v1             -
+shprun/containers/X/var        mountpoint  /tmp/shtetl-probe/run/containers/X/var        inherited from shprun/containers
+shprun/containers/X/var        canmount    on                                            default
+shprun/containers/X/var        mounted     yes                                           -
+shprun/containers/X/var        readonly    off                                           default
+shprun/containers/X/var        origin      shprun/foundations/F/var@v1                   -
+shprun/containers/X/www        mountpoint  /tmp/shtetl-probe/run/containers/X/www        inherited from shprun/containers
+shprun/containers/X/www        canmount    on                                            default
+shprun/containers/X/www        mounted     yes                                           -
+shprun/containers/X/www        readonly    off                                           default
+shprun/containers/X/www        origin      -                                             -
+P7 check ok: renamed X/var (/tmp/shtetl-probe/run/containers/X/var)
+P7 check ok: renamed X/var mounted (yes)
+P7 check ok: renamed X/usr/local mounted (yes)
+== f: export and import; the order the import mounts in
+# zpool export shprun
+# zpool import -d /dev/md1 shprun
+# mount -p
+zbereshit/systems/kidon	/			zfs	rw,noatime,nfsv4acls 	0 0
+devfs			/dev			devfs	rw		0 0
+/dev/gpt/efiboot0	/boot/efi		msdosfs	rw		2 2
+zbereshit/systems/kidon/var /var			zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/tmp		/tmp			zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/containers	/containers		zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/home		/home			zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/mishkan	/zbereshit/mishkan	zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/containers/build123d /containers/build123d	zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/containers/nginx /containers/nginx	zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/containers/recipya /containers/recipya	zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/home/miri	/home/miri		zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/containers/recipya/.git /containers/recipya/.git zfs	rw,noatime,nfsv4acls 	0 0
+zbereshit/containers/nginx/.git /containers/nginx/.git	zfs	rw,noatime,nfsv4acls 	0 0
+zrm			/tmp/zrm-mnt		zfs	rw,nfsv4acls 	0 0
+zrm/mb			/tmp/zrm-mnt/mb		zfs	rw,nfsv4acls 	0 0
+zrm/mf			/tmp/zrm-mnt/mf		zfs	rw,nfsv4acls 	0 0
+zrm/mo			/tmp/zrm-mnt/mo		zfs	rw,nfsv4acls 	0 0
+zrm/mrebased		/tmp/zrm-mnt/mrebased	zfs	ro,nfsv4acls 	0 0
+shprun/foundations	/tmp/shtetl-probe/run/foundations zfs	rw,noatime,nfsv4acls 	0 0
+shprun/containers	/tmp/shtetl-probe/run/containers zfs	rw,noatime,nfsv4acls 	0 0
+shprun/containers/X	/tmp/shtetl-probe/run/containers/X zfs	rw,noatime,nfsv4acls 	0 0
+shprun/containers/X/var	/tmp/shtetl-probe/run/containers/X/var zfs	rw,noatime,nfsv4acls 	0 0
+shprun/containers/X/www	/tmp/shtetl-probe/run/containers/X/www zfs	rw,noatime,nfsv4acls 	0 0
+shprun/containers/X/usr/local /tmp/shtetl-probe/run/containers/X/usr/local zfs	rw,noatime,nfsv4acls 	0 0
+/tmp/shtetl-probe/run/foundations
+/tmp/shtetl-probe/run/containers
+/tmp/shtetl-probe/run/containers/X
+/tmp/shtetl-probe/run/containers/X/var
+/tmp/shtetl-probe/run/containers/X/www
+/tmp/shtetl-probe/run/containers/X/usr/local
+P7 check ok: a child mounted before its parent (none)
+P7 check ok: X/usr/local mounted after import (yes)
+P7 check ok: zrun F mounted after import (no)
+P7 answer: clones under containers/ mount by inheritance, the placeholder hides nothing, renames carry mountpoints, and an import mounts parents first: see the checks

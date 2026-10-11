@@ -1,0 +1,141 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+# zfs create shprun/foundations/F
+# tar -cf - -C /  usr/include usr/share/man | tar -xpf - -C /tmp/shtetl-probe/run/foundations/F
+# zfs snapshot shprun/foundations/F@v1
+# zfs list -o name,used,referenced shprun/foundations/F
+NAME                   USED  REFER
+shprun/foundations/F  23.9M  23.9M
+# zfs clone shprun/foundations/F@v1 shprun/containers/X
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=rc.conf edited' shprun/containers/X@s1
+== v2 in place: every file written again from v1, then the real changes
+# tar -cf - -C /tmp/shtetl-probe/run/foundations/F/.zfs/snapshot/v1 . | tar -xpUf - -C /tmp/shtetl-probe/run/foundations/F
+# zfs snapshot shprun/foundations/F@v2
+== G: the real changes alone
+# zfs clone shprun/foundations/F@v1 shprun/foundations/G
+# zfs snapshot shprun/foundations/G@v2
+  touched  .
+  touched  ./var
+  touched  ./var/log
+  replaced ./var/log/messages
+  touched  ./var/db
+  added    ./var/db/new-v2
+  replaced ./var/db/README
+  touched  ./lib
+  replaced ./lib/libc.so.7
+  touched  ./etc
+  replaced ./etc/rc.conf
+  replaced ./etc/version
+  replaced ./etc/hosts
+  replaced ./etc/master.passwd
+  touched  ./bin
+  replaced ./bin/sh
+  touched  ./usr
+  touched  ./usr/local
+  touched  ./usr/local/etc
+  replaced ./usr/local/etc/pkg.conf
+  touched  ./usr/share
+  replaced ./usr/share/man/man1/printf.1.gz
+  replaced ./usr/share/man/man1/do.1.gz
+  replaced ./usr/share/man/man1/uhsoctl.1.gz
+  replaced ./usr/share/man/man1/llvm-ranlib.1.gz
+  replaced ./usr/share/man/man1/calendar.1.gz
+  replaced ./usr/share/man/man1/nm.1.gz
+  replaced ./usr/share/man/man1/cksum.1.gz
+  replaced ./usr/share/man/man1/ree.1.gz
+  replaced ./usr/share/man/man1/zcmp.1.gz
+  replaced ./usr/share/man/man1/uuencode.1.gz
+  replaced ./usr/share/man/man1/tar.1.gz
+  replaced ./usr/share/man/man1/ckdist.1.gz
+  replaced ./usr/share/man/man1/logins.1.gz
+  replaced ./usr/share/man/man1/gzip.1.gz
+  replaced ./usr/share/man/man1/switch.1.gz
+  replaced ./usr/share/man/man1/leave.1.gz
+  replaced ./usr/share/man/man1/onintr.1.gz
+  replaced ./usr/share/man/man1/genl.1.gz
+  replaced ./usr/share/man/man1/vi.1.gz
+  replaced ./usr/share/man/man1/hashstat.1.gz
+  replaced ./usr/share/man/man1/slogin.1.gz
+  touched  ./usr/share/misc
+  added    ./usr/share/misc/new-v2
+  touched  ./usr/bin
+F@v1 -> F@v2 (rewritten): 233 kept, 13 touched (same object, new ctime), 14303 replaced (new object), 2 added, 0 removed
+  touched  ./var/db
+  added    ./var/db/new-v2
+  touched  ./etc/version
+  touched  ./bin/sh
+  touched  ./usr/local/etc/pkg.conf
+  touched  ./usr/share/misc
+  added    ./usr/share/misc/new-v2
+F@v1 -> G@v2 (changes only): 14544 kept, 5 touched (same object, new ctime), 0 replaced (new object), 2 added, 0 removed
+P5 F@v1 -> F@v2 (rewritten): 233 kept, 13 touched (same object, new ctime), 14303 replaced (new object), 2 added, 0 removed
+P5 F@v1 -> G@v2 (changes only): 14544 kept, 5 touched (same object, new ctime), 0 replaced (new object), 2 added, 0 removed
+P5 check ok: rc.conf's bytes the same in F@v1 and F@v2 (yes)
+P5 send -i F@v1 F@v2: 44.1 MiB; send -i F@v1 G@v2: 0.2 MiB
+== A: X@s1 onto the rewritten F@v2
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T135848Z/P5-a.manifest --from shprun/containers/X@s1 --onto shprun/foundations/F@v2 --result shprun/containers/X-a
+zfs_rebase: the base is shprun/foundations/F@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T135848Z/P5-a.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d5972c717e0e
+zfs_rebase: 7448 pools unchanged
+zfs_rebase: 84512148 bytes compared
+zfs_rebase: applied 0 rm 0 ln 2 cp 0 dup 1 write, 71 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-a is at applying1, held under zr-d5972c717e0e
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-a: the manifest, 3 actions
+zfs_rebase:   done 3, first /etc/rc.conf
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-a is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-a or zfs set mountpoint=PATH shprun/containers/X-a
+zfs_rebase: released zr-d5972c717e0e on shprun/foundations/F@v1
+zfs_rebase: released zr-d5972c717e0e on shprun/containers/X@s1
+zfs_rebase: released zr-d5972c717e0e on shprun/foundations/F@v2
+zfs_rebase: the record is off shprun/containers/X-a
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-a
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T135848Z/P5-a.manifest
+-> exit 0 in 1.38s
+P5 check ok: A: exit (no conflict expected) (0)
+== B: X@s1 onto G@v2
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261011T135848Z/P5-b.manifest --from shprun/containers/X@s1 --onto shprun/foundations/G@v2 --result shprun/containers/X-b
+zfs_rebase: the base is shprun/foundations/F@v1
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261011T135848Z/P5-b.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d5972c737e1a
+zfs_rebase: 14894 pools unchanged
+zfs_rebase: 524332 bytes compared
+zfs_rebase: applied 0 rm 0 ln 2 cp 0 dup 1 write, 71 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-b is at applying1, held under zr-d5972c737e1a
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-b: the manifest, 3 actions
+zfs_rebase:   done 3, first /etc/rc.conf
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-b is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-b or zfs set mountpoint=PATH shprun/containers/X-b
+zfs_rebase: released zr-d5972c737e1a on shprun/foundations/F@v1
+zfs_rebase: released zr-d5972c737e1a on shprun/containers/X@s1
+zfs_rebase: released zr-d5972c737e1a on shprun/foundations/G@v2
+zfs_rebase: the record is off shprun/containers/X-b
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-b
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261011T135848Z/P5-b.manifest
+-> exit 0 in 1.34s
+P5 check ok: B: exit (no conflict expected) (0)
+# zfs set readonly=off shprun/containers/X-a
+# zfs inherit mountpoint shprun/containers/X-a
+P5 check ok: A: the result's rc.conf has the admin's line (1)
+P5 check ok: A: the result's version is v2's (FreeBSD v2)
+P5 answer: rewritten v2: exit 0, 0 conflicts, 1.38s, 84512148 bytes compared, 7448 pools unchanged; send 44.1 MiB
+P5 answer: changes-only v2: exit 0, 0 conflicts, 1.34s, 524332 bytes compared, 14894 pools unchanged; send 0.2 MiB

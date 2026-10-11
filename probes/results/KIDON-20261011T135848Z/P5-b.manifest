@@ -1,0 +1,30 @@
+#rebase-manifest 5
+#result shprun/containers/X-b
+#form clone
+#base shprun/foundations/F@v1 3964139894043280919
+#from shprun/containers/X@s1 17745607902981095360
+#onto shprun/foundations/G@v2 7029878633162685160
+#made -
+#tag zr-d5972c737e1a
+#take -
+#written 2026-10-11T13:59:22Z
+#mode strict
+#actions 3
+#conflicts 0
+/
+    etc/
+        rc.conf write /etc/rc.conf
+        ..
+    usr/
+        local/
+            etc/
+                app-s1.conf cp /usr/local/etc/app-s1.conf
+                ..
+            ..
+        ..
+    var/
+        log/
+            admin-s1.log cp /var/log/admin-s1.log
+            ..
+        ..
+    ..

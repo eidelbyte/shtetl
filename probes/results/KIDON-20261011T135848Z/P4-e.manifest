@@ -1,0 +1,18 @@
+#rebase-manifest 5
+#result s2
+#form dataset
+#base shprun/containers/X@s2 2772880504473992729
+#from shprun/containers/X@s3 9536540792692191906
+#onto shprun/containers/X-staging@s2 9173215211657387828
+#presnap shprun/containers/X-staging@s2
+#readonly off
+#canmount on
+#made -
+#tag zr-d5972c657d49
+#take -
+#written 2026-10-11T13:59:14Z
+#mode strict
+#actions 0
+#conflicts 0
+/
+    ..

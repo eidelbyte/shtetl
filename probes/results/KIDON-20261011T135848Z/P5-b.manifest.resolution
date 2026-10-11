@@ -1,0 +1,9 @@
+#rebase-resolution 5
+#base shprun/foundations/F@v1 3964139894043280919
+#from shprun/containers/X@s1 17745607902981095360
+#onto shprun/foundations/G@v2 7029878633162685160
+#mode strict
+#names 0
+#unanswered 0
+/
+    ..

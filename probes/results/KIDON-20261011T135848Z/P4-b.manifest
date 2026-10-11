@@ -1,0 +1,28 @@
+#rebase-manifest 5
+#result s1
+#form dataset
+#base shprun/containers/X@s1 14478817622477013857
+#from shprun/containers/X@s2 2772880504473992729
+#onto shprun/containers/X-staging@s1 9548570218435845216
+#presnap shprun/containers/X-staging@s1
+#readonly off
+#canmount on
+#made -
+#tag zr-d5972c5d7d1e
+#take -
+#written 2026-10-11T13:59:11Z
+#mode strict
+#actions 2
+#conflicts 0
+/
+    etc/
+        rc.conf write /etc/rc.conf
+        ..
+    usr/
+        local/
+            etc/
+                app-s2.conf cp /usr/local/etc/app-s2.conf
+                ..
+            ..
+        ..
+    ..

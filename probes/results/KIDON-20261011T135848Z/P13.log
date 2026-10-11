@@ -1,0 +1,68 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+# zfs set shtetl:space=lake shplake
+# zfs create shplake/foundations
+# zfs create shplake/containers
+# zfs create -p shplake/archive/containers
+# zfs create shplake2/shtetl
+# zfs set shtetl:space=lake shplake2/shtetl
+# zfs create shplake2/shtetl/foundations
+# zfs create shplake2/shtetl/containers
+# zfs create -p shplake2/shtetl/archive/containers
+== a: discovery
+# zfs get -H -s local -t filesystem -o name,value shtetl:space
+shplake	lake
+shplake2/shtetl	lake
+shprun	run
+-> exit 0 in 0.00s
+P13 a: the roots of every imported pool, found in 0.00s
+P13 check ok: run roots (shprun)
+P13 check ok: lake roots (shplake shplake2/shtetl)
+P13 check ok: inherited values are not roots (inherited from shplake2/shtetl)
+== b: F in one lake root: one match
+# zfs create shplake/foundations/F
+# zfs create -o canmount=off shplake/foundations/F/usr
+# zfs create shplake/foundations/F/usr/local
+# zfs create shplake/foundations/F/var
+# zfs set mountpoint=/tmp/shtetl-probe/build/F shplake/foundations/F
+# zfs inherit mountpoint shplake/foundations/F
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v1' shplake/foundations/F@v1
+# lookup lake foundations/F
+shplake/foundations/F
+P13 check ok: b: matches for foundations/F (1)
+== c: F in both lake roots: two matches, the error case
+# zfs create shplake2/shtetl/foundations/F
+# lookup lake foundations/F
+shplake/foundations/F
+shplake2/shtetl/foundations/F
+P13 check ok: c: matches for foundations/F (2)
+# zfs destroy -r shplake2/shtetl/foundations/F
+== d: G in the second root, Y on it, Y's mirror in G's root
+# zfs create shplake2/shtetl/foundations/G
+# zfs create -o canmount=off shplake2/shtetl/foundations/G/usr
+# zfs create shplake2/shtetl/foundations/G/usr/local
+# zfs create shplake2/shtetl/foundations/G/var
+# zfs set mountpoint=/tmp/shtetl-probe/build/G shplake2/shtetl/foundations/G
+# zfs inherit mountpoint shplake2/shtetl/foundations/G
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v1' shplake2/shtetl/foundations/G@v1
+# zfs send shplake2/shtetl/foundations/G@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/G
+# zfs send shplake2/shtetl/foundations/G/usr@v1 | zfs recv -u -o readonly=on -o canmount=off shprun/foundations/G/usr
+# zfs send shplake2/shtetl/foundations/G/usr/local@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/G/usr/local
+# zfs send shplake2/shtetl/foundations/G/var@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/G/var
+# zfs clone shprun/foundations/G@v1 shprun/containers/Y
+# zfs clone -o canmount=off shprun/foundations/G/usr@v1 shprun/containers/Y/usr
+# zfs clone shprun/foundations/G/usr/local@v1 shprun/containers/Y/usr/local
+# zfs clone shprun/foundations/G/var@v1 shprun/containers/Y/var
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=first save' shprun/containers/Y@s1
+# zfs send -i shprun/foundations/G@v1 shprun/containers/Y@s1 | zfs recv -u shplake2/shtetl/containers/Y
+# zfs send -i shprun/foundations/G/usr@v1 shprun/containers/Y/usr@s1 | zfs recv -u shplake2/shtetl/containers/Y/usr
+# zfs send -i shprun/foundations/G/usr/local@v1 shprun/containers/Y/usr/local@s1 | zfs recv -u shplake2/shtetl/containers/Y/usr/local
+# zfs send -i shprun/foundations/G/var@v1 shprun/containers/Y/var@s1 | zfs recv -u shplake2/shtetl/containers/Y/var
+P13 check ok: d: Y's mirror is a clone of G in the second root (shplake2/shtetl/foundations/G@v1)
+== e: Y's mirror sent to the other lake root, which has no G
+# zfs send -i shprun/foundations/G@v1 shprun/containers/Y@s1 | zfs recv -u shplake/containers/Y
+cannot receive: local origin for clone shplake/containers/Y@s1 does not exist
+-> exit 1
+P13 check ok: e: a clone stream into a root without its origin (refused)
+P13 answer: discovery by local shtetl:space finds pool and dataset roots alike; one match and two are told apart; a mirror lands only in the root holding its foundation (elsewhere: refused)

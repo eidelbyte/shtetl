@@ -1,0 +1,84 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+# zfs set shtetl:space=lake shplake
+# zfs create shplake/foundations
+# zfs create shplake/containers
+# zfs create -p shplake/archive/containers
+# zfs create shplake/foundations/F
+# zfs create -o canmount=off shplake/foundations/F/usr
+# zfs create shplake/foundations/F/usr/local
+# zfs create shplake/foundations/F/var
+# zfs set mountpoint=/tmp/shtetl-probe/build/F shplake/foundations/F
+# zfs inherit mountpoint shplake/foundations/F
+# zfs snapshot -r -o shtetl:kind=version -o 'shtetl:commit=version v1' shplake/foundations/F@v1
+# zfs send shplake/foundations/F@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F
+# zfs send shplake/foundations/F/usr@v1 | zfs recv -u -o readonly=on -o canmount=off shprun/foundations/F/usr
+# zfs send shplake/foundations/F/usr/local@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/usr/local
+# zfs send shplake/foundations/F/var@v1 | zfs recv -u -o readonly=on -o canmount=noauto shprun/foundations/F/var
+# zfs clone shprun/foundations/F@v1 shprun/containers/X
+# zfs clone -o canmount=off shprun/foundations/F/usr@v1 shprun/containers/X/usr
+# zfs clone shprun/foundations/F/usr/local@v1 shprun/containers/X/usr/local
+# zfs clone shprun/foundations/F/var@v1 shprun/containers/X/var
+# zfs create shprun/containers/X/www
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=update to F@v2' shprun/containers/X@from
+# zfs get -Hp -r -t filesystem -o name,value written@from shprun/containers/X
+shprun/containers/X	0
+shprun/containers/X/usr	0
+shprun/containers/X/usr/local	0
+shprun/containers/X/var	0
+shprun/containers/X/www	0
+P8 check ok: a: written@from right after the snapshot (0)
+== b: every dataset unmounted and mounted again
+# zfs unmount shprun/containers/X/www
+# zfs unmount shprun/containers/X/var
+# zfs unmount shprun/containers/X/usr/local
+# zfs unmount shprun/containers/X
+# zfs mount shprun/containers/X
+# zfs mount shprun/containers/X/usr/local
+# zfs mount shprun/containers/X/var
+# zfs mount shprun/containers/X/www
+P8 check ok: b: after a remount (0)
+== c: every file read, atime off (the pool default)
+P8 check ok: c: after reads, atime off (0)
+== d: the same with atime on
+# zfs set atime=on shprun/containers/X
+# zfs get -r -o name,value,source atime,relatime shprun/containers/X
+NAME                                VALUE     SOURCE
+shprun/containers/X                 on        local
+shprun/containers/X                 on        default
+shprun/containers/X@from            -         -
+shprun/containers/X@from            -         -
+shprun/containers/X/usr             on        inherited from shprun/containers/X
+shprun/containers/X/usr             on        default
+shprun/containers/X/usr@from        -         -
+shprun/containers/X/usr@from        -         -
+shprun/containers/X/usr/local       off       temporary
+shprun/containers/X/usr/local       on        default
+shprun/containers/X/usr/local@from  -         -
+shprun/containers/X/usr/local@from  -         -
+shprun/containers/X/var             off       temporary
+shprun/containers/X/var             on        default
+shprun/containers/X/var@from        -         -
+shprun/containers/X/var@from        -         -
+shprun/containers/X/www             off       temporary
+shprun/containers/X/www             on        default
+shprun/containers/X/www@from        -         -
+shprun/containers/X/www@from        -         -
+# zfs get -Hp -r -t filesystem -o name,value written@from shprun/containers/X
+shprun/containers/X	19456
+shprun/containers/X/usr	0
+shprun/containers/X/usr/local	13312
+shprun/containers/X/var	14336
+shprun/containers/X/www	12288
+P8 d: after reads with atime on, written@from sums to 59392 bytes
+# zfs inherit atime shprun/containers/X
+== e: one line appended to a log
+# zfs get -Hp -r -t filesystem -o name,value written@from shprun/containers/X
+shprun/containers/X	21504
+shprun/containers/X/usr	0
+shprun/containers/X/usr/local	13312
+shprun/containers/X/var	14336
+shprun/containers/X/www	12288
+P8 e: after one real write, written@from sums to 61440 bytes
+P8 answer: written@from stays 0 through a remount (0) and reads with atime off (0); reads with atime on make it 59392; one real write makes it 61440

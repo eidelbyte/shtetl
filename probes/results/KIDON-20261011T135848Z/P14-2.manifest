@@ -1,0 +1,35 @@
+#rebase-manifest 5
+#result s1
+#form dataset
+#base shprun/containers/X@s1 16420972617951143432
+#from shprun/containers/X@s2 11626302659408834942
+#onto shprun/containers/X-staging@s1 4270420576287223336
+#presnap shprun/containers/X-staging@s1
+#readonly off
+#canmount on
+#made -
+#tag zr-d5972cbb840b
+#take -
+#written 2026-10-11T13:59:58Z
+#mode strict
+#actions 11
+#conflicts 0
+/
+    etc/
+        rc.conf write /etc/rc.conf
+        ..
+    usr/
+        include/
+            Block.h write /usr/include/Block.h
+            Block_private.h write /usr/include/Block_private.h
+            FlexLexer.h write /usr/include/FlexLexer.h
+            __libunwind_config.h write /usr/include/__libunwind_config.h
+            _ctype.h write /usr/include/_ctype.h
+            _libsys.h write /usr/include/_libsys.h
+            a.out.h write /usr/include/a.out.h
+            alias.h write /usr/include/alias.h
+            ar.h write /usr/include/ar.h
+            archive.h write /usr/include/archive.h
+            ..
+        ..
+    ..

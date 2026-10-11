@@ -1,0 +1,18 @@
+#rebase-manifest 5
+#result shprun/containers/X-staging/usr/local
+#form clone
+#base shprun/foundations/F/usr/local@v1 813589542201225867
+#from shprun/containers/X/usr/local@s1 11908409339676674446
+#onto shprun/foundations/F/usr/local@v2 10204025272568208318
+#made -
+#tag zr-d5972ccf8547
+#take -
+#written 2026-10-11T14:00:07Z
+#mode strict
+#actions 1
+#conflicts 0
+/
+    etc/
+        app-s1.conf cp /etc/app-s1.conf
+        ..
+    ..
