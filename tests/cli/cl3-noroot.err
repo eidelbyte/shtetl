@@ -1,0 +1,10 @@
+shtetl: no configuration root: give -C dir
+usage: shtetl [-C dir] command ...
+       shtetl [-C dir] config show [recipe]
+
+  -C dir  the configuration root: the zshtetl-recipes clone
+
+  config show: the recipe (foundations/F, containers/X, systems/S)
+    with its layers merged, or the site's settings
+
+exit: 0 done, 1 refused (the reasons are on standard error), 2 usage

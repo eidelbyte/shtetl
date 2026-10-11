@@ -59,9 +59,9 @@ BUILD = build
 
 CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o \
 	$(BUILD)/root.o $(BUILD)/syntax.o $(BUILD)/schema.o $(BUILD)/site.o \
-	$(BUILD)/cascade.o
+	$(BUILD)/cascade.o $(BUILD)/show.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(UCL_OBJS)
-TESTS = check_parse check_schema check_site check_cascade
+TESTS = check_parse check_schema check_site check_cascade check_show
 
 all: build shtetl
 
@@ -84,7 +84,9 @@ freebsd:
 check-freebsd:
 	$(MAKE) FLAVOR=freebsd UCL=port CFLAGS="$(CFLAGS) -DSH_FREEBSD" check
 
-$(BUILD)/main.o: src/main.c
+$(BUILD)/main.o: src/main.c src/core/cascade.h src/core/err.h \
+	src/core/root.h src/core/schema.h src/core/show.h src/core/site.h \
+	src/core/tree.h
 	$(CC) $(CFLAGS) -c -o $@ src/main.c
 $(BUILD)/err.o: src/core/err.c src/core/err.h src/core/tree.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/err.c
@@ -109,6 +111,9 @@ $(BUILD)/cascade.o: src/core/cascade.c src/core/cascade.h src/core/err.h \
 	src/core/parse.h src/core/root.h src/core/schema.h src/core/syntax.h \
 	src/core/tree.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/cascade.c
+$(BUILD)/show.o: src/core/show.c src/core/show.h src/core/cascade.h \
+	src/core/schema.h src/core/site.h src/core/err.h src/core/tree.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/show.c
 
 $(BUILD)/ucl/ucl_emitter_streamline.o:
 	$(UCL_CHECK)

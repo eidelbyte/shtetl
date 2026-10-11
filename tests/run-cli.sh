@@ -62,6 +62,21 @@ t cl1-help -h
 t cl2-command frobnicate
 t cl2-option -x config show
 t cl2-optarg -C
+# CL3: no configuration root.
+t cl3-noroot config show
+# CL4, and CW1 - CW6 on a real tree: the merged recipe.
+t cl4-nginx -C tests/conf/site config show containers/nginx
+t cl4-generic -C tests/conf/site config show foundations/generic.conf
+# CL5, CW7: the site's settings, with and without shtetl.conf.
+t cl5-site -C tests/conf/site config show
+t cl5-builtin -C tests/conf/bare config show
+# CL6: refusals: on stderr, nothing on stdout, exit 1.
+t cl6-bad -C tests/conf/site config show containers/bad
+t cl6-drop -C tests/conf/site config show containers/drop
+t cl6-notdir -C tests/conf/nonexistent config show
+t cl6-norecipe -C tests/conf/site config show containers/nope
+# CL7: more than one recipe.
+t cl7-two -C tests/conf/site config show containers/nginx systems/x
 
 if [ "${UPDATE:-0}" = 1 ]; then
 	echo "cli: $n expectations written to $exp"

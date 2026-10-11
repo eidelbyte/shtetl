@@ -1,0 +1,20 @@
+# containers/nginx.conf: a container's recipe, its layers merged
+# layers, nearest last: default.conf, common/web.conf, containers/nginx.conf
+pkg {
+    sudo = true;  # default.conf
+    tmux = true;  # default.conf
+    py311-certbot = true;  # common/web.conf
+    nginx = true;  # containers/nginx.conf
+}
+datasets {
+    tmp {}  # default.conf
+    var {}  # default.conf
+    "usr/local" {}  # default.conf
+    www {  # containers/nginx.conf
+        readonly = true;  # containers/nginx.conf
+    }
+}
+commands {
+    certbot = "sysrc certbot_enable=YES";  # common/web.conf
+    nginx = "sysrc nginx_enable=YES";  # containers/nginx.conf
+}

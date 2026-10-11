@@ -17,11 +17,15 @@ const char sh_site_builtin[] = "(built-in)";
 const char sh_site_conf[] = "shtetl.conf";
 
 /*
- * The built-in settings: 4.3's dataset properties (mountpoint and
- * canmount are shtetl's own and no setting's), 6.3's policies at 0,
- * everything, and the staging suffix of 5.2.
+ * The built-in settings: no space's default root (spaces is here, empty,
+ * so that the sections keep shtetl.conf's order), 4.3's dataset
+ * properties (mountpoint and canmount are shtetl's own and no
+ * setting's), 6.3's policies at 0, everything, and the staging suffix
+ * of 5.2.
  */
 static const char site_builtin_text[] =
+	"spaces {\n"
+	"}\n"
 	"properties {\n"
 	"    default {\n"
 	"        atime = \"off\";\n"

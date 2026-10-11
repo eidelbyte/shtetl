@@ -214,7 +214,9 @@ test_load(void)
 	CHECK(v != NULL && v->sn_type == SH_INT && v->sn_int == 0);
 	v = sh_obj_get(sh_obj_get(s.ss_merged, "build"), "make_jobs");
 	CHECK(v != NULL && v->sn_type == SH_INT && v->sn_int == 0);
-	CHECK(sh_obj_get(s.ss_merged, "spaces") == NULL);
+	v = sh_obj_get(s.ss_merged, "spaces");
+	CHECK(v != NULL && v->sn_type == SH_OBJECT && v->sn_obj.ob_n == 0);
+	CHECK(strcmp(s.ss_merged->sn_obj.ob_v[0].pr_key, "spaces") == 0);
 	sh_site_free(&s);
 
 	/* shtetl.conf sets one property and adds a section */

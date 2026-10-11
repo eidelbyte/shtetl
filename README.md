@@ -8,7 +8,10 @@ onto a newer foundation with
 mishkan and parasa, without their git layer: ZFS snapshots are the
 record, and git is used only to share recipes.
 
-Nothing is built yet. The design:
+Built so far (M1, planning.md 12): the configuration. `shtetl -C
+<zconfig> config show [recipe]` prints a recipe with its layers
+merged, or the site's settings, each value naming the file it came
+from. Everything else is still design:
 
 - `docs/planning.md`: the plan, the rulings so far, and the probes
   that come before any code.

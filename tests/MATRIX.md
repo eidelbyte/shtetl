@@ -167,13 +167,13 @@ the target's spelling.
 
 | cell | scenario | disposition |
 |------|----------|-------------|
-| CW1 | a merged recipe prints as UCL that parses back to the same keys, values and order | planned: check_show.c |
-| CW2 | every value names its layer; one changed by a later layer names both | planned: check_show.c |
-| CW3 | quotes, backslashes and control characters are escaped, and come back the same | planned: check_show.c |
-| CW4 | a multi-line string prints as a heredoc; one ending in a newline, or holding the terminator line, still comes back the same | planned: check_show.c |
-| CW5 | keys that are not bare words are quoted (`"usr/local"`, a URL) | planned: check_show.c |
-| CW6 | an emptied collection prints as an empty object | planned: check_show.c |
-| CW7 | the site settings print with built-in or shtetl.conf on each value | planned: check_show.c |
+| CW1 | a merged recipe prints as UCL that parses back to the same keys, values and order | covered: check_show.c |
+| CW2 | every value names its layer; one changed by a later layer names both | covered: check_show.c |
+| CW3 | quotes, backslashes and control characters are escaped, and come back the same | covered: check_show.c |
+| CW4 | a multi-line string prints as a heredoc; one ending in a newline, or holding the terminator line, still comes back the same | covered: check_show.c |
+| CW5 | keys that are not bare words are quoted (`"usr/local"`, a URL) | covered: check_show.c |
+| CW6 | an emptied collection prints as an empty object | covered: check_show.c |
+| CW7 | the site settings print with built-in or shtetl.conf on each value | covered: check_show.c |
 
 ## CL: the command line (src/main.c; tests/run-cli.sh)
 
@@ -181,8 +181,8 @@ the target's spelling.
 |------|----------|-------------|
 | CL1 | no arguments, or -h: the usage, exit 2 (-h: exit 0) | covered: run-cli.sh cl1-none, cl1-help |
 | CL2 | an unknown command or option, or -C with no directory: the usage, exit 2 | covered: run-cli.sh cl2-command, cl2-option, cl2-optarg |
-| CL3 | no -C: refused, exit 2 | planned: run-cli.sh |
-| CL4 | config show RECIPE: the merged recipe on stdout, exit 0 | planned: run-cli.sh |
-| CL5 | config show: the site settings, exit 0 | planned: run-cli.sh |
-| CL6 | a refused configuration: the reasons on stderr, nothing on stdout, exit 1 | planned: run-cli.sh |
-| CL7 | config show with two recipes: the usage, exit 2 | planned: run-cli.sh |
+| CL3 | no -C: refused, exit 2 | covered: run-cli.sh cl3-noroot |
+| CL4 | config show RECIPE: the merged recipe on stdout, exit 0 | covered: run-cli.sh cl4-nginx, cl4-generic |
+| CL5 | config show: the site settings, exit 0 | covered: run-cli.sh cl5-site, cl5-builtin |
+| CL6 | a refused configuration, a missing recipe, a root that is not a directory: the reasons on stderr, nothing on stdout, exit 1 | covered: run-cli.sh cl6-bad, cl6-drop, cl6-notdir, cl6-norecipe |
+| CL7 | config show with two recipes: the usage, exit 2 | covered: run-cli.sh cl7-two |

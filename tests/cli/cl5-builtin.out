@@ -1,0 +1,20 @@
+# the site's settings: the built-in ones; there is no shtetl.conf
+spaces {}
+properties {
+    default {
+        atime = "off";  # (built-in)
+        compression = "zstd";  # (built-in)
+        aclmode = "passthrough";  # (built-in)
+    }
+}
+build {
+    make_jobs = 0;  # (built-in)
+}
+update {
+    suffix = "staging";  # (built-in)
+    depth = 0;  # (built-in)
+}
+retention {
+    run = 0;  # (built-in)
+    archive = 0;  # (built-in)
+}

@@ -1,0 +1,2 @@
+shtetl: containers/bad.conf: kernconf: not a key of a container's recipe: only a foundation's takes it
+shtetl: containers/bad.conf: datasets.www.recordsize: expected a string, or true or false, not an integer: quote it

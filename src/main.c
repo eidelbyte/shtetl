@@ -5,10 +5,17 @@
  * error; 2 a usage error.
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "core/cascade.h"
+#include "core/err.h"
+#include "core/root.h"
+#include "core/show.h"
+#include "core/site.h"
 
 #define	SH_EXIT_OK	0
 #define	SH_EXIT_REFUSED	1
@@ -31,7 +38,12 @@ struct sh_cmd {
 	int		(*cm_run)(struct sh_ctx *, int, char **);
 };
 
+static int cmd_config_show(struct sh_ctx *, int, char **);
+
 static const struct sh_cmd sh_cmds[] = {
+	{ "config", "show", "[recipe]", "the recipe (foundations/F, "
+	    "containers/X, systems/S)\n    with its layers merged, or the "
+	    "site's settings", cmd_config_show },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -69,6 +81,65 @@ die_usage(const char *why, const char *what)
 		(void) fprintf(stderr, "shtetl: %s%s\n", why, what);
 	usage(stderr);
 	return (SH_EXIT_USAGE);
+}
+
+/*
+ * Standard output, flushed and checked: what was printed reached it,
+ * or the command fails.
+ */
+static int
+out_done(void)
+{
+	if (fflush(stdout) != 0 || ferror(stdout)) {
+		(void) fprintf(stderr, "shtetl: standard output: %s\n",
+		    strerror(errno));
+		return (SH_EXIT_REFUSED);
+	}
+	return (SH_EXIT_OK);
+}
+
+/* The configuration root, or a refusal: 0 if there is one to read. */
+static int
+need_root(const struct sh_ctx *ctx, struct sh_err *e)
+{
+	if (sh_root_kind(ctx->sc_root, ".") != 'd') {
+		sh_errf(e, "%s: not a directory", ctx->sc_root);
+		return (-1);
+	}
+	return (0);
+}
+
+/*
+ * config show [RECIPE]: the merged recipe, or the site's settings,
+ * printed only once all of it has been read and accepted.
+ */
+static int
+cmd_config_show(struct sh_ctx *ctx, int argc, char **argv)
+{
+	struct sh_recipe r;
+	struct sh_site s;
+	struct sh_err e;
+	int rc;
+
+	if (argc > 1)
+		return (die_usage("config show takes one recipe at most", ""));
+	if (ctx->sc_root == NULL)
+		return (die_usage("no configuration root: give -C dir", ""));
+	sh_err_init(&e, stderr, "shtetl: ");
+	if (need_root(ctx, &e) != 0)
+		return (SH_EXIT_REFUSED);
+	if (argc == 0) {
+		if (sh_site_load(ctx->sc_root, &s, &e) != 0)
+			return (SH_EXIT_REFUSED);
+		sh_show_site(stdout, &s);
+		sh_site_free(&s);
+		return (out_done());
+	}
+	rc = sh_recipe_resolve(ctx->sc_root, argv[0], &r, &e);
+	if (rc == 0)
+		sh_show_recipe(stdout, &r);
+	sh_recipe_free(&r);
+	return (rc == 0 ? out_done() : SH_EXIT_REFUSED);
 }
 
 int

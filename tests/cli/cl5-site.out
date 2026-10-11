@@ -1,0 +1,30 @@
+# the site's settings: shtetl.conf over the built-in ones
+spaces {
+    lake {
+        default = "tank/shtetl";  # shtetl.conf
+    }
+    run {
+        default = "fast/shtetl/run";  # shtetl.conf
+    }
+}
+properties {
+    default {
+        atime = "off";  # (built-in)
+        compression = "zstd";  # shtetl.conf, over (built-in)
+        aclmode = "passthrough";  # (built-in)
+    }
+    lake {
+        compression = "zstd-9";  # shtetl.conf
+    }
+}
+build {
+    make_jobs = 0;  # shtetl.conf, over (built-in)
+}
+update {
+    suffix = "staging";  # shtetl.conf, over (built-in)
+    depth = 0;  # shtetl.conf, over (built-in)
+}
+retention {
+    run = 10;  # shtetl.conf, over (built-in)
+    archive = "1y";  # shtetl.conf, over (built-in)
+}

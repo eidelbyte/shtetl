@@ -1,0 +1,27 @@
+# foundations/generic.conf: a foundation's recipe, its layers merged
+# layers, nearest last: default.conf, foundations/generic.conf
+pkg {
+    sudo = true;  # default.conf
+    tmux = true;  # default.conf
+}
+datasets {
+    tmp {}  # default.conf
+    var {}  # default.conf
+    "usr/local" {  # default.conf
+        compression = "zstd-9";  # foundations/generic.conf
+    }
+}
+ver = ">=15";  # foundations/generic.conf
+src_branch = "releng/15.1";  # foundations/generic.conf
+kernconf = "GENERIC";  # foundations/generic.conf
+# foundations/generic.conf
+buildopts = <<EOD
+WITHOUT_LIB32=yes
+WITH_META_MODE=yes
+EOD
+patches {
+    "github.com/eidelbyte/freebsd-patches" {  # foundations/generic.conf
+        ref = "releng-15.1";  # foundations/generic.conf
+    }
+    "patches/generic" {}  # foundations/generic.conf
+}
