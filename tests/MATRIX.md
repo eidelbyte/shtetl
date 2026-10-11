@@ -136,32 +136,32 @@ the target's spelling.
 
 | cell | scenario | disposition |
 |------|----------|-------------|
-| CC1 | layer order: built-in, default.conf, the imports in order, the target | planned: check_cascade.c |
-| CC2 | no default.conf: the recipe resolves without it | planned: check_cascade.c |
-| CC3 | an import's own imports merge before it | planned: check_cascade.c |
-| CC4 | a recipe imported twice merges once, at its first place | planned: check_cascade.c |
-| CC5 | an import cycle is refused, naming the files in it | planned: check_cascade.c |
-| CC6 | an import of a missing file is refused, naming the importing file | planned: check_cascade.c |
-| CC7 | a scalar: the nearer layer wins and keeps the key's place | planned: check_cascade.c |
-| CC8 | a twin: a nearer kernconf_file replaces a lower kernconf, and the other way | planned: check_cascade.c |
-| CC9 | collections: add a key, change one field (fields merge), drop with false | planned: check_cascade.c |
-| CC10 | array shorthand merges as name = true; true over an entry with fields keeps the fields | planned: check_cascade.c |
-| CC11 | a drop of something no lower layer added is refused | planned: check_cascade.c |
-| CC12 | a container or system dropping a pkg or dataset that built-in, default.conf or one of its imports added is refused (5.4's tmp and tmux) | planned: check_cascade.c |
-| CC13 | a container dropping what its own import added is fine (5.4's apache24) | planned: check_cascade.c |
-| CC14 | a foundation dropping a default.conf element is fine | planned: check_cascade.c |
-| CC15 | reset empties an inherited collection before the layer merges; a container's reset of default.conf's pkg is refused by the drop rule | planned: check_cascade.c |
-| CC16 | order: keys keep their first place across layers; an overridden commands block stays where it was first defined | planned: check_cascade.c |
-| CC17 | 5.4's worked example merges to pkg sudo, tmux, py311-certbot, nginx; datasets tmp, var, usr/local, www; commands certbot, nginx | planned: check_cascade.c |
-| CC18 | a foundation with no src_branch after the merge is refused | planned: check_cascade.c |
-| CC19 | a derivation lacking source or command after the merge is refused | planned: check_cascade.c |
-| CC20 | a `_file` or a patches directory that does not exist in the config root is refused | planned: check_cascade.c |
-| CC21 | requires naming a container with no recipe, or the container itself, is refused | planned: check_cascade.c |
-| CC22 | targets: `containers/nginx` and `containers/nginx.conf` alike; an unknown kind directory, `..`, a bad name, a nested path, a missing recipe refused | planned: check_cascade.c |
-| CC23 | errors in several layers are all reported, and nothing is merged | planned: check_cascade.c |
-| CC24 | each merged entry names the layer that added it and the one that last set it | planned: check_cascade.c |
-| CC25 | patches: a lower layer's sources come first; a source a nearer layer changes keeps its place (7.1.1) | planned: check_cascade.c |
-| CC26 | every layer is checked against the target's kind: kernconf in a fragment a container imports is refused, naming the fragment | planned: check_cascade.c |
+| CC1 | layer order: built-in, default.conf, the imports in order, the target | covered: check_cascade.c |
+| CC2 | no default.conf: the recipe resolves without it | covered: check_cascade.c |
+| CC3 | an import's own imports merge before it | covered: check_cascade.c |
+| CC4 | a recipe imported twice merges once, at its first place | covered: check_cascade.c |
+| CC5 | an import cycle is refused, naming the files in it | covered: check_cascade.c |
+| CC6 | an import of a missing file is refused, naming the importing file | covered: check_cascade.c |
+| CC7 | a scalar: the nearer layer wins and keeps the key's place | covered: check_cascade.c |
+| CC8 | a twin: a nearer kernconf_file replaces a lower kernconf, and the other way | covered: check_cascade.c |
+| CC9 | collections: add a key, change one field (fields merge), drop with false | covered: check_cascade.c |
+| CC10 | array shorthand merges as name = true; true over an entry with fields keeps the fields | covered: check_cascade.c |
+| CC11 | a drop of something no lower layer added is refused | covered: check_cascade.c |
+| CC12 | a container or system dropping a pkg or dataset that built-in, default.conf or one of its imports added is refused (5.4's tmp and tmux) | covered: check_cascade.c |
+| CC13 | a container dropping what its own import added is fine (5.4's apache24) | covered: check_cascade.c |
+| CC14 | a foundation dropping a default.conf element is fine | covered: check_cascade.c |
+| CC15 | reset empties an inherited collection before the layer merges; a container's reset of default.conf's pkg is refused by the drop rule | covered: check_cascade.c |
+| CC16 | order: keys keep their first place across layers; an overridden commands block stays where it was first defined | covered: check_cascade.c |
+| CC17 | 5.4's worked example merges to pkg sudo, tmux, py311-certbot, nginx; datasets tmp, var, usr/local, www; commands certbot, nginx | covered: check_cascade.c |
+| CC18 | a foundation with no src_branch after the merge is refused | covered: check_cascade.c |
+| CC19 | a derivation lacking source or command after the merge is refused | covered: check_cascade.c |
+| CC20 | a `_file` or a patches directory that does not exist in the config root is refused | covered: check_cascade.c |
+| CC21 | requires naming a container with no recipe, or the container itself, is refused | covered: check_cascade.c |
+| CC22 | targets: `containers/nginx` and `containers/nginx.conf` alike; an unknown kind directory, `..`, a bad name, a nested path, a missing recipe refused | covered: check_cascade.c |
+| CC23 | errors in several layers are all reported, and nothing is merged | covered: check_cascade.c |
+| CC24 | each merged entry names the layer that added it and the one that last set it | covered: check_cascade.c |
+| CC25 | patches: a lower layer's sources come first; a source a nearer layer changes keeps its place (7.1.1) | covered: check_cascade.c |
+| CC26 | every layer is checked against the target's kind: kernconf in a fragment a container imports is refused, naming the fragment | covered: check_cascade.c |
 
 ## CW: what config show prints (src/core/show.c)
 
