@@ -1,0 +1,4 @@
+build/
+/shtetl
+*.o
+.DS_Store

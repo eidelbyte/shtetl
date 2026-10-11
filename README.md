@@ -28,4 +28,16 @@ Nothing is built yet. The design:
 - `probes/`: the M0 probes as scripts for the box: `sudo sh
   probes/run.sh`. See `probes/README.md`.
 
+## Building
+
+    make            the portable build
+    make check      its unit tests and the command line end to end
+    make gate       ASCII and cstyle, before a commit
+    make freebsd    the FreeBSD build, linking the textproc/libucl port
+
+The portable build compiles libucl from a FreeBSD source tree's
+`contrib/libucl`. On FreeBSD that is `/usr/src`; elsewhere, name a
+checkout once with `export FREEBSD_SRC=/path/to/freebsd-src`. The
+tests are planned in `tests/MATRIX.md` before they are written.
+
 BSD 3-Clause; see `LICENSE`.

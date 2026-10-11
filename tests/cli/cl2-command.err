@@ -1,0 +1,6 @@
+shtetl: unknown command: frobnicate
+usage: shtetl [-C dir] command ...
+
+  -C dir  the configuration root: the zshtetl-recipes clone
+
+exit: 0 done, 1 refused (the reasons are on standard error), 2 usage
