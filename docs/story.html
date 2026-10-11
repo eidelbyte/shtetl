@@ -1269,7 +1269,7 @@ logs, pkg database                                         -&gt; nginx/var</code
 <text class="badgetext" x="666.0" y="362.0" text-anchor="middle">2</text>
 </svg></div>
 <p><b>1</b> Each foundation-inherited dataset goes as a clone stream (<code>zfs send -i &lt;run foundation&gt;@v1 nginx@s1</code>) and is received in zlake as a clone of zlake's own foundation <code>@v1</code>, so zlake stores only what nginx changed. One arrow per kind is drawn; every dataset of the tree goes the same way. <b>2</b> <code>www</code> has no origin, so its first save is a full stream. From now on zlake mirrors nginx as of its last save: same names, same clone relationships, one pool over. Whether the clone streams land as clones without help is probe P1.</p>
-<p>This snapshot is <b>s1</b>; its message travels in <code>shtetl:commit</code> (whether <code>zfs send</code> carries it is probe P10).</p>
+<p>This snapshot is <b>s1</b>; its message is in <code>shtetl:commit</code>. The sends carry no properties (no <code>-p</code>, which would carry the dataset's local ones too), so after each receive shtetl copies the snapshot's <code>shtetl:*</code> properties onto zlake's copy (P10).</p>
 </section>
 <section class="act" id="act-III"><div class="anum">Act III</div><h2>A new foundation version</h2><p>Five weeks later FreeBSD publishes an errata notice for 15.1. The fix lands on <code>releng/15.1</code>. For this story, suppose it also changed <code>/etc/ssh/sshd_config</code> and added a system user to <code>/etc/master.passwd</code> and <code>/etc/group</code>: exactly the files the admin edited too.</p></section>
 <section class="frame" id="f15">

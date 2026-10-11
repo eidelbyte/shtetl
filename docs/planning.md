@@ -500,8 +500,15 @@ at creation (`zfs snapshot -r -o shtetl:commit=...`, which libzfs_core
 does atomically for every snapshot of the `-r`). `shtetl save X -m MSG`,
 or an editor like `git commit` when `-m` is absent. Each snapshot also
 carries `shtetl:config`, the config snapshot it was made with (4.4).
-Whether the properties travel with `zfs send` is probe P10; if not,
-shtetl sets them on the received snapshot.
+They travel with `zfs send` only under `-p` (P10), and `-p` also
+carries every property set locally on the dataset: a deployed system's
+`mountpoint=/` would land on its zlake mirror, and nothing in zlake
+would stop it mounting there (`canmount` does not inherit, P7). So
+every send is without `-p`, and after each receive shtetl copies the
+source snapshot's `shtetl:*` properties onto the received one (ruled
+2026-10-11). Only what shtetl names travels. A received snapshot with
+no `shtetl:kind` is one whose copy was interrupted; the next run
+copies again from the source, which still has them.
 
 ### 6.3 Retention (ruled)
 
@@ -591,7 +598,8 @@ ObsoleteFiles.inc does not list survive delete-old either way (P6).
 `zfs send` each dataset of F (full the first time, `-i` from the
 newest version zrun has after that) into the zrun copy of F:
 `readonly=on`, `canmount=noauto`, and the mountpoint inherited from
-`zrun/foundations` (`/shtetl/foundations/F/...`). It is never mounted
+`zrun/foundations` (`/shtetl/foundations/F/...`). No `-p`; the
+version's `shtetl:*` properties are copied after the receive (6.2). It is never mounted
 except while an update reads it: zfs_rebase reads every side at its
 mountpoint and refuses one that is not mounted (9).
 
@@ -630,6 +638,9 @@ mountpoint and refuses one that is not mounted (9).
      `foundations/F/d@vN`, so zlake holds only the delta;
    - first save of a container-only dataset: a full stream;
    - later saves: `send -i` from the previous save.
+
+   Never `-p`: after each receive, the save's `shtetl:*` properties
+   are copied onto zlake's snapshot (6.2).
 3. Prune by retention (6.3).
 
 ### 7.6 Update X onto F@v2 (into staging)
@@ -1057,6 +1068,12 @@ update and unmounted after; a `canmount=off` placeholder refused as a
 side (expected) and cloned instead.
 
 ## 14. Rulings
+
+### 2026-10-11 (P10)
+
+- Sends never use `-p`; shtetl copies the `shtetl:*` properties onto
+  each received snapshot (6.2). `-p` would carry the dataset's local
+  properties too, a deployed system's `mountpoint=/` among them.
 
 ### 2026-10-09 (open questions of draft 2)
 

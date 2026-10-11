@@ -816,9 +816,11 @@ zfs snapshot -r -o shtetl:kind=save -o shtetl:commit="site live, ploni added" \
 	"stream. From now on zlake mirrors nginx as of its last save: same "
 	"names, same clone relationships, one pool over. Whether the clone "
 	"streams land as clones without help is probe P1.",
-	"This snapshot is <b>s1</b>; its message travels in "
-	"<code>shtetl:commit</code> (whether <code>zfs send</code> carries it "
-	"is probe P10)."))
+	"This snapshot is <b>s1</b>; its message is in "
+	"<code>shtetl:commit</code>. The sends carry no properties (no "
+	"<code>-p</code>, which would carry the dataset's local ones too), so "
+	"after each receive shtetl copies the snapshot's <code>shtetl:*</code> "
+	"properties onto zlake's copy (P10)."))
 
 # Act III -----------------------------------------------------------------
 
