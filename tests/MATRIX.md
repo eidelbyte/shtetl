@@ -84,26 +84,26 @@ object, string}; entry key syntax per collection; error reporting
 
 | cell | scenario | disposition |
 |------|----------|-------------|
-| CK1 | every key of 5.5 is accepted in each kind that has it | planned: check_schema.c |
-| CK2 | an unknown key is refused with the file and its key path | planned: check_schema.c |
-| CK3 | a foundation-only key (src_branch, kernconf, buildopts, patches, the twins) in a container and in a system is refused, naming the kind | planned: check_schema.c |
-| CK4 | a container-only key (requires, jailconf, jailconf_file) in a foundation and in a system is refused | planned: check_schema.c |
-| CK5 | a string key given a number or a bool is refused; a number says to quote it | planned: check_schema.c |
-| CK6 | ver: `>=15`, `=15.1`, `<16`, `<=15.1`, `>14` accepted; ``, `15.1`, `>=`, `=>15`, `>=15.x`, `>=15.` refused | planned: check_schema.c |
-| CK7 | kernconf and kernconf_file in one file are refused; so for buildopts and jailconf | planned: check_schema.c |
-| CK8 | a `_file` value: relative paths accepted; absolute, `..`, empty components refused | planned: check_schema.c |
-| CK9 | import: an array of strings, or one string; a non-string element or a bad path refused | planned: check_schema.c |
-| CK10 | reset: collection names only; an unknown key or a scalar key refused | planned: check_schema.c |
-| CK11 | pkg: array shorthand; entries true and false; an entry with fields refused; bad names (empty, leading `-`, a space) refused | planned: check_schema.c |
-| CK12 | datasets: paths by ZFS's characters; leading or trailing `/`, `//`, `.`, `..`, `@` refused | planned: check_schema.c |
-| CK13 | dataset entries: true, false, or properties with string or bool values; a number refused (quote it); mountpoint, canmount and shtetl:* refused; a bad property name refused | planned: check_schema.c |
-| CK14 | commands: a string or false; true, an object or an array of names refused; an empty string refused; label syntax | planned: check_schema.c |
-| CK15 | derivations: {source, command} or false; an unknown field, a non-string field refused; key path syntax | planned: check_schema.c |
-| CK16 | requires: container names, array shorthand; a bad name refused | planned: check_schema.c |
-| CK17 | patches: array shorthand; {ref, dir}; the three location forms (a URL, host/path, a zconfig directory); an absolute path, `..`, an scp-style address and an unknown field refused | planned: check_schema.c |
-| CK18 | a collection given as a scalar is refused | planned: check_schema.c |
-| CK19 | every error in a layer is reported, not only the first | planned: check_schema.c |
-| CK20 | the key path quotes a component that is not a bare word (`datasets."usr/local".readonly`) | planned: check_schema.c |
+| CK1 | every key of 5.5 is accepted in each kind that has it | covered: check_schema.c |
+| CK2 | an unknown key is refused with the file and its key path | covered: check_schema.c |
+| CK3 | a foundation-only key (src_branch, kernconf, buildopts, patches, the twins) in a container and in a system is refused, naming the kind | covered: check_schema.c |
+| CK4 | a container-only key (requires, jailconf, jailconf_file) in a foundation and in a system is refused | covered: check_schema.c |
+| CK5 | a string key given a number or a bool is refused; a number says to quote it | covered: check_schema.c |
+| CK6 | ver: `>=15`, `=15.1`, `<16`, `<=15.1`, `>14` accepted; ``, `15.1`, `>=`, `=>15`, `>=15.x`, `>=15.` refused | covered: check_schema.c |
+| CK7 | kernconf and kernconf_file in one file are refused; so for buildopts and jailconf | covered: check_schema.c |
+| CK8 | a `_file` value: relative paths accepted; absolute, `..`, empty components refused | covered: check_schema.c |
+| CK9 | import: an array of strings, or one string; a non-string element or a bad path refused | covered: check_schema.c |
+| CK10 | reset: collection names only; an unknown key or a scalar key refused | covered: check_schema.c |
+| CK11 | pkg: array shorthand; entries true and false; an entry with fields refused; bad names (empty, leading `-`, a space) refused | covered: check_schema.c |
+| CK12 | datasets: paths by ZFS's characters; leading or trailing `/`, `//`, `.`, `..`, `@` refused | covered: check_schema.c |
+| CK13 | dataset entries: true, false, or properties with string or bool values; a number refused (quote it); mountpoint, canmount and shtetl:* refused; a bad property name refused | covered: check_schema.c |
+| CK14 | commands: a string or false; true, an object or an array of names refused; an empty string refused; label syntax | covered: check_schema.c |
+| CK15 | derivations: {source, command} or false; an unknown field, a non-string field refused; key path syntax | covered: check_schema.c |
+| CK16 | requires: container names, array shorthand; a bad name refused | covered: check_schema.c |
+| CK17 | patches: array shorthand; {ref, dir}; the three location forms (a URL, host/path, a zconfig directory); an absolute path, `..`, an scp-style address and an unknown field refused | covered: check_schema.c |
+| CK18 | a collection given as a scalar is refused | covered: check_schema.c |
+| CK19 | every error in a layer is reported, not only the first | covered: check_schema.c |
+| CK20 | the key path quotes a component that is not a bare word (`datasets."usr/local".readonly`) | covered: check_schema.c |
 
 ## CS: shtetl.conf (planning.md 5.2, 6.3; src/core/site.c)
 
@@ -114,16 +114,16 @@ forms of 6.3 {0, a count, an interval, each malformed one}; layers
 
 | cell | scenario | disposition |
 |------|----------|-------------|
-| CS1 | 5.2's example is accepted as written | planned: check_site.c |
-| CS2 | an unknown section, or an unknown key in a section, is refused | planned: check_site.c |
-| CS3 | spaces: lake and run take `default`, a dataset name; config or build with one is refused; a bad name is refused | planned: check_site.c |
-| CS4 | properties: sections default, lake, run, config, build; string or bool values; a number refused; mountpoint, canmount, shtetl:* refused | planned: check_site.c |
-| CS5 | build.make_jobs: 0 or more; negative, a string, a float refused | planned: check_site.c |
-| CS6 | update.suffix: a name; empty or a bad character refused | planned: check_site.c |
-| CS7 | retention.run, retention.archive, update.depth: 0, 10, "7d", "6m", "1y", "12H" accepted; -1, "7x", "d7", "", "0d", 1.5 and an unquoted 30d refused, the last saying to quote it | planned: check_site.c |
-| CS8 | with no shtetl.conf the settings are the built-in ones (4.3's properties, 6.3's zeros, suffix staging) | planned: check_site.c |
-| CS9 | shtetl.conf sets one property; the rest stay built-in, each with its layer | planned: check_site.c |
-| CS10 | retention.lake is refused: zlake keeps what zrun keeps | planned: check_site.c |
+| CS1 | 5.2's example is accepted as written | covered: check_site.c |
+| CS2 | an unknown section, or an unknown key in a section, is refused | covered: check_site.c |
+| CS3 | spaces: lake and run take `default`, a dataset name; config or build with one is refused; a bad name is refused | covered: check_site.c |
+| CS4 | properties: sections default, lake, run, config, build; string or bool values; a number refused; mountpoint, canmount, shtetl:* refused | covered: check_site.c |
+| CS5 | build.make_jobs: 0 or more; negative, a string, a float refused | covered: check_site.c |
+| CS6 | update.suffix: a name; empty or a bad character refused | covered: check_site.c |
+| CS7 | retention.run, retention.archive, update.depth: 0, 10, "7d", "6m", "1y", "12H" accepted; -1, "7x", "d7", "", "0d", 1.5 and an unquoted 30d refused, the last saying to quote it | covered: check_site.c |
+| CS8 | with no shtetl.conf the settings are the built-in ones (4.3's properties, 6.3's zeros, suffix staging) | covered: check_site.c |
+| CS9 | shtetl.conf sets one property; the rest stay built-in, each with its layer | covered: check_site.c |
+| CS10 | retention.lake is refused: zlake keeps what zrun keeps | covered: check_site.c |
 
 ## CC: the cascade (planning.md 5.4; src/core/cascade.c)
 

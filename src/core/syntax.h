@@ -1,0 +1,71 @@
+/*
+ * The spellings shtetl takes for the names and paths in its
+ * configuration. Each check returns NULL when S will do, or why not,
+ * as a phrase a message puts after what S should have been ("not a
+ * dataset path: an empty component").
+ */
+
+#ifndef	SH_SYNTAX_H
+#define	SH_SYNTAX_H
+
+/*
+ * A recipe's name (the F of foundations/F.conf, a container, a
+ * system), a name in requires, update.suffix: one dataset component
+ * that is also a jail name and a file name. Letters, digits, '-' and
+ * '_', beginning with a letter or a digit.
+ */
+const char *sh_syn_name(const char *s);
+
+/*
+ * A dataset path in a recipe's datasets, below the recipe's dataset:
+ * usr/local. Components of the characters ZFS names take
+ * (zfs_namecheck.c, valid_char), none empty, none "." or "..".
+ */
+const char *sh_syn_dataset(const char *s);
+
+/* A dataset's whole name, its pool first: tank/shtetl. */
+const char *sh_syn_dsname(const char *s);
+
+/* A package: a name or an origin (www/nginx), pkg's characters. */
+const char *sh_syn_pkg(const char *s);
+
+/* The label of a commands block. */
+const char *sh_syn_label(const char *s);
+
+/*
+ * A path in the configuration root: an import, a _file, a derived
+ * file, a patch directory. Relative, no empty, "." or ".." component.
+ */
+const char *sh_syn_relpath(const char *s);
+
+/*
+ * A ZFS property the configuration may set: a native name
+ * (userquota@x included) or a user property (it has a ':'). Not
+ * mountpoint, canmount or shtetl:*, which are shtetl's own. Whether
+ * a native name is one this ZFS knows is libzfs's to say, on the box.
+ */
+const char *sh_syn_prop(const char *s);
+
+/* A version constraint: >=15, =15.1, <16, <=15.1, >14. */
+const char *sh_syn_ver(const char *s);
+
+/*
+ * A date(1) -v interval (planning.md 6.3): a count above 0 and one
+ * of y, m, w, d, H, M, S.
+ */
+const char *sh_syn_interval(const char *s);
+
+/*
+ * Where patches come from (planning.md 7.1.1): a URL with a scheme;
+ * a host and path, which is https (its first component has a '.');
+ * or a directory in the configuration root.
+ */
+enum sh_loc {
+	SH_LOC_URL,
+	SH_LOC_HOST,
+	SH_LOC_DIR
+};
+
+const char *sh_syn_location(const char *s, enum sh_loc *kind);
+
+#endif	/* SH_SYNTAX_H */

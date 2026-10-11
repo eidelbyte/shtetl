@@ -57,9 +57,10 @@ UCL_CHECK = @test -f $(UCL_SRC)/src/ucl_parser.c || { \
 FLAVOR = portable
 BUILD = build
 
-CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o
+CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o \
+	$(BUILD)/root.o $(BUILD)/syntax.o $(BUILD)/schema.o $(BUILD)/site.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(UCL_OBJS)
-TESTS = check_parse
+TESTS = check_parse check_schema check_site
 
 all: build shtetl
 
@@ -91,6 +92,18 @@ $(BUILD)/tree.o: src/core/tree.c src/core/tree.h
 $(BUILD)/parse.o: src/core/parse.c src/core/parse.h src/core/err.h \
 	src/core/tree.h
 	$(CC) $(CFLAGS) $(UCL_INC) -c -o $@ src/core/parse.c
+$(BUILD)/root.o: src/core/root.c src/core/root.h src/core/err.h \
+	src/core/parse.h src/core/tree.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/root.c
+$(BUILD)/syntax.o: src/core/syntax.c src/core/syntax.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/syntax.c
+$(BUILD)/schema.o: src/core/schema.c src/core/schema.h src/core/err.h \
+	src/core/syntax.h src/core/tree.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/schema.c
+$(BUILD)/site.o: src/core/site.c src/core/site.h src/core/err.h \
+	src/core/parse.h src/core/root.h src/core/schema.h src/core/syntax.h \
+	src/core/tree.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/site.c
 
 $(BUILD)/ucl/ucl_emitter_streamline.o:
 	$(UCL_CHECK)

@@ -1,0 +1,37 @@
+/*
+ * shtetl.conf (planning.md 5.2): what is about this machine, never
+ * about a recipe. Its own schema, and two layers: the built-in
+ * settings, then the file, merged key by key.
+ */
+
+#ifndef	SH_SITE_H
+#define	SH_SITE_H
+
+#include "core/err.h"
+#include "core/tree.h"
+
+/* The layers' names, as config show prints them. */
+extern const char sh_site_builtin[];	/* "(built-in)" */
+extern const char sh_site_conf[];	/* "shtetl.conf" */
+
+struct sh_site {
+	struct sh_node	*ss_merged;	/* the settings in force */
+	int		ss_has_conf;	/* shtetl.conf was there */
+};
+
+/*
+ * Checks SITE, the tree of FILE, against shtetl.conf's keys: every
+ * problem reported to E, and their number returned.
+ */
+unsigned sh_site_check(const struct sh_node *site, const char *file,
+    struct sh_err *e);
+
+/*
+ * The settings of the configuration root ROOT: the built-in ones,
+ * and shtetl.conf over them when it is there. 0, or -1 with the
+ * reasons reported to E.
+ */
+int sh_site_load(const char *root, struct sh_site *s, struct sh_err *e);
+void sh_site_free(struct sh_site *s);
+
+#endif	/* SH_SITE_H */
