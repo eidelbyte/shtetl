@@ -599,8 +599,13 @@ tree, and only a foundation builds one.
 **What is applied.** Every file ending in `.patch` at the top of the
 source (or of its `dir`), in natural order: runs of digits compare as
 numbers, everything else byte by byte. So `0-first.patch`,
-`1-second.patch`, ..., `9-...`, `10-...`. Sources go in the order the
-cascade gives them, each source's files in its own order (Q-Q).
+`1-second.patch`, ..., `9-...`, `10-...`. Sources go one after the
+other, each in its entirety, in the order the recipe lists them (ruled
+2026-10-11, Q-Q). Both spellings keep that order: a UCL array is
+ordered, and libucl keeps an object's keys in the order written
+(`DL_APPEND` in `ucl_hash_insert()`). Across the cascade a lower
+layer's sources come first, and a source a nearer layer changes keeps
+its place (5.4).
 
 **How** (7.1 step 3):
 
@@ -658,7 +663,8 @@ fixed by hand also keeps its `.fixed` file in the foundation's obj
 cache (`foundation-builds/F/patches/<version>/`), since the run
 directory goes when the build ends. A patched tree is uncommitted
 changes to the checkout, so the build's version string says
-`<sha>-dirty` (newvers.sh); Q-R.
+`<sha>-dirty` (newvers.sh). That is kept (ruled 2026-10-11, Q-R): it
+names the real FreeBSD commit and shows that patches went in.
 
 ### 7.2 Update foundation F
 
@@ -1244,6 +1250,13 @@ below that change the plan are folded into the sections named.
 
 ## 14. Rulings
 
+### 2026-10-11 (Q-Q, Q-R: patches)
+
+- Q-Q: patch sources are applied one after the other, each in its
+  entirety, in the order the recipe lists them (7.1.1).
+- Q-R: a patched build keeps newvers.sh's `-dirty`: the version string
+  names the real FreeBSD commit and shows that patches went in.
+
 ### 2026-10-11 (Q-O, Q-P)
 
 - Q-O: every foundation install uses `install -C`
@@ -1348,25 +1361,7 @@ below that change the plan are folded into the sections named.
 
 ## 15. Open questions
 
-Q-Q. With patches from several sources, in what order do they go?
-Proposed: source by source, in the order the cascade gives the sources,
-each source's files in its own natural order, so each source's
-numbering stands on its own (7.1.1). The alternative is every patch of
-every source in one natural order by file name, which lets a site's
-`0-...` patch go first whichever source it sits in, but makes two
-sources' numbers collide.
-
-Q-R. A patched tree builds with a version string ending in `-dirty`
-(`newvers.sh` appends it when the checkout has uncommitted changes),
-so `uname` on every container of a patched foundation says `-dirty`.
-Proposed: shtetl commits the applied patches to a local branch, one
-commit per patch with a fixed author and date (the src commit's), so
-the same patches on the same commit always give the same commit id.
-The build then names that commit and is not dirty, `shtetl:patches`
-records it, and step 8's rollback removes the branch with the rest.
-The alternative is to leave the tree uncommitted and accept `-dirty`.
-
-The next step after these is M1 (12).
+None. The next step is M1 (12).
 
 Still to run on the box, as confirmation and not as a question: P6
 and P15 in 7.2's ruled order (`sudo env OLD_REL=15.0-RELEASE sh
