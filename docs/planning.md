@@ -1,9 +1,11 @@
 # shtetl: planning
 
-Status: draft 4, 2026-10-09. Nothing here is built. Drafts 1 to 3 were
+Status: draft 4, 2026-10-09. M0 is done (13.1); M1, the configuration,
+is built on branch impl/m1 (2026-10-11, section 12). Drafts 1 to 3 were
 reviewed and every ruling is folded in; section 14 lists them so each
-can be traced. No question is open (section 15). A detail marked
-PROPOSAL has not been ruled on but blocks nothing before M1.
+can be traced. Section 15 gathers what M1 decided where the plan was
+silent, for a ruling. A detail marked PROPOSAL has not been ruled on
+but blocks nothing.
 docs/story.html walks one cycle of this design frame by frame.
 
 ## 1. What shtetl is
@@ -324,15 +326,33 @@ holds (ruled 2026-10-09).
 
 ### 5.3 Parsing rules
 
+Built in M1 (`src/core/parse.c`, the one file that includes `ucl.h`):
+
 - Each file is parsed with `UCL_DUPLICATE_ERROR`: a key written twice
-  in one file is an error, never a silent implicit array.
-- UCL macros (`.include`, `.priority`, `.load`, `.inherit`) are
-  errors. libucl's `UCL_PARSER_DISABLE_MACRO` turns them into comments,
-  which would silently drop a recipe's `.include`; shtetl must refuse
-  instead (how: M1).
-- No variables: `$` is literal.
+  in one file is an error, never a silent implicit array, and an
+  object written twice is not merged.
+- UCL macros (`.include`, `.try_include`, `.includes`, `.priority`,
+  `.load`, `.inherit`, or any name) are errors at their line. How
+  (M1): `UCL_PARSER_DISABLE_MACRO`. libucl's header says the flag
+  reads a macro as a comment; tried on libucl 0.9.4 (FreeBSD's
+  contrib copy), it does not: a macro becomes a key that does not
+  begin with a letter, a parse error at its `.`, which shtetl names as
+  a macro. Without the flag, the default parser read `/etc/passwd`
+  into a test file through `.include`. Since the header and the code
+  disagree, shtetl trusts neither: before its first file it tries the
+  linked libucl (a macro refused at line 1, `$` literal, a duplicate
+  refused) and reads nothing with a library that fails.
+- No variables: `$` is literal. In 0.9.4 `UCL_PARSER_DISABLE_MACRO`
+  turns expansion off altogether, and `UCL_PARSER_NO_FILEVARS` keeps
+  libucl from defining its own.
+- Times are left to libucl: an unquoted `30d` arrives as a number, so
+  the schema can say to quote it (6.3).
 - Unknown keys, and keys that belong to another kind (`kernconf` in a
-  container), are errors with file and line.
+  container), are errors with the file and the key path
+  (`datasets."usr/local".readonly`), not the line: libucl keeps no
+  line on the objects it builds, only on a parse error, and a key
+  path names one place, keys being unique in a file. Every problem in
+  every layer is reported, not only the first.
 
 ### 5.4 Recipe cascade: lists are additive
 
@@ -416,7 +436,9 @@ shorthand for an object of `name = true` entries.
     }
 
 Merged for nginx: pkg = sudo, tmux, py311-certbot, nginx; datasets =
-tmp, var, usr/local, www; commands = certbot, then nginx.
+tmp, var, usr/local, www; commands = certbot, then nginx (M1: `shtetl
+config show containers/nginx` prints exactly this, each value with
+the file it came from; tests/cli/cl4-nginx.out).
 
 A drop is legal only for what the container's own layers added:
 `apache24` came from `common/web.conf`. `tmp = false` or `tmux = false`
@@ -424,6 +446,26 @@ would be errors here, because `default.conf` is a layer of the
 foundation's recipe too, so the foundation already splits `tmp` and
 installs `tmux`, and a container must end with a superset of what its
 foundation provides (7.4).
+
+As built (M1, `src/core/cascade.c`):
+
+- `import` is followed in every layer, default.conf's included: a
+  file's imports merge before it, each recipe once, at the first
+  place it is reached, and a cycle is an error naming its files
+  (PROPOSAL, Q-U).
+- The layers shared with every foundation's recipe are the built-in
+  one, default.conf and what default.conf imports. A container or
+  system may not drop, by `false` or by `reset`, a `pkg` or
+  `datasets` element one of them gave; the error names the layer. A
+  `commands` block it may drop (the superset ruled in H is of
+  datasets and pkgs).
+- A drop of what no lower layer gives is an error (PROPOSAL, Q-V).
+- `true` over an entry with fields leaves the fields.
+- default.conf is checked against the target's kind like every
+  layer, so a key only a foundation takes refuses every container
+  there.
+- Every layer is read and checked before anything merges, so one run
+  reports the problems of all of them.
 
 Alternatives considered:
 
@@ -466,6 +508,29 @@ generic`) and recorded by the clone's `origin`, as parasa did.
 
 `make_jobs` moved to shtetl.conf: it is about the machine, not the
 recipe.
+
+The forms of an entry, as built in M1 (`src/core/schema.c`): `false`
+drops it in every collection; `pkg` and `requires` take `true`;
+`datasets` take `true` or ZFS properties (`www { readonly = true;
+recordsize = "1M"; }`: strings, or true and false for on and off; a
+number is refused with "quote it", since UCL reads `1M` as 1000000;
+`mountpoint`, `canmount` and `shtetl:*` are shtetl's own); `commands`
+a string or heredoc; `derivations` `{ source; command; }`; `patches`
+`true` or `{ ref; dir; }`. A list of names stands for `name = true`
+where an entry needs nothing more (pkg, datasets, requires, patches).
+The heredoc keys with a `_file` twin are kernconf, buildopts and
+jailconf; a layer gives one of a pair, and a nearer layer's replaces
+a lower layer's whichever it is. Scalars, `ver` and the heredocs
+included, are replaced by a nearer layer (PROPOSAL, Q-S and Q-T).
+Names: a recipe's (and a `requires` entry, `update.suffix`) takes
+letters, digits, `-` and `_`, so that it is at once a dataset
+component, a jail name and a file name (PROPOSAL, Q-W); a dataset
+path takes what ZFS names take (`valid_char`).
+
+Checked after the merge: a foundation has `src_branch`; a derivation
+has both fields from some layer; a `_file` and a patches directory in
+zconfig exist; `requires` names container recipes that exist, and not
+the container itself.
 
 ## 6. Snapshots
 
@@ -593,7 +658,9 @@ layer drops an inherited one with `"github.com/..." = false`. A
 location with no scheme is https (`github.com/eidelbyte/freebsd-patches`
 is `https://github.com/eidelbyte/freebsd-patches`); a relative path is
 a directory in zconfig, which zconfig's snapshot (`shtetl:config`)
-already records. `patches` is a foundation key: it changes the src
+already records. Told apart (M1, PROPOSAL, Q-X): a location whose
+first component has a `.` is a host; an scp-style `git@host:path` is
+refused, to be written `ssh://...`. `patches` is a foundation key: it changes the src
 tree, and only a foundation builds one.
 
 **What is applied.** Every file ending in `.patch` at the top of the
@@ -1111,6 +1178,14 @@ Layout, after zfs_rebase:
     src/fbsd/      libzfs, jail, exec of make/pkg/git/zfs_rebase
     tests/         per-phase matrices first (tests/MATRIX.md), then tests
 
+As built in M1, src/core: `parse` (libucl, 5.3) hands `tree` (the
+format-free tree, every node with its layer) to `schema` (5.5) and
+`site` (5.2), `cascade` (5.4) merges, `show` prints; `syntax` holds
+the spellings of names, `root` the paths in zconfig, `err` the sink
+every refusal goes through. `src/main.c` is the command table. The
+portable build compiles libucl from a FreeBSD tree's `contrib/libucl`
+(`FREEBSD_SRC`, default /usr/src); `make freebsd` links the port.
+
 Libraries: libzfs, libzfs_core and libnvpair (headers from /usr/src,
 as zfs_rebase's Makefile does), libucl (port), libjail (base), curses
 (base) for the TUI. Programs run with argv arrays, never a shell: make,
@@ -1139,12 +1214,17 @@ beam-down, create, save, update, history replay, gate handling, soak,
 cutover, abandon, mirror, restore, prune. Kill tests at every step of
 patching, create, save, update and cutover.
 
+The matrices are in tests/MATRIX.md. Family C, the configuration (M1),
+is plotted and every cell covered: by unit tests (tests/check_*.c) and
+by the command line run over two configuration roots
+(tests/run-cli.sh, tests/conf).
+
 ## 12. Milestones
 
 | M  | scope | where |
 |----|-------|-------|
 | M0 | probes (section 13) | box |
-| M1 | skeleton, UCL loader, schema, cascade, `shtetl config show` | mac |
+| M1 | skeleton, UCL loader, schema, cascade, `shtetl config show`; built 2026-10-11, branch impl/m1 (tests/MATRIX.md family C, all covered) | mac |
 | M2 | discovery and multi-rooting, bootstrap, property table | box |
 | M3 | foundation build and update into zlake, patches and the pause included; pkg-upgrade | box |
 | M4 | beam-down, new container, save with messages, the zlake mirror | box |
@@ -1364,7 +1444,31 @@ below that change the plan are folded into the sections named.
 
 ## 15. Open questions
 
-None. M0 is done; the next step is M1 (12).
+M1 decided these where the plan was silent; each is built as written
+and marked PROPOSAL where it lives. None blocks M2.
+
+- **Q-S, `ver` across layers.** Built: a nearer layer's `ver`
+  replaces a lower layer's, as every scalar does. The other reading:
+  every layer's constraint must hold, so a fragment that needs `>=15`
+  keeps needing it whatever the recipe that imports it says.
+- **Q-T, heredocs across layers.** Built: `jailconf` and `buildopts`
+  are replaced by a nearer layer. The other reading: appended layer by
+  layer, since 5.5 says jailconf is "appended to the jail's
+  jail.conf block".
+- **Q-U, imports of imports.** Built: followed, each file merged
+  once, cycles refused, as 5.5's "recipes merged in before this file"
+  reads for every file.
+- **Q-V, a drop of nothing.** Built: `x = false` where no lower layer
+  gives `x` is an error, being a misspelling or a layer imported where
+  it does not belong. The other reading: a no-op, so a fragment can
+  say "never x" wherever it is imported.
+- **Q-W, names.** Built: a recipe's name takes letters, digits, `-`
+  and `_` only (no `.`), since it is a dataset component, a jail name
+  (where `.` means a child jail) and a file name at once.
+- **Q-X, patch locations.** Built: with no scheme, a location whose
+  first component has a `.` is a host and anything else a zconfig
+  directory, so a zconfig directory whose first component has a `.`
+  cannot be named.
 
 ## 16. Dropped from parasa
 

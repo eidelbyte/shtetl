@@ -161,13 +161,16 @@ Lines starting with `.` are macros:
 
 **shtetl refuses every macro.** Includes with priorities make a
 recipe's result depend on include order and on numbers scattered
-across files. shtetl's cascade is explicit instead (section 4), and a
-recipe that writes `.include` gets an error telling it to use
-`import`.
+across files. shtetl's cascade is explicit instead (section 4): a
+recipe that writes `.include` gets an error naming the macro and its
+line, and `import` does what it was after.
 
-libucl has a flag, `UCL_PARSER_DISABLE_MACRO`, that treats macros as
-comments. shtetl does not rely on it: a silently ignored `.include`
-is worse than an error.
+libucl's header says its flag `UCL_PARSER_DISABLE_MACRO` treats macros
+as comments. In libucl 0.9.4 it does not: a macro becomes a key that
+does not begin with a letter, a parse error. shtetl sets the flag and,
+since a silently ignored `.include` is worse than an error, checks at
+start-up that the linked libucl refuses a macro, and reads nothing
+with one that does not (planning.md 5.3).
 
 ### Variables
 
@@ -184,7 +187,9 @@ recipe is built from layers, nearest last:
 
 1. built-in recipe defaults
 2. `default.conf`
-3. each recipe named in the target's `import`, in order
+3. each recipe named in the target's `import`, in order, each after
+   what it imports in turn (a recipe reached twice merges once, at
+   its first place)
 4. the target recipe (`foundations/F.conf`, `containers/X.conf`,
    `systems/S.conf`)
 
@@ -195,7 +200,7 @@ variables). shtetl merges the parsed layers itself:
 |-------|------|
 | scalar (string, number, boolean) | the nearer layer replaces |
 | object | merged key by key, recursively |
-| a collection (`pkg`, `datasets`, `derivations`, `requires`, `commands`) | an object keyed by name: merged key by key |
+| a collection (`pkg`, `datasets`, `derivations`, `requires`, `commands`, `patches`) | an object keyed by name: merged key by key |
 
 So editing an inherited collection uses the one rule objects already
 follow:
@@ -208,9 +213,10 @@ follow:
 | drop everything inherited | `reset = [ "pkg" ];` at the top of the layer |
 
 Lists are additive (planning.md 14, H): a layer adds to what the layers
-below gave, and a drop or a `reset` may only take away what the
-container's own layers added. Whatever its foundation provides, the
-container keeps.
+below gave, and in `pkg` and `datasets` a drop or a `reset` may only
+take away what the container's own layers added. Whatever its
+foundation provides, the container keeps. A drop of something no layer
+below gave is an error too.
 
 An array of names is shorthand for an object of `name = true` entries,
 for the common case: `pkg = [ "nginx", "git" ];`.
@@ -224,8 +230,10 @@ foundation is built.
 Unknown keys, and keys that belong to another kind (`kernconf` in a
 container), are errors, not warnings.
 
-`shtetl config show TARGET` (milestone M1) prints the merged result
-with the file and line each value came from.
+`shtetl -C <zconfig> config show TARGET` (built in M1) prints the
+merged result as UCL, each value with the file it came from. libucl
+keeps no line on a value, so a refusal names the file and the key
+path (`datasets."usr/local".readonly`) instead.
 
 ## 5. Examples
 
