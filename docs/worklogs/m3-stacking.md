@@ -171,8 +171,8 @@ correctness in its own right 3. =15 matches 15.x"
 - **ver.** The ruling named `=`; `<=` and `>` follow the same
   principle, a bare N naming every N.x, so `>15` is 16.0 and later.
   That turned test_ver's case e (`>=15`, `<=15.1`, `>15`) from
-  resolving to refused. If `>15` should mean "after 15.0", it is the
-  `case 3` of sh_ver_range alone.
+  resolving to refused. Asked about `>`, the user confirmed: ">15
+  starts at 16."
 - **Gotcha, again**: a Python heredoc that writes C must be raw
   (`r'''...'''`), or `\n` lands in the source as a newline. And a
   command chain with `;` after the gate commits whatever the gate

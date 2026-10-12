@@ -1463,9 +1463,9 @@ So:
   is read: a refused setting refuses every recipe, not only `config
   show`, `spaces` and `bootstrap`.
 - (5.5) In `ver`, a bare major is every minor of it: `=15` is any
-  15.x. Read the same way for the other comparisons, as the ruling's
-  principle: `<=15` takes 15.x, and `>15` begins at 16.0; `>=15` and
-  `<15` are as they were.
+  15.x, `<=15` takes 15.x, and `>15` begins at 16.0; `>=15` and `<15`
+  are as they were. The ruling named `=`; asked about `>`, the author
+  confirmed the reading: ">15 starts at 16."
 
 ### 2026-10-12 (Q-AD: the default's edges)
 
