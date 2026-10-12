@@ -37,3 +37,37 @@ CK23; make check, gate, xcheck.
 Gotchas for the build: sh_version_name wants the full commit (40 hex)
 or at least 12 hex digits, lowercase as git prints them; the build
 asks git for HEAD's full sha.
+
+## m3-zfs (901975c)
+
+What a build asks of ZFS beyond M2, in src/core/zfs.h, with libzfs,
+the stub and the fake each answering it.
+
+- **One call for several snapshots.** sh_zfs_snapshot took one name;
+  a version is a snapshot of F and every child at once, so it now
+  takes a list, one lzc_snapshot: all of them with their properties,
+  or none. Bootstrap's one snapshot passes a list of one.
+- **Snapshots are read by name with an @.** sh_zfs_get and
+  sh_zfs_set open a snapshot when the name has one (zz_open picks
+  ZFS_TYPE_SNAPSHOT); a snapshot's user properties are its own or its
+  filesystem's, inherited, as ZFS reports them.
+- **Rollback only to the newest** (lzc_rollback_to). The patches'
+  rollback to @shtetl-patch-0 destroys the later patch snapshots
+  first, newest first, then rolls back: no recursive rollback hidden
+  in a call.
+- **Destroy is one dataset.** A snapshot, or a filesystem with no
+  children and no snapshots; a tree is the caller's walk, children
+  first.
+- **The fake answers as ZFS does**: snapshots are records with
+  properties, every snapshot of one call shares a createtxg, guids
+  are unique, rollback refuses an older snapshot and is remembered
+  (zfake_last_rollback) for the tests to see.
+
+Verification: check_zfs, 93 checks (Z1 - Z10), make check, gate,
+xcheck. Deferred: Z11, the cells against libzfs on real pools, with
+the M3 box run. tracker: m3-zfs testing until then.
+
+Gotcha, mine, twice now: a command chain that runs the gate and then
+commits with `;` commits whatever the gate says. 901975c was amended
+before the push for a long line. Chain the commit behind
+`grep -q 'gate: clean' &&`.
