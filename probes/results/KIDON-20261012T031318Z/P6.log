@@ -1,0 +1,158 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+P6 source: /usr/src, 16.0-CURRENT 8f02ff221666
+P6 older release: /var/cache/shtetl-probes/15.0-RELEASE-base.txz
+# zfs create shprun/foundations/F
+# zfs create -o canmount=off shprun/foundations/F/usr
+# zfs create shprun/foundations/F/usr/local
+# zfs create shprun/foundations/F/var
+# tar -xpf /var/cache/shtetl-probes/15.0-RELEASE-base.txz -C /tmp/shtetl-probe/run/foundations/F
+-> exit 0 in 3.64s
+# zfs snapshot -r shprun/foundations/F@old
+# make -C /usr/src delete-old DESTDIR=/tmp/shtetl-probe/run/foundations/F BATCH_DELETE_OLD_FILES=yes >P6-new-delete-old.log
+-> exit 0 in 0.59s
+# make -C /usr/src delete-old-libs DESTDIR=/tmp/shtetl-probe/run/foundations/F BATCH_DELETE_OLD_FILES=yes >P6-new-delete-old-libs.log
+-> exit 0 in 0.12s
+# make -C /usr/src installworld DESTDIR=/tmp/shtetl-probe/run/foundations/F 'INSTALL_CMD=install -C' >P6-new-installworld.log
+-> exit 0 in 43.21s
+# make -C /usr/src distribution DESTDIR=/tmp/shtetl-probe/run/foundations/F 'INSTALL_CMD=install -C' >P6-new-distribution.log
+-> exit 0 in 13.46s
+P6 new: installworld and distribution in 56.67s
+# chflags -R noschg /tmp/shtetl-probe/run/foundations/F/boot/loader.kboot.old
+# rm -rf /tmp/shtetl-probe/run/foundations/F/boot/loader.kboot.old
+# chflags -R noschg /tmp/shtetl-probe/run/foundations/F/boot/loader_4th.old
+# rm -rf /tmp/shtetl-probe/run/foundations/F/boot/loader_4th.old
+# chflags -R noschg /tmp/shtetl-probe/run/foundations/F/boot/loader_lua.old
+# rm -rf /tmp/shtetl-probe/run/foundations/F/boot/loader_lua.old
+# chflags -R noschg /tmp/shtetl-probe/run/foundations/F/boot/loader_simp.old
+# rm -rf /tmp/shtetl-probe/run/foundations/F/boot/loader_simp.old
+# chflags -R noschg /tmp/shtetl-probe/run/foundations/F/libexec/ld-elf.so.1.old
+# rm -rf /tmp/shtetl-probe/run/foundations/F/libexec/ld-elf.so.1.old
+# chflags -R noschg /tmp/shtetl-probe/run/foundations/F/libexec/ld-elf32.so.1.old
+# rm -rf /tmp/shtetl-probe/run/foundations/F/libexec/ld-elf32.so.1.old
+# chflags -R noschg /tmp/shtetl-probe/run/foundations/F/sbin/init.bak
+# rm -rf /tmp/shtetl-probe/run/foundations/F/sbin/init.bak
+# zfs snapshot -r shprun/foundations/F@new
+# make -C /usr/src check-old DESTDIR=/tmp/shtetl-probe/run/foundations/F >P6-new-check-old.log
+-> exit 0 in 0.32s
+# zfs create shprun/foundations/H
+# zfs create -o canmount=off shprun/foundations/H/usr
+# zfs create shprun/foundations/H/usr/local
+# zfs create shprun/foundations/H/var
+# make -C /usr/src installworld DESTDIR=/tmp/shtetl-probe/run/foundations/H >P6-fresh-installworld.log
+-> exit 0 in 42.82s
+# make -C /usr/src distribution DESTDIR=/tmp/shtetl-probe/run/foundations/H >P6-fresh-distribution.log
+-> exit 0 in 13.45s
+P6 fresh: installworld and distribution in 56.27s
+# zfs snapshot -r shprun/foundations/H@fresh
+P6 check ok: certificate entries left in /etc/ssl (0)
+P6 check ok: installworld's backups left (0)
+== what remains, by directory
+   429 /var/db
+    20 /usr/share
+     6 /usr/lib
+     4 /usr/include
+     1 /usr/tests
+     1 /sys
+/sys
+/usr/include/machine/_align.h
+/usr/include/openssl/conf_api.h
+/usr/include/thread_pool_impl.h
+/usr/include/x86/_align.h
+/usr/lib/lib9p.a
+/usr/lib/lib9p.so
+/usr/lib/libkrb5profile.a
+/usr/lib/libprivateclang.so.19
+/usr/lib/libprivatelldb.so.19
+/usr/lib/libprivatellvm.so.19
+/usr/share/examples/sound/oss
+/usr/share/examples/sound/oss/README
+/usr/share/examples/sound/oss/audio.c
+/usr/share/man/man1/ar.1.gz
+/usr/share/man/man1/c++filt.1.gz
+/usr/share/man/man1/gcov.1.gz
+/usr/share/man/man1/nm.1.gz
+/usr/share/man/man1/objcopy.1.gz
+/usr/share/man/man1/ranlib.1.gz
+/usr/share/man/man1/strip.1.gz
+/usr/share/man/man4/aw_gpio.4.gz
+/usr/share/man/man4/aw_mmc.4.gz
+/usr/share/man/man4/aw_rtc.4.gz
+/usr/share/man/man4/aw_sid.4.gz
+/usr/share/man/man4/aw_spi.4.gz
+/usr/share/man/man4/aw_syscon.4.gz
+/usr/share/man/man4/i386/perfmon.4.gz
+/usr/share/man/man4/if_le.4.gz
+/usr/share/man/man8/ipfs.8.gz
+/usr/share/man/man9/vm_page_try_to_free.9.gz
+/usr/tests/cddl/lib/libtpool
+/var/db/etcupdate
+/var/db/etcupdate/current
+/var/db/etcupdate/current/COPYRIGHT
+/var/db/etcupdate/current/boot
+/var/db/etcupdate/current/boot/device.hints
+/var/db/etcupdate/current/etc
+/var/db/etcupdate/current/etc/aliases
+/var/db/etcupdate/current/etc/auto_master
+/var/db/etcupdate/current/etc/autofs
+/var/db/etcupdate/current/etc/autofs/include_ldap
+/var/db/etcupdate/current/etc/autofs/include_nis
+/var/db/etcupdate/current/etc/autofs/include_nis_nullfs
+/var/db/etcupdate/current/etc/autofs/special_hosts
+/var/db/etcupdate/current/etc/autofs/special_media
+/var/db/etcupdate/current/etc/autofs/special_noauto
+/var/db/etcupdate/current/etc/autofs/special_null
+/var/db/etcupdate/current/etc/blacklistd.conf
+/var/db/etcupdate/current/etc/blocklistd.conf
+/var/db/etcupdate/current/etc/bluetooth
+/var/db/etcupdate/current/etc/bluetooth/hcsecd.conf
+/var/db/etcupdate/current/etc/bluetooth/hosts
+/var/db/etcupdate/current/etc/bluetooth/protocols
+/var/db/etcupdate/current/etc/cron.d
+/var/db/etcupdate/current/etc/cron.d/at
+/var/db/etcupdate/current/etc/crontab
+/var/db/etcupdate/current/etc/csh.cshrc
+/var/db/etcupdate/current/etc/csh.login
+/var/db/etcupdate/current/etc/csh.logout
+/var/db/etcupdate/current/etc/ddb.conf
+/var/db/etcupdate/current/etc/defaults
+/var/db/etcupdate/current/etc/defaults/bluetooth.device.conf
+/var/db/etcupdate/current/etc/defaults/devfs.rules
+/var/db/etcupdate/current/etc/defaults/periodic.conf
+/var/db/etcupdate/current/etc/defaults/rc.conf
+/var/db/etcupdate/current/etc/devd
+/var/db/etcupdate/current/etc/devd.conf
+/var/db/etcupdate/current/etc/devd/asus.conf
+/var/db/etcupdate/current/etc/devd/autofs.conf
+/var/db/etcupdate/current/etc/devd/bluetooth.conf
+/var/db/etcupdate/current/etc/devd/devmatch.conf
+/var/db/etcupdate/current/etc/devd/dhclient.conf
+/var/db/etcupdate/current/etc/devd/hyperv.conf
+/var/db/etcupdate/current/etc/devd/iwmbtfw.conf
+/var/db/etcupdate/current/etc/devd/moused.conf
+/var/db/etcupdate/current/etc/devd/nvmf.conf
+/var/db/etcupdate/current/etc/devd/power_profile.conf
+/var/db/etcupdate/current/etc/devd/rtlbtfw.conf
+/var/db/etcupdate/current/etc/devd/snd.conf
+/var/db/etcupdate/current/etc/devd/syscons.conf
+/var/db/etcupdate/current/etc/devd/uath.conf
+/var/db/etcupdate/current/etc/devd/ulpt.conf
+/var/db/etcupdate/current/etc/devd/zfs.conf
+/var/db/etcupdate/current/etc/devfs.conf
+/var/db/etcupdate/current/etc/dhclient.conf
+/var/db/etcupdate/current/etc/disktab
+/var/db/etcupdate/current/etc/dma
+/var/db/etcupdate/current/etc/dma/auth.conf
+/var/db/etcupdate/current/etc/dma/dma.conf
+/var/db/etcupdate/current/etc/fbtab
+/var/db/etcupdate/current/etc/freebsd-update.conf
+/var/db/etcupdate/current/etc/gettytab
+/var/db/etcupdate/current/etc/group
+/var/db/etcupdate/current/etc/gss
+/var/db/etcupdate/current/etc/gss/mech
+/var/db/etcupdate/current/etc/hosts
+/var/db/etcupdate/current/etc/hosts.allow
+/var/db/etcupdate/current/etc/hosts.equiv
+/var/db/etcupdate/current/etc/hosts.lpd
+P6 answer: 461 paths remain that a fresh install does not have (P6-remains.txt; most in /var/db (429), /usr/share (20), /usr/lib (6)); 0 paths a fresh install has are missing (P6-missing.txt)

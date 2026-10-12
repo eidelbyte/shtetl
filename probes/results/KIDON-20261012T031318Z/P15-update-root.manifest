@@ -1,0 +1,43 @@
+#rebase-manifest 5
+#result shprun/containers/X-staging
+#form clone
+#base shprun/foundations/F@old 43024931322451257
+#from shprun/containers/X@s1 16772734701654038580
+#onto shprun/foundations/F@new 15893806085686697894
+#made -
+#tag zr-d598a210518a
+#take -
+#written 2026-10-12T03:16:24Z
+#mode strict
+#actions 15
+#conflicts 1
+/
+    etc/
+        group conflict 1
+        hosts write /etc/hosts
+        master.passwd write /etc/master.passwd
+        passwd write /etc/passwd
+        pwd.db write /etc/pwd.db
+        rc.conf cp /etc/rc.conf
+        spwd.db write /etc/spwd.db
+        ..
+    home/ cp /home
+        probe/ cp /home/probe
+            .cshrc cp /home/probe/.cshrc
+            .login cp /home/probe/.login
+            .login_conf cp /home/probe/.login_conf
+            .mail_aliases cp /home/probe/.mail_aliases
+            .mailrc cp /home/probe/.mailrc
+            .profile cp /home/probe/.profile
+            .shrc cp /home/probe/.shrc
+            ..
+        ..
+    ..
+
+# a pool is one file and all its names: {names}letter; same
+# letter, same bytes
+conflict 1 changed-both
+  why  /etc/group changed on both sides
+  base ({/etc/group}x)
+  from ({/etc/group}y)
+  onto ({/etc/group}z)

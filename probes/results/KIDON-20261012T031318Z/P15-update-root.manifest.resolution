@@ -1,0 +1,12 @@
+#rebase-resolution 5
+#base shprun/foundations/F@old 43024931322451257
+#from shprun/containers/X@s1 16772734701654038580
+#onto shprun/foundations/F@new 15893806085686697894
+#mode strict
+#names 1
+#unanswered 1
+/
+    etc/
+        group conflict 1 -
+        ..
+    ..

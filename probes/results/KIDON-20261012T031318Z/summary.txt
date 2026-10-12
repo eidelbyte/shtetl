@@ -1,0 +1,28 @@
+shtetl probes 2026-10-12T03:13:18Z
+host:      FreeBSD KIDON 15.1-RELEASE-p2 FreeBSD 15.1-RELEASE-p2 libzfs_core-get-zprops-n283597-cced9a573b46 GENERIC amd64
+zfs:       zfs-2.4.2-1-FreeBSD_g6330a45b0 zfs-kmod-2.4.2-1-FreeBSD_g6330a45b0 
+shtetl:    830c210
+zfs_rebase: /home/miri/zfs_rebase_tool/zfs_rebase fdab53d
+
+P6 an update over an older release in 7.2's order: what remains that a fresh install lacks?
+P6 source: /usr/src, 16.0-CURRENT 8f02ff221666
+P6 older release: /var/cache/shtetl-probes/15.0-RELEASE-base.txz
+P6 new: installworld and distribution in 56.67s
+P6 fresh: installworld and distribution in 56.27s
+P6 check ok: certificate entries left in /etc/ssl (0)
+P6 check ok: installworld's backups left (0)
+P6 answer: 461 paths remain that a fresh install does not have (P6-remains.txt; most in /var/db (429), /usr/share (20), /usr/lib (6)); 0 paths a fresh install has are missing (P6-missing.txt)
+P6 ran in 121s
+
+P15 a container on an older release rebased onto SRC's world, updated over it in 7.2's order
+P15 source: /usr/src, 16.0-CURRENT 8f02ff221666
+P15 older release: /var/cache/shtetl-probes/15.0-RELEASE-base.txz
+P15 new: installworld and distribution in 57.19s
+P15 send -i F@old F@new: 1735.2 MiB
+P15 update /: exit 1, 2.84s, 13578070 bytes compared, 24938 pools unchanged, 1 conflicted names
+P15 update /usr/local: exit 0, 1.26s, 0 bytes compared, 1 pools unchanged, 0 conflicted names
+P15 update /var: exit 0, 1.18s, 4195840 bytes compared, 963 pools unchanged, 0 conflicted names
+P15 answer: across the release: rebase 5.28s, 1 conflicted names (the resolutions are P15-update-*.manifest.resolution), 0 failed; the foundation's incremental is 1735.2 MiB
+P15 ran in 69s
+
+2 ran, 0 errors, 0 skipped
