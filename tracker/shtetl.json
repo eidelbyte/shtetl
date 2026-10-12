@@ -65,5 +65,24 @@
     "estimated_size": "small",
     "completed": "not-started",
     "note": "Raised by the author 2026-10-12 with the ruling on Q-X: \"Good enough for now, put an issue on the backlog tracker ... in future work to nail down gtlds etc etc. In that future work issue we could also try a fairly simple solution of 'try every '.' including name against dns and if it fails, try to find it locally'.\""
+  },
+  "kernconf-config-and-lines": {
+    "description": "Let one file give kernconf's config and its lines together. Today (src/core/schema.c, cascade.c mg_kernconf) kernconf is one key whose form decides its meaning: a quoted string is the config to start from, a heredoc the lines added to it. UCL takes a key once in a file, so a foundation that starts from a config of its own and adds lines to it gives one of the two in a file it imports. Forms to weigh: an object, kernconf { file = \"MINE\"; lines = <<EOD ... EOD }, beside the string and the heredoc; or nothing, the import being the answer. libucl takes no heredoc inside an array, so a list of the two is out. Verify: tests/MATRIX.md cells for the form chosen, alone and stacked with the default's config and lines, and configuration.md's kernconf section and examples run by make doc.",
+    "requires": [],
+    "epic": "config",
+    "milestone": "future",
+    "expected_changed_files": [
+      "src/core/schema.c",
+      "src/core/cascade.c",
+      "tests/check_schema.c",
+      "tests/check_cascade.c",
+      "tests/MATRIX.md",
+      "docs/configuration.md",
+      "docs/planning.md"
+    ],
+    "provides": "A foundation's kernel config, its base and its lines, written in the one file of its recipe.",
+    "estimated_size": "small",
+    "completed": "not-started",
+    "note": "Raised 2026-10-12 with the kernconf rework (dcb2afc); the author: \"Let's not concern ourselves with the UCL kernconf name + lines problem. let's just put this in future work.\""
   }
 }

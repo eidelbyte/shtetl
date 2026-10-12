@@ -583,10 +583,10 @@ lines even when it holds one line, a quoted string always the config
 (the parse keeps libucl's mark of a heredoc, and the start-up check
 refuses a libucl that does not set it). A file gives a key once, so
 a foundation that starts from a config of its own and adds lines
-gives one of the two in a file it imports. What `jailconf` gives
-twice
-(`allow.raw_sockets` in two files) shtetl does not judge: jail(8)
-does.
+gives one of the two in a file it imports; giving both in one file is
+future work (tracker/shtetl.json, kernconf-config-and-lines). What
+`jailconf` gives twice (`allow.raw_sockets` in two files) shtetl does
+not judge: jail(8) does.
 
 A container or system recipe names no foundation (ruled 2026-10-09).
 It fits any foundation whose version satisfies its `ver`; the foundation
