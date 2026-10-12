@@ -244,10 +244,9 @@ file order. A container does not run a piece its foundation already
 ran (same label, same file, same text): `shtetl.conf` is a layer of
 both, and its pieces run once, when the foundation is built.
 
-Unknown keys, keys that belong to another kind (`kernconf_file` in a
-container's files), and keys that are gone (`kernconf`,
-`buildopts_file`, `jailconf_file`, `reset`) are errors, not warnings;
-a gone key's error says what to write instead.
+Unknown keys, and keys that belong to another kind (`src_branch` in
+a container's files), are errors, not warnings: `invalid key`, `valid
+only in foundation recipe`.
 
 `shtetl -C <zconfig> config show TARGET` (built in M1) prints the
 merged result as UCL, each value with the file it came from. libucl

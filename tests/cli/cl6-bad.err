@@ -1,2 +1,2 @@
-shtetl: containers/bad.conf: kernconf: not a key any more: kernconf_file names the config to start from and kernconf_lines adds to it (ruled 2026-10-12)
-shtetl: containers/bad.conf: datasets.www.recordsize: expected a string, or true or false, not an integer: quote it
+shtetl: containers/bad.conf: src_branch: valid only in foundation recipe
+shtetl: containers/bad.conf: datasets.www.recordsize: must be a quoted string

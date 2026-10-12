@@ -80,27 +80,25 @@ test_example(void)
 static void
 test_keys(void)
 {
-	bad("frob { }", "shtetl.conf: frob: not a key shtetl.conf takes");
-	bad("build { jobs = 1; }", "build.jobs: not a key of build: it takes "
-	    "make_jobs");
-	bad("build = 4;", "build: expected an object, not an integer");
+	bad("frob { }", "shtetl.conf: frob: invalid key");
+	bad("build { jobs = 1; }", "build.jobs: invalid key");
+	bad("build = 4;", "build: must be an object");
 	/* CS3 */
 	bad("spaces { config { default = \"tank/c\"; } }", "spaces.config: "
-	    "not a key of spaces: it takes lake, run");
-	bad("spaces { build { default = \"tank/b\"; } }", "not a key of "
-	    "spaces");
-	bad("spaces { lake { other = 1; } }", "spaces.lake.other: not a key "
-	    "of spaces.lake: it takes default");
+	    "invalid key");
+	bad("spaces { build { default = \"tank/b\"; } }", "spaces.build: "
+	    "invalid key");
+	bad("spaces { lake { other = 1; } }", "spaces.lake.other: invalid "
+	    "key");
 	bad("spaces { lake { default = \"/tank\"; } }", "spaces.lake.default: "
-	    "not a dataset's name: it begins with '/'");
-	bad("spaces { run { default = \"1tank/x\"; } }", "a pool's name "
-	    "begins with a letter");
-	bad("spaces { run { default = 5; } }", "expected a dataset's name, "
-	    "not an integer");
+	    "invalid dataset name: leading /");
+	bad("spaces { run { default = \"1tank/x\"; } }", "invalid dataset "
+	    "name: pool name must begin with a letter");
+	bad("spaces { run { default = 5; } }", "spaces.run.default: must be "
+	    "a string");
 	ok("spaces { lake { default = \"tank\"; } }");
 	/* CS10 */
-	bad("retention { lake = 5; }", "retention.lake: not a key of "
-	    "retention: it takes run, archive");
+	bad("retention { lake = 5; }", "retention.lake: invalid key");
 }
 
 /* CS4: properties. */
@@ -110,17 +108,15 @@ test_properties(void)
 	ok("properties { lake { atime = \"on\"; } build { exec = false; } "
 	    "config { \"com.example:x\" = \"y\"; } run { atime = \"off\"; } "
 	    "}");
-	bad("properties { bogus { } }", "properties.bogus: not a key of "
-	    "properties: it takes default, lake, run, config, build");
+	bad("properties { bogus { } }", "properties.bogus: invalid key");
 	bad("properties { default { recordsize = 1M; } }",
-	    "properties.default.recordsize: expected a string, or true or "
-	    "false, not an integer: quote it");
-	bad("properties { run { mountpoint = \"/x\"; } }", "not a property "
-	    "the configuration may set: shtetl sets it itself");
-	bad("properties { run { canmount = \"on\"; } }", "shtetl sets it "
-	    "itself");
-	bad("properties { lake = \"zstd\"; }", "properties.lake: expected an "
-	    "object of properties, not a string");
+	    "properties.default.recordsize: must be a quoted string");
+	bad("properties { run { mountpoint = \"/x\"; } }",
+	    "properties.run.mountpoint: invalid property: reserved");
+	bad("properties { run { canmount = \"on\"; } }", "invalid property: "
+	    "reserved");
+	bad("properties { lake = \"zstd\"; }", "properties.lake: must be an "
+	    "object");
 }
 
 /* CS5, CS6, CS7: counts, the suffix, the policies of 6.3. */
@@ -137,18 +133,17 @@ test_values(void)
 	size_t i, j;
 
 	ok("build { make_jobs = 8; }");
-	bad("build { make_jobs = -1; }", "build.make_jobs: a count is 0 or "
-	    "more, not -1");
-	bad("build { make_jobs = \"4\"; }", "expected a count, 0 or more, not "
-	    "a string");
-	bad("build { make_jobs = 1.5; }", "expected a count, 0 or more, not "
-	    "a number");
+	bad("build { make_jobs = -1; }", "build.make_jobs: must be 0 or more");
+	bad("build { make_jobs = \"4\"; }", "build.make_jobs: must be an "
+	    "integer");
+	bad("build { make_jobs = 1.5; }", "build.make_jobs: must be an "
+	    "integer");
 	/* CS6 */
 	ok("update { suffix = \"soak\"; }");
-	bad("update { suffix = \"\"; }", "update.suffix: not a name: empty");
-	bad("update { suffix = \"a.b\"; }", "not a name: it takes only "
-	    "letters, digits, '-' and '_'");
-	bad("update { suffix = true; }", "expected a name, not true");
+	bad("update { suffix = \"\"; }", "update.suffix: invalid name: empty");
+	bad("update { suffix = \"a.b\"; }", "update.suffix: invalid name: "
+	    "only letters, digits, - and _ allowed");
+	bad("update { suffix = true; }", "update.suffix: must be a string");
 	/* CS7 */
 	for (i = 0; i < sizeof (keys) / sizeof (keys[0]); i++) {
 		for (j = 0; j < sizeof (good) / sizeof (good[0]); j++) {
@@ -157,20 +152,17 @@ test_values(void)
 		}
 		for (j = 0; j < sizeof (poor) / sizeof (poor[0]); j++) {
 			(void) snprintf(text, sizeof (text), keys[i], poor[j]);
-			bad(text, "not an interval: an interval is a count "
-			    "above 0");
+			bad(text, "invalid interval: must be a count above 0 "
+			    "and one of y, m, w, d, H, M, S");
 		}
 		(void) snprintf(text, sizeof (text), keys[i], "-1");
-		bad(text, "a count is 0 or more, not -1");
+		bad(text, "must be 0 or more");
 		(void) snprintf(text, sizeof (text), keys[i], "1.5");
-		bad(text, "expected a count or a quoted interval, not a "
-		    "number");
+		bad(text, "must be an integer or a quoted interval");
 		(void) snprintf(text, sizeof (text), keys[i], "30d");
-		bad(text, "unquoted, UCL reads 30d as seconds; quote it, "
-		    "\"30d\"");
+		bad(text, "must be an integer or a quoted interval");
 		(void) snprintf(text, sizeof (text), keys[i], "true");
-		bad(text, "expected a count, 0 or more, or a quoted "
-		    "interval, not true");
+		bad(text, "must be an integer or a quoted interval");
 	}
 }
 
@@ -253,7 +245,7 @@ test_load(void)
 	cap_reset(&c);
 	CHECK(sh_site_load(root, &s, &c.c_err) == -1);
 	CHECK(s.ss_merged == NULL);
-	CHECK(cap_has(&c, "shtetl.conf: retention.lake: not a key"));
+	CHECK(cap_has(&c, "shtetl.conf: retention.lake: invalid key"));
 	/* CS11: the default recipe beside the settings, out of their view */
 	(void) scratch_write("four/shtetl.conf",
 	    "build { make_jobs = 2; }\nver = \">=15.1\";\n"
@@ -270,13 +262,12 @@ test_load(void)
 	(void) snprintf(root, sizeof (root), "%s", scratch_path("five"));
 	cap_reset(&c);
 	CHECK(sh_site_load(root, &s, &c.c_err) == -1);
-	CHECK(cap_has(&c, "shtetl.conf: ver: expected a version constraint, "
-	    "not an integer: quote it"));
+	CHECK(cap_has(&c, "shtetl.conf: ver: must be a quoted string"));
 	(void) scratch_write("three/shtetl.conf", ".include \"x\"\n");
 	(void) snprintf(root, sizeof (root), "%s", scratch_path("three"));
 	cap_reset(&c);
 	CHECK(sh_site_load(root, &s, &c.c_err) == -1);
-	CHECK(cap_has(&c, "shtetl.conf:1: a UCL macro"));
+	CHECK(cap_has(&c, "shtetl.conf:1: macros are illegal"));
 }
 
 int

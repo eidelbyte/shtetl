@@ -39,12 +39,12 @@ sh_syn_name(const char *s)
 	if (*s == '\0')
 		return ("empty");
 	if (strlen(s) > SYN_MAX)
-		return ("longer than 255 bytes");
+		return ("too long");
 	if (!syn_alnum(*s))
-		return ("it must begin with a letter or a digit");
+		return ("must begin with a letter or digit");
 	for (p = s; *p != '\0'; p++) {
 		if (!syn_alnum(*p) && *p != '-' && *p != '_')
-			return ("it takes only letters, digits, '-' and '_'");
+			return ("only letters, digits, - and _ allowed");
 	}
 	return (NULL);
 }
@@ -61,7 +61,7 @@ syn_components(const char *s, int (*ok)(char), const char *badchar)
 	if (*s == '\0')
 		return ("empty");
 	if (*s == '/')
-		return ("it begins with '/'");
+		return ("leading /");
 	start = s;
 	for (p = s; ; p++) {
 		if (*p != '/' && *p != '\0') {
@@ -70,11 +70,11 @@ syn_components(const char *s, int (*ok)(char), const char *badchar)
 			continue;
 		}
 		if (p == start)
-			return (*p == '\0' ? "it ends with '/'" :
-			    "an empty component");
+			return (*p == '\0' ? "trailing /" :
+			    "empty path component");
 		if ((p - start == 1 && start[0] == '.') ||
 		    (p - start == 2 && start[0] == '.' && start[1] == '.'))
-			return ("a '.' or '..' component");
+			return (". or .. component");
 		if (*p == '\0')
 			return (NULL);
 		start = p + 1;
@@ -85,9 +85,8 @@ const char *
 sh_syn_dataset(const char *s)
 {
 	if (strlen(s) > SYN_MAX)
-		return ("longer than 255 bytes");
-	return (syn_components(s, syn_zfs_char,
-	    "a character ZFS names do not take"));
+		return ("too long");
+	return (syn_components(s, syn_zfs_char, "invalid character"));
 }
 
 const char *
@@ -98,7 +97,7 @@ sh_syn_dsname(const char *s)
 	if ((why = sh_syn_dataset(s)) != NULL)
 		return (why);
 	if (!((*s >= 'a' && *s <= 'z') || (*s >= 'A' && *s <= 'Z')))
-		return ("a pool's name begins with a letter");
+		return ("pool name must begin with a letter");
 	return (NULL);
 }
 
@@ -110,12 +109,12 @@ sh_syn_pkg(const char *s)
 	if (*s == '\0')
 		return ("empty");
 	if (strlen(s) > SYN_MAX)
-		return ("longer than 255 bytes");
+		return ("too long");
 	if (*s == '-')
-		return ("it begins with '-'");
+		return ("leading -");
 	for (p = s; *p != '\0'; p++) {
 		if (!syn_alnum(*p) && strchr("-_.+@/", *p) == NULL)
-			return ("a character a package's name does not take");
+			return ("invalid character");
 	}
 	return (NULL);
 }
@@ -128,13 +127,12 @@ sh_syn_label(const char *s)
 	if (*s == '\0')
 		return ("empty");
 	if (strlen(s) > SYN_MAX)
-		return ("longer than 255 bytes");
+		return ("too long");
 	if (!syn_alnum(*s))
-		return ("it must begin with a letter or a digit");
+		return ("must begin with a letter or digit");
 	for (p = s; *p != '\0'; p++) {
 		if (!syn_alnum(*p) && strchr("-_.", *p) == NULL)
-			return ("it takes only letters, digits, '-', '_' and "
-			    "'.'");
+			return ("only letters, digits, -, _ and . allowed");
 	}
 	return (NULL);
 }
@@ -149,11 +147,10 @@ const char *
 sh_syn_relpath(const char *s)
 {
 	if (strlen(s) > 1024)
-		return ("longer than 1024 bytes");
+		return ("too long");
 	if (*s == '/')
-		return ("it is absolute: name a path in the configuration "
-		    "root");
-	return (syn_components(s, syn_path_char, "a control character"));
+		return ("absolute path");
+	return (syn_components(s, syn_path_char, "control character"));
 }
 
 static int
@@ -170,27 +167,27 @@ sh_syn_prop(const char *s)
 	if (*s == '\0')
 		return ("empty");
 	if (strlen(s) > SYN_MAX)
-		return ("longer than 255 bytes");
+		return ("too long");
 	if (strcmp(s, "mountpoint") == 0 || strcmp(s, "canmount") == 0 ||
 	    strncmp(s, "shtetl:", 7) == 0)
-		return ("shtetl sets it itself");
+		return ("reserved");
 	if (strchr(s, ':') != NULL) {
 		/* a user property: zfs_prop_user()'s characters */
 		for (p = s; *p != '\0'; p++) {
 			if (!syn_lower(*p) && strchr("_.:-", *p) == NULL)
-				return ("a user property takes only lowercase "
-				    "letters, digits, '_', '.', ':' and '-'");
+				return ("only lowercase letters, digits, _, "
+				    "., : and - allowed");
 		}
 		return (NULL);
 	}
 	if (!(*s >= 'a' && *s <= 'z'))
-		return ("not a ZFS property's name");
+		return ("malformed name");
 	for (p = s; *p != '\0' && *p != '@'; p++) {
 		if (!syn_lower(*p) && *p != '_')
-			return ("not a ZFS property's name");
+			return ("malformed name");
 	}
 	if (*p == '@' && p[1] == '\0')
-		return ("not a ZFS property's name");
+		return ("malformed name");
 	return (NULL);
 }
 
@@ -210,20 +207,20 @@ sh_syn_ver(const char *s)
 		}
 	}
 	if (p == NULL)
-		return ("it begins with none of >=, <=, >, < and =");
+		return ("must begin with >=, <=, >, < or =");
 	if (!syn_digit(*p))
-		return ("no version after the comparison: >=15, =15.1");
+		return ("missing version");
 	while (syn_digit(*p))
 		p++;
 	if (*p == '.') {
 		p++;
 		if (!syn_digit(*p))
-			return ("a version is N or N.N: >=15, =15.1");
+			return ("version must be N or N.N");
 		while (syn_digit(*p))
 			p++;
 	}
 	if (*p != '\0')
-		return ("a version is N or N.N: >=15, =15.1");
+		return ("version must be N or N.N");
 	return (NULL);
 }
 
@@ -301,8 +298,8 @@ sh_syn_interval(const char *s)
 	}
 	if (p == s || p - s > 9 || !nonzero || p[0] == '\0' ||
 	    strchr("ymwdHMS", p[0]) == NULL || p[1] != '\0')
-		return ("an interval is a count above 0 and one of y, m, w, "
-		    "d, H, M, S: \"7d\", \"6m\", \"1y\"");
+		return ("must be a count above 0 and one of y, m, w, d, H, "
+		    "M, S");
 	return (NULL);
 }
 
@@ -314,20 +311,20 @@ sh_syn_location(const char *s, enum sh_loc *kind)
 	if (*s == '\0')
 		return ("empty");
 	if (strlen(s) > 1024)
-		return ("longer than 1024 bytes");
+		return ("too long");
 	for (p = s; *p != '\0'; p++) {
 		if ((unsigned char)*p <= 0x20 || *p == 0x7f || *p == '"')
-			return ("a space, a quote or a control character");
+			return ("space, quote or control character");
 	}
 	if ((sep = strstr(s, "://")) != NULL) {
 		if (!((*s >= 'a' && *s <= 'z')))
-			return ("a URL's scheme begins with a letter");
+			return ("scheme must begin with a letter");
 		for (p = s; p < sep; p++) {
 			if (!syn_lower(*p) && strchr("+.-", *p) == NULL)
-				return ("not a URL's scheme");
+				return ("invalid scheme");
 		}
 		if (sep[3] == '\0')
-			return ("nothing after the scheme");
+			return ("missing path");
 		*kind = SH_LOC_URL;
 		return (NULL);
 	}
@@ -336,8 +333,7 @@ sh_syn_location(const char *s, enum sh_loc *kind)
 		slash = s + strlen(s);
 	for (p = s; p < slash; p++) {
 		if (*p == '@' || *p == ':')
-			return ("an scp-style address: write it as a URL, "
-			    "ssh://...");
+			return ("scp-style address: use ssh://");
 	}
 	if (memchr(s, '.', (size_t)(slash - s)) == NULL) {
 		*kind = SH_LOC_DIR;
@@ -345,11 +341,10 @@ sh_syn_location(const char *s, enum sh_loc *kind)
 	}
 	for (p = s; p < slash; p++) {
 		if (!syn_alnum(*p) && *p != '.' && *p != '-')
-			return ("not a host's name");
+			return ("invalid host");
 	}
 	if (*slash != '/' || slash[1] == '\0')
-		return ("a host with no path: host/path, as "
-		    "github.com/eidelbyte/freebsd-patches");
+		return ("missing path after host");
 	*kind = SH_LOC_HOST;
 	return (NULL);
 }

@@ -405,7 +405,7 @@ Built in M1 (`src/core/parse.c`, the one file that includes `ucl.h`):
   turns expansion off altogether, and `UCL_PARSER_NO_FILEVARS` keeps
   libucl from defining its own.
 - Times are left to libucl: an unquoted `30d` arrives as a number, so
-  the schema can say to quote it (6.3).
+  the schema refuses it as no quoted interval (6.3).
 - Unknown keys, and keys that belong to another kind (`kernconf_file`
   in a container's files), are errors with the file and the key path
   (`datasets."usr/local".readonly`), not the line: libucl keeps no
@@ -586,10 +586,8 @@ dropping what its foundation had.
 
 shtetl writes the files these go into, whole: the kernel config
 (`include` of `kernconf_file`, then `ident` and the lines), the
-src.conf, and the jail's `NAME { ... }` block in jail.conf. So
-`kernconf`, `buildopts_file` and `jailconf_file` are not keys any
-more, and neither is `reset`; each is refused with what to write
-instead (ruled 2026-10-12, Q-AC). What `jailconf` gives twice
+src.conf, and the jail's `NAME { ... }` block in jail.conf. What
+`jailconf` gives twice
 (`allow.raw_sockets` in two files) shtetl does not judge: jail(8)
 does.
 
@@ -601,12 +599,13 @@ generic`) and recorded by the clone's `origin`, as parasa did.
 `make_jobs` moved to shtetl.conf: it is about the machine, not the
 recipe.
 
-The forms of an entry, as built in M1 (`src/core/schema.c`; `false`
-refused since 2026-10-12, nothing being dropped): `pkg` and
-`requires` take `true`;
+The forms of an entry, as built (`src/core/schema.c`; `false` is
+refused: dropping values is illegal): `pkg` and `requires` take
+`true`;
 `datasets` take `true` or ZFS properties (`www { readonly = true;
 recordsize = "1M"; }`: strings, or true and false for on and off; a
-number is refused with "quote it", since UCL reads `1M` as 1000000;
+number is refused, "must be a quoted string", since UCL reads `1M`
+as 1000000;
 `mountpoint`, `canmount` and `shtetl:*` are shtetl's own); `commands`
 a string or heredoc; `derivations` `{ source; command; }`, both in one
 file; `patches` `true` or `{ ref; dir; }`. A list of names stands for

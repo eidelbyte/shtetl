@@ -143,7 +143,7 @@ static const char *const example[] = {
 	NULL
 };
 
-/* CC1, CC13, CC17, CC24: the worked example, and its layers. */
+/* CC1, CC17, CC24: the worked example, and its layers. */
 static void
 test_example(void)
 {
@@ -225,14 +225,14 @@ test_import_errors(void)
 	};
 
 	refused(mkroot("cyc", cyc), "containers/x", "common/b.conf: "
-	    "import[0]: an import cycle: common/a.conf, common/b.conf, "
+	    "import[0]: import cycle: common/a.conf, common/b.conf, "
 	    "common/a.conf");
 	CHECK(r.sr_merged == NULL);
 	refused(root, "containers/self", "containers/self.conf: import[0]: "
-	    "an import cycle: containers/self.conf, containers/self.conf");
+	    "import cycle: containers/self.conf, containers/self.conf");
 	(void) R(root, "containers/gone");
 	CHECK(cap_has(&c, "containers/gone.conf: import[1]: common/nope.conf: "
-	    "no such recipe in the configuration root"));
+	    "no such file"));
 }
 
 /*
@@ -298,11 +298,9 @@ test_stacked(void)
 	CHECK(is(M("src_branch")->sn_from, "common/b.conf"));
 	/* given again, not alike */
 	refused(root, "foundations/f2", "foundations/f2.conf: kernconf_file: "
-	    "MINE here, GENERIC in common/k.conf: the files that give it "
-	    "must agree");
+	    "MINE conflicts with GENERIC in common/k.conf");
 	refused(root, "foundations/f3", "foundations/f3.conf: src_branch: "
-	    "main here, releng/15.1 in common/b.conf: the files that give "
-	    "it must agree");
+	    "main conflicts with releng/15.1 in common/b.conf");
 }
 
 /* CC27: every ver must hold, so the ranges they allow must meet. */
@@ -355,15 +353,15 @@ test_ver(void)
 	size_t i;
 
 	refused(mkroot("vr", vr), "containers/a", "containers/a.conf: ver: "
-	    "no version is >=16 (containers/a.conf) and <15 (shtetl.conf) "
-	    "at once");
+	    ">=16 in containers/a.conf conflicts with <15 in shtetl.conf");
 	resolves(root, "containers/b");
-	refused(mkroot("vr2", vr2), "containers/c", "ver: no version is "
-	    ">15.1 (containers/c.conf) and =15.1 (common/x.conf) at once");
+	refused(mkroot("vr2", vr2), "containers/c", "ver: >15.1 in "
+	    "containers/c.conf conflicts with =15.1 in common/x.conf");
 	resolves(root, "containers/d");
-	refused(root, "containers/e", "ver: no version is >15 "
-	    "(containers/e.conf) and <=15.1 (containers/e.conf) at once");
-	refused(root, "containers/f", "no version is >=15.1");
+	refused(root, "containers/e", "ver: >15 in containers/e.conf "
+	    "conflicts with <=15.1 in containers/e.conf");
+	refused(root, "containers/f", "ver: >=15.1 in containers/f.conf "
+	    "conflicts with <15.1 in containers/f.conf");
 
 	for (i = 0; i < sizeof (ranges) / sizeof (ranges[0]); i++) {
 		sh_ver_range(ranges[i].vr_s, &lo, &hi);
@@ -372,11 +370,11 @@ test_ver(void)
 		CHECK(lo == ranges[i].vr_lo && hi == ranges[i].vr_hi);
 	}
 	resolves(mkroot("vr3", vr3), "containers/g");
-	refused(root, "containers/h", "no version is =15 "
-	    "(containers/h.conf) and <15 (containers/h.conf) at once");
+	refused(root, "containers/h", "ver: =15 in containers/h.conf "
+	    "conflicts with <15 in containers/h.conf");
 	resolves(root, "containers/i");
-	refused(root, "containers/j", "no version is >15 "
-	    "(containers/j.conf) and <16 (containers/j.conf) at once");
+	refused(root, "containers/j", "ver: >15 in containers/j.conf "
+	    "conflicts with <16 in containers/j.conf");
 	resolves(root, "containers/k");
 }
 
@@ -420,7 +418,7 @@ test_collections(void)
 	/* CC28 */
 	CHECK(wc.c_err.se_count == 1);
 	CHECK(cap_has(&wc, "containers/x.conf: datasets.www.compression: "
-	    "zstd overrides lz4, from common/f.conf"));
+	    "zstd overrides lz4 from common/f.conf"));
 	CHECK(is(sh_obj_find(M("datasets"), "www")->pr_from,
 	    "common/f.conf"));
 	/* CC16 */
@@ -448,9 +446,9 @@ test_collections(void)
 }
 
 /*
- * CC11, CC12, CC14, CC15: nothing is dropped and nothing reset (ruled
- * 2026-10-12), in any kind of recipe; so what shtetl.conf and its
- * imports give, every recipe keeps, commands included.
+ * CC11, CC12: dropping values is illegal in any kind of recipe, so
+ * what shtetl.conf and its imports give, every recipe keeps, commands
+ * included.
  */
 static void
 test_nodrops(void)
@@ -467,21 +465,18 @@ test_nodrops(void)
 		"systems/motd.conf", "commands { motd = false; }\n",
 		"foundations/f.conf",
 		"src_branch = \"main\";\npkg { tmux = false; }\n",
-		"foundations/g.conf",
-		"src_branch = \"main\";\nreset = [ \"pkg\" ];\n",
 		"containers/keep.conf", "pkg = [ \"mine\" ];\n",
 		NULL
 	};
 
 	refused(mkroot("nd", nd), "containers/tmux", "containers/tmux.conf: "
-	    "pkg.tmux: false drops nothing: the layers stack, and what one "
-	    "gives stays (ruled 2026-10-12)");
-	refused(root, "containers/tmp", "datasets.tmp: false drops nothing");
-	refused(root, "systems/motd", "commands.motd: false drops nothing");
-	refused(root, "foundations/f", "foundations/f.conf: pkg.tmux: false "
-	    "drops nothing");
-	refused(root, "foundations/g", "foundations/g.conf: reset: not a key "
-	    "any more: nothing is reset: the layers stack");
+	    "pkg.tmux: dropping values is illegal");
+	refused(root, "containers/tmp", "datasets.tmp: dropping values is "
+	    "illegal");
+	refused(root, "systems/motd", "commands.motd: dropping values is "
+	    "illegal");
+	refused(root, "foundations/f", "foundations/f.conf: pkg.tmux: "
+	    "dropping values is illegal");
 	resolves(root, "containers/keep");
 	CHECK(is(keys(M("pkg")), "zsh sudo tmux mine"));
 	CHECK(is(keys(M("datasets")), "tmp"));
@@ -525,19 +520,17 @@ test_merged(void)
 	};
 
 	refused(mkroot("mg", mg), "foundations/nob", "foundations/nob.conf: "
-	    "no layer gives src_branch: a foundation is built from a FreeBSD "
-	    "branch");
+	    "missing src_branch");
 	/* CC19: a derivation is given once, whole, alike or not */
 	resolves(root, "containers/once");
 	CHECK(is(keys(sh_obj_get(M("derivations"), "etc/x")),
 	    "source command"));
 	refused(root, "containers/twice", "containers/twice.conf: "
-	    "derivations.\"etc/x\": given in common/d.conf already: a "
-	    "derivation is given once");
+	    "derivations.\"etc/x\": already defined in common/d.conf");
 	/* CC30: a source's field given twice, alike or not; one added */
 	refused(root, "foundations/pref", "foundations/pref.conf: "
-	    "patches.\"github.com/a/b\".ref: given in common/p.conf already: "
-	    "what one file gives, another does not give again");
+	    "patches.\"github.com/a/b\".ref: already defined in "
+	    "common/p.conf");
 	resolves(root, "foundations/pdir");
 	CHECK(is(keys(sh_obj_get(M("patches"), "github.com/a/b")),
 	    "ref dir"));
@@ -545,18 +538,18 @@ test_merged(void)
 	CHECK(R(root, "foundations/files") == -1);
 	CHECK(c.c_err.se_count == 2);
 	CHECK(cap_has(&c, "foundations/files.conf: kernconf_file: "
-	    "kernels/NOPE: no such file in the configuration root"));
+	    "kernels/NOPE: no such file\n"));
 	CHECK(cap_has(&c, "foundations/files.conf: patches.\"patches/gen\": "
-	    "patches/gen/15.1: no such directory in the configuration root"));
+	    "patches/gen/15.1: no such directory\n"));
 	refused(root, "foundations/pat", "foundations/pat.conf: "
 	    "patches.\"patches/gone\": patches/gone: no such directory");
 	/* CC21 */
 	CHECK(R(root, "containers/req") == -1);
 	CHECK(c.c_err.se_count == 2);
-	CHECK(cap_has(&c, "containers/req.conf: requires.req: a container "
-	    "cannot require itself"));
+	CHECK(cap_has(&c, "containers/req.conf: requires.req: requires "
+	    "itself"));
 	CHECK(cap_has(&c, "containers/req.conf: requires.nope: no such "
-	    "container recipe: containers/nope.conf"));
+	    "container"));
 }
 
 /* CC22: naming the target. */
@@ -571,19 +564,19 @@ test_targets(void)
 	resolves(mkroot("tg", tg), "containers/x");
 	resolves(root, "containers/x.conf");
 	CHECK(is(r.sr_name, "x"));
-	refused(root, "x", "x: not a recipe: name one by its path, as "
-	    "foundations/F, containers/X or systems/S");
-	refused(root, "jails/x", "jails/x: not a recipe:");
-	refused(root, "containersx/x", "not a recipe:");
-	refused(root, "containers/../x", "containers/../x: not a recipe's "
-	    "name: it must begin with a letter or a digit");
-	refused(root, "containers/a.b", "not a recipe's name: it takes only");
-	refused(root, "containers/web/nginx", "not a recipe's name");
-	refused(root, "containers/", "containers/: not a recipe's name: "
+	refused(root, "x", "x: invalid recipe: use foundations/NAME, "
+	    "containers/NAME or systems/NAME");
+	refused(root, "jails/x", "jails/x: invalid recipe:");
+	refused(root, "containersx/x", "invalid recipe:");
+	refused(root, "containers/../x", "containers/../x: invalid recipe "
+	    "name: must begin with a letter or digit");
+	refused(root, "containers/a.b", "invalid recipe name: only letters");
+	refused(root, "containers/web/nginx", "invalid recipe name");
+	refused(root, "containers/", "containers/: invalid recipe name: "
 	    "empty");
 	refused(root, "containers/nope", "containers/nope.conf: no such "
-	    "recipe in the configuration root");
-	refused(root, "foundations/x", "foundations/x.conf: no such recipe");
+	    "file");
+	refused(root, "foundations/x", "foundations/x.conf: no such file");
 }
 
 /* CC23, CC26: every layer's problems, against the target's kind. */
@@ -600,12 +593,12 @@ test_layer_errors(void)
 
 	CHECK(R(mkroot("le", le), "containers/x") == -1);
 	CHECK(c.c_err.se_count == 4);
-	CHECK(cap_has(&c, "shtetl.conf: frob: not a key shtetl.conf takes"));
-	CHECK(cap_has(&c, "common/k.conf: kernconf_file: not a key of a "
-	    "container's recipe: only a foundation's takes it"));
-	CHECK(cap_has(&c, "common/k.conf: pkg[0]: not a package's name"));
-	CHECK(cap_has(&c, "containers/x.conf: jailconf: expected a string, "
-	    "not an integer: quote it"));
+	CHECK(cap_has(&c, "shtetl.conf: frob: invalid key"));
+	CHECK(cap_has(&c, "common/k.conf: kernconf_file: valid only in "
+	    "foundation recipe"));
+	CHECK(cap_has(&c, "common/k.conf: pkg[0]: invalid package name"));
+	CHECK(cap_has(&c, "containers/x.conf: jailconf: must be a quoted "
+	    "string"));
 	CHECK(r.sr_merged == NULL);
 }
 
@@ -672,9 +665,9 @@ test_default(void)
 	CHECK(is(v->sn_str, "lz4") && is(v->sn_from, "containers/x.conf"));
 	CHECK(wc.c_err.se_count == 2);
 	CHECK(cap_has(&wc, "containers/x.conf: datasets.var.compression: "
-	    "lz4 overrides zstd, from shtetl.conf"));
+	    "lz4 overrides zstd from shtetl.conf"));
 	CHECK(cap_has(&wc, "containers/x.conf: derivations.\"etc/pwd.db\": "
-	    "overrides the derivation from shtetl.conf"));
+	    "overrides shtetl.conf"));
 	v = sh_obj_get(sh_obj_get(M("derivations"), "etc/pwd.db"), "command");
 	CHECK(is(v->sn_str, "pwd_mkdb -p"));
 
@@ -687,11 +680,11 @@ test_default(void)
 	    "ref")->sn_str, "r2"));
 	CHECK(wc.c_err.se_count == 3);
 	CHECK(cap_has(&wc, "foundations/f.conf: src_branch: main overrides "
-	    "releng/15.1, from shtetl.conf"));
+	    "releng/15.1 from shtetl.conf"));
 	CHECK(cap_has(&wc, "foundations/f.conf: kernconf_file: MINIMAL "
-	    "overrides GENERIC, from shtetl.conf"));
+	    "overrides GENERIC from shtetl.conf"));
 	CHECK(cap_has(&wc, "foundations/f.conf: "
-	    "patches.\"github.com/a/b\".ref: r2 overrides r1, from "
+	    "patches.\"github.com/a/b\".ref: r2 overrides r1 from "
 	    "shtetl.conf"));
 	/* CC34: a foundation takes no container key */
 	CHECK(M("jailconf") == NULL);
@@ -719,10 +712,10 @@ test_site_checked(void)
 	};
 
 	refused(mkroot("sc", sc), "containers/x", "shtetl.conf: "
-	    "build.make_jobs: a count is 0 or more, not -1");
+	    "build.make_jobs: must be 0 or more");
 	CHECK(r.sr_merged == NULL);
 	refused(mkroot("si", si), "containers/x", "common/site.conf: "
-	    "retention: not a key a recipe takes");
+	    "retention: invalid key");
 }
 
 /* CC25: patch sources across layers keep their first place. */

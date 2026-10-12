@@ -86,9 +86,6 @@ test_every_key(void)
 	    "derivations { x { source = \"y\"; command = \"true\"; } }\n"
 	    "requires = [ \"db\" ];\n"
 	    "jailconf = \"allow.raw_sockets;\";\n", C);
-	bad("jailconf_file = \"jails/nginx.jail\";\n", C, "jailconf_file: "
-	    "not a key any more: shtetl writes the jail's block itself, and "
-	    "jailconf gives the options in it (ruled 2026-10-12)");
 	ok("import = [ \"common/base.conf\" ];\n"
 	    "ver = \"<16\";\n"
 	    "datasets { home {} }\n"
@@ -110,24 +107,21 @@ test_kinds(void)
 	char want[128];
 	size_t i;
 
-	bad("frobnicate = 1;\n", F, "t.conf: frobnicate: not a key a recipe "
-	    "takes");
-	bad("Pkg = [ \"a\" ];\n", C, "t.conf: Pkg: not a key a recipe takes");
+	bad("frobnicate = 1;\n", F, "t.conf: frobnicate: invalid key");
+	bad("Pkg = [ \"a\" ];\n", C, "t.conf: Pkg: invalid key");
 	for (i = 0; i < sizeof (fonly) / sizeof (fonly[0]); i++) {
-		(void) snprintf(want, sizeof (want), "t.conf: %.*s: not a key "
-		    "of a container's recipe: only a foundation's takes it",
-		    (int)strcspn(fonly[i], " "), fonly[i]);
+		(void) snprintf(want, sizeof (want), "t.conf: %.*s: valid only "
+		    "in foundation recipe", (int)strcspn(fonly[i], " "),
+		    fonly[i]);
 		bad(fonly[i], C, want);
-		bad(fonly[i], S, "only a foundation's takes it");
-		CHECK(cap_has(&c, "of a system's recipe"));
+		bad(fonly[i], S, want);
 	}
-	bad("requires = [ \"db\" ];", F, "t.conf: requires: not a key of a "
-	    "foundation's recipe: only a container's takes it");
-	bad("requires = [ \"db\" ];", S, "only a container's takes it");
-	bad("jailconf = \"x\";", S, "jailconf: not a key of a system's");
-	bad("kernconf = \"G\";", F, "kernconf: not a key any more: "
-	    "kernconf_file names the config to start from and "
-	    "kernconf_lines adds to it (ruled 2026-10-12)");
+	bad("requires = [ \"db\" ];", F, "t.conf: requires: valid only in "
+	    "container recipe");
+	bad("requires = [ \"db\" ];", S, "requires: valid only in container "
+	    "recipe");
+	bad("jailconf = \"x\";", S, "jailconf: valid only in container "
+	    "recipe");
 }
 
 /* CK5, CK6: strings and versions. */
@@ -141,14 +135,11 @@ test_strings(void)
 	char text[64];
 	size_t i;
 
-	bad("src_branch = 15;", F, "src_branch: expected a string, not an "
-	    "integer: quote it");
-	bad("kernconf_lines = true;", F, "expected a string, not true: "
-	    "quote it");
-	bad("ver = 15.1;", C, "ver: expected a version constraint, not a "
-	    "number: quote it");
-	bad("jailconf = [ \"a\" ];", C, "expected a string, not a list");
-	CHECK(!cap_has(&c, "quote it"));
+	bad("src_branch = 15;", F, "src_branch: must be a quoted string");
+	bad("kernconf_lines = true;", F, "kernconf_lines: must be a quoted "
+	    "string");
+	bad("ver = 15.1;", C, "ver: must be a quoted string");
+	bad("jailconf = [ \"a\" ];", C, "jailconf: must be a string");
 	bad("src_branch = \"\";", F, "src_branch: empty");
 	for (i = 0; i < sizeof (good) / sizeof (good[0]); i++) {
 		(void) snprintf(text, sizeof (text), "ver = \"%s\";", good[i]);
@@ -157,54 +148,41 @@ test_strings(void)
 	for (i = 0; i < sizeof (poor) / sizeof (poor[0]); i++) {
 		(void) snprintf(text, sizeof (text), "ver = \"%s\";", poor[i]);
 		bad(text, S, poor[i][0] == '\0' ? "ver: empty" :
-		    "ver: not a version constraint: ");
+		    "ver: invalid version constraint: ");
 	}
 }
 
-/*
- * CK7, CK8: kernconf_file and kernconf_lines, and paths in the
- * configuration root; buildopts_file is no key any more.
- */
+/* CK7, CK8: kernconf_file and kernconf_lines, and paths. */
 static void
 test_files(void)
 {
 	ok("kernconf_file = \"GENERIC\"; kernconf_lines = \"device vmm\";",
 	    F);
-	bad("buildopts_file = \"b\";", F, "buildopts_file: not a key any "
-	    "more: shtetl writes the src.conf itself, and buildopts gives "
-	    "the lines in it (ruled 2026-10-12)");
 	ok("kernconf_file = \"kernels/GAMING\";", F);
-	bad("kernconf_file = \"/etc/GAMING\";", F, "kernconf_file: not a "
-	    "file's path: it is absolute");
-	bad("kernconf_file = \"a/../b\";", F, "a '.' or '..' component");
-	bad("kernconf_file = \"./b\";", F, "a '.' or '..' component");
-	bad("kernconf_file = \"a//b\";", F, "an empty component");
-	bad("kernconf_file = \"a/\";", F, "it ends with '/'");
-	bad("kernconf_file = 5;", F, "expected a file's path, not an "
-	    "integer: quote it");
+	bad("kernconf_file = \"/etc/GAMING\";", F, "kernconf_file: invalid "
+	    "path: absolute path");
+	bad("kernconf_file = \"a/../b\";", F, "invalid path: . or .. "
+	    "component");
+	bad("kernconf_file = \"./b\";", F, "invalid path: . or .. component");
+	bad("kernconf_file = \"a//b\";", F, "invalid path: empty path "
+	    "component");
+	bad("kernconf_file = \"a/\";", F, "invalid path: trailing /");
+	bad("kernconf_file = 5;", F, "kernconf_file: must be a quoted "
+	    "string");
 }
 
-/* CK9, CK10: import, and reset refused. */
+/* CK9: import. */
 static void
-test_import_reset(void)
+test_import(void)
 {
 	ok("import = \"x.conf\";", C);
 	ok("import = [ \"a.conf\", \"b/c.conf\" ];", C);
-	bad("import = [ \"a.conf\", 1 ];", C, "import[1]: expected a "
-	    "recipe's path, not an integer");
-	bad("import = [ \"/x.conf\" ];", C, "import[0]: not a recipe's path: "
-	    "it is absolute");
-	bad("import { a = 1; }", C, "import: expected a list of recipes' "
-	    "paths, not an object");
-
-	bad("reset = [ \"pkg\", \"datasets\" ];", C,
-	    "t.conf: reset: "
-	    "not a key any more: nothing is reset: the layers stack, and "
-	    "what one gives stays (ruled 2026-10-12)");
-	bad("reset = \"commands\";", S, "reset: not a key any more: nothing "
-	    "is reset");
-	bad("reset = [ \"patches\" ];", F, "reset: not a key any more: "
-	    "nothing is reset");
+	bad("import = [ \"a.conf\", 1 ];", C, "import[1]: must be a quoted "
+	    "string");
+	bad("import = [ \"/x.conf\" ];", C, "import[0]: invalid path: "
+	    "absolute path");
+	bad("import { a = 1; }", C, "import: must be a path or a list of "
+	    "paths");
 }
 
 /* CK11, CK18: pkg, and collections given as scalars. */
@@ -214,28 +192,21 @@ test_pkg(void)
 	ok("pkg = [ \"a\", \"py311-certbot\", \"www/nginx\", \"gtk+3\" ];",
 	    C);
 	ok("pkg { a = true; b = true; }", C);
-	bad("pkg { a = true; b = false; }", C, "pkg.b: false drops nothing: "
-	    "the layers stack, and what one gives stays (ruled 2026-10-12)");
-	bad("pkg { a { x = 1; } }", C, "pkg.a: expected true, not an "
-	    "object");
-	bad("pkg { a = \"yes\"; }", C, "pkg.a: expected true, not a "
-	    "string");
-	bad("pkg = [ \"\" ];", C, "pkg[0]: not a package's name: empty");
-	bad("pkg = [ \"-x\" ];", C, "pkg[0]: not a package's name: it "
-	    "begins with '-'");
-	bad("pkg = [ \"a b\" ];", C, "a character a package's name does not "
-	    "take");
-	bad("pkg = [ \"a\", \"b\", \"a\" ];", C, "pkg[2]: \"a\" is listed "
-	    "twice");
-	bad("pkg = [ 5 ];", C, "pkg[0]: expected a package's name, not an "
-	    "integer: quote it");
+	bad("pkg { a = true; b = false; }", C, "pkg.b: dropping values is "
+	    "illegal");
+	bad("pkg { a { x = 1; } }", C, "pkg.a: must be true");
+	bad("pkg { a = \"yes\"; }", C, "pkg.a: must be true");
+	bad("pkg = [ \"\" ];", C, "pkg[0]: invalid package name: empty");
+	bad("pkg = [ \"-x\" ];", C, "pkg[0]: invalid package name: leading -");
+	bad("pkg = [ \"a b\" ];", C, "invalid package name: invalid "
+	    "character");
+	bad("pkg = [ \"a\", \"b\", \"a\" ];", C, "pkg[2]: duplicate entry "
+	    "\"a\"");
+	bad("pkg = [ 5 ];", C, "pkg[0]: must be a quoted string");
 	/* CK18 */
-	bad("pkg = \"a\";", C, "pkg: expected an object keyed by a "
-	    "package's name, or a list of them, not a string");
-	bad("datasets = 5;", F, "datasets: expected an object keyed by a "
-	    "dataset path, or a list of them, not an integer");
-	bad("commands = \"x\";", F, "commands: expected an object keyed by "
-	    "a label, not a string");
+	bad("pkg = \"a\";", C, "pkg: must be an object or a list");
+	bad("datasets = 5;", F, "datasets: must be an object or a list");
+	bad("commands = \"x\";", F, "commands: must be an object");
 }
 
 /* CK12, CK13: dataset paths, and their properties. */
@@ -244,39 +215,38 @@ test_datasets(void)
 {
 	ok("datasets = [ \"tmp\", \"usr/local\", \"var/db:x\", "
 	    "\"a b\" ];", F);
-	bad("datasets = [ \"/usr\" ];", F, "datasets[0]: not a dataset path: "
-	    "it begins with '/'");
-	bad("datasets = [ \"usr/\" ];", F, "it ends with '/'");
-	bad("datasets = [ \"a//b\" ];", F, "an empty component");
-	bad("datasets = [ \".\" ];", F, "a '.' or '..' component");
-	bad("datasets = [ \"a/../b\" ];", F, "a '.' or '..' component");
-	bad("datasets { \"a@b\" {} }", F, "datasets.\"a@b\": not a dataset "
-	    "path: a character ZFS names do not take");
-	bad("datasets = [ \"a#b\" ];", F, "a character ZFS names do not take");
+	bad("datasets = [ \"/usr\" ];", F, "datasets[0]: invalid dataset "
+	    "path: leading /");
+	bad("datasets = [ \"usr/\" ];", F, "trailing /");
+	bad("datasets = [ \"a//b\" ];", F, "empty path component");
+	bad("datasets = [ \".\" ];", F, ". or .. component");
+	bad("datasets = [ \"a/../b\" ];", F, ". or .. component");
+	bad("datasets { \"a@b\" {} }", F, "datasets.\"a@b\": invalid dataset "
+	    "path: invalid character");
+	bad("datasets = [ \"a#b\" ];", F, "invalid dataset path: invalid "
+	    "character");
 
 	ok("datasets { www { readonly = true; compression = \"lz4\"; "
 	    "recordsize = \"1M\"; \"com.example:x\" = \"y\"; "
 	    "\"userquota@www\" = \"1G\"; } }", C);
 	bad("datasets { www { recordsize = 1M; } }", C, "datasets.www."
-	    "recordsize: expected a string, or true or false, not an "
-	    "integer: quote it");
+	    "recordsize: must be a quoted string");
 	bad("datasets { www { mountpoint = \"/x\"; } }", C, "datasets.www."
-	    "mountpoint: not a property the configuration may set: shtetl "
-	    "sets it itself");
-	bad("datasets { www { canmount = \"on\"; } }", C, "shtetl sets it "
-	    "itself");
-	bad("datasets { www { \"shtetl:kind\" = \"x\"; } }", C, "shtetl sets "
-	    "it itself");
-	bad("datasets { www { Readonly = \"on\"; } }", C, "not a ZFS "
-	    "property's name");
-	bad("datasets { www { \"Com.example:x\" = \"y\"; } }", C, "a user "
-	    "property takes only lowercase");
+	    "mountpoint: invalid property: reserved");
+	bad("datasets { www { canmount = \"on\"; } }", C, "invalid property: "
+	    "reserved");
+	bad("datasets { www { \"shtetl:kind\" = \"x\"; } }", C, "invalid "
+	    "property: reserved");
+	bad("datasets { www { Readonly = \"on\"; } }", C, "invalid property: "
+	    "malformed name");
+	bad("datasets { www { \"Com.example:x\" = \"y\"; } }", C, "invalid "
+	    "property: only lowercase");
 	bad("datasets { www { readonly = \"\"; } }", C, "datasets.www."
 	    "readonly: empty");
-	bad("datasets { www = \"on\"; }", C, "datasets.www: expected true, "
-	    "or its properties, not a string");
-	bad("datasets { www = false; }", C, "datasets.www: false drops "
-	    "nothing");
+	bad("datasets { www = \"on\"; }", C, "datasets.www: must be true or "
+	    "an object");
+	bad("datasets { www = false; }", C, "datasets.www: dropping values "
+	    "is illegal");
 }
 
 /* CK14, CK15: commands and derivations. */
@@ -284,39 +254,35 @@ static void
 test_commands(void)
 {
 	ok("commands { a = \"x\"; \"c.d\" = \"y\"; }", S);
-	bad("commands { a = true; }", S, "commands.a: expected its commands, "
-	    "as a string or heredoc, not true");
-	bad("commands { a = false; }", S, "commands.a: false drops nothing");
-	bad("commands { a { x = 1; } }", S, "not an object");
-	bad("commands { a = 5; }", S, "not an integer: quote it");
-	bad("commands = [ \"a\" ];", S, "commands: expected an object keyed "
-	    "by a label, not a list");
+	bad("commands { a = true; }", S, "commands.a: must be a quoted "
+	    "string");
+	bad("commands { a = false; }", S, "commands.a: dropping values is "
+	    "illegal");
+	bad("commands { a { x = 1; } }", S, "commands.a: must be a string");
+	bad("commands { a = 5; }", S, "commands.a: must be a quoted string");
+	bad("commands = [ \"a\" ];", S, "commands: must be an object");
 	bad("commands { a = \"\"; }", S, "commands.a: empty");
-	bad("commands { \"-a\" = \"x\"; }", S, "commands.\"-a\": not a label: "
-	    "it must begin with a letter or a digit");
+	bad("commands { \"-a\" = \"x\"; }", S, "commands.\"-a\": invalid "
+	    "label: must begin with a letter or digit");
 
 	ok("derivations { \"etc/pwd.db\" { source = \"etc/master.passwd\"; "
 	    "command = \"pwd_mkdb\"; } }", C);
-	bad("derivations { x { source = \"s\"; } }", C, "derivations.x: a "
-	    "derivation gives its source and its command together, in one "
-	    "file");
+	bad("derivations { x { source = \"s\"; } }", C, "derivations.x: "
+	    "missing command");
+	bad("derivations { x { command = \"c\"; } }", C, "derivations.x: "
+	    "missing source");
 	bad("derivations { x { source = \"s\"; command = \"c\"; "
-	    "bogus = \"1\"; } }", C, "derivations.x.bogus: "
-	    "not a field of a derivation: it takes source and command");
+	    "bogus = \"1\"; } }", C, "derivations.x.bogus: invalid key");
 	bad("derivations { x { source = \"s\"; command = 5; } }",
-	    C, "derivations.x.command: "
-	    "expected a command, not an integer: quote it");
+	    C, "derivations.x.command: must be a quoted string");
 	bad("derivations { x { source = \"/etc/s\"; command = \"c\"; } "
-	    "}", C, "not a source "
-	    "file's path: it is absolute");
-	bad("derivations { \"/etc/x\" { command = \"c\"; } }", C,
-	    "derivations.\"/etc/x\": not a derived file's path: it is "
-	    "absolute");
-	bad("derivations = [ \"x\" ];", C, "derivations: expected an object "
-	    "keyed by a derived file's path, not a list");
-	bad("derivations { x = true; }", C, "expected { source; command; }, "
-	    "not true");
-	bad("derivations { x = false; }", C, "false drops nothing");
+	    "}", C, "derivations.x.source: invalid path: absolute path");
+	bad("derivations { \"/etc/x\" { source = \"s\"; command = \"c\"; } }",
+	    C, "derivations.\"/etc/x\": invalid path: absolute path");
+	bad("derivations = [ \"x\" ];", C, "derivations: must be an object");
+	bad("derivations { x = true; }", C, "derivations.x: must be an "
+	    "object");
+	bad("derivations { x = false; }", C, "dropping values is illegal");
 }
 
 /* CK16, CK17: requires, and patch sources. */
@@ -327,32 +293,33 @@ test_requires_patches(void)
 
 	ok("requires = [ \"db\", \"cache-1\" ];", C);
 	ok("requires { db = true; }", C);
-	bad("requires { old = false; }", C, "requires.old: false drops "
-	    "nothing");
-	bad("requires = [ \"a.b\" ];", C, "requires[0]: not a container's "
-	    "name: it takes only letters, digits, '-' and '_'");
-	bad("requires { db { x = 1; } }", C, "requires.db: expected true, "
-	    "not an object");
+	bad("requires { old = false; }", C, "requires.old: dropping values "
+	    "is illegal");
+	bad("requires = [ \"a.b\" ];", C, "requires[0]: invalid container "
+	    "name: only letters, digits, - and _ allowed");
+	bad("requires { db { x = 1; } }", C, "requires.db: must be true");
 
 	ok("patches = [ \"github.com/eidelbyte/freebsd-patches\", "
 	    "\"https://git.example.org/p.git\", \"patches/generic\" ];", F);
 	ok("patches { \"github.com/x/y\" { ref = \"releng-15.1\"; dir = "
 	    "\"15.1\"; } \"patches/local\" {} }", F);
-	bad("patches { old = false; }", F, "patches.old: false drops "
-	    "nothing");
-	bad("patches = [ \"/abs/dir\" ];", F, "patches[0]: not a patch "
-	    "source's location: it is absolute");
-	bad("patches = [ \"patches/../x\" ];", F, "a '.' or '..' component");
-	bad("patches = [ \"git@github.com:x/y\" ];", F, "an scp-style "
-	    "address: write it as a URL, ssh://...");
-	bad("patches = [ \"github.com\" ];", F, "a host with no path");
-	bad("patches = [ \"1http://x\" ];", F, "begins with a letter");
-	bad("patches { x { bogus = \"1\"; } }", F, "patches.x.bogus: not a "
-	    "field of a patch source: it takes ref and dir");
-	bad("patches { x { ref = \"a b\"; } }", F, "patches.x.ref: not a git "
-	    "ref: a space or a control character");
-	bad("patches { x { dir = \"/x\"; } }", F, "patches.x.dir: not a "
-	    "directory in the source: it is absolute");
+	bad("patches { old = false; }", F, "patches.old: dropping values is "
+	    "illegal");
+	bad("patches = [ \"/abs/dir\" ];", F, "patches[0]: invalid patch "
+	    "location: absolute path");
+	bad("patches = [ \"patches/../x\" ];", F, ". or .. component");
+	bad("patches = [ \"git@github.com:x/y\" ];", F, "invalid patch "
+	    "location: scp-style address: use ssh://");
+	bad("patches = [ \"github.com\" ];", F, "invalid patch location: "
+	    "missing path after host");
+	bad("patches = [ \"1http://x\" ];", F, "invalid patch location: "
+	    "scheme must begin with a letter");
+	bad("patches { x { bogus = \"1\"; } }", F, "patches.x.bogus: invalid "
+	    "key");
+	bad("patches { x { ref = \"a b\"; } }", F, "patches.x.ref: invalid "
+	    "git ref: space or control character");
+	bad("patches { x { dir = \"/x\"; } }", F, "patches.x.dir: invalid "
+	    "path: absolute path");
 
 	CHECK(sh_syn_location("https://x.org/a", &k) == NULL &&
 	    k == SH_LOC_URL);
@@ -369,13 +336,14 @@ test_reporting(void)
 {
 	CHECK(L("frob = 1;\npkg = [ \"-x\" ];\nkernconf_file = \"G\";\n"
 	    "datasets { \"usr/local\" { recordsize = 1; } }\n", C) == 4);
-	CHECK(cap_has(&c, "t.conf: frob: not a key a recipe takes\n"));
-	CHECK(cap_has(&c, "t.conf: pkg[0]: not a package's name"));
-	CHECK(cap_has(&c, "t.conf: kernconf_file: not a key of a container's"));
+	CHECK(cap_has(&c, "t.conf: frob: invalid key\n"));
+	CHECK(cap_has(&c, "t.conf: pkg[0]: invalid package name: leading -"));
+	CHECK(cap_has(&c, "t.conf: kernconf_file: valid only in foundation "
+	    "recipe"));
 	CHECK(cap_has(&c, "t.conf: datasets.\"usr/local\".recordsize: "
-	    "expected a string"));
-	bad("datasets { \"x\\\"y\" {} }", F, "datasets.\"x\\\"y\": not a "
-	    "dataset path");
+	    "must be a quoted string"));
+	bad("datasets { \"x\\\"y\" {} }", F, "datasets.\"x\\\"y\": invalid "
+	    "dataset path: invalid character");
 }
 
 /* TEXT checked as a file of the default layer: the count. */
@@ -405,13 +373,11 @@ test_default(void)
 	    "jailconf = \"allow.raw_sockets;\";\npkg = [ \"sudo\" ];\n", 1) ==
 	    0);
 	CHECK(DF("frob = 1;\n", 1) == 1);
-	CHECK(cap_has(&c, "shtetl.conf: frob: not a key shtetl.conf takes"));
-	CHECK(DF("reset = [ \"pkg\" ];\n", 1) == 1);
-	CHECK(cap_has(&c, "reset: not a key any more"));
+	CHECK(cap_has(&c, "shtetl.conf: frob: invalid key"));
 	CHECK(DF("build { make_jobs = 4; }\n", 0) == 1);
-	CHECK(cap_has(&c, "build: not a key a recipe takes"));
+	CHECK(cap_has(&c, "shtetl.conf: build: invalid key"));
 	CHECK(DF("kernconf_file = 5;\n", 1) == 1);
-	CHECK(cap_has(&c, "kernconf_file: expected a file's path"));
+	CHECK(cap_has(&c, "kernconf_file: must be a quoted string"));
 }
 
 int
@@ -422,7 +388,7 @@ main(void)
 	test_kinds();
 	test_strings();
 	test_files();
-	test_import_reset();
+	test_import();
 	test_pkg();
 	test_datasets();
 	test_commands();

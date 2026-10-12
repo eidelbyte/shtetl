@@ -122,7 +122,7 @@ ld_cycle(struct ld *x, size_t i, const char *name, const char *from,
 	}
 	n = strlen(buf);
 	(void) snprintf(buf + n, sizeof (buf) - n, "%s", name);
-	sh_err_at(x->ld_err, from, fpath, "an import cycle: %s", buf);
+	sh_err_at(x->ld_err, from, fpath, "import cycle: %s", buf);
 }
 
 static int ld_load(struct ld *x, const char *name, const char *from,
@@ -187,8 +187,8 @@ ld_load(struct ld *x, const char *name, const char *from,
 		}
 	}
 	if (x->ld_depth == SH_IMPORT_DEPTH) {
-		sh_err_at(x->ld_err, from, fpath, "imports nested more than "
-		    "%d deep", SH_IMPORT_DEPTH);
+		sh_err_at(x->ld_err, from, fpath, "imports nested deeper than "
+		    "%d", SH_IMPORT_DEPTH);
 		x->ld_failed = 1;
 		return (0);
 	}
@@ -197,11 +197,10 @@ ld_load(struct ld *x, const char *name, const char *from,
 	tree = sh_root_parse(x->ld_root, file, &missing, x->ld_err);
 	if (tree == NULL) {
 		if (missing && from != NULL)
-			sh_err_at(x->ld_err, from, fpath, "%s: no such recipe "
-			    "in the configuration root", name);
+			sh_err_at(x->ld_err, from, fpath, "%s: no such file",
+			    name);
 		else if (missing && !optional)
-			sh_errf(x->ld_err, "%s: no such recipe in the "
-			    "configuration root", name);
+			sh_errf(x->ld_err, "%s: no such file", name);
 		if (!missing || !optional)
 			x->ld_failed = 1;
 		free(file);
@@ -260,8 +259,8 @@ rs_target(const char *target, struct sh_recipe *r, struct sh_err *e)
 			break;
 	}
 	if (slash == NULL || i == sizeof (dirs) / sizeof (dirs[0])) {
-		sh_errf(e, "%s: not a recipe: name one by its path, as "
-		    "foundations/F, containers/X or systems/S", target);
+		sh_errf(e, "%s: invalid recipe: use foundations/NAME, "
+		    "containers/NAME or systems/NAME", target);
 		return (-1);
 	}
 	r->sr_kind = dirs[i].t_kind;
@@ -276,7 +275,7 @@ rs_target(const char *target, struct sh_recipe *r, struct sh_err *e)
 	(void) memcpy(r->sr_name, name, nlen);
 	r->sr_name[nlen] = '\0';
 	if ((why = sh_syn_name(r->sr_name)) != NULL) {
-		sh_errf(e, "%s: not a recipe's name: %s", target, why);
+		sh_errf(e, "%s: invalid recipe name: %s", target, why);
 		return (-1);
 	}
 	flen = strlen(dirs[i].t_dir) + 1 + nlen + strlen(".conf") + 1;
@@ -375,13 +374,12 @@ mg_entry(struct mg *m, struct sh_node *coll, const struct sh_rkey *rk,
 			if (m->mg_warn != NULL &&
 			    !sh_node_equal(cur->pr_val, ev))
 				sh_err_at(m->mg_warn, m->mg_l->sl_file,
-				    &m->mg_path, "overrides the derivation "
-				    "from %s", cur->pr_val->sn_from);
+				    &m->mg_path, "overrides %s",
+				    cur->pr_val->sn_from);
 			mg_set(m, coll, ek, ev);
 		} else
 			sh_err_at(m->mg_err, m->mg_l->sl_file, &m->mg_path,
-			    "given in %s already: a derivation is given once",
-			    cur->pr_from);
+			    "already defined in %s", cur->pr_from);
 		return;
 	}
 	if (ev->sn_type == SH_BOOL) {
@@ -400,13 +398,12 @@ mg_entry(struct mg *m, struct sh_node *coll, const struct sh_rkey *rk,
 		if (have != NULL && rk->rk_coll != SH_C_DATASETS &&
 		    !mg_default(m, have->pr_val)) {
 			sh_err_at(m->mg_err, m->mg_l->sl_file, &m->mg_path,
-			    "given in %s already: what one file gives, another "
-			    "does not give again", have->pr_val->sn_from);
+			    "already defined in %s", have->pr_val->sn_from);
 		} else {
 			if (have != NULL && m->mg_warn != NULL &&
 			    !sh_node_equal(have->pr_val, f->pr_val))
 				sh_err_at(m->mg_warn, m->mg_l->sl_file,
-				    &m->mg_path, "%s overrides %s, from %s",
+				    &m->mg_path, "%s overrides %s from %s",
 				    mg_said(f->pr_val), mg_said(have->pr_val),
 				    have->pr_val->sn_from);
 			mg_set(m, cur->pr_val, f->pr_key, f->pr_val);
@@ -546,7 +543,7 @@ mg_layer(struct mg *m)
 			    m->mg_warn != NULL &&
 			    !sh_node_equal(have->pr_val, pr->pr_val))
 				sh_err_at(m->mg_warn, m->mg_l->sl_file,
-				    &m->mg_path, "%s overrides %s, from %s",
+				    &m->mg_path, "%s overrides %s from %s",
 				    mg_said(pr->pr_val), mg_said(have->pr_val),
 				    have->pr_val->sn_from);
 			if (have == NULL || mg_default(m, have->pr_val))
@@ -554,8 +551,7 @@ mg_layer(struct mg *m)
 				    pr->pr_val);
 			else if (!sh_node_equal(have->pr_val, pr->pr_val))
 				sh_err_at(m->mg_err, m->mg_l->sl_file,
-				    &m->mg_path, "%s here, %s in %s: the files "
-				    "that give it must agree",
+				    &m->mg_path, "%s conflicts with %s in %s",
 				    mg_said(pr->pr_val), mg_said(have->pr_val),
 				    have->pr_val->sn_from);
 			break;
@@ -593,7 +589,7 @@ ck_ver(const struct sh_recipe *r, struct sh_err *e)
 		}
 	}
 	if (low != NULL && high != NULL && maxlo > minhi)
-		sh_errf(e, "%s: ver: no version is %s (%s) and %s (%s) at once",
+		sh_errf(e, "%s: ver: %s in %s conflicts with %s in %s",
 		    r->sr_file, low->sn_str, low->sn_from, high->sn_str,
 		    high->sn_from);
 }
@@ -617,15 +613,14 @@ ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
 	sh_path_init(&path);
 	if (r->sr_kind == SH_FOUNDATION &&
 	    sh_obj_get(merged, "src_branch") == NULL)
-		sh_errf(e, "%s: no layer gives src_branch: a foundation is "
-		    "built from a FreeBSD branch", r->sr_file);
+		sh_errf(e, "%s: missing src_branch", r->sr_file);
 	/* kernconf_file: a name is the src tree's, a path zconfig's */
 	if ((v = sh_obj_get(merged, "kernconf_file")) != NULL &&
 	    strchr(v->sn_str, '/') != NULL &&
 	    sh_root_kind(root, v->sn_str) != 'f') {
 		(void) sh_path_push(&path, "kernconf_file");
-		sh_err_at(e, v->sn_from, &path, "%s: no such file in the "
-		    "configuration root", v->sn_str);
+		sh_err_at(e, v->sn_from, &path, "%s: no such file",
+		    v->sn_str);
 		sh_path_pop(&path, 0);
 	}
 	ck_ver(r, e);
@@ -647,7 +642,7 @@ ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
 		}
 		if (sh_root_kind(root, sub) != 'd')
 			sh_err_at(e, pr->pr_from, &path, "%s: no such "
-			    "directory in the configuration root", sub);
+			    "directory", sub);
 		sh_path_pop(&path, 0);
 	}
 	coll = sh_obj_get(merged, "requires");
@@ -658,11 +653,9 @@ ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
 		(void) snprintf(rel, sizeof (rel), "containers/%s.conf",
 		    pr->pr_key);
 		if (strcmp(pr->pr_key, r->sr_name) == 0)
-			sh_err_at(e, pr->pr_from, &path, "a container cannot "
-			    "require itself");
+			sh_err_at(e, pr->pr_from, &path, "requires itself");
 		else if (sh_root_kind(root, rel) != 'f')
-			sh_err_at(e, pr->pr_from, &path, "no such container "
-			    "recipe: %s", rel);
+			sh_err_at(e, pr->pr_from, &path, "no such container");
 		sh_path_pop(&path, 0);
 	}
 }
@@ -681,8 +674,7 @@ sh_recipe_resolve(const char *root, const char *target,
 	if (rs_target(target, r, e) != 0)
 		return (-1);
 	if (sh_root_kind(root, r->sr_file) == 0) {
-		sh_errf(e, "%s: no such recipe in the configuration root",
-		    r->sr_file);
+		sh_errf(e, "%s: no such file", r->sr_file);
 		return (-1);
 	}
 	(void) memset(&x, 0, sizeof (x));

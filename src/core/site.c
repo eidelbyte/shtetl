@@ -2,7 +2,6 @@
  * shtetl.conf: its schema, the built-in settings, and the merge.
  */
 
-#include <stdio.h>
 #include <string.h>
 
 #include "core/err.h"
@@ -121,37 +120,26 @@ struct ck {
 };
 
 static void
-ck_type(struct ck *x, const char *what, const struct sh_node *v)
+ck_type(struct ck *x, const char *what)
 {
-	const char *found;
-
-	if (v->sn_type == SH_BOOL)
-		found = v->sn_bool ? "true" : "false";
-	else
-		found = sh_type_name(v->sn_type);
-	sh_err_at(x->ck_err, x->ck_file, &x->ck_path, "expected %s, not %s",
-	    what, found);
+	sh_err_at(x->ck_err, x->ck_file, &x->ck_path, "must be %s", what);
 }
 
 static void
 ck_value(struct ck *x, const struct skey *k, const struct sh_node *v);
 
-/* The keys of one section, against TABLE; WHAT names it. */
+/* The keys of one section, against TABLE. */
 static void
-ck_section(struct ck *x, const struct skey *table, const char *what,
-    const struct sh_node *v)
+ck_section(struct ck *x, const struct skey *table, const struct sh_node *v)
 {
 	const struct skey *k;
 	const struct sh_pair *pr;
-	char names[256], section[SH_PATH_MAX];
-	size_t i, was, n;
+	size_t i, was;
 
 	if (v->sn_type != SH_OBJECT) {
-		ck_type(x, "an object", v);
+		ck_type(x, "an object");
 		return;
 	}
-	/* WHAT may be the path itself, which the walk below extends */
-	(void) snprintf(section, sizeof (section), "%s", what);
 	for (i = 0; i < v->sn_obj.ob_n; i++) {
 		pr = &v->sn_obj.ob_v[i];
 		/* the default recipe's keys: sh_schema_default's to check */
@@ -162,18 +150,11 @@ ck_section(struct ck *x, const struct skey *table, const char *what,
 			if (strcmp(k->sk_name, pr->pr_key) == 0)
 				break;
 		}
-		if (k->sk_name != NULL) {
+		if (k->sk_name != NULL)
 			ck_value(x, k, pr->pr_val);
-		} else {
-			names[0] = '\0';
-			for (k = table, n = 0; k->sk_name != NULL; k++) {
-				n = strlen(names);
-				(void) snprintf(names + n, sizeof (names) - n,
-				    "%s%s", n > 0 ? ", " : "", k->sk_name);
-			}
+		else
 			sh_err_at(x->ck_err, x->ck_file, &x->ck_path,
-			    "not a key of %s: it takes %s", section, names);
-		}
+			    "invalid key");
 		sh_path_pop(&x->ck_path, was);
 	}
 }
@@ -185,7 +166,7 @@ ck_value(struct ck *x, const struct skey *k, const struct sh_node *v)
 
 	switch (k->sk_type) {
 	case SV_SECTION:
-		ck_section(x, k->sk_sub, x->ck_path.pa_buf, v);
+		ck_section(x, k->sk_sub, v);
 		return;
 	case SV_PROPS:
 		(void) sh_schema_props(v, x->ck_file, &x->ck_path, x->ck_err);
@@ -193,45 +174,36 @@ ck_value(struct ck *x, const struct skey *k, const struct sh_node *v)
 	case SV_COUNT:
 	case SV_POLICY:
 		if (v->sn_type == SH_INT && v->sn_int < 0) {
-			sh_err_at(x->ck_err, x->ck_file, &x->ck_path,
-			    "a count is 0 or more, not %lld",
-			    (long long)v->sn_int);
+			ck_type(x, "0 or more");
 			return;
 		}
 		if (v->sn_type == SH_INT)
 			return;
 		if (k->sk_type == SV_COUNT) {
-			ck_type(x, "a count, 0 or more", v);
+			ck_type(x, "an integer");
 			return;
 		}
 		if (v->sn_type == SH_STR) {
 			if ((why = sh_syn_interval(v->sn_str)) != NULL)
 				sh_err_at(x->ck_err, x->ck_file, &x->ck_path,
-				    "not an interval: %s", why);
+				    "invalid interval: %s", why);
 			return;
 		}
-		if (v->sn_type == SH_NUM) {
-			sh_err_at(x->ck_err, x->ck_file, &x->ck_path,
-			    "expected a count or a quoted interval, not a "
-			    "number: unquoted, UCL reads 30d as seconds; "
-			    "quote it, \"30d\"");
-			return;
-		}
-		ck_type(x, "a count, 0 or more, or a quoted interval", v);
+		/* UCL reads an unquoted 30d as a number of seconds */
+		ck_type(x, "an integer or a quoted interval");
 		return;
 	case SV_DSNAME:
 	case SV_NAME:
 		if (v->sn_type != SH_STR) {
-			ck_type(x, k->sk_type == SV_NAME ? "a name" :
-			    "a dataset's name", v);
+			ck_type(x, "a string");
 			return;
 		}
 		why = k->sk_type == SV_NAME ? sh_syn_name(v->sn_str) :
 		    sh_syn_dsname(v->sn_str);
 		if (why != NULL)
 			sh_err_at(x->ck_err, x->ck_file, &x->ck_path,
-			    "not %s: %s", k->sk_type == SV_NAME ? "a name" :
-			    "a dataset's name", why);
+			    "invalid %s: %s", k->sk_type == SV_NAME ? "name" :
+			    "dataset name", why);
 		return;
 	}
 }
@@ -251,7 +223,7 @@ sh_site_check(const struct sh_node *site, const char *file,
 	x.ck_file = file;
 	x.ck_err = e;
 	sh_path_init(&x.ck_path);
-	ck_section(&x, sk_top, "shtetl.conf", site);
+	ck_section(&x, sk_top, site);
 	if (site->sn_type == SH_OBJECT)
 		(void) sh_schema_default(site, file, 1, e);
 	return (e->se_count - before);

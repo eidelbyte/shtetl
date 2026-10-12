@@ -48,22 +48,6 @@ static const struct sh_rkey rkeys[] = {
 	{ NULL, 0, SH_V_STRING, SH_C_NONE, SH_M_LAYERS }
 };
 
-/* Keys there are no more, and what to write instead. */
-static const struct {
-	const char	*g_name;
-	const char	*g_why;
-} gone[] = {
-	{ "reset", "nothing is reset: the layers stack, and what one gives "
-	    "stays (ruled 2026-10-12)" },
-	{ "kernconf", "kernconf_file names the config to start from and "
-	    "kernconf_lines adds to it (ruled 2026-10-12)" },
-	{ "jailconf_file", "shtetl writes the jail's block itself, and "
-	    "jailconf gives the options in it (ruled 2026-10-12)" },
-	{ "buildopts_file", "shtetl writes the src.conf itself, and "
-	    "buildopts gives the lines in it (ruled 2026-10-12)" },
-	{ NULL, NULL }
-};
-
 #undef	F
 #undef	C
 
@@ -83,17 +67,16 @@ static const struct cdesc {
 	const char	*cd_forms;	/* the entry's forms, for messages */
 } cdescs[] = {
 	[SH_C_NONE] = { NULL, NULL, 0, 0, NULL },
-	[SH_C_PKG] = { "a package's name", sh_syn_pkg, 1, E_TRUE, "true" },
-	[SH_C_DATASETS] = { "a dataset path", sh_syn_dataset, 1,
-	    E_TRUE | E_OBJ, "true, or its properties" },
-	[SH_C_COMMANDS] = { "a label", sh_syn_label, 0, E_STR,
-	    "its commands, as a string or heredoc" },
-	[SH_C_DERIVATIONS] = { "a derived file's path", sh_syn_relpath, 0,
-	    E_OBJ, "{ source; command; }" },
-	[SH_C_REQUIRES] = { "a container's name", sh_syn_name, 1, E_TRUE,
+	[SH_C_PKG] = { "package name", sh_syn_pkg, 1, E_TRUE, "true" },
+	[SH_C_DATASETS] = { "dataset path", sh_syn_dataset, 1,
+	    E_TRUE | E_OBJ, "true or an object" },
+	[SH_C_COMMANDS] = { "label", sh_syn_label, 0, E_STR, "a string" },
+	[SH_C_DERIVATIONS] = { "path", sh_syn_relpath, 0, E_OBJ,
+	    "an object" },
+	[SH_C_REQUIRES] = { "container name", sh_syn_name, 1, E_TRUE,
 	    "true" },
-	[SH_C_PATCHES] = { "a patch source's location", cd_location, 1,
-	    E_TRUE | E_OBJ, "true, or { ref; dir; }" }
+	[SH_C_PATCHES] = { "patch location", cd_location, 1,
+	    E_TRUE | E_OBJ, "true or an object" }
 };
 
 /* One check's place: the file, the kind, where in the tree. */
@@ -139,41 +122,35 @@ sh_rkey(const char *key)
 }
 
 /*
- * "expected WHAT, not ...": what V is, and, where a quoted string
- * would have done and UCL read a bare word as something else, to
- * quote it.
+ * "must be WHAT". QUOTE: a string would do, and UCL read an unquoted
+ * word as a number or a boolean.
  */
 static void
 sc_type(struct sc *x, const char *what, const struct sh_node *v, int quote)
 {
-	const char *found;
-
-	if (v->sn_type == SH_BOOL)
-		found = v->sn_bool ? "true" : "false";
-	else
-		found = sh_type_name(v->sn_type);
-	sh_err_at(x->sc_err, x->sc_file, &x->sc_path, "expected %s, not %s%s",
-	    what, found, quote && (v->sn_type == SH_INT ||
-	    v->sn_type == SH_NUM || v->sn_type == SH_BOOL) ?
-	    ": quote it" : "");
+	if (quote && (v->sn_type == SH_INT || v->sn_type == SH_NUM ||
+	    v->sn_type == SH_BOOL))
+		what = "a quoted string";
+	sh_err_at(x->sc_err, x->sc_file, &x->sc_path, "must be %s", what);
 }
 
-/* WHY, from a syntax check, refusing S as WHAT. 1 if S passed. */
+/* WHY, from a syntax check, refusing a WHAT. 1 if it passed. */
 static int
 sc_syn(struct sc *x, const char *what, const char *why)
 {
 	if (why == NULL)
 		return (1);
-	sh_err_at(x->sc_err, x->sc_file, &x->sc_path, "not %s: %s", what, why);
+	sh_err_at(x->sc_err, x->sc_file, &x->sc_path, "invalid %s: %s", what,
+	    why);
 	return (0);
 }
 
 /* A non-empty string. 1 if V is one. */
 static int
-sc_string(struct sc *x, const struct sh_node *v, const char *what)
+sc_string(struct sc *x, const struct sh_node *v)
 {
 	if (v->sn_type != SH_STR) {
-		sc_type(x, what, v, 1);
+		sc_type(x, "a string", v, 1);
 		return (0);
 	}
 	if (v->sn_str[0] == '\0') {
@@ -186,7 +163,7 @@ sc_string(struct sc *x, const struct sh_node *v, const char *what)
 static void
 sc_relpath(struct sc *x, const struct sh_node *v, const char *what)
 {
-	if (sc_string(x, v, what))
+	if (sc_string(x, v))
 		(void) sc_syn(x, what, sh_syn_relpath(v->sn_str));
 }
 
@@ -194,9 +171,8 @@ sc_relpath(struct sc *x, const struct sh_node *v, const char *what)
 static void
 sc_ver_one(struct sc *x, const struct sh_node *v)
 {
-	if (sc_string(x, v, "a version constraint"))
-		(void) sc_syn(x, "a version constraint",
-		    sh_syn_ver(v->sn_str));
+	if (sc_string(x, v))
+		(void) sc_syn(x, "version constraint", sh_syn_ver(v->sn_str));
 }
 
 static void
@@ -222,16 +198,16 @@ sc_import(struct sc *x, const struct sh_node *v)
 	size_t i, was;
 
 	if (v->sn_type == SH_STR) {
-		sc_relpath(x, v, "a recipe's path");
+		sc_relpath(x, v, "path");
 		return;
 	}
 	if (v->sn_type != SH_ARRAY) {
-		sc_type(x, "a list of recipes' paths", v, 0);
+		sc_type(x, "a path or a list of paths", v, 0);
 		return;
 	}
 	for (i = 0; i < v->sn_arr.ar_n; i++) {
 		was = sh_path_index(&x->sc_path, i);
-		sc_relpath(x, v->sn_arr.ar_v[i], "a recipe's path");
+		sc_relpath(x, v->sn_arr.ar_v[i], "path");
 		sh_path_pop(&x->sc_path, was);
 	}
 }
@@ -250,13 +226,11 @@ sc_props(struct sc *x, const struct sh_node *props)
 	for (i = 0; i < props->sn_obj.ob_n; i++) {
 		pr = &props->sn_obj.ob_v[i];
 		was = sh_path_push(&x->sc_path, pr->pr_key);
-		if (sc_syn(x, "a property the configuration may set",
-		    sh_syn_prop(pr->pr_key))) {
+		if (sc_syn(x, "property", sh_syn_prop(pr->pr_key))) {
 			if (pr->pr_val->sn_type == SH_STR) {
-				(void) sc_string(x, pr->pr_val,
-				    "a property's value");
+				(void) sc_string(x, pr->pr_val);
 			} else if (pr->pr_val->sn_type != SH_BOOL) {
-				sc_type(x, "a string, or true or false",
+				sc_type(x, "a string or a boolean",
 				    pr->pr_val, 1);
 			}
 		}
@@ -277,7 +251,7 @@ sh_schema_props(const struct sh_node *props, const char *file,
 	x.sc_err = e;
 	x.sc_path = *path;
 	if (props->sn_type != SH_OBJECT)
-		sc_type(&x, "an object of properties", props, 0);
+		sc_type(&x, "an object", props, 0);
 	else
 		sc_props(&x, props);
 	return (e->se_count - before);
@@ -285,8 +259,7 @@ sh_schema_props(const struct sh_node *props, const char *file,
 
 /*
  * The fields of a derivation, or of a patch source. A derivation is
- * given whole, in one file: no file adds to or redefines another's
- * (ruled 2026-10-12).
+ * given whole, in one file.
  */
 static void
 sc_fields(struct sc *x, enum sh_coll coll, const struct sh_node *entry)
@@ -300,38 +273,38 @@ sc_fields(struct sc *x, enum sh_coll coll, const struct sh_node *entry)
 		was = sh_path_push(&x->sc_path, pr->pr_key);
 		if (coll == SH_C_DERIVATIONS &&
 		    strcmp(pr->pr_key, "source") == 0) {
-			sc_relpath(x, pr->pr_val, "a source file's path");
+			sc_relpath(x, pr->pr_val, "path");
 		} else if (coll == SH_C_DERIVATIONS &&
 		    strcmp(pr->pr_key, "command") == 0) {
-			(void) sc_string(x, pr->pr_val, "a command");
+			(void) sc_string(x, pr->pr_val);
 		} else if (coll == SH_C_PATCHES &&
 		    strcmp(pr->pr_key, "dir") == 0) {
-			sc_relpath(x, pr->pr_val, "a directory in the source");
+			sc_relpath(x, pr->pr_val, "path");
 		} else if (coll == SH_C_PATCHES &&
 		    strcmp(pr->pr_key, "ref") == 0) {
-			if (sc_string(x, pr->pr_val, "a git ref")) {
+			if (sc_string(x, pr->pr_val)) {
 				for (p = pr->pr_val->sn_str; *p != '\0'; p++) {
 					if ((unsigned char)*p <= 0x20 ||
 					    *p == 0x7f)
 						break;
 				}
 				if (*p != '\0')
-					(void) sc_syn(x, "a git ref",
-					    "a space or a control character");
+					(void) sc_syn(x, "git ref",
+					    "space or control character");
 			}
 		} else {
 			sh_err_at(x->sc_err, x->sc_file, &x->sc_path,
-			    "not a field of %s: it takes %s",
-			    coll == SH_C_DERIVATIONS ? "a derivation" :
-			    "a patch source", coll == SH_C_DERIVATIONS ?
-			    "source and command" : "ref and dir");
+			    "invalid key");
 		}
 		sh_path_pop(&x->sc_path, was);
 	}
-	if (coll == SH_C_DERIVATIONS && (sh_obj_get(entry, "source") == NULL ||
-	    sh_obj_get(entry, "command") == NULL))
-		sh_err_at(x->sc_err, x->sc_file, &x->sc_path, "a derivation "
-		    "gives its source and its command together, in one file");
+	if (coll != SH_C_DERIVATIONS)
+		return;
+	if (sh_obj_get(entry, "source") == NULL)
+		sh_err_at(x->sc_err, x->sc_file, &x->sc_path, "missing source");
+	if (sh_obj_get(entry, "command") == NULL)
+		sh_err_at(x->sc_err, x->sc_file, &x->sc_path,
+		    "missing command");
 }
 
 /* One entry of a collection: its key is on the path already. */
@@ -344,8 +317,7 @@ sc_entry(struct sc *x, const struct sh_rkey *rk, const struct sh_node *v)
 	case SH_BOOL:
 		if (!v->sn_bool) {
 			sh_err_at(x->sc_err, x->sc_file, &x->sc_path,
-			    "false drops nothing: the layers stack, and what "
-			    "one gives stays (ruled 2026-10-12)");
+			    "dropping values is illegal");
 			return;
 		}
 		if ((cd->cd_entry & E_TRUE) != 0)
@@ -362,7 +334,7 @@ sc_entry(struct sc *x, const struct sh_rkey *rk, const struct sh_node *v)
 	case SH_STR:
 		if ((cd->cd_entry & E_STR) == 0)
 			break;
-		(void) sc_string(x, v, cd->cd_forms);
+		(void) sc_string(x, v);
 		return;
 	default:
 		break;
@@ -389,17 +361,15 @@ sc_coll(struct sc *x, const struct sh_rkey *rk, const struct sh_node *v)
 		return;
 	}
 	if (v->sn_type != SH_ARRAY || !cd->cd_list) {
-		sh_err_at(x->sc_err, x->sc_file, &x->sc_path,
-		    "expected an object keyed by %s%s, not %s", cd->cd_key,
-		    cd->cd_list ? ", or a list of them" : "",
-		    sh_type_name(v->sn_type));
+		sh_err_at(x->sc_err, x->sc_file, &x->sc_path, "must be %s",
+		    cd->cd_list ? "an object or a list" : "an object");
 		return;
 	}
 	for (i = 0; i < v->sn_arr.ar_n; i++) {
 		el = v->sn_arr.ar_v[i];
 		was = sh_path_index(&x->sc_path, i);
 		if (el->sn_type != SH_STR) {
-			sc_type(x, cd->cd_key, el, 1);
+			sc_type(x, "a string", el, 1);
 		} else if (sc_syn(x, cd->cd_key, cd->cd_syn(el->sn_str))) {
 			for (j = 0; j < i; j++) {
 				if (v->sn_arr.ar_v[j]->sn_type == SH_STR &&
@@ -409,25 +379,10 @@ sc_coll(struct sc *x, const struct sh_rkey *rk, const struct sh_node *v)
 			}
 			if (j < i)
 				sh_err_at(x->sc_err, x->sc_file, &x->sc_path,
-				    "\"%s\" is listed twice", el->sn_str);
+				    "duplicate entry \"%s\"", el->sn_str);
 		}
 		sh_path_pop(&x->sc_path, was);
 	}
-}
-
-/* Which kinds take a key, for a message: "a foundation's". */
-static const char *
-sc_whose(unsigned kinds)
-{
-	switch (kinds) {
-	case SH_FOUNDATION:
-		return ("a foundation's");
-	case SH_CONTAINER:
-		return ("a container's");
-	case SH_SYSTEM:
-		return ("a system's");
-	}
-	return ("another kind's");
 }
 
 /*
@@ -443,7 +398,7 @@ sc_layer(const struct sh_node *layer, unsigned kinds, const char *file,
 	const struct sh_pair *pr;
 	struct sc x;
 	unsigned before;
-	size_t i, j, was;
+	size_t i, was;
 
 	before = e->se_count;
 	x.sc_file = file;
@@ -460,21 +415,12 @@ sc_layer(const struct sh_node *layer, unsigned kinds, const char *file,
 			continue;
 		was = sh_path_push(&x.sc_path, pr->pr_key);
 		rk = sh_rkey(pr->pr_key);
-		for (j = 0; gone[j].g_name != NULL; j++) {
-			if (strcmp(pr->pr_key, gone[j].g_name) == 0)
-				break;
-		}
-		if (gone[j].g_name != NULL) {
-			sh_err_at(e, file, &x.sc_path, "not a key any more: %s",
-			    gone[j].g_why);
-		} else if (rk == NULL) {
-			sh_err_at(e, file, &x.sc_path, "not a key %s takes",
-			    settings ? "shtetl.conf" : "a recipe");
+		if (rk == NULL) {
+			sh_err_at(e, file, &x.sc_path, "invalid key");
 		} else if ((rk->rk_kinds & kinds) == 0) {
-			sh_err_at(e, file, &x.sc_path, "not a key of a %s's "
-			    "recipe: only %s takes it",
-			    sh_kind_name((enum sh_kind)kinds),
-			    sc_whose(rk->rk_kinds));
+			sh_err_at(e, file, &x.sc_path,
+			    "valid only in %s recipe",
+			    sh_kind_name((enum sh_kind)rk->rk_kinds));
 		} else {
 			switch (rk->rk_vt) {
 			case SH_V_IMPORT:
@@ -484,10 +430,10 @@ sc_layer(const struct sh_node *layer, unsigned kinds, const char *file,
 				sc_ver(&x, pr->pr_val);
 				break;
 			case SH_V_STRING:
-				(void) sc_string(&x, pr->pr_val, "a string");
+				(void) sc_string(&x, pr->pr_val);
 				break;
 			case SH_V_FILE:
-				sc_relpath(&x, pr->pr_val, "a file's path");
+				sc_relpath(&x, pr->pr_val, "path");
 				break;
 			case SH_V_COLL:
 				sc_coll(&x, rk, pr->pr_val);

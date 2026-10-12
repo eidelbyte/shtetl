@@ -76,7 +76,7 @@ test_shape(void)
 	sh_node_free(n);
 	CHECK(c.c_err.se_count == 0);
 
-	refused("[1, 2]", "t.conf: the file must hold keys, not a list");
+	refused("[1, 2]", "t.conf: must be an object");
 }
 
 /* CP3, CP4: every scalar kind, typed as UCL types it. */
@@ -162,12 +162,13 @@ test_nesting(void)
 static void
 test_duplicates(void)
 {
-	refused("a = 1;\nb = 2;\na = 3;\n", "line: 3");
+	refused("a = 1;\nb = 2;\na = 3;\n", "t.conf:3: duplicate key");
 	CHECK(cap_has(&c, "t.conf"));
 	CHECK(cap_has(&c, "duplicate"));
-	refused("a { x = 1; }\nb = 2;\na { y = 3; }\n", "line: 3");
+	refused("a { x = 1; }\nb = 2;\na { y = 3; }\n",
+	    "t.conf:3: duplicate key");
 	CHECK(cap_has(&c, "duplicate"));
-	refused("o {\n a = 1;\n a = 2;\n}\n", "line: 3");
+	refused("o {\n a = 1;\n a = 2;\n}\n", "t.conf:3: duplicate key");
 	CHECK(cap_has(&c, "duplicate"));
 }
 
@@ -184,20 +185,20 @@ test_macros(void)
 
 	inc = scratch_write("inc.conf", "included = true;\n");
 	(void) snprintf(text, sizeof (text), "x = 1;\n.include \"%s\"\n", inc);
-	refused(text, "t.conf:2: a UCL macro");
+	refused(text, "t.conf:2: macros are illegal");
 	(void) snprintf(text, sizeof (text), "o {\n  x = 1;\n  .priority 5\n"
 	    "}\n");
-	refused(text, "t.conf:3: a UCL macro");
+	refused(text, "t.conf:3: macros are illegal");
 	(void) snprintf(text, sizeof (text), ".try_include \"%s\"\n", inc);
-	refused(text, "t.conf:1: a UCL macro");
+	refused(text, "t.conf:1: macros are illegal");
 	(void) snprintf(text, sizeof (text), "a = 1;\n.includes \"%s\"\n",
 	    inc);
-	refused(text, "t.conf:2: a UCL macro");
+	refused(text, "t.conf:2: macros are illegal");
 	(void) snprintf(text, sizeof (text), ".load(key=\"k\") \"%s\"\n", inc);
-	refused(text, "t.conf:1: a UCL macro");
+	refused(text, "t.conf:1: macros are illegal");
 	refused("o { a = 1; }\np {\n  .inherit \"o\"\n}\n",
-	    "t.conf:3: a UCL macro");
-	refused("x = 1;\n.foo bar\n", "t.conf:2: a UCL macro");
+	    "t.conf:3: macros are illegal");
+	refused("x = 1;\n.foo bar\n", "t.conf:2: macros are illegal");
 }
 
 /*
@@ -235,13 +236,14 @@ test_bad_input(void)
 	char deep[512];
 	size_t i;
 
-	refused("a = {\n b = 1;\n", "t.conf");
+	refused("a = {\n b = 1;\n", "syntax error");
+	CHECK(cap_has(&c, "t.conf:"));
 
 	cap_reset(&c);
 	n = sh_parse_buf(nul, sizeof (nul) - 1, "t.conf", &c.c_err);
 	CHECK(n == NULL);
 	CHECK(c.c_err.se_count == 1);
-	CHECK(cap_has(&c, "t.conf:2: a NUL byte"));
+	CHECK(cap_has(&c, "t.conf:2: NUL byte"));
 	/* the same byte by escape, which libucl may unescape */
 	cap_reset(&c);
 	n = P("a = \"x\\u0000y\";\n");
@@ -256,7 +258,7 @@ test_bad_input(void)
 	(void) strcat(deep, "b = 1;");
 	for (i = 0; i < SH_PARSE_DEPTH; i++)
 		(void) strcat(deep, "}");
-	refused(deep, "nested more than 64 deep");
+	refused(deep, "nested deeper than 64");
 	CHECK(cap_has(&c, "t.conf: a.a.a."));
 }
 
@@ -295,7 +297,7 @@ test_files(void)
 	CHECK(truncate(scratch_path("big.conf"), SH_PARSE_MAX) == 0);
 	CHECK(sh_parse_file(scratch_path("big.conf"), "big.conf",
 	    &c.c_err) == NULL);
-	CHECK(cap_has(&c, "big.conf:1: a NUL byte"));
+	CHECK(cap_has(&c, "big.conf:1: NUL byte"));
 
 	/* CP22: every node and key of a parsed file is from that file */
 	cap_reset(&c);

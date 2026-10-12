@@ -1,1 +1,1 @@
-shtetl: containers/drop.conf: pkg.tmux: false drops nothing: the layers stack, and what one gives stays (ruled 2026-10-12)
+shtetl: containers/drop.conf: pkg.tmux: dropping values is illegal

@@ -2,9 +2,8 @@ The rule this file follows: plot each phase's problem space before
 writing its tests. Enumerate the dimensions, cross them into cells,
 and give every cell a disposition: planned (names the test that will
 close it), covered (the test exists and names the cell), deferred
-(with the reason and the work that unblocks it), or retired (a ruling
-took the behavior away; the row says which, and what covers the
-ruling instead). A cell with no row
+(with the reason and the work that unblocks it). A behavior a ruling
+takes away goes from the matrix with its cells. A cell with no row
 is a hole. Each test's comment names the cells it closes. When a cell
 flips from planned to covered, the row changes with it.
 
@@ -90,15 +89,14 @@ object, string}; entry key syntax per collection; error reporting
 | CK2 | an unknown key is refused with the file and its key path | covered: check_schema.c |
 | CK3 | a foundation-only key (src_branch, kernconf_file, kernconf_lines, buildopts, patches) in a container and in a system is refused, naming the kind | covered: check_schema.c |
 | CK4 | a container-only key (requires, jailconf) in a foundation and in a system is refused | covered: check_schema.c |
-| CK5 | a string key given a number or a bool is refused; a number says to quote it | covered: check_schema.c |
+| CK5 | a string key given a number or a bool is refused: must be a quoted string | covered: check_schema.c |
 | CK6 | ver, one constraint or a list of them: `>=15`, `=15.1`, `<16`, `<=15.1`, `>14` accepted; ``, `15.1`, `>=`, `=>15`, `>=15.x`, `>=15.` refused | covered: check_schema.c, check_cascade.c test_ver |
 | CK7 | kernconf_file and kernconf_lines in one file; a kernconf_file path in zconfig | covered: check_schema.c |
 | CK8 | a `_file` value: relative paths accepted; absolute, `..`, empty components refused | covered: check_schema.c |
 | CK9 | import: an array of strings, or one string; a non-string element or a bad path refused | covered: check_schema.c |
-| CK10 | reset is refused: nothing is reset, the layers stack (ruled 2026-10-12) | covered: check_schema.c |
-| CK11 | pkg: array shorthand; entries true; false refused (nothing is dropped); an entry with fields refused; bad names (empty, leading `-`, a space) refused | covered: check_schema.c |
+| CK11 | pkg: array shorthand; entries true; false refused (dropping values is illegal); an entry with fields refused; bad names (empty, leading `-`, a space) refused | covered: check_schema.c |
 | CK12 | datasets: paths by ZFS's characters; leading or trailing `/`, `//`, `.`, `..`, `@` refused | covered: check_schema.c |
-| CK13 | dataset entries: true, or properties with string or bool values; false refused; a number refused (quote it); mountpoint, canmount and shtetl:* refused; a bad property name refused | covered: check_schema.c |
+| CK13 | dataset entries: true, or properties with string or bool values; false refused; a number refused (must be a quoted string); mountpoint, canmount and shtetl:* refused; a bad property name refused | covered: check_schema.c |
 | CK14 | commands: a string; true, false, an object or an array of names refused; an empty string refused; label syntax | covered: check_schema.c |
 | CK15 | derivations: {source, command}, both, in one file; false, an unknown field, a non-string field, half an entry refused; key path syntax | covered: check_schema.c |
 | CK16 | requires: container names, array shorthand; false and a bad name refused | covered: check_schema.c |
@@ -106,8 +104,7 @@ object, string}; entry key syntax per collection; error reporting
 | CK18 | a collection given as a scalar is refused | covered: check_schema.c |
 | CK19 | every error in a layer is reported, not only the first | covered: check_schema.c |
 | CK20 | the key path quotes a component that is not a bare word (`datasets."usr/local".readonly`) | covered: check_schema.c |
-| CK21 | a key there is no more (reset, kernconf, jailconf_file, buildopts_file) is refused, saying what to write instead | covered: check_schema.c |
-| CK22 | a file of the default layer takes every kind's keys; shtetl.conf's sections of settings are no recipe keys, and a file it imports may have none; an unknown key or a key there is no more is refused | covered: check_schema.c test_default |
+| CK22 | a file of the default layer takes every kind's keys; shtetl.conf's sections of settings are no recipe keys, and a file it imports may have none; an unknown key is refused | covered: check_schema.c test_default |
 
 ## CS: shtetl.conf (planning.md 5.2, 6.3; src/core/site.c)
 
@@ -124,7 +121,7 @@ forms of 6.3 {0, a count, an interval, each malformed one}; layers
 | CS4 | properties: sections default, lake, run, config, build; string or bool values; a number refused; mountpoint, canmount, shtetl:* refused | covered: check_site.c |
 | CS5 | build.make_jobs: 0 or more; negative, a string, a float refused | covered: check_site.c |
 | CS6 | update.suffix: a name; empty or a bad character refused | covered: check_site.c |
-| CS7 | retention.run, retention.archive, update.depth: 0, 10, "7d", "6m", "1y", "12H" accepted; -1, "7x", "d7", "", "0d", 1.5 and an unquoted 30d refused, the last saying to quote it | covered: check_site.c |
+| CS7 | retention.run, retention.archive, update.depth: 0, 10, "7d", "6m", "1y", "12H" accepted; -1, "7x", "d7", "", "0d", 1.5 and an unquoted 30d refused | covered: check_site.c |
 | CS8 | with no shtetl.conf the settings are the built-in ones (4.3's properties, 6.3's zeros, suffix staging) | covered: check_site.c |
 | CS9 | shtetl.conf sets one property; the rest stay built-in, each with its layer | covered: check_site.c |
 | CS10 | retention.lake is refused: zlake keeps what zrun keeps | covered: check_site.c |
@@ -137,8 +134,8 @@ imports), imports flat, nested, repeated, cyclic, missing, the
 target}; merge {one value (agree, disagree, over the default), text
 pieces, ver, collection add, a field given again (over a recipe file,
 over the default), a dataset property overridden, a derivation given
-again, a commands piece, array shorthand, true over fields; drops and
-reset retired}; the default's keys {of the recipe's kind, of another
+again, a commands piece, array shorthand, true over fields, false};
+the default's keys {of the recipe's kind, of another
 kind, settings}; order; checks after the merge; the target's
 spelling.
 
@@ -154,13 +151,10 @@ spelling.
 | CC8 | buildopts, kernconf_lines and jailconf append: a piece from each file, keyed by it, lower layers first (ruled 2026-10-12, Q-T, Q-AC) | covered: check_cascade.c test_stacked |
 | CC9 | collections: a key added; an entry's fields compose across files, each given once | covered: check_cascade.c |
 | CC10 | array shorthand merges as name = true; true over an entry with fields keeps the fields | covered: check_cascade.c |
-| CC11 | false and reset are refused in every kind of recipe: nothing is dropped, nothing reset (ruled 2026-10-12) | covered: check_cascade.c test_nodrops |
+| CC11 | false as an entry is refused in every kind of recipe: dropping values is illegal | covered: check_cascade.c test_nodrops |
 | CC12 | what stacks in the default (shtetl.conf and its imports), every recipe keeps, commands included | covered: check_cascade.c test_nodrops, test_default |
-| CC13 | retired 2026-10-12: a container dropped what its own import added (5.4's apache24); nothing is dropped now | retired: no drops (CC11) |
-| CC14 | retired 2026-10-12: a foundation dropped a default.conf element; nothing is dropped now | retired: no drops (CC11) |
-| CC15 | retired 2026-10-12: reset emptied an inherited collection; reset is refused now | retired: no reset (CC11, CK10) |
 | CC16 | order: keys keep their first place across layers; an overridden commands block stays where it was first defined | covered: check_cascade.c |
-| CC17 | 5.4's worked example, nothing dropped, its default in shtetl.conf: pkg sudo, tmux, apache24, py311-certbot, nginx; datasets tmp, var, usr/local, www; commands certbot, nginx | covered: check_cascade.c |
+| CC17 | 5.4's worked example, its default in shtetl.conf: pkg sudo, tmux, apache24, py311-certbot, nginx; datasets tmp, var, usr/local, www; commands certbot, nginx | covered: check_cascade.c |
 | CC18 | a foundation with no src_branch after the merge is refused | covered: check_cascade.c |
 | CC19 | a derivation given in a second file, alike or not, is refused, naming the first (ruled 2026-10-12) | covered: check_cascade.c |
 | CC20 | a kernconf_file path or a patches directory that does not exist in the config root is refused, naming the key | covered: check_cascade.c |

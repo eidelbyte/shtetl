@@ -76,8 +76,8 @@ read and checked before anything merges, and every problem in every
 file is reported, not only the first.
 
 UCL reads an unquoted `15.1` as a number, `1M` as 1000000 and `30d`
-as a number of seconds. Where shtetl wants a string, it refuses the
-number and says to quote it.
+as a number of seconds. Where shtetl wants a string, a number is
+refused: "must be a quoted string".
 
 <!-- example: reading -->
 
@@ -98,32 +98,31 @@ pkg = [ "nginx" ];
 ver = 15.1;
 pkgs = [ "nginx" ];
 src_branch = "releng/15.1";
-kernconf = "GENERIC";
+requires = [ "web.1" ];
 pkg { nginx = true; git = false; }
 datasets { www { recordsize = 1M; } }
 ```
 
 ```console
 $ shtetl config show containers/twice
-shtetl: error while parsing containers/twice.conf: line: 3, column: 6 - 'duplicate element for key 'pkg' found', character: '['
+shtetl: containers/twice.conf:3: duplicate key
 $ shtetl config show containers/macro
-shtetl: containers/macro.conf:2: a UCL macro (.include, .priority and the like): shtetl's configuration takes none
+shtetl: containers/macro.conf:2: macros are illegal
 $ shtetl config show containers/many
-shtetl: containers/many.conf: ver: expected a version constraint, not a number: quote it
-shtetl: containers/many.conf: pkgs: not a key a recipe takes
-shtetl: containers/many.conf: src_branch: not a key of a container's recipe: only a foundation's takes it
-shtetl: containers/many.conf: kernconf: not a key any more: kernconf_file names the config to start from and kernconf_lines adds to it (ruled 2026-10-12)
-shtetl: containers/many.conf: pkg.git: false drops nothing: the layers stack, and what one gives stays (ruled 2026-10-12)
-shtetl: containers/many.conf: datasets.www.recordsize: expected a string, or true or false, not an integer: quote it
+shtetl: containers/many.conf: ver: must be a quoted string
+shtetl: containers/many.conf: pkgs: invalid key
+shtetl: containers/many.conf: src_branch: valid only in foundation recipe
+shtetl: containers/many.conf: requires[0]: invalid container name: only letters, digits, - and _ allowed
+shtetl: containers/many.conf: pkg.git: dropping values is illegal
+shtetl: containers/many.conf: datasets.www.recordsize: must be a quoted string
 $ echo $?
 1
 ```
 
 The last file has six problems, and all six are reported: `ver` and
-`recordsize` are numbers where strings are wanted; `pkgs` is no key;
-`src_branch` is a foundation's key, not a container's; `kernconf` is
-a key there is no more, and the message says what to write instead;
-`false` takes nothing away (section 5).
+`recordsize` are numbers where strings belong; `pkgs` is no key;
+`src_branch` is a foundation's key; `web.1` is no container's name;
+and `false` would drop a value (section 5).
 
 shtetl does not refuse bytes outside ASCII in a value; a package's,
 a dataset's or a label's name takes only the characters given for it
@@ -250,13 +249,13 @@ retention {
 
 ```console
 $ shtetl config show
-shtetl: shtetl.conf: spaces.lake.default: not a dataset's name: a pool's name begins with a letter
-shtetl: shtetl.conf: properties.default.mountpoint: not a property the configuration may set: shtetl sets it itself
-shtetl: shtetl.conf: properties.default.recordsize: expected a string, or true or false, not an integer: quote it
-shtetl: shtetl.conf: build.make_jobs: a count is 0 or more, not -1
-shtetl: shtetl.conf: update.suffix: not a name: it takes only letters, digits, '-' and '_'
-shtetl: shtetl.conf: retention.run: expected a count or a quoted interval, not a number: unquoted, UCL reads 30d as seconds; quote it, "30d"
-shtetl: shtetl.conf: retention.lake: not a key of retention: it takes run, archive
+shtetl: shtetl.conf: spaces.lake.default: invalid dataset name: pool name must begin with a letter
+shtetl: shtetl.conf: properties.default.mountpoint: invalid property: reserved
+shtetl: shtetl.conf: properties.default.recordsize: must be a quoted string
+shtetl: shtetl.conf: build.make_jobs: must be 0 or more
+shtetl: shtetl.conf: update.suffix: invalid name: only letters, digits, - and _ allowed
+shtetl: shtetl.conf: retention.run: must be an integer or a quoted interval
+shtetl: shtetl.conf: retention.lake: invalid key
 ```
 
 shtetl.conf is checked whole wherever it is read (ruled 2026-10-12),
@@ -270,13 +269,13 @@ pkg = [ "nginx" ];
 
 ```console
 $ shtetl config show containers/x
-shtetl: shtetl.conf: spaces.lake.default: not a dataset's name: a pool's name begins with a letter
-shtetl: shtetl.conf: properties.default.mountpoint: not a property the configuration may set: shtetl sets it itself
-shtetl: shtetl.conf: properties.default.recordsize: expected a string, or true or false, not an integer: quote it
-shtetl: shtetl.conf: build.make_jobs: a count is 0 or more, not -1
-shtetl: shtetl.conf: update.suffix: not a name: it takes only letters, digits, '-' and '_'
-shtetl: shtetl.conf: retention.run: expected a count or a quoted interval, not a number: unquoted, UCL reads 30d as seconds; quote it, "30d"
-shtetl: shtetl.conf: retention.lake: not a key of retention: it takes run, archive
+shtetl: shtetl.conf: spaces.lake.default: invalid dataset name: pool name must begin with a letter
+shtetl: shtetl.conf: properties.default.mountpoint: invalid property: reserved
+shtetl: shtetl.conf: properties.default.recordsize: must be a quoted string
+shtetl: shtetl.conf: build.make_jobs: must be 0 or more
+shtetl: shtetl.conf: update.suffix: invalid name: only letters, digits, - and _ allowed
+shtetl: shtetl.conf: retention.run: must be an integer or a quoted interval
+shtetl: shtetl.conf: retention.lake: invalid key
 ```
 
 ## 4. Recipe keys
@@ -691,8 +690,8 @@ pkg {
     nginx = true;  # containers/www.conf
 }
 $ shtetl config show containers/loop
-shtetl: common/b.conf: import: an import cycle: common/a.conf, common/b.conf, common/a.conf
-shtetl: containers/loop.conf: import[1]: common/nope.conf: no such recipe in the configuration root
+shtetl: common/b.conf: import: import cycle: common/a.conf, common/b.conf, common/a.conf
+shtetl: containers/loop.conf: import[1]: common/nope.conf: no such file
 ```
 
 `common/base.conf` is imported twice and merged once, before
@@ -763,9 +762,9 @@ pkg {
     go = true;  # containers/dev.conf
 }
 $ shtetl config show containers/twice
-shtetl: containers/twice.conf: pkg[2]: "go" is listed twice
+shtetl: containers/twice.conf: pkg[2]: duplicate entry "go"
 $ shtetl config show containers/drop
-shtetl: containers/drop.conf: pkg.tmux: false drops nothing: the layers stack, and what one gives stays (ruled 2026-10-12)
+shtetl: containers/drop.conf: pkg.tmux: dropping values is illegal
 ```
 
 `git` comes from `common/tools.conf`, the file that first gave it;
@@ -831,7 +830,7 @@ patches {
 
 ```console
 $ shtetl config show containers/app
-shtetl: warning: containers/app.conf: datasets.db.recordsize: 8k overrides 16k, from common/data.conf
+shtetl: warning: containers/app.conf: datasets.db.recordsize: 8k overrides 16k from common/data.conf
 # containers/app.conf: a container's recipe, its layers merged
 # layers, nearest last: common/data.conf, containers/app.conf
 datasets {
@@ -853,9 +852,9 @@ derivations {
 $ echo $?
 0
 $ shtetl config show containers/redo
-shtetl: containers/redo.conf: derivations."etc/pwd.db": given in common/data.conf already: a derivation is given once
+shtetl: containers/redo.conf: derivations."etc/pwd.db": already defined in common/data.conf
 $ shtetl config show foundations/f
-shtetl: foundations/f.conf: patches."github.com/eidelbyte/freebsd-patches".ref: given in common/src.conf already: what one file gives, another does not give again
+shtetl: foundations/f.conf: patches."github.com/eidelbyte/freebsd-patches".ref: already defined in common/src.conf
 ```
 
 `www` gets `readonly` from one file and `compression` from another:
@@ -995,7 +994,7 @@ ver = [
     ">=15.1"  # containers/fits.conf
 ]
 $ shtetl config show containers/never
-shtetl: containers/never.conf: ver: no version is >=15 (common/new.conf) and <14 (containers/never.conf) at once
+shtetl: containers/never.conf: ver: >=15 in common/new.conf conflicts with <14 in containers/never.conf
 $ shtetl config show containers/any15
 # containers/any15.conf: a container's recipe, its layers merged
 # layers, nearest last: containers/any15.conf
@@ -1004,7 +1003,7 @@ ver = [
     ">=15.3"  # containers/any15.conf
 ]
 $ shtetl config show containers/past15
-shtetl: containers/past15.conf: ver: no version is >15 (containers/past15.conf) and <=15.3 (containers/past15.conf) at once
+shtetl: containers/past15.conf: ver: >15 in containers/past15.conf conflicts with <=15.3 in containers/past15.conf
 ```
 
 A `ver` no version can satisfy is refused when the recipe is read,
@@ -1039,7 +1038,7 @@ $ shtetl config show foundations/same
 # layers, nearest last: common/branch.conf, foundations/same.conf
 src_branch = "releng/15.1";  # common/branch.conf
 $ shtetl config show foundations/other
-shtetl: foundations/other.conf: src_branch: stable/15 here, releng/15.1 in common/branch.conf: the files that give it must agree
+shtetl: foundations/other.conf: src_branch: stable/15 conflicts with releng/15.1 in common/branch.conf
 ```
 
 `src_branch` and `kernconf_file` may be given in several files when
@@ -1127,7 +1126,7 @@ ver = "<15";
 
 ```console
 $ shtetl config show foundations/small
-shtetl: warning: foundations/small.conf: kernconf_file: MINIMAL overrides GENERIC, from shtetl.conf
+shtetl: warning: foundations/small.conf: kernconf_file: MINIMAL overrides GENERIC from shtetl.conf
 # foundations/small.conf: a foundation's recipe, its layers merged
 # layers, nearest last: common/site.conf, shtetl.conf, foundations/small.conf
 pkg {
@@ -1151,8 +1150,8 @@ derivations {
 }
 src_branch = "releng/15.1";  # foundations/small.conf
 $ shtetl config show containers/app
-shtetl: warning: containers/app.conf: datasets.var.compression: lz4 overrides zstd, from shtetl.conf
-shtetl: warning: containers/app.conf: derivations."etc/pwd.db": overrides the derivation from shtetl.conf
+shtetl: warning: containers/app.conf: datasets.var.compression: lz4 overrides zstd from shtetl.conf
+shtetl: warning: containers/app.conf: derivations."etc/pwd.db": overrides shtetl.conf
 # containers/app.conf: a container's recipe, its layers merged
 # layers, nearest last: common/site.conf, shtetl.conf, containers/app.conf
 pkg {
@@ -1178,7 +1177,7 @@ derivations {
     }
 }
 $ shtetl config show containers/old
-shtetl: containers/old.conf: ver: no version is >=15.1 (shtetl.conf) and <15 (containers/old.conf) at once
+shtetl: containers/old.conf: ver: >=15.1 in shtetl.conf conflicts with <15 in containers/old.conf
 ```
 
 The foundation overrides `kernconf_file`, with a warning, and takes
@@ -1193,11 +1192,11 @@ Some things only the merged recipe can answer:
 
 | check | refused with |
 |-------|--------------|
-| a foundation has a `src_branch` | no layer gives src_branch |
-| every `ver` holds together | no version is A and B at once |
-| a `kernconf_file` with a `/` exists in the configuration root | no such file in the configuration root |
-| a `patches` directory exists in the configuration root | no such directory in the configuration root |
-| each `requires` is a container recipe, not the container itself | no such container recipe; a container cannot require itself |
+| a foundation has a `src_branch` | missing src_branch |
+| every `ver` holds together | A in FILE conflicts with B in FILE |
+| a `kernconf_file` with a `/` exists in the configuration root | PATH: no such file |
+| a `patches` directory exists in the configuration root | PATH: no such directory |
+| each `requires` is a container recipe, not the container itself | no such container; requires itself |
 
 <!-- example: after-merge -->
 
@@ -1214,23 +1213,23 @@ requires = [ "lonely", "ghost" ];
 
 ```console
 $ shtetl config show foundations/nobranch
-shtetl: foundations/nobranch.conf: no layer gives src_branch: a foundation is built from a FreeBSD branch
-shtetl: foundations/nobranch.conf: kernconf_file: conf/MYKERNEL: no such file in the configuration root
-shtetl: foundations/nobranch.conf: patches."patches/mine": patches/mine: no such directory in the configuration root
+shtetl: foundations/nobranch.conf: missing src_branch
+shtetl: foundations/nobranch.conf: kernconf_file: conf/MYKERNEL: no such file
+shtetl: foundations/nobranch.conf: patches."patches/mine": patches/mine: no such directory
 $ shtetl config show containers/lonely
-shtetl: containers/lonely.conf: requires.lonely: a container cannot require itself
-shtetl: containers/lonely.conf: requires.ghost: no such container recipe: containers/ghost.conf
+shtetl: containers/lonely.conf: requires.lonely: requires itself
+shtetl: containers/lonely.conf: requires.ghost: no such container
 ```
 
 ## 8. Messages, warnings and exit status
 
 A refusal is a line on standard error, one for each problem, and the
 exit status is 1: nothing is printed and nothing is done. A problem
-shtetl finds reads `shtetl: FILE: KEY.PATH: what is wrong`; a macro,
-`shtetl: FILE:LINE: ...`; and what libucl itself cannot parse,
-libucl's message with the file, line and column (section 2). A
-warning, `shtetl: warning: FILE: KEY.PATH: ...`, is printed and the
-command goes on, exit 0. A usage error prints the usage and exits 2.
+in a value reads `shtetl: FILE: KEY.PATH: what is wrong`; a problem
+in the text itself, `shtetl: FILE:LINE: what is wrong` (a duplicate
+key, a macro, a syntax error). A warning, `shtetl: warning: FILE:
+KEY.PATH: ...`, is printed and the command goes on, exit 0. A usage
+error prints the usage and exits 2.
 
 <!-- example: usage -->
 
@@ -1256,7 +1255,7 @@ exit: 0 done, 1 refused (the reasons are on standard error), 2 usage
 $ echo $?
 2
 $ shtetl config show nginx
-shtetl: nginx: not a recipe: name one by its path, as foundations/F, containers/X or systems/S
+shtetl: nginx: invalid recipe: use foundations/NAME, containers/NAME or systems/NAME
 $ echo $?
 1
 ```
