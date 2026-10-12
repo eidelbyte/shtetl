@@ -1,6 +1,6 @@
 /*
  * The recipe cascade (planning.md 5.4): tests/MATRIX.md family CC,
- * every cell (CC1 - CC26). Each test writes the configuration root it
+ * every cell (CC1 - CC36). Each test writes the configuration root it
  * needs into the scratch directory.
  */
 

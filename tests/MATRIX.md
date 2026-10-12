@@ -88,7 +88,7 @@ object, string}; entry key syntax per collection; error reporting
 |------|----------|-------------|
 | CK1 | every key of 5.5 is accepted in each kind that has it | covered: check_schema.c |
 | CK2 | an unknown key is refused with the file and its key path | covered: check_schema.c |
-| CK3 | a foundation-only key (src_branch, kernconf_file, kernconf_lines, buildopts, buildopts_file, patches) in a container and in a system is refused, naming the kind | covered: check_schema.c |
+| CK3 | a foundation-only key (src_branch, kernconf_file, kernconf_lines, buildopts, patches) in a container and in a system is refused, naming the kind | covered: check_schema.c |
 | CK4 | a container-only key (requires, jailconf) in a foundation and in a system is refused | covered: check_schema.c |
 | CK5 | a string key given a number or a bool is refused; a number says to quote it | covered: check_schema.c |
 | CK6 | ver, one constraint or a list of them: `>=15`, `=15.1`, `<16`, `<=15.1`, `>14` accepted; ``, `15.1`, `>=`, `=>15`, `>=15.x`, `>=15.` refused | covered: check_schema.c, check_cascade.c test_ver |
@@ -169,7 +169,7 @@ spelling.
 | CC23 | errors in several layers are all reported, and nothing is merged | covered: check_cascade.c |
 | CC24 | each merged entry names the layer that added it and the one that last set it | covered: check_cascade.c |
 | CC25 | patches: a lower layer's sources come first; a source a nearer layer changes keeps its place (7.1.1) | covered: check_cascade.c |
-| CC26 | every layer is checked against the target's kind: kernconf in a fragment a container imports is refused, naming the fragment | covered: check_cascade.c |
+| CC26 | every layer is checked against the target's kind: kernconf_file in a fragment a container imports is refused, naming the fragment | covered: check_cascade.c |
 | CC27 | the ver constraints of all the files must leave a version: >=16 with <15, =15.1 with >15.1, refused naming the two | covered: check_cascade.c test_ver |
 | CC28 | a dataset property a nearer file gives again, differently, overrides, with a warning naming both values and the first file (ruled 2026-10-12) | covered: check_cascade.c |
 | CC29 | a commands block given in several files stacks: a piece from each, keyed by its file, lower first (ruled 2026-10-12) | covered: check_cascade.c |
