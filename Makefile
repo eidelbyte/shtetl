@@ -52,6 +52,21 @@ UCL_CHECK = @test -f $(UCL_SRC)/src/ucl_parser.c || { \
 	echo "src tree>, or UCL=port to link the textproc/libucl port"; \
 	exit 1; }
 
+# libzfs (planning.md 10): FreeBSD installs libzfs.h and libnvpair.h
+# but not the OpenZFS headers they assume (sys/fs/zfs.h, libspl's
+# Solaris types), so the freebsd flavor takes them from the source
+# tree, with the include set zfs_rebase's Makefile uses. Only the ZFS
+# layer, src/fbsd/zfs.c, gets them: libspl ships headers that would
+# shadow FreeBSD's for everything else.
+ZFS_TOP = $(FREEBSD_SRC)/sys/contrib/openzfs
+ZFS_CFLAGS = -I$(ZFS_TOP)/lib/libspl/include/os/freebsd \
+	-I$(ZFS_TOP)/lib/libspl/include \
+	-I$(ZFS_TOP)/include/os/freebsd -I$(ZFS_TOP)/include \
+	-include $(ZFS_TOP)/include/os/freebsd/spl/sys/ccompile.h \
+	-include $(FREEBSD_SRC)/sys/modules/zfs/zfs_config.h \
+	-DNEED_SOLARIS_BOOLEAN -DHAVE_ISSETUGID -DHAVE_STRLCAT -DHAVE_STRLCPY
+ZFS_LIBS = -lzfs -lnvpair
+
 # Which flavor build/ holds, as in zfs_rebase: the two do not share
 # objects, and asking for the other empties build/ first.
 FLAVOR = portable
@@ -65,7 +80,7 @@ CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o \
 # FreeBSD one gets src/fbsd/zfs.c, over libzfs; the unit tests get
 # tests/zfake.c, a pool in memory.
 ZFS_OBJS_portable = $(BUILD)/zstub.o
-ZFS_OBJS_freebsd = $(BUILD)/zstub.o
+ZFS_OBJS_freebsd = $(BUILD)/fbsd_zfs.o
 ZFS_OBJS = $(ZFS_OBJS_$(FLAVOR))
 TEST_OBJS = $(BUILD)/zfake.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(ZFS_OBJS) $(UCL_OBJS)
@@ -88,10 +103,12 @@ shtetl: build $(SHTETL_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(SHTETL_OBJS) $(LDFLAGS) $(UCL_LIBS)
 
 freebsd:
-	$(MAKE) FLAVOR=freebsd UCL=port CFLAGS="$(CFLAGS) -DSH_FREEBSD" all
+	$(MAKE) FLAVOR=freebsd UCL=port CFLAGS="$(CFLAGS) -DSH_FREEBSD" \
+	    LDFLAGS="$(LDFLAGS) $(ZFS_LIBS)" all
 
 check-freebsd:
-	$(MAKE) FLAVOR=freebsd UCL=port CFLAGS="$(CFLAGS) -DSH_FREEBSD" check
+	$(MAKE) FLAVOR=freebsd UCL=port CFLAGS="$(CFLAGS) -DSH_FREEBSD" \
+	    LDFLAGS="$(LDFLAGS) $(ZFS_LIBS)" check
 
 $(BUILD)/main.o: src/main.c src/core/cascade.h src/core/err.h \
 	src/core/root.h src/core/schema.h src/core/show.h src/core/site.h \
@@ -130,6 +147,8 @@ $(BUILD)/spaces.o: src/core/spaces.c src/core/spaces.h src/core/err.h \
 	$(CC) $(CFLAGS) -c -o $@ src/core/spaces.c
 $(BUILD)/zstub.o: src/core/zstub.c src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/zstub.c
+$(BUILD)/fbsd_zfs.o: src/fbsd/zfs.c src/core/zfs.h src/core/err.h
+	$(CC) $(CFLAGS) $(ZFS_CFLAGS) -c -o $@ src/fbsd/zfs.c
 $(BUILD)/zfake.o: tests/zfake.c tests/zfake.h src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ tests/zfake.c
 
@@ -180,7 +199,13 @@ cli: shtetl
 gate:
 	sh tools/gate.sh
 
+# The FreeBSD sources compiled for FreeBSD on a machine that is not:
+# a syntax check against a FreeBSD tree's headers, not a build.
+xcheck:
+	sh tools/xcheck-freebsd.sh
+
 clean:
 	rm -rf $(BUILD) shtetl
 
-.PHONY: all build flavor freebsd check check-freebsd unit cli gate clean
+.PHONY: all build flavor freebsd check check-freebsd unit cli gate xcheck \
+	clean
