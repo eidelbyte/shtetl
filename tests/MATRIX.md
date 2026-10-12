@@ -157,7 +157,7 @@ spelling.
 | CC16 | order: keys keep their first place across layers; an overridden commands block stays where it was first defined | covered: check_cascade.c |
 | CC17 | 5.4's worked example, its default in shtetl.conf: pkg sudo, tmux, apache24, py311-certbot, nginx; datasets tmp, var, usr/local, www; commands certbot, nginx | covered: check_cascade.c |
 | CC18 | a foundation with no src_branch after the merge is refused | covered: check_cascade.c |
-| CC19 | a derivation given in a second file, alike or not, is refused, naming the first (ruled 2026-10-12) | covered: check_cascade.c |
+| CC19 | a derivation given in a second file, alike or not, is refused, naming the first | covered: check_cascade.c |
 | CC20 | a kernconf config path or a patches directory that does not exist in the config root is refused, naming the key | covered: check_cascade.c |
 | CC21 | requires naming a container with no recipe, or the container itself, is refused | covered: check_cascade.c |
 | CC22 | targets: `containers/nginx` and `containers/nginx.conf` alike; an unknown kind directory, `..`, a bad name, a nested path, a missing recipe refused | covered: check_cascade.c |
@@ -166,15 +166,15 @@ spelling.
 | CC25 | patches: a lower layer's sources come first; a source a nearer layer changes keeps its place (7.1.1) | covered: check_cascade.c |
 | CC26 | every layer is checked against the target's kind: kernconf in a fragment a container imports is refused, naming the fragment | covered: check_cascade.c |
 | CC27 | the ver constraints of all the files must leave a version: >=16 with <15, =15.1 with >15.1, refused naming the two | covered: check_cascade.c test_ver |
-| CC28 | a dataset property a nearer file gives again, differently, overrides, with a warning naming both values and the first file (ruled 2026-10-12) | covered: check_cascade.c |
-| CC29 | a commands block given in several files stacks: a piece from each, keyed by its file, lower first (ruled 2026-10-12) | covered: check_cascade.c |
+| CC28 | a dataset property a nearer file gives again, differently, overrides, with a warning naming both values and the first file | covered: check_cascade.c |
+| CC29 | a commands block given in several files stacks: a piece from each, keyed by its file, lower first | covered: check_cascade.c |
 | CC30 | an entry's field a second file gives again, alike or not, is refused (a patch source's ref); a field the first did not give composes (dir) | covered: check_cascade.c |
 | CC31 | a recipe takes from the default only the keys of its kind (a container no kernconf, a foundation no jailconf), and none of shtetl.conf's settings | covered: check_cascade.c test_default |
-| CC32 | what a recipe gives again of the default's one-value keys, derivations, entries' fields and dataset properties overrides it, each with a warning naming the value replaced and its file; the default's value given again alike is no override and warns nothing (ruled 2026-10-12) | covered: check_cascade.c test_default; run-cli.sh cl4-generic (GENERIC again, alike) |
+| CC32 | what a recipe gives again of the default's one-value keys, derivations, entries' fields and dataset properties overrides it, each with a warning naming the value replaced and its file; the default's value given again alike is no override and warns nothing | covered: check_cascade.c test_default; run-cli.sh cl4-generic (GENERIC again, alike) |
 | CC33 | what stacks, stacks with the default: pkg, ver, text, commands | covered: check_cascade.c test_default |
 | CC34 | the files shtetl.conf imports are of the default too | covered: check_cascade.c test_default |
-| CC35 | shtetl.conf is checked whole wherever it is read: a refused setting refuses a recipe's resolve, naming the setting; a file shtetl.conf imports holds no settings (ruled 2026-10-12) | covered: check_cascade.c test_site_checked; configuration.md, example settings-refused |
-| CC36 | in ver a bare major is every minor of it (ruled 2026-10-12): =15 any 15.x, <=15 takes 15.x, >15 begins at 16.0; N.N is that version; each form's range, and the meets they make (=15 with >=15.3; =15 with <15 and >15 with <16 refused) | covered: check_cascade.c test_ver; configuration.md, example ver |
+| CC35 | shtetl.conf is checked whole wherever it is read: a refused setting refuses a recipe's resolve, naming the setting; a file shtetl.conf imports holds no settings | covered: check_cascade.c test_site_checked; configuration.md, example settings-refused |
+| CC36 | in ver a bare major is every minor of it: =15 any 15.x, <=15 takes 15.x, >15 begins at 16.0; N.N is that version; each form's range, and the meets they make (=15 with >=15.3; =15 with <15 and >15 with <16 refused) | covered: check_cascade.c test_ver; configuration.md, example ver |
 | CC37 | kernconf: the config from one file of the stack, a second file giving it refused, alike or not; the default's overridden with a warning; lines stack with the default's and the imports'; merged as { file; lines } | covered: check_cascade.c test_stacked, test_default |
 
 ## CW: what config show prints (src/core/show.c)

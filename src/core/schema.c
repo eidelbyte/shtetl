@@ -7,9 +7,9 @@
  * kind's keys (5.3: "keys that belong to another kind are errors").
  * The default's files (shtetl.conf and its imports) are a layer of
  * every kind, so they take every kind's keys, and each recipe takes
- * those of its own (ruled 2026-10-12). Entries may be given in parts
- * across files, a dataset's properties or a patch source's fields;
- * a derivation is given whole, in one file.
+ * those of its own. Entries may be given in parts across files, a
+ * dataset's properties or a patch source's fields; a derivation is
+ * given whole, in one file.
  */
 
 #include <string.h>

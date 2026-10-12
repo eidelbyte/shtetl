@@ -166,8 +166,8 @@ The forms:
 - **A name**: letters, digits, `-` and `_`, beginning with a letter
   or a digit.
 
-There is no `retention.lake`: zlake holds exactly what zrun holds
-(ruled 2026-10-09). M2 uses `spaces` and `properties`; the others are
+There is no `retention.lake`: zlake holds exactly what zrun holds.
+M2 uses `spaces` and `properties`; the others are
 read and checked now and used by the milestones that need them.
 
 <!-- example: settings -->
@@ -258,8 +258,7 @@ shtetl: shtetl.conf: retention.run: must be an integer or a quoted interval
 shtetl: shtetl.conf: retention.lake: invalid key
 ```
 
-shtetl.conf is checked whole wherever it is read (ruled 2026-10-12),
-so a refused setting refuses every recipe too, each recipe reading
+shtetl.conf is checked whole wherever it is read, so a refused setting refuses every recipe too, each recipe reading
 shtetl.conf as its default:
 
 ```ucl
@@ -319,7 +318,7 @@ component. Section 5 says how imports are followed.
 The FreeBSD versions the recipe fits: `">=15"`, `"<16"`, `"=15.1"`,
 or a list, `[ ">=15", "<16" ]`. A constraint is one of `>=`, `<=`,
 `>`, `<` and `=`, then `N` or `N.N`. `N.N` is that version; a bare
-`N` is every `N.x` (ruled 2026-10-12):
+`N` is every `N.x`:
 
 | constraint | versions |
 |------------|----------|
@@ -370,7 +369,7 @@ two in a file it imports.
 ### buildopts
 
 Text: make(1) variables, the lines of the src.conf shtetl writes for
-the build (`WITHOUT_LIB32=yes`). `buildopts_file` is no key any more.
+the build (`WITHOUT_LIB32=yes`).
 
 ### patches
 
@@ -474,7 +473,7 @@ itself, `X { ... }`, with these inside it:
     EOD
 
 An option given twice, in two files, is jail(8)'s to settle, not
-shtetl's. `jailconf_file` is no key any more.
+shtetl's.
 
 ### Every key at once
 
@@ -701,9 +700,8 @@ shtetl: containers/loop.conf: import[1]: common/nope.conf: no such file
 ### Everything stacks
 
 Each file adds to what the files below it gave. No file takes
-anything away, and none takes another's place: there is no `false`
-to drop an entry and no `reset` to empty a collection (ruled
-2026-10-12). How each key stacks:
+anything away, and none takes another's place: `false` as an entry
+is refused, since dropping values is illegal. How each key stacks:
 
 | key | two files giving it |
 |-----|---------------------|
@@ -717,8 +715,8 @@ to drop an entry and no `reset` to empty a collection (ruled
 | `kernconf`'s config | one file of the stack gives it |
 
 What one file gives, another does not give again: two files that need
-the same thing defined two ways are not a composition of the two
-(ruled 2026-10-12). So a second value for a one-value key, a
+the same thing defined two ways are not a composition of the two.
+So a second value for a one-value key, a
 derivation given in two files, or a field of an entry given twice
 (even alike) is refused, naming both files. Listing an entry again
 with nothing new is no redefinition. Two things may be given again:
@@ -1070,9 +1068,8 @@ exception: a recipe overrides it, with a warning (section 6).
 
 ## 6. The default: shtetl.conf
 
-There is no `default.conf` and no built-in recipe: the default every
-recipe starts from is shtetl.conf, beside its settings, after the
-files it imports (ruled 2026-10-12). The recipes repository ships it
+The default every recipe starts from is shtetl.conf, beside its
+settings, after the files it imports. The recipes repository ships it
 with:
 
     ver = ">=15.1";
@@ -1086,8 +1083,8 @@ The default is the one file a recipe may override:
 - What would be a redefinition of the default's value overrides it,
   with a warning naming the value replaced and its file: a recipe's
   `src_branch` or `kernconf` config, a derivation for the same path, an
-  entry's field, a dataset's property (ruled 2026-10-12). Giving the
-  default's value again, alike, is no override and says nothing.
+  entry's field, a dataset's property. Giving the default's value
+  again, alike, is no override and says nothing.
 - What stacks, stacks with the default: its `ver`, `pkg`, datasets,
   texts and commands reach every recipe of the kinds that take them.
   A recipe cannot take them away; to be rid of one, take it out of

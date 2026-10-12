@@ -1,7 +1,7 @@
 /*
  * shtetl bootstrap (planning.md 4.2, 4.3).
  *
- * The layout (4.6, 4.7), with the mount rules ruled 2026-10-11:
+ * The layout (4.6, 4.7), with its mount rules:
  *
  *	lake root	mountpoint=none, canmount=noauto; below it
  *			foundations, foundation-builds, containers,

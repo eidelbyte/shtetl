@@ -185,8 +185,8 @@ in a value is a literal `$`.
 
 `shtetl.conf` holds two things: the machine's settings (where things
 go, properties, retention), in their own schema, and beside them the
-default recipe, the layer every recipe starts from. There is no
-`default.conf`. A recipe is built from layers, nearest last:
+default recipe, the layer every recipe starts from. A recipe is
+built from layers, nearest last:
 
 1. the default: `shtetl.conf`, after what it imports
 2. each recipe named in the target's `import`, in order, each after

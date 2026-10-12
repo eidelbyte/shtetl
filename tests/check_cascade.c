@@ -174,7 +174,7 @@ test_example(void)
 	CHECK(www->sn_type == SH_OBJECT);
 	CHECK(sh_obj_get(www, "readonly")->sn_bool);
 	CHECK(sh_recipe_layer(&r, "containers/nginx.conf") == NULL);
-	/* import and reset are the cascade's, not the recipe's */
+	/* import is the cascade's, not the recipe's */
 	CHECK(M("import") == NULL);
 }
 
@@ -332,7 +332,7 @@ test_ver(void)
 		"containers/f.conf", "ver = [ \">=15.1\", \"<15.1\" ];\n",
 		NULL
 	};
-	/* a bare major is every minor of it (ruled 2026-10-12) */
+	/* a bare major is every minor of it */
 	static const char *const vr3[] = {
 		"containers/g.conf", "ver = [ \"=15\", \">=15.3\" ];\n",
 		"containers/h.conf", "ver = [ \"=15\", \"<15\" ];\n",
@@ -610,12 +610,11 @@ test_layer_errors(void)
 }
 
 /*
- * CC31 - CC34: shtetl.conf, the default (ruled 2026-10-12). Every
- * recipe takes the keys of its kind from it; what a recipe gives again
- * of the default's one-value keys, derivations, entries' fields and
- * dataset properties overrides it, each with a warning (ruled
- * 2026-10-12); what stacks stacks with it; its settings are no
- * recipe's.
+ * CC31 - CC34: shtetl.conf, the default. Every recipe takes the keys of
+ * its kind from it; what a recipe gives again of the default's
+ * one-value keys, derivations, entries' fields and dataset properties
+ * overrides it, each with a warning; what stacks stacks with it; its
+ * settings are no recipe's.
  */
 static void
 test_default(void)
@@ -701,9 +700,9 @@ test_default(void)
 }
 
 /*
- * CC35: shtetl.conf is checked whole wherever it is read (ruled
- * 2026-10-12): a refused setting refuses every recipe, and a file
- * shtetl.conf imports holds no settings.
+ * CC35: shtetl.conf is checked whole wherever it is read: a refused
+ * setting refuses every recipe, and a file shtetl.conf imports holds no
+ * settings.
  */
 static void
 test_site_checked(void)

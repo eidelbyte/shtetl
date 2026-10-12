@@ -10,21 +10,20 @@
  * imports merge before it, each recipe once, at the first place it
  * is reached. A cycle is refused.
  *
- * Merging, layer by layer, with everything stacking (ruled
- * 2026-10-12): nothing is dropped and nothing reset, and no file
- * redefines what another gave. A collection merges entry by entry, a
- * list of names standing for name = true: an entry listed again adds
- * nothing; its fields compose across files, each given once, but for
- * a dataset's properties, which a nearer file may override (with a
- * warning); a derivation is given whole, in one file; a commands
- * block's texts stack, a piece from each file. Every file's ver is
- * kept, to hold together, and the ranges they allow must meet;
+ * Merging, layer by layer, with everything stacking: nothing is
+ * dropped, and no file redefines what another gave. A collection merges
+ * entry by entry, a list of names standing for name = true: an entry
+ * listed again adds nothing; its fields compose across files, each
+ * given once, but for a dataset's properties, which a nearer file may
+ * override (with a warning); a derivation is given whole, in one file;
+ * a commands block's texts stack, a piece from each file. Every file's
+ * ver is kept, to hold together, and the ranges they allow must meet;
  * buildopts, jailconf and kernconf's lines append, a piece from each
  * file, lower layers first; src_branch, one value, may be given again
- * only alike, and kernconf's file is given by one file. A recipe takes
- * from the default only its kind's keys, and what would redefine the
- * default's value overrides it instead. A key keeps the place where it
- * was first added, so a commands block runs where it was first
+ * only alike, and kernconf's config is given by one file. A recipe
+ * takes from the default only its kind's keys, and what would redefine
+ * the default's value overrides it instead. A key keeps the place where
+ * it was first added, so a commands block runs where it was first
  * defined.
  */
 
@@ -208,8 +207,8 @@ ld_load(struct ld *x, const char *name, const char *from,
 	}
 	/*
 	 * shtetl.conf is checked whole, its settings too, wherever it is
-	 * read (ruled 2026-10-12); the rest of the default as files of
-	 * any kind, and every other file as one of the recipe's kind.
+	 * read; the rest of the default as files of any kind, and every
+	 * other file as one of the recipe's kind.
 	 */
 	if (x->ld_default && strcmp(file, cascade_default) == 0)
 		n = sh_site_check(tree, file, x->ld_err);
@@ -347,14 +346,14 @@ mg_piece(struct mg *m, struct sh_node *coll, struct sh_pair *cur,
 
 /*
  * One entry, EV under key EK of the collection RK, into the merged
- * COLL (ruled 2026-10-12). Listing an entry again adds nothing and is
- * no redefinition. What an entry holds is given once: a field a file
+ * COLL. Listing an entry again adds nothing and is no redefinition.
+ * What an entry holds is given once: a field a file
  * gives a second time is refused, and so is a derivation given in two
  * files; two files giving one entry different parts of it compose.
  * But a dataset's property a nearer file may override, with a
  * warning, the default's as any other's; and a commands block's texts
  * stack, each a piece of its own. What the default gives, a recipe
- * overrides, always with a warning (ruled 2026-10-12).
+ * overrides, always with a warning.
  */
 static void
 mg_entry(struct mg *m, struct sh_node *coll, const struct sh_rkey *rk,
@@ -606,7 +605,7 @@ mg_layer(struct mg *m)
 }
 
 /*
- * Every ver must hold together (ruled 2026-10-12): the ranges they
+ * Every ver must hold together: the ranges they
  * allow must meet. Refused, naming the two that do not.
  */
 static void

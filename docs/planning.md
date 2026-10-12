@@ -357,7 +357,7 @@ kind of recipe takes. The settings are its sections (`spaces`,
 `properties`, `build`, `update`, `retention`); any other top-level key
 is the default recipe's and is checked by the recipe schema, so a
 setting never reaches a recipe and a recipe key never reaches the
-settings. There is no `default.conf`.
+settings.
 
     spaces {
         lake { default = "tank/shtetl"; }   # needed with several lake roots
@@ -415,25 +415,23 @@ Built in M1 (`src/core/parse.c`, the one file that includes `ucl.h`):
 
 ### 5.4 Recipe cascade: everything stacks
 
-Ruled 2026-10-12 (14), replacing the drops and `reset` this section
-had before. There are two layers: a foundation's recipe, and a
-container's or system's, which stacks on its foundation's when it is
-created (7.4). Each is made of files, nearest last:
+Ruled 2026-10-12 (14). There are two layers: a foundation's recipe,
+and a container's or system's, which stacks on its foundation's when
+it is created (7.4). Each is made of files, nearest last:
 
 1. the default: `shtetl.conf`, after what it imports
 2. each recipe named in `import`, in order, each after its own imports
 3. the recipe itself (`foundations/F.conf`, `containers/X.conf`,
    `systems/S.conf`)
 
-There is no built-in recipe and no `default.conf`: what every recipe
-starts from is the site's `shtetl.conf`, which upstream ships with
-`ver = ">=15.1"` and `kernconf = "GENERIC"` (4.4). Without a
-`shtetl.conf` a recipe has no default layer.
+What every recipe starts from is the site's `shtetl.conf`, which
+upstream ships with `ver = ">=15.1"` and `kernconf = "GENERIC"`
+(4.4). Without a `shtetl.conf` a recipe has no default layer.
 
 Everything stacks: each file adds to what the files below it gave,
-and no file takes anything away. There is no way to drop an element,
-to empty an inherited collection or to replace a value: `false` as an
-entry and `reset` are refused. How each key stacks:
+and no file takes anything away or replaces a value: `false` as an
+entry is refused, dropping values being illegal. How each key
+stacks:
 
 | key | stacks as |
 |-----|-----------|
@@ -543,7 +541,7 @@ A container keeps everything its foundation has (7.4, ruled H) by
 construction now: nothing can be taken away, by the container's files
 or by anyone's.
 
-As built (M1, revised 2026-10-12, `src/core/cascade.c`):
+As built (`src/core/cascade.c`):
 
 - `import` is followed in every file, shtetl.conf's included: a
   file's imports merge before it, each file once, at the first place
@@ -559,13 +557,6 @@ As built (M1, revised 2026-10-12, `src/core/cascade.c`):
 - Every file is read and checked before anything merges, so one run
   reports the problems of all of them.
 - The warnings go to stderr, apart from what `config show` prints.
-
-Before the ruling, a recipe could take away an inherited element
-(`name = false`) or a whole collection (`reset`), and the ways to do
-that were weighed against a `-` prefix in arrays, verb objects per
-key, separate keys and UCL priorities. The ruling removed taking
-away altogether, and with it the drop rule that kept a container from
-dropping what its foundation had.
 
 ### 5.5 Recipe keys (from mishkan, adapted)
 
@@ -602,7 +593,7 @@ It fits any foundation whose version satisfies its `ver`; the foundation
 is chosen when the container is created (`shtetl create nginx --on
 generic`) and recorded by the clone's `origin`, as parasa did.
 
-`make_jobs` moved to shtetl.conf: it is about the machine, not the
+`make_jobs` is in shtetl.conf: it is about the machine, not the
 recipe.
 
 The forms of an entry, as built (`src/core/schema.c`; `false` is
@@ -752,7 +743,7 @@ or, with options:
     }
 
 A source is keyed by its location, like every collection (5.4), and
-sources stack: no file drops one another gave (ruled 2026-10-12). A
+sources stack, as everything does (5.4). A
 location with no scheme is https (`github.com/eidelbyte/freebsd-patches`
 is `https://github.com/eidelbyte/freebsd-patches`); a relative path is
 a directory in zconfig, which zconfig's snapshot (`shtetl:config`)
