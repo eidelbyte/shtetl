@@ -222,8 +222,9 @@ with a warning, the property being the container's own clone's.
 The default is the one layer a recipe may override. It may hold any
 kind's keys, and each recipe takes those of its kind (a container
 takes no `kernconf_file`). What a recipe gives again of its one-value
-keys, derivations, fields or dataset properties replaces the
-default's, without a warning. What stacks, stacks with it: its `pkg`
+keys, derivations or fields replaces the default's without a word; a
+dataset property replaces it with the warning it gives over any
+layer. What stacks, stacks with it: its `pkg`
 and `ver` reach every recipe, and the way to be rid of one is to take
 it out of `shtetl.conf`.
 

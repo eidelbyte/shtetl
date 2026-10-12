@@ -571,9 +571,9 @@ test_layer_errors(void)
  * CC31 - CC34: shtetl.conf, the default (ruled 2026-10-12). Every
  * recipe takes the keys of its kind from it; what a recipe gives again
  * of the default's one-value keys, derivations, entries' fields and
- * dataset properties overrides it (no warning: a default is there to
- * be overridden); what stacks stacks with it; its settings are no
- * recipe's.
+ * dataset properties overrides it, a dataset property with a warning
+ * as from any layer (ruled 2026-10-12, Q-AD); what stacks stacks with
+ * it; its settings are no recipe's.
  */
 static void
 test_default(void)
@@ -628,7 +628,9 @@ test_default(void)
 	/* CC32: what is given again of the default's, overrides it */
 	v = sh_obj_get(sh_obj_get(M("datasets"), "var"), "compression");
 	CHECK(is(v->sn_str, "lz4") && is(v->sn_from, "containers/x.conf"));
-	CHECK(wc.c_err.se_count == 0);
+	CHECK(wc.c_err.se_count == 1);
+	CHECK(cap_has(&wc, "containers/x.conf: datasets.var.compression: "
+	    "lz4 overrides zstd, from shtetl.conf"));
 	v = sh_obj_get(sh_obj_get(M("derivations"), "etc/pwd.db"), "command");
 	CHECK(is(v->sn_str, "pwd_mkdb -p"));
 

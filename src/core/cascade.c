@@ -338,8 +338,8 @@ mg_piece(struct mg *m, struct sh_node *coll, struct sh_pair *cur,
  * gives a second time is refused, and so is a derivation given in two
  * files; two files giving one entry different parts of it compose.
  * But a dataset's property a nearer file may override, with a
- * warning, and a commands block's texts stack, each a piece of its
- * own.
+ * warning, the default's as any other's; and a commands block's texts
+ * stack, each a piece of its own.
  */
 static void
 mg_entry(struct mg *m, struct sh_node *coll, const struct sh_rkey *rk,
@@ -383,7 +383,6 @@ mg_entry(struct mg *m, struct sh_node *coll, const struct sh_rkey *rk,
 			    "does not give again", have->pr_val->sn_from);
 		} else {
 			if (have != NULL && m->mg_warn != NULL &&
-			    !mg_default(m, have->pr_val) &&
 			    !sh_node_equal(have->pr_val, f->pr_val))
 				sh_err_at(m->mg_warn, m->mg_l->sl_file,
 				    &m->mg_path, "%s overrides %s, from %s",

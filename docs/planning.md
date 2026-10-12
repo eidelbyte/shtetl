@@ -468,10 +468,11 @@ override:
   and leaves the rest (a container takes no `kernconf_file`, a
   foundation no `jailconf`). shtetl.conf's settings are no recipe's.
 - What would be a redefinition of the default's value is an override
-  instead, without a warning: a recipe's `src_branch` or
-  `kernconf_file` over the default's, its derivation over the
-  default's for the same path, its field or dataset property over the
-  default's.
+  instead: a recipe's `src_branch` or `kernconf_file` over the
+  default's, its derivation over the default's for the same path, its
+  field over the default's, without a word; its dataset property over
+  the default's with the warning any layer's override gives (ruled
+  2026-10-12, Q-AD).
 - What stacks, stacks with the default too: its `ver`, `pkg`,
   datasets, texts and commands reach every recipe of the kinds that
   take them. To be rid of one, the site takes it out of shtetl.conf.
@@ -1435,6 +1436,20 @@ below that change the plan are folded into the sections named.
 
 ## 14. Rulings
 
+### 2026-10-12 (Q-AD: the default's edges)
+
+Asked: are the files shtetl.conf imports of the default too; does
+overriding a default's dataset property warn, as another layer's
+does; and does the default's `ver` stack, so that a recipe whose
+`ver` cannot meet `>=15.1` is refused.
+
+- "1: sounds good 2: give warning for all layers including default
+  3: agreed"
+
+So (5.4): shtetl.conf's imports are of the default; a dataset
+property's override warns whichever layer gave the value it
+replaces; the default's `ver` stacks like any list.
+
 ### 2026-10-12 (the default: shtetl.conf)
 
 Asked: may the default file hold any kind's keys, each recipe taking
@@ -1649,18 +1664,8 @@ So (5.4, 5.5):
 
 ## 15. Open questions
 
-Q-AC is ruled (14, 2026-10-12), and with it the default.
-
-Built with the default ruling, where it was silent:
-
-- **Q-AD, the default's edges.** Built: the files shtetl.conf imports
-  are of the default too, so a recipe overrides what they give as it
-  overrides shtetl.conf's own; overriding a default's dataset property
-  gives no warning, being what the default is for; and `ver` stacks
-  with the default like every list, so a recipe whose `ver` cannot
-  meet shtetl.conf's `>=15.1` is refused, the site taking it out of
-  shtetl.conf if it wants it gone. The other reading of the last:
-  the default's `ver` yields, as its one-value keys do.
+Q-AC is ruled (14, 2026-10-12), and with it the default; so is
+Q-AD, the default's edges.
 
 M1 and M2 decided these where the plan was silent; each is built as
 written and marked PROPOSAL where it lives. None blocks M3. Q-S, Q-T
