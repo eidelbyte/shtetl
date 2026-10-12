@@ -302,6 +302,8 @@ confirmation {-y, a terminal's answer, no terminal}.
 
 On the box, tests/box/run.sh runs D1, D2, D5, D6, D14, D16, B3, B6,
 B8, B10 - B14 and B16 - B18 again, as commands against two pools on
-memory disks, and logs each by its cell. Until a log of it comes back
-from the box, those cells stand on the fake ZFS alone, and the libzfs
-layer (src/fbsd/zfs.c) on the cross-compile of tools/xcheck-freebsd.sh.
+memory disks, and logs each by its cell. All passed on KIDON
+(15.1-RELEASE-p2, OpenZFS 2.4.2) at 1ef5e85, 2026-10-12: 53 checks,
+tests/box/results/KIDON-20261012T111021Z.log. B13 ran with git; B8
+with the ashift warning, the memory disks having another ashift than
+12.

@@ -2,7 +2,7 @@
 
 2026-10-11, branch impl/m2, from impl/m1. planning.md 12's M2:
 discovery and multi-rooting, bootstrap, the property table. Built and
-tested on the mac; the box run (tests/box/run.sh) is still to come.
+tested on the mac; passed on the box 2026-10-12.
 
 ## What was built
 
@@ -72,10 +72,17 @@ used to give the usage.
   2.2 and later).
 - make gate: clean.
 
+On the box, 2026-10-12, at 1ef5e85: make freebsd built the libzfs
+layer as it stood, and tests/box/run.sh passed all 53 checks on KIDON
+(15.1-RELEASE-p2, OpenZFS 2.4.2):
+tests/box/results/KIDON-20261012T111021Z.log. Discovery, both
+refusals and both bootstraps, the run layout's mounts as ruled, the
+recipes cloned after their snapshot, a later run root's canmount=off,
+and layout already there read below the altroot, all as the fake
+said.
+
 Not yet verified:
 
-- The libzfs layer has never been built or run: that is the box's
-  make freebsd and tests/box/run.sh.
 - AddressSanitizer: still not run (M1's worklog says why on the mac).
 
 ## Gotchas

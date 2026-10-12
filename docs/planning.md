@@ -2,8 +2,8 @@
 
 Status: draft 4, 2026-10-09. M0 is done (13.1); M1, the configuration,
 is built and passes on the box (branch impl/m1); M2, discovery and
-bootstrap, is built on branch impl/m2 and waits for its box run
-(2026-10-11, section 12). Drafts 1 to 3 were reviewed and every ruling
+bootstrap, is built and passes on the box (branch impl/m2;
+2026-10-11/12, section 12). Drafts 1 to 3 were reviewed and every ruling
 is folded in; section 14 lists them so each can be traced. Section 15
 gathers what M1 and M2 decided where the plan was silent, for a
 ruling. A detail marked PROPOSAL has not been ruled on but blocks
@@ -1276,7 +1276,7 @@ by the command line run over two configuration roots
 |----|-------|-------|
 | M0 | probes (section 13) | box |
 | M1 | skeleton, UCL loader, schema, cascade, `shtetl config show`; built 2026-10-11, branch impl/m1 (tests/MATRIX.md family C, all covered; make check and make check-freebsd pass on the box) | mac |
-| M2 | discovery and multi-rooting, bootstrap, property table; built 2026-10-11, branch impl/m2 (tests/MATRIX.md families R, D, B on the mac; tests/box/run.sh to run on the box) | box |
+| M2 | discovery and multi-rooting, bootstrap, property table; built 2026-10-11, branch impl/m2 (tests/MATRIX.md families R, D, B on the mac; tests/box/run.sh passes on the box, 2026-10-12) | box |
 | M3 | foundation build and update into zlake, patches and the pause included; pkg-upgrade | box |
 | M4 | beam-down, new container, save with messages, the zlake mirror | box |
 | M5 | update into staging, history replay, gate handling and derivations, cutover, abandon | box |
