@@ -182,3 +182,42 @@ correctness in its own right 3. =15 matches 15.x"
 Verification: make check (8 suites, check_cascade 250 checks; 21
 command-line cases; 35 doc commands in 14 examples), make gate
 clean, xcheck below.
+
+## Simple messages, no legacy, kernconf one key
+
+Asked on reading the reference: simple, declarative messages; no
+message, test or doc for a key that was removed, nothing having been
+released; no ruling dates; and kernconf one key again, a heredoc
+lines that stack, a string the config, one per stack. Quoted in
+planning.md 14.
+
+| commit | unit |
+|--------|------|
+| d63f471 | the configuration's messages: "invalid key", "valid only in foundation recipe", "dropping values is illegal", "must be a quoted string", "already defined in F", "A in F conflicts with B in G", "missing src_branch", "no such file"; libucl's errors become "F:N: duplicate key", "macros are illegal" or "syntax error"; the removed-keys table and its tests and cells gone |
+| 24d9ea2 | the same for spaces, bootstrap and running programs; tests/box/run.sh's B3, B6, B16 take the new text |
+| dcb2afc | kernconf: a heredoc is lines, a string the config, one file of the stack giving it; the parse keeps libucl's heredoc mark (sn_block), the self-check refuses a libucl without it; config show comments only a collection's entries |
+| 3f7bb14 | the reference, the primer, the plan's design sections, comments and the matrix without history or ruling dates |
+
+- **Messages.** The rule I wrote by: the key path says where, the
+  message says what is wrong, in as few words as are true; a hint
+  only where the fix is not the obvious one ("must be a quoted
+  string", since UCL took the word for a number). libucl's own text
+  is no longer passed on: its error code says whether a key was
+  written twice (UCL_EMERGE, both of its merge errors), and the line
+  is libucl's.
+- **kernconf and one key per file.** UCL takes a key once in a file,
+  so a foundation that starts from a config of its own and adds lines
+  gives one of the two in an imported file. Raised with the user; the
+  reference says so.
+- **One per stack** read as: a second file giving the config is
+  refused even when alike, unlike src_branch, which may repeat alike.
+  The default's is overridden, with a warning.
+- **config show**: a layer comment on an object now only where it is
+  a collection's entry, so kernconf's lines print as buildopts does.
+
+Verification: make check: check_parse 189, check_schema 325,
+check_site 186, check_cascade 251, check_show 52, check_run 107,
+check_spaces 89, check_boot 278; 21 command-line cases; 36 doc
+commands in 14 examples. MATRIX 159 cells, none planned. make gate
+clean; xcheck: every source passes. Not on the box: tests/box/run.sh
+needs a run for B3, B6 and B16's new text.
