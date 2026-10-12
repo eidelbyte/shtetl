@@ -56,6 +56,7 @@ static const struct {
 	{ "recordsize", "128K", 1 },
 	{ "mountpoint", NULL, 1 },
 	{ "canmount", "on", 0 },
+	{ "mounted", "no", 0 },
 	{ NULL, NULL, 0 }
 };
 

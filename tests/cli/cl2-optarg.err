@@ -1,10 +1,13 @@
 shtetl: -C needs a directory
 usage: shtetl [-C dir] command ...
        shtetl [-C dir] config show [recipe]
+       shtetl [-C dir] spaces
 
-  -C dir  the configuration root: the zshtetl-recipes clone
+  -C dir  the configuration root (the zshtetl-recipes clone);
+          without it, the config root's mountpoint
 
   config show: the recipe (foundations/F, containers/X, systems/S)
     with its layers merged, or the site's settings
+  spaces: each space's roots, and where config and build are mounted
 
 exit: 0 done, 1 refused (the reasons are on standard error), 2 usage

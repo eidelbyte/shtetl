@@ -62,8 +62,13 @@ t cl1-help -h
 t cl2-command frobnicate
 t cl2-option -x config show
 t cl2-optarg -C
-# CL3: no configuration root.
-t cl3-noroot config show
+# CL3, D17: no -C, so the config root is looked for, and a portable
+# shtetl has no ZFS to look in. On the freebsd flavor this would ask
+# the machine's own pools; tests/box covers it there.
+if [ "$(cat build/.flavor 2>/dev/null)" = portable ]; then
+	t cl3-noroot config show
+	t d17-spaces spaces
+fi
 # CL4, and CW1 - CW6 on a real tree: the merged recipe.
 t cl4-nginx -C tests/conf/site config show containers/nginx
 t cl4-generic -C tests/conf/site config show foundations/generic.conf

@@ -17,6 +17,8 @@
 #include "core/root.h"
 #include "core/show.h"
 #include "core/site.h"
+#include "core/spaces.h"
+#include "core/zfs.h"
 
 #define	SH_EXIT_OK	0
 #define	SH_EXIT_REFUSED	1
@@ -24,11 +26,16 @@
 
 /*
  * What every command is handed. sc_root is the configuration root
- * (zconfig, planning.md 4.4) that -C named, or NULL: until discovery
- * by shtetl:space (4.1) is built, -C is the only way to name it.
+ * (zconfig, planning.md 4.4): the directory -C named, or, without
+ * -C, the config root's mountpoint, found by shtetl:space (4.1) when
+ * a command first needs it. ZFS is opened, and the spaces found, once.
  */
 struct sh_ctx {
-	const char	*sc_root;
+	const char		*sc_root;
+	char			*sc_rootbuf;
+	struct sh_zfs		*sc_zfs;
+	struct sh_spaces	sc_spaces;
+	int			sc_found;
 };
 
 struct sh_cmd {
@@ -40,11 +47,15 @@ struct sh_cmd {
 };
 
 static int cmd_config_show(struct sh_ctx *, int, char **);
+static int cmd_spaces(struct sh_ctx *, int, char **);
 
+/* A command of one word has no verb. */
 static const struct sh_cmd sh_cmds[] = {
 	{ "config", "show", "[recipe]", "the recipe (foundations/F, "
 	    "containers/X, systems/S)\n    with its layers merged, or the "
 	    "site's settings", cmd_config_show },
+	{ "spaces", NULL, "", "each space's roots, and where config and "
+	    "build are mounted", cmd_spaces },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -55,17 +66,20 @@ usage(FILE *f)
 
 	(void) fprintf(f, "usage: shtetl [-C dir] command ...\n");
 	for (c = sh_cmds; c->cm_word != NULL; c++) {
-		(void) fprintf(f, "       shtetl [-C dir] %s %s%s%s\n",
-		    c->cm_word, c->cm_verb, c->cm_args[0] != '\0' ? " " : "",
-		    c->cm_args);
+		(void) fprintf(f, "       shtetl [-C dir] %s%s%s%s%s\n",
+		    c->cm_word, c->cm_verb != NULL ? " " : "",
+		    c->cm_verb != NULL ? c->cm_verb : "",
+		    c->cm_args[0] != '\0' ? " " : "", c->cm_args);
 	}
-	(void) fprintf(f, "\n  -C dir  the configuration root: the "
-	    "zshtetl-recipes clone\n");
+	(void) fprintf(f, "\n  -C dir  the configuration root (the "
+	    "zshtetl-recipes clone);\n          without it, the config "
+	    "root's mountpoint\n");
 	if (sh_cmds[0].cm_word != NULL)
 		(void) fprintf(f, "\n");
 	for (c = sh_cmds; c->cm_word != NULL; c++)
-		(void) fprintf(f, "  %s %s: %s\n", c->cm_word, c->cm_verb,
-		    c->cm_what);
+		(void) fprintf(f, "  %s%s%s: %s\n", c->cm_word,
+		    c->cm_verb != NULL ? " " : "",
+		    c->cm_verb != NULL ? c->cm_verb : "", c->cm_what);
 	(void) fprintf(f, "\nexit: 0 done, 1 refused (the reasons are on "
 	    "standard error), 2 usage\n");
 }
@@ -99,15 +113,47 @@ out_done(void)
 	return (SH_EXIT_OK);
 }
 
-/* The configuration root, or a refusal: 0 if there is one to read. */
+/* ZFS opened and the spaces found, once. */
 static int
-need_root(const struct sh_ctx *ctx, struct sh_err *e)
+ctx_zfs(struct sh_ctx *ctx, struct sh_err *e)
 {
+	if (ctx->sc_found)
+		return (0);
+	if (ctx->sc_zfs == NULL && sh_zfs_open(&ctx->sc_zfs, e) != 0)
+		return (-1);
+	if (sh_spaces_discover(ctx->sc_zfs, &ctx->sc_spaces, e) != 0)
+		return (-1);
+	ctx->sc_found = 1;
+	return (0);
+}
+
+/*
+ * The configuration root: -C's directory, or the config root where
+ * it is mounted. 0 when there is a directory to read.
+ */
+static int
+ctx_root(struct sh_ctx *ctx, struct sh_err *e)
+{
+	if (ctx->sc_root == NULL) {
+		if (ctx_zfs(ctx, e) != 0 ||
+		    sh_spaces_config_dir(ctx->sc_zfs, &ctx->sc_spaces,
+		    &ctx->sc_rootbuf, e) != 0)
+			return (-1);
+		ctx->sc_root = ctx->sc_rootbuf;
+	}
 	if (sh_root_kind(ctx->sc_root, ".") != 'd') {
 		sh_errf(e, "%s: not a directory", ctx->sc_root);
 		return (-1);
 	}
 	return (0);
+}
+
+static void
+ctx_free(struct sh_ctx *ctx)
+{
+	sh_spaces_free(&ctx->sc_spaces);
+	sh_zfs_close(ctx->sc_zfs);
+	free(ctx->sc_rootbuf);
 }
 
 /*
@@ -124,10 +170,8 @@ cmd_config_show(struct sh_ctx *ctx, int argc, char **argv)
 
 	if (argc > 1)
 		return (die_usage("config show takes one recipe at most", ""));
-	if (ctx->sc_root == NULL)
-		return (die_usage("no configuration root: give -C dir", ""));
 	sh_err_init(&e, stderr, "shtetl: ");
-	if (need_root(ctx, &e) != 0)
+	if (ctx_root(ctx, &e) != 0)
 		return (SH_EXIT_REFUSED);
 	if (argc == 0) {
 		if (sh_site_load(ctx->sc_root, &s, &e) != 0)
@@ -158,6 +202,41 @@ std_fds(void)
 		    open("/dev/null", fd == 0 ? O_RDONLY : O_WRONLY) != fd)
 			exit(SH_EXIT_REFUSED);
 	}
+}
+
+/*
+ * spaces: the roots. The default lake and run roots need shtetl.conf,
+ * so the settings are read when there is a configuration to read
+ * them from; without one, no default is marked.
+ */
+static int
+cmd_spaces(struct sh_ctx *ctx, int argc, char **argv)
+{
+	struct sh_site site;
+	struct sh_err e, quiet;
+	FILE *null;
+	int r, have;
+
+	(void) argv;
+	if (argc > 0)
+		return (die_usage("spaces takes no operand", ""));
+	sh_err_init(&e, stderr, "shtetl: ");
+	if (ctx_zfs(ctx, &e) != 0)
+		return (SH_EXIT_REFUSED);
+	if ((null = fopen("/dev/null", "w")) == NULL) {
+		sh_errf(&e, "/dev/null: %s", strerror(errno));
+		return (SH_EXIT_REFUSED);
+	}
+	sh_err_init(&quiet, null, "");
+	have = ctx_root(ctx, &quiet) == 0;
+	(void) fclose(null);
+	if (have && sh_site_load(ctx->sc_root, &site, &e) != 0)
+		return (SH_EXIT_REFUSED);
+	r = sh_spaces_show(stdout, ctx->sc_zfs, &ctx->sc_spaces,
+	    have ? site.ss_merged : NULL, &e);
+	if (have)
+		sh_site_free(&site);
+	return (r == 0 ? out_done() : SH_EXIT_REFUSED);
 }
 
 int
@@ -193,9 +272,16 @@ main(int argc, char **argv)
 	if (argc == 0)
 		return (die_usage(NULL, NULL));
 	for (c = sh_cmds; c->cm_word != NULL; c++) {
-		if (strcmp(argv[0], c->cm_word) == 0 && argc >= 2 &&
-		    strcmp(argv[1], c->cm_verb) == 0)
-			return (c->cm_run(&ctx, argc - 2, argv + 2));
+		if (strcmp(argv[0], c->cm_word) != 0)
+			continue;
+		if (c->cm_verb == NULL)
+			ch = c->cm_run(&ctx, argc - 1, argv + 1);
+		else if (argc >= 2 && strcmp(argv[1], c->cm_verb) == 0)
+			ch = c->cm_run(&ctx, argc - 2, argv + 2);
+		else
+			continue;
+		ctx_free(&ctx);
+		return (ch);
 	}
 	return (die_usage("unknown command: ", argv[0]));
 }

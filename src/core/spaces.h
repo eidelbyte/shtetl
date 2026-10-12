@@ -9,6 +9,7 @@
 #define	SH_SPACES_H
 
 #include <stddef.h>
+#include <stdio.h>
 
 #include "core/err.h"
 #include "core/tree.h"
@@ -59,5 +60,21 @@ int sh_spaces_lookup(struct sh_zfs *z, const struct sh_spaces *s,
  */
 int sh_spaces_default(const struct sh_spaces *s, const struct sh_node *site,
     enum sh_space sp, const char **root, struct sh_err *e);
+
+/*
+ * The directory the configuration is read from: the config root's
+ * mountpoint, where it is mounted (the caller frees it). Refused: no
+ * config root; no mountpoint (none, legacy); not mounted.
+ */
+int sh_spaces_config_dir(struct sh_zfs *z, const struct sh_spaces *s,
+    char **dir, struct sh_err *e);
+
+/*
+ * shtetl spaces: each space's roots, a line each. With several lake or
+ * run roots, the default is marked (SITE, the settings, may be NULL);
+ * config and build say where they are mounted.
+ */
+int sh_spaces_show(FILE *out, struct sh_zfs *z, const struct sh_spaces *s,
+    const struct sh_node *site, struct sh_err *e);
 
 #endif	/* SH_SPACES_H */

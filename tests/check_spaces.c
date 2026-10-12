@@ -257,6 +257,104 @@ test_default(void)
 	sh_node_free(site);
 }
 
+/* D14, D15: the directory the configuration is read from. */
+static void
+test_config_dir(void)
+{
+	char *dir;
+
+	pools();
+	CHECK(D() == 0);
+	CHECK(sh_spaces_config_dir(z, &s, &dir, &c.c_err) == -1);
+	CHECK(dir == NULL);
+	CHECK(cap_has(&c, "no config root: shtetl bootstrap makes one, or -C "
+	    "names a directory to read"));
+
+	zfake_fs("tank/zconfig");
+	zfake_set("tank/zconfig", SH_SPACE_PROP, "config");
+	zfake_set("tank/zconfig", "mountpoint", "/zconfig");
+	CHECK(D() == 0);
+	CHECK(sh_spaces_config_dir(z, &s, &dir, &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/zconfig, the config root, is not mounted: "
+	    "the configuration is read where it is mounted"));
+	zfake_set("tank/zconfig", "mounted", "yes");
+	cap_reset(&c);
+	CHECK(sh_spaces_config_dir(z, &s, &dir, &c.c_err) == 0);
+	CHECK(is(dir, "/zconfig"));
+	free(dir);
+	/* inherited from the pool: tank/zconfig at /tank/zconfig */
+	zfake_set("tank/zconfig", "mountpoint", "none");
+	CHECK(sh_spaces_config_dir(z, &s, &dir, &c.c_err) == -1);
+	CHECK(cap_has(&c, "has no mountpoint"));
+	zfake_set("tank/zconfig", "mountpoint", "legacy");
+	cap_reset(&c);
+	CHECK(sh_spaces_config_dir(z, &s, &dir, &c.c_err) == -1);
+	CHECK(cap_has(&c, "has no mountpoint"));
+}
+
+/* What sh_spaces_show printed; the last one is freed at the end. */
+static char *shownbuf;
+
+static const char *
+shown(const struct sh_node *site)
+{
+	size_t len;
+	FILE *f;
+
+	free(shownbuf);
+	shownbuf = NULL;
+	f = open_memstream(&shownbuf, &len);
+	CHECK(f != NULL);
+	CHECK(sh_spaces_show(f, z, &s, site, &c.c_err) == 0);
+	CHECK(fclose(f) == 0);
+	return (shownbuf);
+}
+
+/* D16: shtetl spaces. */
+static void
+test_show(void)
+{
+	struct sh_node *site;
+
+	pools();
+	CHECK(D() == 0);
+	CHECK(is(shown(NULL),
+	    "lake    -  none: shtetl bootstrap makes one\n"
+	    "config  -  none: shtetl bootstrap makes one\n"
+	    "build   -  none: shtetl bootstrap makes one\n"
+	    "run     -  none: shtetl bootstrap makes one\n"));
+
+	zfake_fs("tank/lake");
+	zfake_set("tank/lake", SH_SPACE_PROP, "lake");
+	zfake_fs("tank/zconfig");
+	zfake_set("tank/zconfig", SH_SPACE_PROP, "config");
+	zfake_set("tank/zconfig", "mountpoint", "/zconfig");
+	zfake_set("tank/zconfig", "mounted", "yes");
+	zfake_fs("tank/zbuild");
+	zfake_set("tank/zbuild", SH_SPACE_PROP, "build");
+	zfake_set("tank/zbuild", "mountpoint", "/usr/src");
+	zfake_set("fast", SH_SPACE_PROP, "run");
+	zfake_fs("tank/run2");
+	zfake_set("tank/run2", SH_SPACE_PROP, "run");
+	CHECK(D() == 0);
+	CHECK(is(shown(NULL),
+	    "lake    tank/lake\n"
+	    "config  tank/zconfig  mounted at /zconfig\n"
+	    "build   tank/zbuild  not mounted\n"
+	    "run     fast\n"
+	    "run     tank/run2\n"
+	    "           no default: shtetl.conf names none as "
+	    "spaces.run.default\n"));
+	site = conf("spaces { run { default = \"tank/run2\"; } }");
+	CHECK(is(shown(site),
+	    "lake    tank/lake\n"
+	    "config  tank/zconfig  mounted at /zconfig\n"
+	    "build   tank/zbuild  not mounted\n"
+	    "run     fast\n"
+	    "run     tank/run2  default\n"));
+	sh_node_free(site);
+}
+
 int
 main(void)
 {
@@ -266,6 +364,9 @@ main(void)
 	test_refused();
 	test_lookup();
 	test_default();
+	test_config_dir();
+	test_show();
+	free(shownbuf);
 	sh_spaces_free(&s);
 	sh_zfs_close(z);
 	cap_close(&c);

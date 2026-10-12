@@ -181,7 +181,7 @@ the target's spelling.
 |------|----------|-------------|
 | CL1 | no arguments, or -h: the usage, exit 2 (-h: exit 0) | covered: run-cli.sh cl1-none, cl1-help |
 | CL2 | an unknown command or option, or -C with no directory: the usage, exit 2 | covered: run-cli.sh cl2-command, cl2-option, cl2-optarg |
-| CL3 | no -C: refused, exit 2 | covered: run-cli.sh cl3-noroot |
+| CL3 | no -C: the configuration root is looked for by discovery (D14); a portable shtetl, with no ZFS, refuses, exit 1 | covered: run-cli.sh cl3-noroot |
 | CL4 | config show RECIPE: the merged recipe on stdout, exit 0 | covered: run-cli.sh cl4-nginx, cl4-generic |
 | CL5 | config show: the site settings, exit 0 | covered: run-cli.sh cl5-site, cl5-builtin |
 | CL6 | a refused configuration, a missing recipe, a root that is not a directory: the reasons on stderr, nothing on stdout, exit 1 | covered: run-cli.sh cl6-bad, cl6-drop, cl6-notdir, cl6-norecipe |
@@ -255,3 +255,7 @@ that is no root of its space}; ZFS refusing the walk.
 | D11 | the default root: the only root; with several, spaces.X.default when it names one of them | covered: check_spaces.c |
 | D12 | the default refused: no root; several and no default; a default that is no root of that space | covered: check_spaces.c |
 | D13 | ZFS refusing the walk refuses the discovery, with ZFS's reason | covered: check_spaces.c |
+| D14 | the configuration is read from the config root's mountpoint, where it is mounted | covered: check_spaces.c |
+| D15 | the config root refused: none; no mountpoint (none, legacy); not mounted | covered: check_spaces.c |
+| D16 | shtetl spaces: each space's roots, the default lake and run roots marked, config and build with where they are mounted, a space with none saying so | covered: check_spaces.c |
+| D17 | a portable shtetl, with no -C, says it was built without ZFS | covered: run-cli.sh cl3-noroot, d17-spaces |

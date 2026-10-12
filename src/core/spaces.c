@@ -190,38 +190,169 @@ sh_spaces_lookup(struct sh_zfs *z, const struct sh_spaces *s,
 	return (0);
 }
 
+/* Why there is no default root, for sp_default's callers. */
+enum sp_why {
+	SP_OK,
+	SP_NONE,		/* no root */
+	SP_UNNAMED,		/* several, and no default named */
+	SP_NOTROOT		/* the default named is no root of the space */
+};
+
+static const char *
+sp_default(const struct sh_spaces *s, const struct sh_node *site,
+    enum sh_space sp, const struct sh_node **defp, enum sp_why *why)
+{
+	const struct sh_node *def;
+	size_t i;
+
+	def = sh_obj_get(sh_obj_get(sh_obj_get(site, "spaces"),
+	    sp_names[sp]), "default");
+	*defp = def;
+	if (s->ss_n[sp] == 0) {
+		*why = SP_NONE;
+		return (NULL);
+	}
+	if (def == NULL || def->sn_type != SH_STR) {
+		if (s->ss_n[sp] == 1) {
+			*why = SP_OK;
+			return (s->ss_roots[sp][0]);
+		}
+		*why = SP_UNNAMED;
+		return (NULL);
+	}
+	for (i = 0; i < s->ss_n[sp]; i++) {
+		if (strcmp(s->ss_roots[sp][i], def->sn_str) == 0) {
+			*why = SP_OK;
+			return (s->ss_roots[sp][i]);
+		}
+	}
+	*why = SP_NOTROOT;
+	return (NULL);
+}
+
 int
 sh_spaces_default(const struct sh_spaces *s, const struct sh_node *site,
     enum sh_space sp, const char **root, struct sh_err *e)
 {
 	const struct sh_node *def;
-	size_t i;
+	enum sp_why why;
 
-	*root = NULL;
-	def = sh_obj_get(sh_obj_get(sh_obj_get(site, "spaces"),
-	    sp_names[sp]), "default");
-	if (s->ss_n[sp] == 0) {
+	*root = sp_default(s, site, sp, &def, &why);
+	switch (why) {
+	case SP_OK:
+		return (0);
+	case SP_NONE:
 		sh_errf(e, "no %s root: shtetl bootstrap makes one",
 		    sp_names[sp]);
-		return (-1);
-	}
-	if (def == NULL || def->sn_type != SH_STR) {
-		if (s->ss_n[sp] == 1) {
-			*root = s->ss_roots[sp][0];
-			return (0);
-		}
+		break;
+	case SP_UNNAMED:
 		sh_errf(e, "%zu %s roots, and shtetl.conf names none of them "
 		    "as spaces.%s.default", s->ss_n[sp], sp_names[sp],
 		    sp_names[sp]);
+		break;
+	case SP_NOTROOT:
+		sh_errf(e, "%s: spaces.%s.default names %s, which is no %s "
+		    "root", def->sn_from, sp_names[sp], def->sn_str,
+		    sp_names[sp]);
+		break;
+	}
+	return (-1);
+}
+
+/*
+ * Where ROOT is mounted: 0 and the path in DIR; 1 when it has no
+ * mountpoint (none, legacy); 2 when it is not mounted; -1 when ZFS
+ * refuses.
+ */
+static int
+sp_where(struct sh_zfs *z, const char *root, char *dir, size_t len,
+    struct sh_err *e)
+{
+	char mounted[SH_ZFS_VALMAX];
+
+	if (sh_zfs_get(z, root, "mountpoint", dir, len, NULL, e) != 0 ||
+	    sh_zfs_get(z, root, "mounted", mounted, sizeof (mounted), NULL,
+	    e) != 0)
+		return (-1);
+	if (dir[0] != '/')
+		return (1);
+	if (strcmp(mounted, "yes") != 0)
+		return (2);
+	return (0);
+}
+
+int
+sh_spaces_config_dir(struct sh_zfs *z, const struct sh_spaces *s,
+    char **dir, struct sh_err *e)
+{
+	char path[SH_ZFS_VALMAX];
+	const char *root;
+	int r;
+
+	*dir = NULL;
+	if (s->ss_n[SH_SP_CONFIG] == 0) {
+		sh_errf(e, "no config root: shtetl bootstrap makes one, or -C "
+		    "names a directory to read");
 		return (-1);
 	}
-	for (i = 0; i < s->ss_n[sp]; i++) {
-		if (strcmp(s->ss_roots[sp][i], def->sn_str) == 0) {
-			*root = s->ss_roots[sp][i];
-			return (0);
-		}
+	root = s->ss_roots[SH_SP_CONFIG][0];
+	if ((r = sp_where(z, root, path, sizeof (path), e)) < 0)
+		return (-1);
+	if (r > 0) {
+		sh_errf(e, "%s, the config root, %s: the configuration is "
+		    "read where it is mounted", root, r == 1 ?
+		    "has no mountpoint" : "is not mounted");
+		return (-1);
 	}
-	sh_errf(e, "%s: spaces.%s.default names %s, which is no %s root",
-	    def->sn_from, sp_names[sp], def->sn_str, sp_names[sp]);
-	return (-1);
+	if ((*dir = strdup(path)) == NULL) {
+		sh_err_nomem(e);
+		return (-1);
+	}
+	return (0);
+}
+
+int
+sh_spaces_show(FILE *out, struct sh_zfs *z, const struct sh_spaces *s,
+    const struct sh_node *site, struct sh_err *e)
+{
+	const struct sh_node *def;
+	const char *dflt;
+	char dir[SH_ZFS_VALMAX];
+	enum sp_why w;
+	size_t i;
+	int sp, r;
+
+	for (sp = 0; sp < SH_SP_N; sp++) {
+		if (s->ss_n[sp] == 0) {
+			(void) fprintf(out, "%-7s -  none: shtetl bootstrap "
+			    "makes one\n", sp_names[sp]);
+			continue;
+		}
+		dflt = NULL;
+		if (sp == SH_SP_LAKE || sp == SH_SP_RUN)
+			dflt = sp_default(s, site, (enum sh_space)sp, &def,
+			    &w);
+		for (i = 0; i < s->ss_n[sp]; i++) {
+			(void) fprintf(out, "%-7s %s", sp_names[sp],
+			    s->ss_roots[sp][i]);
+			if (sp == SH_SP_CONFIG || sp == SH_SP_BUILD) {
+				r = sp_where(z, s->ss_roots[sp][i], dir,
+				    sizeof (dir), e);
+				if (r < 0)
+					return (-1);
+				(void) fprintf(out, "  %s%s", r == 0 ?
+				    "mounted at " : r == 1 ? "no mountpoint" :
+				    "not mounted", r == 0 ? dir : "");
+			} else if (dflt == s->ss_roots[sp][i] &&
+			    s->ss_n[sp] > 1) {
+				(void) fprintf(out, "  default");
+			}
+			(void) fputc('\n', out);
+		}
+		if ((sp == SH_SP_LAKE || sp == SH_SP_RUN) && dflt == NULL)
+			(void) fprintf(out, "%-7s    no default: shtetl.conf "
+			    "names none as spaces.%s.default\n", "",
+			    sp_names[sp]);
+	}
+	return (0);
 }

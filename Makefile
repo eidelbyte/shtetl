@@ -112,7 +112,7 @@ check-freebsd:
 
 $(BUILD)/main.o: src/main.c src/core/cascade.h src/core/err.h \
 	src/core/root.h src/core/schema.h src/core/show.h src/core/site.h \
-	src/core/tree.h
+	src/core/spaces.h src/core/tree.h src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/main.c
 $(BUILD)/err.o: src/core/err.c src/core/err.h src/core/tree.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/err.c
