@@ -640,6 +640,7 @@ bx_clone(struct sh_zfs *z, const struct sh_broot *rt, const char *url,
 {
 	char snap[SH_BOOT_NAME + 64], stamp[32], **env, *u, *d;
 	char *argv[] = { "git", "clone", "--", NULL, NULL, NULL };
+	const char *one;
 	struct sh_run r;
 	struct tm tm;
 	time_t now;
@@ -660,7 +661,8 @@ bx_clone(struct sh_zfs *z, const struct sh_broot *rt, const char *url,
 	(void) strftime(stamp, sizeof (stamp), "%Y%m%d-%H%M%S", &tm);
 	(void) snprintf(snap, sizeof (snap), "%s@bootstrap-%s", rt->rt_ds,
 	    stamp);
-	if (sh_zfs_snapshot(z, snap, NULL, 0, e) != 0)
+	one = snap;
+	if (sh_zfs_snapshot(z, &one, 1, NULL, 0, e) != 0)
 		return (-1);
 	(void) fprintf(out, "snapshot %s\n", snap);
 	for (n = 0; environ[n] != NULL; n++)

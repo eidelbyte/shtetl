@@ -32,8 +32,12 @@ void zfake_fail_nth(const char *what, int nth);
 int zfake_count(void);
 int zfake_exists(const char *ds);
 
-/* Whether the snapshot NAME (ds@snap) was taken, and the last one. */
+/*
+ * Whether the snapshot NAME (ds@snap) is there, the newest taken, and
+ * the snapshot the last rollback went back to (NULL: none yet).
+ */
 int zfake_snapshot(const char *name);
 const char *zfake_last_snapshot(void);
+const char *zfake_last_rollback(void);
 
 #endif	/* SH_ZFAKE_H */

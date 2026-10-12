@@ -90,11 +90,23 @@ sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
 }
 
 int
-sh_zfs_snapshot(struct sh_zfs *z, const char *name,
+sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
+    struct sh_err *e)
+{
+	(void) z;
+	(void) ds;
+	(void) prop;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
+sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
     const struct sh_zprop *props, size_t nprops, struct sh_err *e)
 {
 	(void) z;
-	(void) name;
+	(void) names;
+	(void) n;
 	(void) props;
 	(void) nprops;
 	sh_errf(e, "%s", ZS_NONE);
@@ -102,7 +114,48 @@ sh_zfs_snapshot(struct sh_zfs *z, const char *name,
 }
 
 int
+sh_zfs_snapshots(struct sh_zfs *z, const char *ds,
+    int (*fn)(void *, const char *), void *arg, struct sh_err *e)
+{
+	(void) z;
+	(void) ds;
+	(void) fn;
+	(void) arg;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
+sh_zfs_rollback(struct sh_zfs *z, const char *ds, const char *snap,
+    struct sh_err *e)
+{
+	(void) z;
+	(void) ds;
+	(void) snap;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
+sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
+{
+	(void) z;
+	(void) name;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
 sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	(void) z;
+	(void) ds;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
+sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 {
 	(void) z;
 	(void) ds;

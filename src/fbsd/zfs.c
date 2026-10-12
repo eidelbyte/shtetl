@@ -161,12 +161,16 @@ sh_zfs_local(struct sh_zfs *z, const char *prop,
 	return (w.zw_failed ? -1 : 0);
 }
 
-/* DS opened as a filesystem: 1 and nothing reported if there is none. */
+/*
+ * DS opened, a snapshot when its name has an @, a filesystem
+ * otherwise: 1 and nothing reported if there is none.
+ */
 static int
 zz_open(struct sh_zfs *z, const char *ds, zfs_handle_t **zhpp,
     struct sh_err *e)
 {
-	*zhpp = zfs_open(z->zz_hdl, ds, ZFS_TYPE_FILESYSTEM);
+	*zhpp = zfs_open(z->zz_hdl, ds, strchr(ds, '@') != NULL ?
+	    ZFS_TYPE_SNAPSHOT : ZFS_TYPE_FILESYSTEM);
 	if (*zhpp != NULL)
 		return (0);
 	if (libzfs_errno(z->zz_hdl) == EZFS_NOENT)
@@ -337,13 +341,50 @@ sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
 	return (r != 0 ? -1 : 0);
 }
 
+int
+sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
+    struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	int r;
+
+	if ((r = zz_open(z, ds, &zhp, e)) != 0) {
+		if (r == 1)
+			sh_errf(e, "%s: no such filesystem", ds);
+		return (-1);
+	}
+	r = zfs_prop_inherit(zhp, prop, B_FALSE);
+	if (r != 0)
+		zz_err(z, e, ds);
+	zfs_close(zhp);
+	return (r != 0 ? -1 : 0);
+}
+
+/* An nvlist whose keys are NAMES, as lzc_* takes snapshots. */
+static nvlist_t *
+zz_names(const char *const *names, size_t n)
+{
+	nvlist_t *nv;
+	size_t i;
+
+	if (nvlist_alloc(&nv, NV_UNIQUE_NAME, 0) != 0)
+		return (NULL);
+	for (i = 0; i < n; i++) {
+		if (nvlist_add_boolean(nv, names[i]) != 0) {
+			nvlist_free(nv);
+			return (NULL);
+		}
+	}
+	return (nv);
+}
+
 /*
  * lzc_snapshot (lib/libzfs_core/libzfs_core.c): the snapshots as the
  * keys of one nvlist, the properties in another, all of it one ioctl,
- * so the snapshot exists with its properties or not at all.
+ * so the snapshots exist with their properties, or none of them do.
  */
 int
-sh_zfs_snapshot(struct sh_zfs *z, const char *name,
+sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
     const struct sh_zprop *props, size_t nprops, struct sh_err *e)
 {
 	nvlist_t *snaps, *pv, *errlist;
@@ -351,14 +392,9 @@ sh_zfs_snapshot(struct sh_zfs *z, const char *name,
 
 	(void) z;
 	errlist = NULL;
+	snaps = NULL;
 	if ((pv = zz_props(props, nprops)) == NULL ||
-	    nvlist_alloc(&snaps, NV_UNIQUE_NAME, 0) != 0) {
-		nvlist_free(pv);
-		sh_err_nomem(e);
-		return (-1);
-	}
-	if (nvlist_add_boolean(snaps, name) != 0) {
-		nvlist_free(snaps);
+	    (snaps = zz_names(names, n)) == NULL) {
 		nvlist_free(pv);
 		sh_err_nomem(e);
 		return (-1);
@@ -367,6 +403,94 @@ sh_zfs_snapshot(struct sh_zfs *z, const char *name,
 	nvlist_free(snaps);
 	nvlist_free(pv);
 	nvlist_free(errlist);
+	if (r != 0) {
+		sh_errf(e, "%s%s: %s", names[0], n > 1 ? " and the rest" : "",
+		    strerror(r));
+		return (-1);
+	}
+	return (0);
+}
+
+/* One walk for sh_zfs_snapshots. */
+struct zz_snaps {
+	int	(*zs_fn)(void *, const char *);
+	void	*zs_arg;
+	int	zs_stop;
+};
+
+static int
+zz_snap(zfs_handle_t *zhp, void *arg)
+{
+	struct zz_snaps *w = arg;
+	const char *at;
+
+	at = strchr(zfs_get_name(zhp), '@');
+	if (w->zs_stop == 0 && at != NULL)
+		w->zs_stop = w->zs_fn(w->zs_arg, at + 1);
+	zfs_close(zhp);
+	return (w->zs_stop != 0 ? -1 : 0);
+}
+
+int
+sh_zfs_snapshots(struct sh_zfs *z, const char *ds,
+    int (*fn)(void *, const char *), void *arg, struct sh_err *e)
+{
+	struct zz_snaps w;
+	zfs_handle_t *zhp;
+	int r;
+
+	if ((r = zz_open(z, ds, &zhp, e)) != 0) {
+		if (r == 1)
+			sh_errf(e, "%s: no such filesystem", ds);
+		return (-1);
+	}
+	w.zs_fn = fn;
+	w.zs_arg = arg;
+	w.zs_stop = 0;
+	r = zfs_iter_snapshots_sorted_v2(zhp, 0, zz_snap, &w, 0, 0);
+	if (r != 0 && w.zs_stop == 0)
+		zz_err(z, e, ds);
+	zfs_close(zhp);
+	if (w.zs_stop != 0)
+		return (w.zs_stop);
+	return (r != 0 ? -1 : 0);
+}
+
+int
+sh_zfs_rollback(struct sh_zfs *z, const char *ds, const char *snap,
+    struct sh_err *e)
+{
+	char name[ZFS_MAX_DATASET_NAME_LEN];
+	int r;
+
+	(void) z;
+	(void) snprintf(name, sizeof (name), "%s@%s", ds, snap);
+	if ((r = lzc_rollback_to(ds, name)) != 0) {
+		sh_errf(e, "%s: %s", name, strerror(r));
+		return (-1);
+	}
+	return (0);
+}
+
+int
+sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
+{
+	nvlist_t *snaps, *errlist;
+	int r;
+
+	(void) z;
+	if (strchr(name, '@') == NULL) {
+		r = lzc_destroy(name);
+	} else {
+		errlist = NULL;
+		if ((snaps = zz_names(&name, 1)) == NULL) {
+			sh_err_nomem(e);
+			return (-1);
+		}
+		r = lzc_destroy_snaps(snaps, B_FALSE, &errlist);
+		nvlist_free(snaps);
+		nvlist_free(errlist);
+	}
 	if (r != 0) {
 		sh_errf(e, "%s: %s", name, strerror(r));
 		return (-1);
@@ -386,6 +510,24 @@ sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 		return (-1);
 	}
 	r = zfs_mount(zhp, NULL, 0);
+	if (r != 0)
+		zz_err(z, e, ds);
+	zfs_close(zhp);
+	return (r != 0 ? -1 : 0);
+}
+
+int
+sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	int r;
+
+	if ((r = zz_open(z, ds, &zhp, e)) != 0) {
+		if (r == 1)
+			sh_errf(e, "%s: no such filesystem", ds);
+		return (-1);
+	}
+	r = zfs_unmount(zhp, NULL, 0);
 	if (r != 0)
 		zz_err(z, e, ds);
 	zfs_close(zhp);

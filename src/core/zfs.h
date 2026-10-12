@@ -52,9 +52,9 @@ int sh_zfs_local(struct sh_zfs *z, const char *prop,
     struct sh_err *e);
 
 /*
- * PROP of DS, native or user: its value into VAL and, when SRC is
- * not NULL, where it comes from. 1, and nothing reported, when there
- * is no filesystem DS.
+ * PROP of DS, a filesystem or a snapshot (ds@snap), native or user:
+ * its value into VAL and, when SRC is not NULL, where it comes from.
+ * 1, and nothing reported, when there is no DS.
  */
 int sh_zfs_get(struct sh_zfs *z, const char *ds, const char *prop,
     char *val, size_t len, enum sh_zsrc *src, struct sh_err *e);
@@ -67,19 +67,46 @@ int sh_zfs_children(struct sh_zfs *z, const char *ds,
 int sh_zfs_create(struct sh_zfs *z, const char *ds,
     const struct sh_zprop *props, size_t nprops, struct sh_err *e);
 
-/* PROP of DS set locally to VALUE. */
+/* PROP of DS, a filesystem or a snapshot, set locally to VALUE. */
 int sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
     const char *value, struct sh_err *e);
 
+/* PROP of DS no longer set locally: inherited, or its default. */
+int sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
+    struct sh_err *e);
+
 /*
- * A snapshot, NAME being ds@snap, with PROPS set on it from its birth
- * (lzc_snapshot: atomic).
+ * Snapshots of N filesystems at once, NAMES ds@snap each, with PROPS
+ * set on every one from its birth: one transaction (lzc_snapshot), so
+ * all of them are taken, or none.
  */
-int sh_zfs_snapshot(struct sh_zfs *z, const char *name,
+int sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
     const struct sh_zprop *props, size_t nprops, struct sh_err *e);
 
-/* DS mounted where its mountpoint says. */
+/*
+ * The snapshots of DS, oldest first (by createtxg): FN with each one's
+ * name after the @. FN's non-zero return stops the walk and is
+ * returned.
+ */
+int sh_zfs_snapshots(struct sh_zfs *z, const char *ds,
+    int (*fn)(void *arg, const char *snap), void *arg, struct sh_err *e);
+
+/*
+ * DS rolled back to SNAP, its newest snapshot (lzc_rollback_to): what
+ * was written since is gone. Refused when SNAP is not the newest.
+ */
+int sh_zfs_rollback(struct sh_zfs *z, const char *ds, const char *snap,
+    struct sh_err *e);
+
+/*
+ * NAME destroyed: a snapshot (ds@snap), or a filesystem with no
+ * children and no snapshots.
+ */
+int sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e);
+
+/* DS mounted where its mountpoint says, and unmounted. */
 int sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e);
+int sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e);
 
 /*
  * A pool's property, and setting one. "ashift" is answered with the

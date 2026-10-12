@@ -86,7 +86,7 @@ ZFS_OBJS = $(ZFS_OBJS_$(FLAVOR))
 TEST_OBJS = $(BUILD)/zfake.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(ZFS_OBJS) $(UCL_OBJS)
 TESTS = check_parse check_schema check_site check_cascade check_show \
-	check_run check_spaces check_boot check_version
+	check_run check_spaces check_boot check_version check_zfs
 
 all: build shtetl
 

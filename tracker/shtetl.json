@@ -117,7 +117,7 @@
     ],
     "provides": "Everything the build asks of ZFS, faked faithfully enough to test the build on the mac.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing"
   },
   "m3-build": {
     "description": "shtetl build F for a new foundation (planning.md 7.1, without patches): the recipe resolved and checked; the plan shown and confirmed as bootstrap's is (-y); one build at a time (shtetl:build on the src root); the config root snapshotted and the snapshot recorded (4.4, shtetl:config); zlake/foundations/F pre-split before anything is installed; the checkout of src_branch in zbuild; the kernel config and src.conf shtetl writes (kernconf, buildopts); make buildworld buildkernel with MAKEOBJDIRPREFIX on foundation-builds/F; installworld, installkernel and distribution with INSTALL_CMD=\"install -C\"; pkg and commands in a chroot of F; snapshot -r with the version name and shtetl:kind, shtetl:commit, shtetl:config, shtetl:patches; every mount undone on every way out. Programs from a table the tests point at fakes. Verify: MATRIX family F (the build) before its tests, over the fake ZFS and fake make, git and pkg; the box for a real build.",

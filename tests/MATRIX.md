@@ -345,3 +345,33 @@ do not.
 | V6 | REVISION read from newvers.sh -V's one line, REVISION="16.0"; anything else refused | covered: check_version.c |
 | V7 | before the checkout: releng/N.M must satisfy every ver, stable/N must leave some N.x every ver allows, main passes; the refusal names the constraint and its file | covered: check_version.c |
 | V8 | after the checkout: REVISION must satisfy every ver, the refusal naming the constraint and its file | covered: check_version.c |
+
+# Family Z: what the build asks of ZFS (M3; src/core/zfs.h; tests/zfake.c, src/fbsd/zfs.c)
+
+The calls a build makes beyond M2's: snapshots of several filesystems
+at once with properties, a dataset's snapshots in order, rollback,
+destroy, inherit, unmount, and properties of snapshots. The build's
+tests run over the fake, so the fake must answer as ZFS does; these
+cells hold it to that. The libzfs side compiles with the rest
+(tools/xcheck-freebsd.sh) and answers on the box.
+
+Dimensions: the call; its target {a filesystem, a snapshot, missing,
+malformed}; several names at once {all good, one taken, one missing,
+one twice}; a snapshot's property {identity, its own user property,
+its filesystem's, none}; rollback {to the newest, to an older one};
+destroy {a snapshot, a leaf filesystem, one with children, one with
+snapshots}; ZFS refusing.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| Z1 | snapshots of several filesystems at once share one createtxg, each with the properties given, and come back oldest first | covered: check_zfs.c |
+| Z2 | all or none: a name taken, a filesystem missing, a name twice, a malformed name; nothing taken | covered: check_zfs.c |
+| Z3 | a snapshot's type, name, createtxg and guid; its own user property, local; its filesystem's, inherited; none, "-" | covered: check_zfs.c |
+| Z4 | a user property set on a snapshot after it is taken; a native one, or a missing snapshot, refused | covered: check_zfs.c |
+| Z5 | a dataset's snapshots: its own only, not its children's, oldest first; FN's stop returned | covered: check_zfs.c |
+| Z6 | rollback to the newest snapshot; to an older one, refused | covered: check_zfs.c |
+| Z7 | destroy: a snapshot; a filesystem with no children and no snapshots; one with either refused | covered: check_zfs.c |
+| Z8 | inherit: the local value gone, the inherited one back | covered: check_zfs.c |
+| Z9 | unmount after mount | covered: check_zfs.c |
+| Z10 | each call refused when ZFS refuses, with ZFS's reason | covered: check_zfs.c |
+| Z11 | the same cells against libzfs on real pools | deferred: the M3 box run (tests/box), which the build's box cases need anyway |
