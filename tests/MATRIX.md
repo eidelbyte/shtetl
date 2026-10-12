@@ -88,11 +88,11 @@ object, string}; entry key syntax per collection; error reporting
 |------|----------|-------------|
 | CK1 | every key of 5.5 is accepted in each kind that has it | covered: check_schema.c |
 | CK2 | an unknown key is refused with the file and its key path | covered: check_schema.c |
-| CK3 | a foundation-only key (src_branch, kernconf, buildopts, patches, the twins) in a container and in a system is refused, naming the kind | covered: check_schema.c |
-| CK4 | a container-only key (requires, jailconf, jailconf_file) in a foundation and in a system is refused | covered: check_schema.c |
+| CK3 | a foundation-only key (src_branch, kernconf_file, kernconf_lines, buildopts, buildopts_file, patches) in a container and in a system is refused, naming the kind | covered: check_schema.c |
+| CK4 | a container-only key (requires, jailconf) in a foundation and in a system is refused | covered: check_schema.c |
 | CK5 | a string key given a number or a bool is refused; a number says to quote it | covered: check_schema.c |
-| CK6 | ver: `>=15`, `=15.1`, `<16`, `<=15.1`, `>14` accepted; ``, `15.1`, `>=`, `=>15`, `>=15.x`, `>=15.` refused | covered: check_schema.c |
-| CK7 | kernconf and kernconf_file in one file are refused, one value given twice; buildopts and buildopts_file, jailconf and jailconf_file, in one file, stack | covered: check_schema.c |
+| CK6 | ver, one constraint or a list of them: `>=15`, `=15.1`, `<16`, `<=15.1`, `>14` accepted; ``, `15.1`, `>=`, `=>15`, `>=15.x`, `>=15.` refused | covered: check_schema.c, check_cascade.c test_ver |
+| CK7 | kernconf_file and kernconf_lines in one file; buildopts and buildopts_file in one file, which stack | covered: check_schema.c |
 | CK8 | a `_file` value: relative paths accepted; absolute, `..`, empty components refused | covered: check_schema.c |
 | CK9 | import: an array of strings, or one string; a non-string element or a bad path refused | covered: check_schema.c |
 | CK10 | reset is refused: nothing is reset, the layers stack (ruled 2026-10-12) | covered: check_schema.c |
@@ -100,12 +100,13 @@ object, string}; entry key syntax per collection; error reporting
 | CK12 | datasets: paths by ZFS's characters; leading or trailing `/`, `//`, `.`, `..`, `@` refused | covered: check_schema.c |
 | CK13 | dataset entries: true, or properties with string or bool values; false refused; a number refused (quote it); mountpoint, canmount and shtetl:* refused; a bad property name refused | covered: check_schema.c |
 | CK14 | commands: a string; true, false, an object or an array of names refused; an empty string refused; label syntax | covered: check_schema.c |
-| CK15 | derivations: {source, command}; false, an unknown field, a non-string field refused; key path syntax | covered: check_schema.c |
+| CK15 | derivations: {source, command}, both, in one file; false, an unknown field, a non-string field, half an entry refused; key path syntax | covered: check_schema.c |
 | CK16 | requires: container names, array shorthand; false and a bad name refused | covered: check_schema.c |
 | CK17 | patches: array shorthand; {ref, dir}; the three location forms (a URL, host/path, a zconfig directory); false, an absolute path, `..`, an scp-style address and an unknown field refused | covered: check_schema.c |
 | CK18 | a collection given as a scalar is refused | covered: check_schema.c |
 | CK19 | every error in a layer is reported, not only the first | covered: check_schema.c |
 | CK20 | the key path quotes a component that is not a bare word (`datasets."usr/local".readonly`) | covered: check_schema.c |
+| CK21 | a key there is no more (reset, kernconf, jailconf_file) is refused, saying what to write instead | covered: check_schema.c |
 
 ## CS: shtetl.conf (planning.md 5.2, 6.3; src/core/site.c)
 
@@ -144,9 +145,9 @@ the target's spelling.
 | CC4 | a recipe imported twice merges once, at its first place | covered: check_cascade.c |
 | CC5 | an import cycle is refused, naming the files in it | covered: check_cascade.c |
 | CC6 | an import of a missing file is refused, naming the importing file | covered: check_cascade.c |
-| CC7 | ver: every file's constraint kept, in layer order, each with its file, to hold together (ruled 2026-10-12, Q-S); src_branch and kernconf, one value: the nearer file's, until Q-AC is ruled | covered: check_cascade.c test_stacked |
-| CC8 | kernconf_file stands for kernconf as { file }; buildopts and jailconf append, lower layers first, a _file's file in its place (ruled 2026-10-12, Q-T) | covered: check_cascade.c test_stacked |
-| CC9 | collections: a key added; an entry's fields join those lower layers gave (a field given twice: the nearer file's, until Q-AC is ruled) | covered: check_cascade.c |
+| CC7 | ver: every file's constraints kept, in layer order, each with its file, to hold together (ruled 2026-10-12, Q-S); src_branch and kernconf_file, one value: given again only alike, else refused naming both files (ruled 2026-10-12, Q-AC) | covered: check_cascade.c test_stacked |
+| CC8 | buildopts, kernconf_lines and jailconf append, lower layers first, a buildopts_file's file in its place (ruled 2026-10-12, Q-T, Q-AC) | covered: check_cascade.c test_stacked |
+| CC9 | collections: a key added; an entry's fields compose across files, each given once | covered: check_cascade.c |
 | CC10 | array shorthand merges as name = true; true over an entry with fields keeps the fields | covered: check_cascade.c |
 | CC11 | false and reset are refused in every kind of recipe: nothing is dropped, nothing reset (ruled 2026-10-12) | covered: check_cascade.c test_nodrops |
 | CC12 | what default.conf and its imports give, every recipe keeps, commands included (once the drop rule; retired with drops, 2026-10-12) | covered: check_cascade.c test_nodrops |
@@ -156,7 +157,7 @@ the target's spelling.
 | CC16 | order: keys keep their first place across layers; an overridden commands block stays where it was first defined | covered: check_cascade.c |
 | CC17 | 5.4's worked example, nothing dropped: pkg sudo, tmux, apache24, py311-certbot, nginx; datasets tmp, var, usr/local, www; commands certbot, nginx | covered: check_cascade.c |
 | CC18 | a foundation with no src_branch after the merge is refused | covered: check_cascade.c |
-| CC19 | a derivation lacking source or command after the merge is refused | covered: check_cascade.c |
+| CC19 | a derivation given in a second file, alike or not, is refused, naming the first (ruled 2026-10-12) | covered: check_cascade.c |
 | CC20 | a file a _file names (kernconf, buildopts, jailconf) or a patches directory that does not exist in the config root is refused, naming the key | covered: check_cascade.c |
 | CC21 | requires naming a container with no recipe, or the container itself, is refused | covered: check_cascade.c |
 | CC22 | targets: `containers/nginx` and `containers/nginx.conf` alike; an unknown kind directory, `..`, a bad name, a nested path, a missing recipe refused | covered: check_cascade.c |
@@ -164,6 +165,10 @@ the target's spelling.
 | CC24 | each merged entry names the layer that added it and the one that last set it | covered: check_cascade.c |
 | CC25 | patches: a lower layer's sources come first; a source a nearer layer changes keeps its place (7.1.1) | covered: check_cascade.c |
 | CC26 | every layer is checked against the target's kind: kernconf in a fragment a container imports is refused, naming the fragment | covered: check_cascade.c |
+| CC27 | the ver constraints of all the files must leave a version: >=16 with <15, =15.1 with >15.1, refused naming the two | covered: check_cascade.c test_ver |
+| CC28 | a dataset property a nearer file gives again, differently, overrides, with a warning naming both values and the first file (ruled 2026-10-12) | covered: check_cascade.c |
+| CC29 | a commands block given in several files stacks: a piece from each, keyed by its file, lower first (ruled 2026-10-12) | covered: check_cascade.c |
+| CC30 | an entry's field a second file gives again, alike or not, is refused (a patch source's ref); a field the first did not give composes (dir) | covered: check_cascade.c |
 
 ## CW: what config show prints (src/core/show.c)
 

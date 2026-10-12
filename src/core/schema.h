@@ -42,16 +42,15 @@ enum sh_coll {
 };
 
 /*
- * How a key's values from several files come together. Everything
- * stacks (ruled 2026-10-12): nothing is dropped or reset, and no
- * file's value takes another's place, but for the keys that hold one
- * value, whose rule is still asked (planning.md 15, Q-AC).
+ * How a key's values from several files come together (ruled
+ * 2026-10-12): everything stacks, nothing is dropped or reset, and no
+ * file redefines what another gave, but where a ruling says so.
  */
 enum sh_merge {
 	SH_M_LAYERS,		/* import: names layers, is no value */
 	SH_M_ALL,		/* every file's kept, all to hold: ver */
 	SH_M_TEXT,		/* every file's appended, lower first */
-	SH_M_ONE,		/* one value: src_branch, kernconf */
+	SH_M_AGREE,		/* one value; files that give it agree */
 	SH_M_COLL		/* entries stacked, key by key */
 };
 

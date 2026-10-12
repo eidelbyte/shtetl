@@ -9,17 +9,19 @@
  * place it is reached. A cycle is refused.
  *
  * Merging, layer by layer, with everything stacking (ruled
- * 2026-10-12): nothing is dropped and nothing reset, and a file's
- * value takes no other's place. A collection merges entry by entry, a
- * list of names standing for name = true: true adds an entry or leaves
- * it as it is, an entry's fields join those lower layers gave. Every
- * file's ver is kept, to hold together; buildopts and jailconf append,
- * lower layers first, a _file twin's file in its place. A key keeps
+ * 2026-10-12): nothing is dropped and nothing reset, and no file
+ * redefines what another gave. A collection merges entry by entry, a
+ * list of names standing for name = true: an entry listed again adds
+ * nothing; its fields compose across files, each given once, but for
+ * a dataset's properties, which a nearer file may override (with a
+ * warning); a derivation is given whole, in one file; a commands
+ * block's texts stack, a piece from each file. Every file's ver is
+ * kept, to hold together, and the ranges they allow must meet;
+ * buildopts and kernconf_lines and jailconf append, lower layers
+ * first, buildopts_file's file in its place; src_branch and
+ * kernconf_file, one value, may be given again only alike. A key keeps
  * the place where it was first added, so a commands block runs where
- * it was first defined. What a key holding one value does when two
- * files set it (src_branch, kernconf, an entry's field, a commands
- * block's text) is asked (planning.md 15, Q-AC): until it is ruled,
- * the nearer file's stands.
+ * it was first defined.
  */
 
 #include <stdio.h>
@@ -54,6 +56,7 @@ struct mg {
 	struct sh_recipe	*mg_r;
 	const struct sh_layer	*mg_l;
 	struct sh_err		*mg_err;
+	struct sh_err		*mg_warn;	/* or NULL */
 	struct sh_path		mg_path;
 	int			mg_nomem;
 };
@@ -311,32 +314,98 @@ mg_set(struct mg *m, struct sh_node *obj, const char *key,
 		m->mg_nomem = 1;
 }
 
+/* A value as a message shows it. */
+static const char *
+mg_said(const struct sh_node *v)
+{
+	if (v->sn_type == SH_STR)
+		return (v->sn_str);
+	if (v->sn_type == SH_BOOL)
+		return (v->sn_bool ? "true" : "false");
+	return (sh_type_name(v->sn_type));
+}
+
 /*
- * One entry, EV under key EK, into the merged collection COLL: added,
- * or stacked on the entry a lower layer gave. true adds the entry or
- * leaves it as it is; fields join the entry's; a string (a commands
- * block) takes the entry's place until Q-AC is ruled (planning.md 15).
+ * A commands block's text EV, one more piece of the block EK: the
+ * block is an object of its pieces, each keyed by the file that gives
+ * it, in the order the files merge. A file gives a block once, so a
+ * key is never given twice; and the key is what a container needs to
+ * run each piece once (7.4).
  */
 static void
-mg_entry(struct mg *m, struct sh_node *coll, const char *ek,
-    const struct sh_node *ev)
+mg_piece(struct mg *m, struct sh_node *coll, struct sh_pair *cur,
+    const char *ek, const struct sh_node *ev)
 {
-	struct sh_pair *cur;
-	const struct sh_pair *f;
-	size_t i;
+	struct sh_node *block;
 
-	cur = sh_obj_find(coll, ek);
-	if (ev->sn_type == SH_BOOL && cur != NULL)
-		return;
-	if (ev->sn_type == SH_OBJECT && cur != NULL &&
-	    cur->pr_val->sn_type == SH_OBJECT) {
-		for (i = 0; i < ev->sn_obj.ob_n; i++) {
-			f = &ev->sn_obj.ob_v[i];
-			mg_set(m, cur->pr_val, f->pr_key, f->pr_val);
-		}
+	if (cur != NULL) {
+		mg_set(m, cur->pr_val, m->mg_l->sl_file, ev);
 		return;
 	}
-	mg_set(m, coll, ek, ev);
+	if ((block = sh_node_new(SH_OBJECT, m->mg_l->sl_file)) == NULL ||
+	    sh_obj_set(coll, ek, block, m->mg_l->sl_file) != 0) {
+		m->mg_nomem = 1;
+		return;
+	}
+	mg_set(m, block, m->mg_l->sl_file, ev);
+}
+
+/*
+ * One entry, EV under key EK of the collection RK, into the merged
+ * COLL (ruled 2026-10-12). Listing an entry again adds nothing and is
+ * no redefinition. What an entry holds is given once: a field a file
+ * gives a second time is refused, and so is a derivation given in two
+ * files; two files giving one entry different parts of it compose.
+ * But a dataset's property a nearer file may override, with a
+ * warning, and a commands block's texts stack, each a piece of its
+ * own.
+ */
+static void
+mg_entry(struct mg *m, struct sh_node *coll, const struct sh_rkey *rk,
+    const char *ek, const struct sh_node *ev)
+{
+	struct sh_pair *cur, *have;
+	const struct sh_pair *f;
+	size_t i, was;
+
+	cur = sh_obj_find(coll, ek);
+	if (rk->rk_coll == SH_C_COMMANDS) {
+		mg_piece(m, coll, cur, ek, ev);
+		return;
+	}
+	if (rk->rk_coll == SH_C_DERIVATIONS && cur != NULL) {
+		sh_err_at(m->mg_err, m->mg_l->sl_file, &m->mg_path, "given "
+		    "in %s already: a derivation is given once", cur->pr_from);
+		return;
+	}
+	if (ev->sn_type == SH_BOOL) {
+		if (cur == NULL)
+			mg_set(m, coll, ek, ev);
+		return;
+	}
+	if (cur == NULL || cur->pr_val->sn_type != SH_OBJECT) {
+		mg_set(m, coll, ek, ev);
+		return;
+	}
+	for (i = 0; i < ev->sn_obj.ob_n; i++) {
+		f = &ev->sn_obj.ob_v[i];
+		have = sh_obj_find(cur->pr_val, f->pr_key);
+		was = sh_path_push(&m->mg_path, f->pr_key);
+		if (have != NULL && rk->rk_coll != SH_C_DATASETS) {
+			sh_err_at(m->mg_err, m->mg_l->sl_file, &m->mg_path,
+			    "given in %s already: what one file gives, another "
+			    "does not give again", have->pr_val->sn_from);
+		} else {
+			if (have != NULL && m->mg_warn != NULL &&
+			    !sh_node_equal(have->pr_val, f->pr_val))
+				sh_err_at(m->mg_warn, m->mg_l->sl_file,
+				    &m->mg_path, "%s overrides %s, from %s",
+				    mg_said(f->pr_val), mg_said(have->pr_val),
+				    have->pr_val->sn_from);
+			mg_set(m, cur->pr_val, f->pr_key, f->pr_val);
+		}
+		sh_path_pop(&m->mg_path, was);
+	}
 }
 
 static void
@@ -345,7 +414,7 @@ mg_coll(struct mg *m, const struct sh_rkey *rk, const struct sh_node *v)
 	struct sh_node *coll, yes;
 	const struct sh_node *el;
 	const struct sh_pair *pr;
-	size_t i;
+	size_t i, was;
 
 	coll = sh_obj_get(m->mg_r->sr_merged, rk->rk_name);
 	if (coll == NULL) {
@@ -364,13 +433,17 @@ mg_coll(struct mg *m, const struct sh_rkey *rk, const struct sh_node *v)
 		yes.sn_from = m->mg_l->sl_file;
 		for (i = 0; i < v->sn_arr.ar_n; i++) {
 			el = v->sn_arr.ar_v[i];
-			mg_entry(m, coll, el->sn_str, &yes);
+			was = sh_path_push(&m->mg_path, el->sn_str);
+			mg_entry(m, coll, rk, el->sn_str, &yes);
+			sh_path_pop(&m->mg_path, was);
 		}
 		return;
 	}
 	for (i = 0; i < v->sn_obj.ob_n; i++) {
 		pr = &v->sn_obj.ob_v[i];
-		mg_entry(m, coll, pr->pr_key, pr->pr_val);
+		was = sh_path_push(&m->mg_path, pr->pr_key);
+		mg_entry(m, coll, rk, pr->pr_key, pr->pr_val);
+		sh_path_pop(&m->mg_path, was);
 	}
 }
 
@@ -426,15 +499,15 @@ mg_layer(struct mg *m)
 {
 	const struct sh_node *tree = m->mg_l->sl_tree;
 	const struct sh_rkey *rk;
-	const struct sh_pair *pr;
-	struct sh_node *v;
+	const struct sh_pair *pr, *have;
 	const char *into;
-	size_t i;
+	size_t i, j, was;
 
 	for (i = 0; i < tree->sn_obj.ob_n; i++) {
 		pr = &tree->sn_obj.ob_v[i];
 		rk = sh_rkey(pr->pr_key);
 		into = rk->rk_into != NULL ? rk->rk_into : rk->rk_name;
+		was = sh_path_push(&m->mg_path, rk->rk_name);
 		switch (rk->rk_merge) {
 		case SH_M_LAYERS:
 			break;
@@ -442,19 +515,33 @@ mg_layer(struct mg *m)
 			mg_coll(m, rk, pr->pr_val);
 			break;
 		case SH_M_ALL:
+			/* one constraint, or a list of them */
+			if (pr->pr_val->sn_type != SH_ARRAY) {
+				mg_append(m, into, sh_node_copy(pr->pr_val));
+				break;
+			}
+			for (j = 0; j < pr->pr_val->sn_arr.ar_n; j++)
+				mg_append(m, into,
+				    sh_node_copy(pr->pr_val->sn_arr.ar_v[j]));
+			break;
 		case SH_M_TEXT:
 			mg_append(m, into, rk->rk_vt == SH_V_FILE ?
 			    mg_file(m, pr->pr_val) : sh_node_copy(pr->pr_val));
 			break;
-		case SH_M_ONE:
-			/* replaced, until Q-AC is ruled (planning.md 15) */
-			v = rk->rk_vt == SH_V_FILE ? mg_file(m, pr->pr_val) :
-			    sh_node_copy(pr->pr_val);
-			if (v == NULL || sh_obj_set(m->mg_r->sr_merged, into,
-			    v, m->mg_l->sl_file) != 0)
-				m->mg_nomem = 1;
+		case SH_M_AGREE:
+			have = sh_obj_find(m->mg_r->sr_merged, rk->rk_name);
+			if (have == NULL)
+				mg_set(m, m->mg_r->sr_merged, rk->rk_name,
+				    pr->pr_val);
+			else if (!sh_node_equal(have->pr_val, pr->pr_val))
+				sh_err_at(m->mg_err, m->mg_l->sl_file,
+				    &m->mg_path, "%s here, %s in %s: the files "
+				    "that give it must agree",
+				    mg_said(pr->pr_val), mg_said(have->pr_val),
+				    have->pr_val->sn_from);
 			break;
 		}
+		sh_path_pop(&m->mg_path, was);
 	}
 }
 
@@ -480,6 +567,40 @@ ck_file(const char *root, const char *key, const struct sh_node *file,
 }
 
 /*
+ * Every ver must hold together (ruled 2026-10-12): the ranges they
+ * allow must meet. Refused, naming the two that do not.
+ */
+static void
+ck_ver(const struct sh_recipe *r, struct sh_err *e)
+{
+	const struct sh_node *ver, *c, *low, *high;
+	long lo, hi, maxlo, minhi;
+	size_t i;
+
+	if ((ver = sh_obj_get(r->sr_merged, "ver")) == NULL)
+		return;
+	maxlo = SH_VER_LOW;
+	minhi = SH_VER_HIGH;
+	low = high = NULL;
+	for (i = 0; i < ver->sn_arr.ar_n; i++) {
+		c = ver->sn_arr.ar_v[i];
+		sh_ver_range(c->sn_str, &lo, &hi);
+		if (lo > maxlo) {
+			maxlo = lo;
+			low = c;
+		}
+		if (hi < minhi) {
+			minhi = hi;
+			high = c;
+		}
+	}
+	if (low != NULL && high != NULL && maxlo > minhi)
+		sh_errf(e, "%s: ver: no version is %s (%s) and %s (%s) at once",
+		    r->sr_file, low->sn_str, low->sn_from, high->sn_str,
+		    high->sn_from);
+}
+
+/*
  * The checks only the merged recipe can answer: what a kind needs,
  * entries made whole across layers, and what the configuration root
  * must hold.
@@ -487,8 +608,7 @@ ck_file(const char *root, const char *key, const struct sh_node *file,
 static void
 ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
 {
-	static const char *const texts[] = { "kernconf", "buildopts",
-	    "jailconf" };
+	static const char *const texts[] = { "buildopts" };
 	const struct sh_node *merged = r->sr_merged;
 	const struct sh_node *v, *coll, *dir;
 	const struct sh_pair *pr;
@@ -505,26 +625,19 @@ ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
 	for (i = 0; i < sizeof (texts) / sizeof (texts[0]); i++) {
 		if ((v = sh_obj_get(merged, texts[i])) == NULL)
 			continue;
-		if (v->sn_type != SH_ARRAY) {
-			ck_file(root, texts[i], v, e);
-			continue;
-		}
 		for (j = 0; j < v->sn_arr.ar_n; j++)
 			ck_file(root, texts[i], v->sn_arr.ar_v[j], e);
 	}
-	coll = sh_obj_get(merged, "derivations");
-	for (i = 0; coll != NULL && i < coll->sn_obj.ob_n; i++) {
-		pr = &coll->sn_obj.ob_v[i];
-		(void) sh_path_push(&path, "derivations");
-		(void) sh_path_push(&path, pr->pr_key);
-		if (sh_obj_get(pr->pr_val, "source") == NULL)
-			sh_err_at(e, pr->pr_from, &path, "no layer gives its "
-			    "source");
-		if (sh_obj_get(pr->pr_val, "command") == NULL)
-			sh_err_at(e, pr->pr_from, &path, "no layer gives its "
-			    "command");
+	/* kernconf_file: a name is the src tree's, a path zconfig's */
+	if ((v = sh_obj_get(merged, "kernconf_file")) != NULL &&
+	    strchr(v->sn_str, '/') != NULL &&
+	    sh_root_kind(root, v->sn_str) != 'f') {
+		(void) sh_path_push(&path, "kernconf_file");
+		sh_err_at(e, v->sn_from, &path, "%s: no such file in the "
+		    "configuration root", v->sn_str);
 		sh_path_pop(&path, 0);
 	}
+	ck_ver(r, e);
 	coll = sh_obj_get(merged, "patches");
 	for (i = 0; coll != NULL && i < coll->sn_obj.ob_n; i++) {
 		pr = &coll->sn_obj.ob_v[i];
@@ -565,7 +678,7 @@ ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
 
 int
 sh_recipe_resolve(const char *root, const char *target,
-    struct sh_recipe *r, struct sh_err *e)
+    struct sh_recipe *r, struct sh_err *e, struct sh_err *w)
 {
 	struct ld x;
 	struct mg m;
@@ -598,6 +711,7 @@ sh_recipe_resolve(const char *root, const char *target,
 	(void) memset(&m, 0, sizeof (m));
 	m.mg_r = r;
 	m.mg_err = e;
+	m.mg_warn = w;
 	for (i = 0; i < r->sr_nlayers; i++) {
 		m.mg_l = &r->sr_layers[i];
 		sh_path_init(&m.mg_path);

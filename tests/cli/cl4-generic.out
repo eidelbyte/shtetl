@@ -15,7 +15,10 @@ ver = [
     ">=15"  # foundations/generic.conf
 ]
 src_branch = "releng/15.1";  # foundations/generic.conf
-kernconf = "GENERIC";  # foundations/generic.conf
+kernconf_file = "GENERIC";  # foundations/generic.conf
+kernconf_lines = [
+    "nooptions INVARIANTS\nnooptions WITNESS"  # foundations/generic.conf
+]
 buildopts = [
     "WITHOUT_LIB32=yes\nWITH_META_MODE=yes"  # foundations/generic.conf
 ]

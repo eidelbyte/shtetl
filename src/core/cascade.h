@@ -41,10 +41,11 @@ struct sh_recipe {
  * Resolves TARGET, a recipe named by its path in the configuration
  * root ROOT with or without .conf (containers/nginx), into R. 0, or
  * -1 with every reason reported to E; sh_recipe_free cleans up R
- * either way.
+ * either way. A dataset property one file overrides another's on is
+ * reported to W, when there is one, and refuses nothing.
  */
 int sh_recipe_resolve(const char *root, const char *target,
-    struct sh_recipe *r, struct sh_err *e);
+    struct sh_recipe *r, struct sh_err *e, struct sh_err *w);
 void sh_recipe_free(struct sh_recipe *r);
 
 /* The layer FROM (a pointer out of sr_merged) names, or NULL. */

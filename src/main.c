@@ -171,7 +171,7 @@ cmd_config_show(struct sh_ctx *ctx, int argc, char **argv)
 {
 	struct sh_recipe r;
 	struct sh_site s;
-	struct sh_err e;
+	struct sh_err e, w;
 	int rc;
 
 	if (argc > 1)
@@ -186,7 +186,8 @@ cmd_config_show(struct sh_ctx *ctx, int argc, char **argv)
 		sh_site_free(&s);
 		return (out_done());
 	}
-	rc = sh_recipe_resolve(ctx->sc_root, argv[0], &r, &e);
+	sh_err_init(&w, stderr, "shtetl: warning: ");
+	rc = sh_recipe_resolve(ctx->sc_root, argv[0], &r, &e, &w);
 	if (rc == 0)
 		sh_show_recipe(stdout, &r);
 	sh_recipe_free(&r);

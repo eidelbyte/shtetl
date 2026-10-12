@@ -50,6 +50,18 @@ const char *sh_syn_prop(const char *s);
 const char *sh_syn_ver(const char *s);
 
 /*
+ * The versions constraint S (which sh_syn_ver took) allows, as a range
+ * of major * SH_VER_MINORS + minor, both ends in it; a version written
+ * N is N.0. Every constraint of a recipe must hold together (ruled
+ * 2026-10-12), so their ranges must meet.
+ */
+#define	SH_VER_MINORS	100000L
+#define	SH_VER_LOW	(-1L)
+#define	SH_VER_HIGH	(1000L * SH_VER_MINORS)
+
+void sh_ver_range(const char *s, long *lo, long *hi);
+
+/*
  * A date(1) -v interval (planning.md 6.3): a count above 0 and one
  * of y, m, w, d, H, M, S.
  */

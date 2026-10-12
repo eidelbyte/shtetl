@@ -67,7 +67,8 @@ test_every_key(void)
 	ok("import = [ \"common/base.conf\" ];\n"
 	    "ver = \">=15\";\n"
 	    "src_branch = \"releng/15.1\";\n"
-	    "kernconf = \"GENERIC\";\n"
+	    "kernconf_file = \"GENERIC\";\n"
+	    "kernconf_lines = <<EOD\nnooptions INVARIANTS\nEOD\n"
 	    "buildopts = <<EOD\nWITHOUT_LIB32=yes\nEOD\n"
 	    "patches = [ \"github.com/eidelbyte/freebsd-patches\" ];\n"
 	    "datasets { tmp {} var {} \"usr/local\" { compression = "
@@ -83,10 +84,12 @@ test_every_key(void)
 	    "pkg { nginx = true; }\n"
 	    "datasets { www { readonly = true; } }\n"
 	    "commands { nginx = <<EOD\nsysrc nginx_enable=YES\nEOD\n}\n"
-	    "derivations { x { command = \"true\"; } }\n"
+	    "derivations { x { source = \"y\"; command = \"true\"; } }\n"
 	    "requires = [ \"db\" ];\n"
 	    "jailconf = \"allow.raw_sockets;\";\n", C);
-	ok("jailconf_file = \"jails/nginx.jail\";\n", C);
+	bad("jailconf_file = \"jails/nginx.jail\";\n", C, "jailconf_file: "
+	    "not a key any more: shtetl writes the jail's block itself, and "
+	    "jailconf gives the options in it (ruled 2026-10-12)");
 	ok("import = [ \"common/base.conf\" ];\n"
 	    "ver = \"<16\";\n"
 	    "datasets { home {} }\n"
@@ -102,7 +105,7 @@ static void
 test_kinds(void)
 {
 	static const char *const fonly[] = { "src_branch = \"main\";",
-	    "kernconf = \"G\";", "kernconf_file = \"k\";",
+	    "kernconf_lines = \"G\";", "kernconf_file = \"k\";",
 	    "buildopts = \"x\";", "buildopts_file = \"b\";",
 	    "patches = [ \"p/q\" ];" };
 	char want[128];
@@ -123,7 +126,9 @@ test_kinds(void)
 	    "foundation's recipe: only a container's takes it");
 	bad("requires = [ \"db\" ];", S, "only a container's takes it");
 	bad("jailconf = \"x\";", S, "jailconf: not a key of a system's");
-	bad("jailconf_file = \"j\";", F, "only a container's takes it");
+	bad("kernconf = \"G\";", F, "kernconf: not a key any more: "
+	    "kernconf_file names the config to start from and "
+	    "kernconf_lines adds to it (ruled 2026-10-12)");
 }
 
 /* CK5, CK6: strings and versions. */
@@ -139,7 +144,8 @@ test_strings(void)
 
 	bad("src_branch = 15;", F, "src_branch: expected a string, not an "
 	    "integer: quote it");
-	bad("kernconf = true;", F, "expected a string, not true: quote it");
+	bad("kernconf_lines = true;", F, "expected a string, not true: "
+	    "quote it");
 	bad("ver = 15.1;", C, "ver: expected a version constraint, not a "
 	    "number: quote it");
 	bad("jailconf = [ \"a\" ];", C, "expected a string, not a list");
@@ -157,18 +163,16 @@ test_strings(void)
 }
 
 /*
- * CK7, CK8: the twins, and paths in the configuration root. kernconf
- * holds one value, so a file gives it once; buildopts and jailconf
- * stack, so a file may give its text and a file of it both.
+ * CK7, CK8: kernconf_file and kernconf_lines, buildopts and its file,
+ * and paths in the configuration root. A file may give both
+ * buildopts and buildopts_file: they stack.
  */
 static void
 test_files(void)
 {
-	bad("kernconf = \"G\"; kernconf_file = \"k\";", F,
-	    "kernconf_file: and kernconf both: two values for the one "
-	    "kernconf");
+	ok("kernconf_file = \"GENERIC\"; kernconf_lines = \"device vmm\";",
+	    F);
 	ok("buildopts_file = \"b\"; buildopts = \"x\";", F);
-	ok("jailconf = \"x\"; jailconf_file = \"j\";", C);
 	ok("kernconf_file = \"kernels/GAMING\";", F);
 	bad("kernconf_file = \"/etc/GAMING\";", F, "kernconf_file: not a "
 	    "file's path: it is absolute");
@@ -176,7 +180,7 @@ test_files(void)
 	bad("kernconf_file = \"./b\";", F, "a '.' or '..' component");
 	bad("kernconf_file = \"a//b\";", F, "an empty component");
 	bad("kernconf_file = \"a/\";", F, "it ends with '/'");
-	bad("jailconf_file = 5;", C, "expected a file's path, not an "
+	bad("buildopts_file = 5;", F, "expected a file's path, not an "
 	    "integer: quote it");
 }
 
@@ -193,11 +197,14 @@ test_import_reset(void)
 	bad("import { a = 1; }", C, "import: expected a list of recipes' "
 	    "paths, not an object");
 
-	bad("reset = [ \"pkg\", \"datasets\" ];", C, "t.conf: reset: "
-	    "nothing is reset: the layers stack, and what one gives stays "
-	    "(ruled 2026-10-12)");
-	bad("reset = \"commands\";", S, "reset: nothing is reset");
-	bad("reset = [ \"patches\" ];", F, "reset: nothing is reset");
+	bad("reset = [ \"pkg\", \"datasets\" ];", C,
+	    "t.conf: reset: "
+	    "not a key any more: nothing is reset: the layers stack, and "
+	    "what one gives stays (ruled 2026-10-12)");
+	bad("reset = \"commands\";", S, "reset: not a key any more: nothing "
+	    "is reset");
+	bad("reset = [ \"patches\" ];", F, "reset: not a key any more: "
+	    "nothing is reset");
 }
 
 /* CK11, CK18: pkg, and collections given as scalars. */
@@ -290,12 +297,17 @@ test_commands(void)
 
 	ok("derivations { \"etc/pwd.db\" { source = \"etc/master.passwd\"; "
 	    "command = \"pwd_mkdb\"; } }", C);
-	ok("derivations { x { source = \"s\"; } }", C);
-	bad("derivations { x { bogus = \"1\"; } }", C, "derivations.x.bogus: "
+	bad("derivations { x { source = \"s\"; } }", C, "derivations.x: a "
+	    "derivation gives its source and its command together, in one "
+	    "file");
+	bad("derivations { x { source = \"s\"; command = \"c\"; "
+	    "bogus = \"1\"; } }", C, "derivations.x.bogus: "
 	    "not a field of a derivation: it takes source and command");
-	bad("derivations { x { command = 5; } }", C, "derivations.x.command: "
+	bad("derivations { x { source = \"s\"; command = 5; } }",
+	    C, "derivations.x.command: "
 	    "expected a command, not an integer: quote it");
-	bad("derivations { x { source = \"/etc/s\"; } }", C, "not a source "
+	bad("derivations { x { source = \"/etc/s\"; command = \"c\"; } "
+	    "}", C, "not a source "
 	    "file's path: it is absolute");
 	bad("derivations { \"/etc/x\" { command = \"c\"; } }", C,
 	    "derivations.\"/etc/x\": not a derived file's path: it is "
@@ -355,11 +367,11 @@ test_requires_patches(void)
 static void
 test_reporting(void)
 {
-	CHECK(L("frob = 1;\npkg = [ \"-x\" ];\nkernconf = \"G\";\n"
+	CHECK(L("frob = 1;\npkg = [ \"-x\" ];\nkernconf_file = \"G\";\n"
 	    "datasets { \"usr/local\" { recordsize = 1; } }\n", C) == 4);
 	CHECK(cap_has(&c, "t.conf: frob: not a key a recipe takes\n"));
 	CHECK(cap_has(&c, "t.conf: pkg[0]: not a package's name"));
-	CHECK(cap_has(&c, "t.conf: kernconf: not a key of a container's"));
+	CHECK(cap_has(&c, "t.conf: kernconf_file: not a key of a container's"));
 	CHECK(cap_has(&c, "t.conf: datasets.\"usr/local\".recordsize: "
 	    "expected a string"));
 	bad("datasets { \"x\\\"y\" {} }", F, "datasets.\"x\\\"y\": not a "

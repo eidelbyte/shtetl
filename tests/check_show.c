@@ -56,7 +56,7 @@ show(const char *rt, const char *target)
 
 	sh_recipe_free(&r);
 	cap_reset(&c);
-	if (sh_recipe_resolve(rt, target, &r, &c.c_err) != 0)
+	if (sh_recipe_resolve(rt, target, &r, &c.c_err, NULL) != 0)
 		printf("%s did not resolve:\n%s", target, cap_text(&c));
 	CHECK(c.c_err.se_count == 0);
 	free(out);
@@ -130,7 +130,8 @@ test_recipes(void)
 	/* CW5 */
 	CHECK(has("\n    \"usr/local\" {}  # default.conf\n"));
 	CHECK(has("\n    py311-certbot = true;"));
-	CHECK(has("\n    \"c.d\" = \"x\";"));
+	CHECK(has("\n    \"c.d\" {  # containers/nginx.conf\n"
+	    "        \"containers/nginx.conf\" = \"x\";\n    }\n"));
 
 	/* CW1 on a foundation; CW5's URLs; CW8, text and a file stacked */
 	show(root, "foundations/f");
@@ -167,18 +168,22 @@ test_strings(void)
 	const struct sh_node *cmd;
 
 	show(mkroot("st", st), "containers/s");
+	/* each block's piece, keyed by its file */
 	cmd = sh_obj_get(r.sr_merged, "commands");
-	CHECK(strcmp(sh_obj_get(cmd, "q")->sn_str,
-	    "say \"hi\" \\ back\ttab\001 \r end") == 0);
-	CHECK(has("q = \"say \\\"hi\\\" \\\\ back\\ttab\\u0001 \\r end\";"));
-	CHECK(has("    # containers/s.conf\n    two = <<EOD\nline one\n"
-	    "  line two\nEOD\n"));
-	CHECK(has("nl = <<EOD\nends in a newline\n\nEOD\n"));
-	CHECK(has("only = <<EOD\n\n\nEOD\n"));
-	CHECK(has("clash = <<EODX\na\nEOD\nb\nEODX\n"));
-	CHECK(has("clash2 = <<EODXXX\n"));
-	CHECK(has("term = <<EODX\nEOD\nfirst\nEODX\n"));
-	CHECK(strcmp(sh_obj_get(cmd, "high")->sn_str, "caf\303\251") == 0);
+	CHECK(strcmp(sh_obj_get(sh_obj_get(cmd, "q"), "containers/s.conf")->
+	    sn_str, "say \"hi\" \\ back\ttab\001 \r end") == 0);
+	CHECK(has("\"containers/s.conf\" = \"say \\\"hi\\\" \\\\ "
+	    "back\\ttab\\u0001 \\r end\";"));
+	CHECK(has("    two {  # containers/s.conf\n"
+	    "        \"containers/s.conf\" = <<EOD\nline one\n"
+	    "  line two\nEOD\n    }\n"));
+	CHECK(has("\"containers/s.conf\" = <<EOD\nends in a newline\n\nEOD\n"));
+	CHECK(has("\"containers/s.conf\" = <<EOD\n\n\nEOD\n"));
+	CHECK(has("\"containers/s.conf\" = <<EODX\na\nEOD\nb\nEODX\n"));
+	CHECK(has("\"containers/s.conf\" = <<EODXXX\n"));
+	CHECK(has("\"containers/s.conf\" = <<EODX\nEOD\nfirst\nEODX\n"));
+	CHECK(strcmp(sh_obj_get(sh_obj_get(cmd, "high"), "containers/s.conf")->
+	    sn_str, "caf\303\251") == 0);
 }
 
 /* CW7: the site's settings. */

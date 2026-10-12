@@ -2,6 +2,7 @@
  * The spellings of names and paths in shtetl's configuration.
  */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "core/syntax.h"
@@ -224,6 +225,60 @@ sh_syn_ver(const char *s)
 	if (*p != '\0')
 		return ("a version is N or N.N: >=15, =15.1");
 	return (NULL);
+}
+
+void
+sh_ver_range(const char *s, long *lo, long *hi)
+{
+	const char *p;
+	long major, minor, v;
+	int op;
+
+	/* op: 0 =, 1 >=, 2 <=, 3 >, 4 < */
+	if (strncmp(s, ">=", 2) == 0) {
+		op = 1;
+		p = s + 2;
+	} else if (strncmp(s, "<=", 2) == 0) {
+		op = 2;
+		p = s + 2;
+	} else if (*s == '>') {
+		op = 3;
+		p = s + 1;
+	} else if (*s == '<') {
+		op = 4;
+		p = s + 1;
+	} else {
+		op = 0;
+		p = s + 1;
+	}
+	major = strtol(p, (char **)NULL, 10);
+	while (syn_digit(*p))
+		p++;
+	minor = *p == '.' ? strtol(p + 1, (char **)NULL, 10) : 0;
+	if (major > 999)
+		major = 999;
+	if (minor >= SH_VER_MINORS)
+		minor = SH_VER_MINORS - 1;
+	v = major * SH_VER_MINORS + minor;
+	*lo = SH_VER_LOW;
+	*hi = SH_VER_HIGH;
+	switch (op) {
+	case 0:
+		*lo = *hi = v;
+		break;
+	case 1:
+		*lo = v;
+		break;
+	case 2:
+		*hi = v;
+		break;
+	case 3:
+		*lo = v + 1;
+		break;
+	default:
+		*hi = v - 1;
+		break;
+	}
 }
 
 const char *

@@ -20,8 +20,12 @@ ver = [
     "<16"  # containers/nginx.conf
 ]
 commands {
-    certbot = "sysrc certbot_enable=YES";  # common/web.conf
-    nginx = "sysrc nginx_enable=YES";  # containers/nginx.conf
+    certbot {  # common/web.conf
+        "common/web.conf" = "sysrc certbot_enable=YES";
+    }
+    nginx {  # containers/nginx.conf
+        "containers/nginx.conf" = "sysrc nginx_enable=YES";
+    }
 }
 jailconf = [
     "allow.raw_sockets;",  # common/web.conf

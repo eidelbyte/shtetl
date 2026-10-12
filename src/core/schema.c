@@ -21,16 +21,19 @@
 #define	C	SH_CONTAINER
 
 /*
- * A _file key gives its file's text in the place of the text the key
- * it goes into would give, so kernconf and kernconf_file are one
- * value, and buildopts_file's file is a piece of buildopts.
+ * buildopts_file gives its file's text in the place of the text
+ * buildopts would give: a piece of buildopts. kernconf_file is the
+ * kernel config the foundation's starts from (a name in the src
+ * tree's conf directory, GENERIC; or a file in zconfig, a path) and
+ * kernconf_lines the lines added to it; shtetl writes the config
+ * itself (planning.md 5.5).
  */
 static const struct sh_rkey rkeys[] = {
 	{ "import", SH_ALLKINDS, SH_V_IMPORT, SH_C_NONE, SH_M_LAYERS, NULL },
 	{ "ver", SH_ALLKINDS, SH_V_VER, SH_C_NONE, SH_M_ALL, NULL },
-	{ "src_branch", F, SH_V_STRING, SH_C_NONE, SH_M_ONE, NULL },
-	{ "kernconf", F, SH_V_STRING, SH_C_NONE, SH_M_ONE, NULL },
-	{ "kernconf_file", F, SH_V_FILE, SH_C_NONE, SH_M_ONE, "kernconf" },
+	{ "src_branch", F, SH_V_STRING, SH_C_NONE, SH_M_AGREE, NULL },
+	{ "kernconf_file", F, SH_V_FILE, SH_C_NONE, SH_M_AGREE, NULL },
+	{ "kernconf_lines", F, SH_V_STRING, SH_C_NONE, SH_M_TEXT, NULL },
 	{ "buildopts", F, SH_V_STRING, SH_C_NONE, SH_M_TEXT, NULL },
 	{ "buildopts_file", F, SH_V_FILE, SH_C_NONE, SH_M_TEXT,
 	    "buildopts" },
@@ -42,8 +45,21 @@ static const struct sh_rkey rkeys[] = {
 	    NULL },
 	{ "requires", C, SH_V_COLL, SH_C_REQUIRES, SH_M_COLL, NULL },
 	{ "jailconf", C, SH_V_STRING, SH_C_NONE, SH_M_TEXT, NULL },
-	{ "jailconf_file", C, SH_V_FILE, SH_C_NONE, SH_M_TEXT, "jailconf" },
-	{ NULL, 0, SH_V_STRING, SH_C_NONE, SH_M_ONE, NULL }
+	{ NULL, 0, SH_V_STRING, SH_C_NONE, SH_M_LAYERS, NULL }
+};
+
+/* Keys there are no more, and what to write instead. */
+static const struct {
+	const char	*g_name;
+	const char	*g_why;
+} gone[] = {
+	{ "reset", "nothing is reset: the layers stack, and what one gives "
+	    "stays (ruled 2026-10-12)" },
+	{ "kernconf", "kernconf_file names the config to start from and "
+	    "kernconf_lines adds to it (ruled 2026-10-12)" },
+	{ "jailconf_file", "shtetl writes the jail's block itself, and "
+	    "jailconf gives the options in it (ruled 2026-10-12)" },
+	{ NULL, NULL }
 };
 
 #undef	F
@@ -172,6 +188,31 @@ sc_relpath(struct sc *x, const struct sh_node *v, const char *what)
 		(void) sc_syn(x, what, sh_syn_relpath(v->sn_str));
 }
 
+/* ver: a version constraint, or a list of them, all to hold. */
+static void
+sc_ver_one(struct sc *x, const struct sh_node *v)
+{
+	if (sc_string(x, v, "a version constraint"))
+		(void) sc_syn(x, "a version constraint",
+		    sh_syn_ver(v->sn_str));
+}
+
+static void
+sc_ver(struct sc *x, const struct sh_node *v)
+{
+	size_t i, was;
+
+	if (v->sn_type != SH_ARRAY) {
+		sc_ver_one(x, v);
+		return;
+	}
+	for (i = 0; i < v->sn_arr.ar_n; i++) {
+		was = sh_path_index(&x->sc_path, i);
+		sc_ver_one(x, v->sn_arr.ar_v[i]);
+		sh_path_pop(&x->sc_path, was);
+	}
+}
+
 /* import: a recipe's path, or a list of them. */
 static void
 sc_import(struct sc *x, const struct sh_node *v)
@@ -240,7 +281,11 @@ sh_schema_props(const struct sh_node *props, const char *file,
 	return (e->se_count - before);
 }
 
-/* The fields of a derivation, or of a patch source. */
+/*
+ * The fields of a derivation, or of a patch source. A derivation is
+ * given whole, in one file: no file adds to or redefines another's
+ * (ruled 2026-10-12).
+ */
 static void
 sc_fields(struct sc *x, enum sh_coll coll, const struct sh_node *entry)
 {
@@ -281,6 +326,10 @@ sc_fields(struct sc *x, enum sh_coll coll, const struct sh_node *entry)
 		}
 		sh_path_pop(&x->sc_path, was);
 	}
+	if (coll == SH_C_DERIVATIONS && (sh_obj_get(entry, "source") == NULL ||
+	    sh_obj_get(entry, "command") == NULL))
+		sh_err_at(x->sc_err, x->sc_file, &x->sc_path, "a derivation "
+		    "gives its source and its command together, in one file");
 }
 
 /* One entry of a collection: its key is on the path already. */
@@ -387,7 +436,7 @@ sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
 	const struct sh_pair *pr;
 	struct sc x;
 	unsigned before;
-	size_t i, was;
+	size_t i, j, was;
 
 	before = e->se_count;
 	x.sc_file = file;
@@ -402,10 +451,13 @@ sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
 		pr = &layer->sn_obj.ob_v[i];
 		was = sh_path_push(&x.sc_path, pr->pr_key);
 		rk = sh_rkey(pr->pr_key);
-		if (strcmp(pr->pr_key, "reset") == 0) {
-			sh_err_at(e, file, &x.sc_path, "nothing is reset: the "
-			    "layers stack, and what one gives stays (ruled "
-			    "2026-10-12)");
+		for (j = 0; gone[j].g_name != NULL; j++) {
+			if (strcmp(pr->pr_key, gone[j].g_name) == 0)
+				break;
+		}
+		if (gone[j].g_name != NULL) {
+			sh_err_at(e, file, &x.sc_path, "not a key any more: %s",
+			    gone[j].g_why);
 		} else if (rk == NULL) {
 			sh_err_at(e, file, &x.sc_path, "not a key a recipe "
 			    "takes");
@@ -419,11 +471,7 @@ sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
 				sc_import(&x, pr->pr_val);
 				break;
 			case SH_V_VER:
-				if (sc_string(&x, pr->pr_val,
-				    "a version constraint"))
-					(void) sc_syn(&x,
-					    "a version constraint",
-					    sh_syn_ver(pr->pr_val->sn_str));
+				sc_ver(&x, pr->pr_val);
 				break;
 			case SH_V_STRING:
 				(void) sc_string(&x, pr->pr_val, "a string");
@@ -435,11 +483,6 @@ sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
 				sc_coll(&x, rk, pr->pr_val);
 				break;
 			}
-			if (rk->rk_merge == SH_M_ONE && rk->rk_into != NULL &&
-			    sh_obj_find(layer, rk->rk_into) != NULL)
-				sh_err_at(e, file, &x.sc_path, "and %s both: "
-				    "two values for the one %s", rk->rk_into,
-				    rk->rk_into);
 		}
 		sh_path_pop(&x.sc_path, was);
 	}

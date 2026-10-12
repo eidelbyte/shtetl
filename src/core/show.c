@@ -141,11 +141,17 @@ sw_scalar(struct sw *w, const struct sh_node *v)
 	}
 }
 
-/* LEAD, then "# SET", or "# SET, over ADDED". */
+/*
+ * LEAD, then "# SET", or "# SET, over ADDED"; nothing when the key
+ * names the layer itself (a commands block's pieces).
+ */
 static void
 sw_from(struct sw *w, const struct sh_pair *pr, const char *lead)
 {
 	const char *set = pr->pr_val->sn_from;
+
+	if (strcmp(pr->pr_key, set) == 0)
+		return;
 
 	(void) fprintf(w->sw_out, "%s# %s", lead, set);
 	if (pr->pr_from != NULL && strcmp(pr->pr_from, set) != 0)
@@ -213,9 +219,11 @@ sw_pair(struct sw *w, const struct sh_pair *pr, int depth)
 		return;
 	}
 	if (v->sn_type == SH_STR && sw_heredoc(v->sn_str, term)) {
-		sw_indent(w, depth);
-		sw_from(w, pr, "");
-		(void) fputc('\n', w->sw_out);
+		if (strcmp(pr->pr_key, v->sn_from) != 0) {
+			sw_indent(w, depth);
+			sw_from(w, pr, "");
+			(void) fputc('\n', w->sw_out);
+		}
 		sw_indent(w, depth);
 		sw_key(w, pr->pr_key);
 		(void) fprintf(w->sw_out, " = <<%s\n%s\n%s\n", term, v->sn_str,
