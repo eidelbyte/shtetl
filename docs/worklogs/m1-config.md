@@ -86,14 +86,17 @@ ruling are section 15's.
   InitializeShadowMemory -> malloc -> AsanInitFromRtl). Worth a run on
   the box.
 
-Deferred to the box:
+On the box, 2026-10-11, at 3c585d7: `make check` (the portable
+build, libucl from /usr/src/contrib/libucl) and `make check-freebsd`
+(the textproc/libucl port) both pass. So the parse cells, the
+start-up self-check among them, hold for the libucl shtetl will ship
+against as well as for FreeBSD's contrib copy.
 
-- `make check` (portable, libucl from /usr/src/contrib/libucl) and
-  `make check-freebsd` (the textproc/libucl port: `pkg install
-  libucl`). The parse cells are meant to hold for whichever libucl is
-  linked; the port's version is the one shtetl will ship against.
+Still deferred:
+
 - Whether a native property name is one ZFS knows: libzfs's to say
   (M2).
+- AddressSanitizer, which FreeBSD's clang runs, has not been run.
 
 ## Gotchas for the next milestones
 

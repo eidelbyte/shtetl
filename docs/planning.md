@@ -1224,7 +1224,7 @@ by the command line run over two configuration roots
 | M  | scope | where |
 |----|-------|-------|
 | M0 | probes (section 13) | box |
-| M1 | skeleton, UCL loader, schema, cascade, `shtetl config show`; built 2026-10-11, branch impl/m1 (tests/MATRIX.md family C, all covered) | mac |
+| M1 | skeleton, UCL loader, schema, cascade, `shtetl config show`; built 2026-10-11, branch impl/m1 (tests/MATRIX.md family C, all covered; make check and make check-freebsd pass on the box) | mac |
 | M2 | discovery and multi-rooting, bootstrap, property table | box |
 | M3 | foundation build and update into zlake, patches and the pause included; pkg-upgrade | box |
 | M4 | beam-down, new container, save with messages, the zlake mirror | box |
