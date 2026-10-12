@@ -1009,7 +1009,8 @@ shtetl: foundations/other.conf: src_branch: stable/15 here, releng/15.1 in commo
 
 `src_branch` and `kernconf_file` may be given in several files when
 they give the same value; two values are refused. The default's
-value is the exception: a recipe overrides it (section 6).
+value is the exception: a recipe overrides it, with a warning
+(section 6).
 
 ## 6. The default: shtetl.conf
 
@@ -1026,10 +1027,11 @@ The default is the one file a recipe may override:
 - It takes every kind's keys, and each recipe takes those of its
   kind: a container takes no `kernconf_file` from it, a foundation no
   `jailconf`. Its settings are no recipe's.
-- What would be a redefinition of the default's value overrides it:
-  a recipe's `src_branch` or `kernconf_file`, a derivation for the
-  same path, an entry's field. A dataset's property overrides it
-  with a warning, as it would any file's (ruled 2026-10-12).
+- What would be a redefinition of the default's value overrides it,
+  with a warning naming the value replaced and its file: a recipe's
+  `src_branch` or `kernconf_file`, a derivation for the same path, an
+  entry's field, a dataset's property (ruled 2026-10-12). Giving the
+  default's value again, alike, is no override and says nothing.
 - What stacks, stacks with the default: its `ver`, `pkg`, datasets,
   texts and commands reach every recipe of the kinds that take them.
   A recipe cannot take them away; to be rid of one, take it out of
@@ -1089,6 +1091,7 @@ ver = "<15";
 
 ```console
 $ shtetl config show foundations/small
+shtetl: warning: foundations/small.conf: kernconf_file: MINIMAL overrides GENERIC, from shtetl.conf
 # foundations/small.conf: a foundation's recipe, its layers merged
 # layers, nearest last: common/site.conf, shtetl.conf, foundations/small.conf
 pkg {
@@ -1113,6 +1116,7 @@ derivations {
 src_branch = "releng/15.1";  # foundations/small.conf
 $ shtetl config show containers/app
 shtetl: warning: containers/app.conf: datasets.var.compression: lz4 overrides zstd, from shtetl.conf
+shtetl: warning: containers/app.conf: derivations."etc/pwd.db": overrides the derivation from shtetl.conf
 # containers/app.conf: a container's recipe, its layers merged
 # layers, nearest last: common/site.conf, shtetl.conf, containers/app.conf
 pkg {
@@ -1141,11 +1145,11 @@ $ shtetl config show containers/old
 shtetl: containers/old.conf: ver: no version is >=15.1 (shtetl.conf) and <15 (containers/old.conf) at once
 ```
 
-The foundation overrides `kernconf_file` without a word, and takes
+The foundation overrides `kernconf_file`, with a warning, and takes
 no `jailconf`; the container takes `jailconf` and no
-`kernconf_file`, overrides the derivation without a word and the
-property with a warning, and keeps `sudo` and `tmux`. `ver` stacks,
-so `containers/old` cannot be read with this shtetl.conf.
+`kernconf_file`, overrides the property and the derivation, a warning
+for each, and keeps `sudo` and `tmux`. `ver` stacks, so
+`containers/old` cannot be read with this shtetl.conf.
 
 ## 7. Checks after the merge
 
@@ -1249,5 +1253,5 @@ the file each value came from as a comment:
 | `ver` | both kept; refused if no version satisfies both |
 | `src_branch` or `kernconf_file`, alike | one value |
 | `src_branch` or `kernconf_file`, different | refused |
-| anything, one of the two being the default | the recipe's overrides the default's, or stacks with it, as section 6 says |
+| anything, one of the two being the default | the recipe's overrides the default's, with a warning, or stacks with it, as section 6 says |
 | `false`, `reset` | refused: nothing is taken away |

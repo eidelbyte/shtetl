@@ -342,7 +342,8 @@ mg_piece(struct mg *m, struct sh_node *coll, struct sh_pair *cur,
  * files; two files giving one entry different parts of it compose.
  * But a dataset's property a nearer file may override, with a
  * warning, the default's as any other's; and a commands block's texts
- * stack, each a piece of its own.
+ * stack, each a piece of its own. What the default gives, a recipe
+ * overrides, always with a warning (ruled 2026-10-12).
  */
 static void
 mg_entry(struct mg *m, struct sh_node *coll, const struct sh_rkey *rk,
@@ -358,9 +359,14 @@ mg_entry(struct mg *m, struct sh_node *coll, const struct sh_rkey *rk,
 		return;
 	}
 	if (rk->rk_coll == SH_C_DERIVATIONS && cur != NULL) {
-		if (mg_default(m, cur->pr_val))
+		if (mg_default(m, cur->pr_val)) {
+			if (m->mg_warn != NULL &&
+			    !sh_node_equal(cur->pr_val, ev))
+				sh_err_at(m->mg_warn, m->mg_l->sl_file,
+				    &m->mg_path, "overrides the derivation "
+				    "from %s", cur->pr_val->sn_from);
 			mg_set(m, coll, ek, ev);
-		else
+		} else
 			sh_err_at(m->mg_err, m->mg_l->sl_file, &m->mg_path,
 			    "given in %s already: a derivation is given once",
 			    cur->pr_from);
@@ -524,6 +530,13 @@ mg_layer(struct mg *m)
 			break;
 		case SH_M_AGREE:
 			have = sh_obj_find(m->mg_r->sr_merged, rk->rk_name);
+			if (have != NULL && mg_default(m, have->pr_val) &&
+			    m->mg_warn != NULL &&
+			    !sh_node_equal(have->pr_val, pr->pr_val))
+				sh_err_at(m->mg_warn, m->mg_l->sl_file,
+				    &m->mg_path, "%s overrides %s, from %s",
+				    mg_said(pr->pr_val), mg_said(have->pr_val),
+				    have->pr_val->sn_from);
 			if (have == NULL || mg_default(m, have->pr_val))
 				mg_set(m, m->mg_r->sr_merged, rk->rk_name,
 				    pr->pr_val);

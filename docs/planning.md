@@ -471,11 +471,10 @@ override:
   and leaves the rest (a container takes no `kernconf_file`, a
   foundation no `jailconf`). shtetl.conf's settings are no recipe's.
 - What would be a redefinition of the default's value is an override
-  instead: a recipe's `src_branch` or `kernconf_file` over the
-  default's, its derivation over the default's for the same path, its
-  field over the default's, without a word; its dataset property over
-  the default's with the warning any layer's override gives (ruled
-  2026-10-12, Q-AD).
+  instead, with a warning naming the value replaced and its file: a
+  recipe's `src_branch` or `kernconf_file` over the default's, its
+  derivation over the default's for the same path, its field or
+  dataset property over the default's (ruled 2026-10-12).
 - What stacks, stacks with the default too: its `ver`, `pkg`,
   datasets, texts and commands reach every recipe of the kinds that
   take them. To be rid of one, the site takes it out of shtetl.conf.
@@ -1438,6 +1437,23 @@ below that change the plan are folded into the sections named.
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-12 (overrides warn, shtetl.conf checked, a bare major)
+
+Asked, after the configuration reference was written: should every
+override of the default warn, not only a dataset property's; should a
+recipe be refused when shtetl.conf's settings are; and is `"=15"`
+15.0 alone, or every 15.x.
+
+- "1. yes, all should warn. 2. shtetl.conf should be checked for
+  correctness in its own right 3. =15 matches 15.x"
+
+So:
+
+- (5.4) Every override of the default warns, naming the value it
+  replaces and its file: a one-value key, a derivation, a field, a
+  dataset property. The default's value given again alike is no
+  override.
 
 ### 2026-10-12 (Q-AD: the default's edges)
 

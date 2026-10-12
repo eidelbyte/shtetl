@@ -175,7 +175,7 @@ spelling.
 | CC29 | a commands block given in several files stacks: a piece from each, keyed by its file, lower first (ruled 2026-10-12) | covered: check_cascade.c |
 | CC30 | an entry's field a second file gives again, alike or not, is refused (a patch source's ref); a field the first did not give composes (dir) | covered: check_cascade.c |
 | CC31 | a recipe takes from the default only the keys of its kind (a container no kernconf_file, a foundation no jailconf), and none of shtetl.conf's settings | covered: check_cascade.c test_default |
-| CC32 | what a recipe gives again of the default's one-value keys, derivations, entries' fields and dataset properties overrides it; a dataset property with the warning any layer's override gives, the rest without a word (ruled 2026-10-12, Q-AD) | covered: check_cascade.c test_default |
+| CC32 | what a recipe gives again of the default's one-value keys, derivations, entries' fields and dataset properties overrides it, each with a warning naming the value replaced and its file; the default's value given again alike is no override and warns nothing (ruled 2026-10-12) | covered: check_cascade.c test_default; run-cli.sh cl4-generic (GENERIC again, alike) |
 | CC33 | what stacks, stacks with the default: pkg, ver, text, commands | covered: check_cascade.c test_default |
 | CC34 | the files shtetl.conf imports are of the default too | covered: check_cascade.c test_default |
 
