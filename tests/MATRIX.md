@@ -222,3 +222,36 @@ a child that leaves a process holding its output open.
 | R15 | shtetl's signal handlers and mask are as they were after a run | covered: check_run.c |
 | R16 | a child that exits leaving a process holding its output: the run returns when the child exits | covered: check_run.c |
 | R17 | echo: the output also reaches standard error | covered: check_run.c |
+
+# Family D: discovery and multi-rooting (M2; planning.md 4.1; src/core/spaces.c)
+
+The roots of the four spaces are found by the user property
+shtetl:space, set locally on each root. On the mac, a fake ZFS
+(tests/zfake.c) stands in: an in-memory set of pools and filesystems
+with ZFS's inheritance; on the box, the same cells against pools on
+memory disks (tests/box).
+
+Dimensions: what carries the property {nothing, a pool's root
+dataset, a dataset deeper, a child that inherits it}; its value {each
+space, something else}; how many roots {none, one, several in one
+pool, several across pools} per space {lake and run take several,
+config and build one}; roots nested in roots; lookup of a name under
+a space's roots {no match, one, two}; the default root for something
+new {one root, several with and without spaces.X.default, a default
+that is no root of its space}; ZFS refusing the walk.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| D1 | nothing carries shtetl:space: every space has no root | covered: check_spaces.c |
+| D2 | one root per space, a pool's root dataset among them | covered: check_spaces.c |
+| D3 | an inherited value is no root: a root's children are not roots | covered: check_spaces.c |
+| D4 | a value that names no space is refused, naming the dataset and the value | covered: check_spaces.c |
+| D5 | two config roots, or two build roots, are refused, naming both | covered: check_spaces.c |
+| D6 | several lake and run roots, in one pool and across pools, come back sorted by name | covered: check_spaces.c |
+| D7 | a root inside another root is refused, naming both | covered: check_spaces.c |
+| D8 | lookup of a name under a space's roots: one match gives its name; none says so | covered: check_spaces.c |
+| D9 | lookup with the name under two roots is refused, naming both: one name, one place | covered: check_spaces.c |
+| D10 | lookup takes whole names only: foundations/F is not foundations/F2 | covered: check_spaces.c |
+| D11 | the default root: the only root; with several, spaces.X.default when it names one of them | covered: check_spaces.c |
+| D12 | the default refused: no root; several and no default; a default that is no root of that space | covered: check_spaces.c |
+| D13 | ZFS refusing the walk refuses the discovery, with ZFS's reason | covered: check_spaces.c |

@@ -1,0 +1,80 @@
+/*
+ * The ZFS shtetl's core asks of the system, as library calls (libzfs
+ * and libzfs_core), never zfs(8): planning.md 3, facts from their
+ * binary source. Three things implement it, chosen at link time:
+ * src/fbsd/zfs.c on FreeBSD, src/core/zstub.c in the portable build
+ * (every call refused: there is no ZFS to ask), and tests/zfake.c, an
+ * in-memory pool for the unit tests.
+ *
+ * Every call returns 0, or -1 with the reason reported to E, except
+ * where it says otherwise.
+ */
+
+#ifndef	SH_ZFS_H
+#define	SH_ZFS_H
+
+#include <stddef.h>
+
+#include "core/err.h"
+
+struct sh_zfs;
+
+/* Where a property's value comes from, as zfs get's SOURCE says. */
+enum sh_zsrc {
+	SH_ZSRC_NONE,		/* a user property nobody set */
+	SH_ZSRC_DEFAULT,
+	SH_ZSRC_LOCAL,
+	SH_ZSRC_INHERITED,
+	SH_ZSRC_RECEIVED,
+	SH_ZSRC_TEMPORARY
+};
+
+/* One property to set: its name and value. */
+struct sh_zprop {
+	const char	*zp_name;
+	const char	*zp_value;
+};
+
+/* The longest value shtetl reads: ZFS_MAXPROPLEN. */
+#define	SH_ZFS_VALMAX	8192
+
+int sh_zfs_open(struct sh_zfs **zp, struct sh_err *e);
+void sh_zfs_close(struct sh_zfs *z);
+
+/*
+ * Every filesystem of every imported pool where PROP, a user
+ * property, is set locally (an inherited value is not), with its
+ * value, in the order the pools and their trees are walked. FN's
+ * non-zero return stops the walk and is returned.
+ */
+int sh_zfs_local(struct sh_zfs *z, const char *prop,
+    int (*fn)(void *arg, const char *ds, const char *value), void *arg,
+    struct sh_err *e);
+
+/*
+ * PROP of DS, native or user: its value into VAL and, when SRC is
+ * not NULL, where it comes from. 1, and nothing reported, when there
+ * is no filesystem DS.
+ */
+int sh_zfs_get(struct sh_zfs *z, const char *ds, const char *prop,
+    char *val, size_t len, enum sh_zsrc *src, struct sh_err *e);
+
+/* The direct child filesystems of DS, by full name. */
+int sh_zfs_children(struct sh_zfs *z, const char *ds,
+    int (*fn)(void *arg, const char *child), void *arg, struct sh_err *e);
+
+/* A filesystem DS, created with PROPS set locally from its birth. */
+int sh_zfs_create(struct sh_zfs *z, const char *ds,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e);
+
+/* PROP of DS set locally to VALUE. */
+int sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
+    const char *value, struct sh_err *e);
+
+/* A pool's property, and setting one. */
+int sh_zpool_get(struct sh_zfs *z, const char *pool, const char *prop,
+    char *val, size_t len, struct sh_err *e);
+int sh_zpool_set(struct sh_zfs *z, const char *pool, const char *prop,
+    const char *value, struct sh_err *e);
+
+#endif	/* SH_ZFS_H */

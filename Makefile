@@ -59,10 +59,18 @@ BUILD = build
 
 CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o \
 	$(BUILD)/root.o $(BUILD)/syntax.o $(BUILD)/schema.o $(BUILD)/site.o \
-	$(BUILD)/cascade.o $(BUILD)/show.o $(BUILD)/run.o
-SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(UCL_OBJS)
+	$(BUILD)/cascade.o $(BUILD)/show.o $(BUILD)/run.o $(BUILD)/spaces.o
+# src/core/zfs.h has three implementations, picked at the link: the
+# portable shtetl gets src/core/zstub.c, which refuses every call; the
+# FreeBSD one gets src/fbsd/zfs.c, over libzfs; the unit tests get
+# tests/zfake.c, a pool in memory.
+ZFS_OBJS_portable = $(BUILD)/zstub.o
+ZFS_OBJS_freebsd = $(BUILD)/zstub.o
+ZFS_OBJS = $(ZFS_OBJS_$(FLAVOR))
+TEST_OBJS = $(BUILD)/zfake.o
+SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(ZFS_OBJS) $(UCL_OBJS)
 TESTS = check_parse check_schema check_site check_cascade check_show \
-	check_run
+	check_run check_spaces
 
 all: build shtetl
 
@@ -117,6 +125,13 @@ $(BUILD)/show.o: src/core/show.c src/core/show.h src/core/cascade.h \
 	$(CC) $(CFLAGS) -c -o $@ src/core/show.c
 $(BUILD)/run.o: src/core/run.c src/core/run.h src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/run.c
+$(BUILD)/spaces.o: src/core/spaces.c src/core/spaces.h src/core/err.h \
+	src/core/tree.h src/core/zfs.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/spaces.c
+$(BUILD)/zstub.o: src/core/zstub.c src/core/zfs.h src/core/err.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/zstub.c
+$(BUILD)/zfake.o: tests/zfake.c tests/zfake.h src/core/zfs.h src/core/err.h
+	$(CC) $(CFLAGS) -c -o $@ tests/zfake.c
 
 $(BUILD)/ucl/ucl_emitter_streamline.o:
 	$(UCL_CHECK)
@@ -151,10 +166,10 @@ $(BUILD)/ucl/ucl_util.o:
 # (tests/run-cli.sh). Everything here runs on the mac.
 check: unit cli
 
-unit: build $(CORE_OBJS) $(UCL_OBJS)
+unit: build $(CORE_OBJS) $(TEST_OBJS) $(UCL_OBJS)
 	@for t in $(TESTS); do \
 	    $(CC) $(CFLAGS) -o $(BUILD)/$$t tests/$$t.c $(CORE_OBJS) \
-		$(UCL_OBJS) $(LDFLAGS) $(UCL_LIBS) || exit 1; \
+		$(TEST_OBJS) $(UCL_OBJS) $(LDFLAGS) $(UCL_LIBS) || exit 1; \
 	    ./$(BUILD)/$$t || { echo "FAIL $$t"; exit 1; }; \
 	    echo "ok   $$t"; \
 	done
