@@ -99,3 +99,26 @@ Not yet verified:
 - tests/box refuses to run while any pool has a shtetl root: once the
   box is bootstrapped for real, the tests need a machine, or a jail,
   without one.
+
+## Later: one root to a space (2026-10-12, b0cc3b9)
+
+The user asked why `spaces.lake.default` mattered, ruled that the
+skeleton is there once and found by bootstrap, and then dropped
+multi-rooting entirely (planning.md 14, quoted). M2's code changed
+with it, on impl/m3:
+
+- `struct sh_spaces` holds one root a space; discovery refuses two of
+  any space; `sh_spaces_default`, the `spaces` settings and the
+  default marks of `shtetl spaces` are gone.
+- bootstrap takes one dataset a space and refuses a second root; the
+  run root's containers is always the one mounted at /containers, so
+  Q-AA, the later run root's canmount=off, is gone too.
+- A second root named where the space has one says "two run roots: A
+  and B"; the root itself named again still says "already a lake
+  root", the second-root check skipping it.
+
+Verified on the mac: make check (check_spaces 62, check_boot 289,
+check_site 172, check_show 53 checks; 22 command-line cases; 36 doc
+commands), gate clean, xcheck. Not on the box: tests/box/run.sh was
+reworked (B6 before the root is made, B14 and B18 on a run containers
+made by hand, B4 a refused second run root) and needs a run.
