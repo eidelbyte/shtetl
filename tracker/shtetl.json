@@ -84,5 +84,110 @@
     "estimated_size": "small",
     "completed": "not-started",
     "note": "Raised 2026-10-12 with the kernconf rework (dcb2afc); the author: \"Let's not concern ourselves with the UCL kernconf name + lines problem. let's just put this in future work.\""
+  },
+  "m3-version": {
+    "description": "A foundation version's name (planning.md 6.1) and the ver check (7.1 step 1). From src_branch: releng/N.M is N.M-releng, stable/N is N-stable, main is <major>-current, the major asked of the checkout's sys/conf/newvers.sh (-V REVISION, a program, not a parse). With the build's date (UTC, ISO), the checkout's sha (12 characters, as uname shows it) and a counter for a second build the same day from the same sha (.2, .3, from the names F's snapshots have): @15.1-releng-2026-10-08-0f691888dc56. The ver check: before the checkout, the version src_branch names (N.M, or every N.x for stable/N) must meet every ver of the recipe; after it, newvers.sh's REVISION must satisfy them all. Portable. Verify: tests/MATRIX.md family V before tests/check_version.c.",
+    "requires": [],
+    "epic": "build",
+    "milestone": "M3",
+    "expected_changed_files": [
+      "src/core/version.c",
+      "src/core/version.h",
+      "tests/check_version.c",
+      "tests/MATRIX.md",
+      "Makefile"
+    ],
+    "provides": "The name and the version check every build and update use.",
+    "estimated_size": "small",
+    "completed": "not-started"
+  },
+  "m3-zfs": {
+    "description": "The ZFS calls a build needs, in src/core/zfs.h with the fake (tests/zfake.c) and libzfs (src/fbsd/zfs.c): a recursive snapshot with user properties, atomic (lzc_snapshot); a dataset's snapshots with createtxg, guid and shtetl:kind; rollback to a snapshot; a snapshot destroyed; a property set and inherited; a filesystem and its children mounted and unmounted. Verify: MATRIX cells for the fake's behavior (it is what the build's tests stand on), and tools/xcheck-freebsd.sh for the libzfs side; the box for the libzfs side's behavior.",
+    "requires": [],
+    "epic": "build",
+    "milestone": "M3",
+    "expected_changed_files": [
+      "src/core/zfs.h",
+      "src/core/zstub.c",
+      "src/fbsd/zfs.c",
+      "tests/zfake.c",
+      "tests/zfake.h",
+      "tests/check_zfake.c",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Everything the build asks of ZFS, faked faithfully enough to test the build on the mac.",
+    "estimated_size": "medium",
+    "completed": "not-started"
+  },
+  "m3-build": {
+    "description": "shtetl build F for a new foundation (planning.md 7.1, without patches): the recipe resolved and checked; the plan shown and confirmed as bootstrap's is (-y); one build at a time (shtetl:build on the src root); the config root snapshotted and the snapshot recorded (4.4, shtetl:config); zlake/foundations/F pre-split before anything is installed; the checkout of src_branch in zbuild; the kernel config and src.conf shtetl writes (kernconf, buildopts); make buildworld buildkernel with MAKEOBJDIRPREFIX on foundation-builds/F; installworld, installkernel and distribution with INSTALL_CMD=\"install -C\"; pkg and commands in a chroot of F; snapshot -r with the version name and shtetl:kind, shtetl:commit, shtetl:config, shtetl:patches; every mount undone on every way out. Programs from a table the tests point at fakes. Verify: MATRIX family F (the build) before its tests, over the fake ZFS and fake make, git and pkg; the box for a real build.",
+    "requires": [
+      "m3-version",
+      "m3-zfs"
+    ],
+    "epic": "build",
+    "milestone": "M3",
+    "expected_changed_files": [
+      "src/core/build.c",
+      "src/core/build.h",
+      "src/main.c",
+      "tests/check_build.c",
+      "tests/MATRIX.md",
+      "docs/planning.md"
+    ],
+    "provides": "A foundation built from its recipe into zlake, one version snapshot.",
+    "estimated_size": "large",
+    "completed": "not-started"
+  },
+  "m3-patches": {
+    "description": "Patches and the pause (planning.md 7.1.1): the sources fetched into the run directory; *.patch in natural order; a snapshot of the src root before each; git apply, a patch already in skipped; anything else applied with --3way or --reject and the build paused, recorded on the src root and in the run directory; build F --continue (no conflict marker or .rej left; the fix written out as .fixed), --skip, --abort; the src root rolled back when the build ends; shtetl:patches on the version. Verify: MATRIX family P before tests, with a fake git; the box with real patches.",
+    "requires": [
+      "m3-build"
+    ],
+    "epic": "build",
+    "milestone": "M3",
+    "expected_changed_files": [
+      "src/core/patch.c",
+      "src/core/patch.h",
+      "src/core/build.c",
+      "tests/check_patch.c",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Patched foundations, a failing patch pausing the build for a person.",
+    "estimated_size": "large",
+    "completed": "not-started"
+  },
+  "m3-update": {
+    "description": "Update foundation F (planning.md 7.2): 7.1 steps 3 - 8 on the same datasets; delete-old and delete-old-libs before the install; the install with install -C; installworld's backups removed after their schg flags are cleared; the datasets checked to match the previous version's; refused at a securelevel above 0, where schg cannot be cleared. Verify: MATRIX cells in family F; the box.",
+    "requires": [
+      "m3-build"
+    ],
+    "epic": "build",
+    "milestone": "M3",
+    "expected_changed_files": [
+      "src/core/build.c",
+      "tests/check_build.c",
+      "tests/MATRIX.md"
+    ],
+    "provides": "A foundation's next version on the same snapshot chain.",
+    "estimated_size": "medium",
+    "completed": "not-started"
+  },
+  "m3-pkg-upgrade": {
+    "description": "shtetl pkg-upgrade F (planning.md 7.2): pkg upgrade in a chroot of F and a snapshot -pkg of the version (6.1, shtetl:kind=pkg). Verify: MATRIX cells; the box.",
+    "requires": [
+      "m3-build"
+    ],
+    "epic": "build",
+    "milestone": "M3",
+    "expected_changed_files": [
+      "src/core/build.c",
+      "src/main.c",
+      "tests/check_build.c",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Base-plus-packages versions to rebase onto.",
+    "estimated_size": "small",
+    "completed": "not-started"
   }
 }
