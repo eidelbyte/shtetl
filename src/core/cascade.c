@@ -4,9 +4,10 @@
  * Loading: every layer is parsed and checked against the target's
  * kind before anything merges, and a refused layer does not stop the
  * others from being read, so one run reports every layer's problems.
- * "import" is followed in every layer, default.conf's included: a
- * file's imports merge before it, each recipe once, at the first
- * place it is reached. A cycle is refused.
+ * The default comes first: shtetl.conf and what it imports, checked
+ * as files of any kind. "import" is followed in every layer, the
+ * default's included: a file's imports merge before it, each recipe
+ * once, at the first place it is reached. A cycle is refused.
  *
  * Merging, layer by layer, with everything stacking (ruled
  * 2026-10-12): nothing is dropped and nothing reset, and no file
@@ -17,11 +18,13 @@
  * warning); a derivation is given whole, in one file; a commands
  * block's texts stack, a piece from each file. Every file's ver is
  * kept, to hold together, and the ranges they allow must meet;
- * buildopts and kernconf_lines and jailconf append, lower layers
- * first, buildopts_file's file in its place; src_branch and
- * kernconf_file, one value, may be given again only alike. A key keeps
- * the place where it was first added, so a commands block runs where
- * it was first defined.
+ * buildopts and kernconf_lines and jailconf append, a piece from each
+ * file, lower layers first; src_branch and kernconf_file, one value,
+ * may be given again only alike. A recipe takes from the default only
+ * its kind's keys, and what would redefine the default's value
+ * overrides it instead (ruled 2026-10-12). A key keeps the place where
+ * it was first added, so a commands block runs where it was first
+ * defined.
  */
 
 #include <stdio.h>

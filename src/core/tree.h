@@ -8,7 +8,8 @@
  * A parsed tree's layer is its file throughout; in a merged tree a
  * key's pr_from is the layer that added it and its value's sn_from
  * the layer that last set it, which is what config show prints and
- * what the drop rule of 5.4 reads.
+ * what the cascade reads to tell the default's values from a
+ * recipe's.
  */
 
 #ifndef	SH_TREE_H

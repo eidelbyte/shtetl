@@ -2,12 +2,14 @@
  * The keys of a recipe (planning.md 5.5) and the check of one layer.
  *
  * A layer is checked against the kind of the recipe it is merged
- * into, not against the file it is: default.conf and an imported
- * common/web.conf are each a layer of a foundation, a container or a
- * system, and take that kind's keys (5.3: "keys that belong to
- * another kind are errors"). A layer may set part of an entry (one
- * field of a derivation) for a lower layer's to complete; whether
- * the merged entry is whole is the cascade's check.
+ * into, not against the file it is: an imported common/web.conf is a
+ * layer of a foundation, a container or a system, and takes that
+ * kind's keys (5.3: "keys that belong to another kind are errors").
+ * The default's files (shtetl.conf and its imports) are a layer of
+ * every kind, so they take every kind's keys, and each recipe takes
+ * those of its own (ruled 2026-10-12). Entries may be given in parts
+ * across files, a dataset's properties or a patch source's fields;
+ * a derivation is given whole, in one file.
  */
 
 #include <string.h>

@@ -3,17 +3,19 @@
  * was printed from (tests/check_show.c holds it to that), with the
  * layers as comments:
  *
- *     sudo = true;  # default.conf
+ *     sudo = true;  # shtetl.conf
  *     compression = "zstd";  # containers/x.conf, over common/f.conf
  *
  * The first names the layer that set the value; "over" names the one
  * that added the key, when that was another. A collection's entries
  * carry their own comments and the collection none, since many
- * layers fill it; so does a list that stacks (ver, buildopts), each
- * of its values on a line of its own that ends with its layer. Not on
- * a line above: libucl 0.9.4 reads a comment between [ and the first
- * value as a part of that value, quotes and all (tried; a comment
- * after a value and its comma it reads as a comment).
+ * layers fill it; so does ver, each of its values on a line of its
+ * own that ends with its layer. Not on a line above: libucl 0.9.4
+ * reads a comment between [ and the first value as a part of that
+ * value, quotes and all (tried; a comment after a value and its comma
+ * it reads as a comment). A text that stacks (buildopts,
+ * kernconf_lines, jailconf, a commands block) is an object of pieces
+ * keyed by their files, which says their layers itself.
  *
  * A string with a newline in it is printed as a heredoc, by libucl
  * 0.9.4's rules (ucl_parse_multiline_string): the opening <<TERM ends
