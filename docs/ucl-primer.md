@@ -10,6 +10,8 @@ planning.md section 5.1.
 
 Facts below were checked against the libucl that FreeBSD carries in
 `contrib/libucl` (ucl_parser.c, ucl_util.c, ucl_hash.c, include/ucl.h).
+Every key shtetl takes, and what it prints when files stack, is in
+configuration.md, whose examples are run.
 shtetl links the `textproc/libucl` port: base builds its copy as
 PRIVATELIB (`lib/libucl/Makefile`), which third-party programs cannot
 link.

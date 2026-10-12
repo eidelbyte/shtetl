@@ -187,8 +187,10 @@ $(BUILD)/ucl/ucl_util.o:
 
 # make check: the unit tests (tests/check_*.c, each linked against
 # the core and run), then the command line end to end
-# (tests/run-cli.sh). Everything here runs on the mac.
-check: unit cli
+# (tests/run-cli.sh), then the examples of docs/configuration.md
+# (tools/doccheck.py; skipped, and said so, where there is no
+# python3). Everything here runs on the mac.
+check: unit cli doc
 
 unit: build $(CORE_OBJS) $(TEST_OBJS) $(UCL_OBJS)
 	@for t in $(TESTS); do \
@@ -201,6 +203,13 @@ unit: build $(CORE_OBJS) $(TEST_OBJS) $(UCL_OBJS)
 cli: shtetl
 	sh tests/run-cli.sh
 
+doc: shtetl
+	@if command -v python3 >/dev/null 2>&1; then \
+	    python3 tools/doccheck.py docs/configuration.md ./shtetl; \
+	else \
+	    echo "doc: no python3: docs/configuration.md not checked"; \
+	fi
+
 gate:
 	sh tools/gate.sh
 
@@ -212,5 +221,5 @@ xcheck:
 clean:
 	rm -rf $(BUILD) shtetl
 
-.PHONY: all build flavor freebsd check check-freebsd unit cli gate xcheck \
-	clean
+.PHONY: all build flavor freebsd check check-freebsd unit cli doc gate \
+	xcheck clean

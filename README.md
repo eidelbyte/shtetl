@@ -35,6 +35,9 @@ Everything else is still design:
   page.
 - `docs/ucl-primer.md`: the configuration format, and the rules
   shtetl adds to it.
+- `docs/configuration.md`: every setting and recipe key, how a file
+  is read and how a recipe's files stack, with examples that `make
+  check` runs against the built shtetl (`tools/doccheck.py`).
 - `probes/`: the M0 probes as scripts for the box: `sudo sh
   probes/run.sh`. See `probes/README.md`.
 

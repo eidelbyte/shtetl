@@ -319,6 +319,9 @@ remains only for one container mounting another's dataset
 
 ## 5. Configuration
 
+The reference for every setting and recipe key as built, with run
+examples of how files are read and stack, is docs/configuration.md.
+
 ### 5.1 Format: UCL (kept, with the comparison asked for)
 
 The question was whether, since UCL needs a port anyway, a more common
