@@ -201,17 +201,17 @@ variables). shtetl merges the parsed layers itself:
 | value | rule |
 |-------|------|
 | `ver` | every file's constraint kept; all must hold together |
-| `buildopts`, `kernconf_lines`, `jailconf` | text: a piece from each file, kept in order, lower files first |
+| `buildopts`, `jailconf`, `kernconf`'s lines (a heredoc) | text: a piece from each file, kept in order, lower files first |
 | `pkg`, `requires` | the union |
 | `datasets`, `patches` | an object keyed by name: the union, an entry's fields composing |
 | `derivations` | the union; each one given whole, in one file |
 | `commands` | the union by label; one label's texts stack, a piece from each file |
-| `src_branch`, `kernconf_file` | one value: every file that gives it gives the same |
+| `src_branch` | one value: every file that gives it gives the same |
+| `kernconf`'s config (a string) | one value, given by one file |
 
-Everything stacks (planning.md 14, ruled 2026-10-12): a file adds to
-what the files below gave, and nothing takes anything away or takes
-another file's place. There is no `false` to drop an element and no
-`reset` to empty a collection; shtetl refuses both. So whatever its
+Everything stacks: a file adds to what the files below gave, and
+nothing takes anything away or takes another file's place. `false`
+as an entry is refused: dropping values is illegal. So whatever its
 foundation provides, a container keeps.
 
 What one file gives, another does not give again: a second value for
@@ -223,7 +223,7 @@ with a warning, the property being the container's own clone's.
 
 The default is the one layer a recipe may override. It may hold any
 kind's keys, and each recipe takes those of its kind (a container
-takes no `kernconf_file`). What a recipe gives again of its one-value
+takes no `kernconf`). What a recipe gives again of its one-value
 keys, derivations, fields or dataset properties replaces the
 default's, with a warning. What stacks, stacks with it: its `pkg`
 and `ver` reach every recipe, and the way to be rid of one is to take
@@ -233,7 +233,7 @@ it out of `shtetl.conf`.
 |----|-------|
 | add an element | a new key: `pkg { nginx = true; }` |
 | add to an element | the same key with new fields: `datasets { www { readonly = true; } }` |
-| change a default | give it again: `kernconf_file = "MINIMAL";` |
+| change a default | give it again: `kernconf = "MINIMAL";` |
 
 An array of names is shorthand for an object of `name = true` entries,
 for the common case: `pkg = [ "nginx", "git" ];`.
@@ -271,7 +271,7 @@ path (`datasets."usr/local".readonly`) instead.
     }
 
     ver = ">=15.1";
-    kernconf_file = "GENERIC";
+    kernconf = "GENERIC";
 
     datasets {
         tmp {}
@@ -307,7 +307,7 @@ path (`datasets."usr/local".readonly`) instead.
 `foundations/gaming.conf`
 
     src_branch = "stable/15";
-    kernconf_lines = <<EOD
+    kernconf = <<EOD
     device          drm
     options         SCHED_ULE
     EOD
@@ -322,7 +322,8 @@ path (`datasets."usr/local".readonly`) instead.
     }
 
 shtetl writes the kernel config itself: `include GENERIC` (the
-default's `kernconf_file`), an `ident` of its own, then the lines.
+default's `kernconf`), an `ident` of its own, then the lines. A
+heredoc is lines; a quoted string is the config to start from.
 
 `common/web.conf`
 

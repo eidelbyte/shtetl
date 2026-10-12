@@ -67,8 +67,7 @@ test_every_key(void)
 	ok("import = [ \"common/base.conf\" ];\n"
 	    "ver = \">=15\";\n"
 	    "src_branch = \"releng/15.1\";\n"
-	    "kernconf_file = \"GENERIC\";\n"
-	    "kernconf_lines = <<EOD\nnooptions INVARIANTS\nEOD\n"
+	    "kernconf = <<EOD\nnooptions INVARIANTS\nEOD\n"
 	    "buildopts = <<EOD\nWITHOUT_LIB32=yes\nEOD\n"
 	    "patches = [ \"github.com/eidelbyte/freebsd-patches\" ];\n"
 	    "datasets { tmp {} var {} \"usr/local\" { compression = "
@@ -77,7 +76,7 @@ test_every_key(void)
 	    "commands { motd = \"echo hi > /etc/motd\"; }\n"
 	    "derivations { \"etc/pwd.db\" { source = \"etc/master.passwd\"; "
 	    "command = \"pwd_mkdb -d etc etc/master.passwd\"; } }\n", F);
-	ok("kernconf_file = \"kernels/GAMING\";\n", F);
+	ok("kernconf = \"kernels/GAMING\";\n", F);
 	ok("import = \"common/web.conf\";\n"
 	    "ver = \"=15.1\";\n"
 	    "pkg { nginx = true; }\n"
@@ -101,7 +100,7 @@ static void
 test_kinds(void)
 {
 	static const char *const fonly[] = { "src_branch = \"main\";",
-	    "kernconf_lines = \"G\";", "kernconf_file = \"k\";",
+	    "kernconf = \"G\";",
 	    "buildopts = \"x\";",
 	    "patches = [ \"p/q\" ];" };
 	char want[128];
@@ -136,8 +135,7 @@ test_strings(void)
 	size_t i;
 
 	bad("src_branch = 15;", F, "src_branch: must be a quoted string");
-	bad("kernconf_lines = true;", F, "kernconf_lines: must be a quoted "
-	    "string");
+	bad("kernconf = true;", F, "kernconf: must be a quoted string");
 	bad("ver = 15.1;", C, "ver: must be a quoted string");
 	bad("jailconf = [ \"a\" ];", C, "jailconf: must be a string");
 	bad("src_branch = \"\";", F, "src_branch: empty");
@@ -152,23 +150,28 @@ test_strings(void)
 	}
 }
 
-/* CK7, CK8: kernconf_file and kernconf_lines, and paths. */
+/*
+ * CK7, CK8: kernconf, a string being the config's name or path, a
+ * heredoc its lines; and paths.
+ */
 static void
 test_files(void)
 {
-	ok("kernconf_file = \"GENERIC\"; kernconf_lines = \"device vmm\";",
-	    F);
-	ok("kernconf_file = \"kernels/GAMING\";", F);
-	bad("kernconf_file = \"/etc/GAMING\";", F, "kernconf_file: invalid "
-	    "path: absolute path");
-	bad("kernconf_file = \"a/../b\";", F, "invalid path: . or .. "
-	    "component");
-	bad("kernconf_file = \"./b\";", F, "invalid path: . or .. component");
-	bad("kernconf_file = \"a//b\";", F, "invalid path: empty path "
-	    "component");
-	bad("kernconf_file = \"a/\";", F, "invalid path: trailing /");
-	bad("kernconf_file = 5;", F, "kernconf_file: must be a quoted "
-	    "string");
+	ok("kernconf = \"GENERIC\";", F);
+	ok("kernconf = \"kernels/GAMING\";", F);
+	ok("kernconf = <<EOD\nnooptions INVARIANTS\ndevice vmm\nEOD\n", F);
+	/* a heredoc is lines, whatever they hold */
+	ok("kernconf = <<EOD\n/etc/GAMING\nEOD\n", F);
+	bad("kernconf = \"/etc/GAMING\";", F, "kernconf: invalid path: "
+	    "absolute path");
+	bad("kernconf = \"a/../b\";", F, "invalid path: . or .. component");
+	bad("kernconf = \"./b\";", F, "invalid path: . or .. component");
+	bad("kernconf = \"a//b\";", F, "invalid path: empty path component");
+	bad("kernconf = \"a/\";", F, "invalid path: trailing /");
+	bad("kernconf = \"device vmm\\nnooptions X\";", F, "kernconf: invalid "
+	    "path: control character");
+	bad("kernconf = \"\";", F, "kernconf: empty");
+	bad("kernconf = 5;", F, "kernconf: must be a quoted string");
 }
 
 /* CK9: import. */
@@ -334,11 +337,11 @@ test_requires_patches(void)
 static void
 test_reporting(void)
 {
-	CHECK(L("frob = 1;\npkg = [ \"-x\" ];\nkernconf_file = \"G\";\n"
+	CHECK(L("frob = 1;\npkg = [ \"-x\" ];\nkernconf = \"G\";\n"
 	    "datasets { \"usr/local\" { recordsize = 1; } }\n", C) == 4);
 	CHECK(cap_has(&c, "t.conf: frob: invalid key\n"));
 	CHECK(cap_has(&c, "t.conf: pkg[0]: invalid package name: leading -"));
-	CHECK(cap_has(&c, "t.conf: kernconf_file: valid only in foundation "
+	CHECK(cap_has(&c, "t.conf: kernconf: valid only in foundation "
 	    "recipe"));
 	CHECK(cap_has(&c, "t.conf: datasets.\"usr/local\".recordsize: "
 	    "must be a quoted string"));
@@ -369,15 +372,15 @@ static void
 test_default(void)
 {
 	CHECK(DF("build { make_jobs = 4; }\nver = \">=15.1\";\n"
-	    "kernconf_file = \"GENERIC\";\nrequires = [ \"db\" ];\n"
+	    "kernconf = \"GENERIC\";\nrequires = [ \"db\" ];\n"
 	    "jailconf = \"allow.raw_sockets;\";\npkg = [ \"sudo\" ];\n", 1) ==
 	    0);
 	CHECK(DF("frob = 1;\n", 1) == 1);
 	CHECK(cap_has(&c, "shtetl.conf: frob: invalid key"));
 	CHECK(DF("build { make_jobs = 4; }\n", 0) == 1);
 	CHECK(cap_has(&c, "shtetl.conf: build: invalid key"));
-	CHECK(DF("kernconf_file = 5;\n", 1) == 1);
-	CHECK(cap_has(&c, "kernconf_file: must be a quoted string"));
+	CHECK(DF("kernconf = 5;\n", 1) == 1);
+	CHECK(cap_has(&c, "kernconf: must be a quoted string"));
 }
 
 int

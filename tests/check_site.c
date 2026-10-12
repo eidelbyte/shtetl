@@ -249,7 +249,7 @@ test_load(void)
 	/* CS11: the default recipe beside the settings, out of their view */
 	(void) scratch_write("four/shtetl.conf",
 	    "build { make_jobs = 2; }\nver = \">=15.1\";\n"
-	    "kernconf_file = \"GENERIC\";\npkg = [ \"sudo\" ];\n");
+	    "kernconf = \"GENERIC\";\npkg = [ \"sudo\" ];\n");
 	(void) snprintf(root, sizeof (root), "%s", scratch_path("four"));
 	cap_reset(&c);
 	CHECK(sh_site_load(root, &s, &c.c_err) == 0);

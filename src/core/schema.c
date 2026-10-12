@@ -24,19 +24,17 @@
 #define	C	SH_CONTAINER
 
 /*
- * kernconf_file is the kernel config the foundation's starts from (a
- * name in the src tree's conf directory, GENERIC; or a file in
- * zconfig, a path) and kernconf_lines the lines added to it; shtetl
- * writes the config itself (planning.md 5.5), as it writes the
- * src.conf buildopts goes into and the jail's block jailconf goes
- * into.
+ * kernconf, a foundation's: a string is the kernel config to start
+ * from (a name in the src tree's conf directory, GENERIC, or a path
+ * in zconfig), and lines, a heredoc, are added to it; shtetl writes
+ * the config itself (planning.md 5.5), as it writes the src.conf
+ * buildopts goes into and the jail's block jailconf goes into.
  */
 static const struct sh_rkey rkeys[] = {
 	{ "import", SH_ALLKINDS, SH_V_IMPORT, SH_C_NONE, SH_M_LAYERS },
 	{ "ver", SH_ALLKINDS, SH_V_VER, SH_C_NONE, SH_M_ALL },
 	{ "src_branch", F, SH_V_STRING, SH_C_NONE, SH_M_AGREE },
-	{ "kernconf_file", F, SH_V_FILE, SH_C_NONE, SH_M_AGREE },
-	{ "kernconf_lines", F, SH_V_STRING, SH_C_NONE, SH_M_TEXT },
+	{ "kernconf", F, SH_V_KERNCONF, SH_C_NONE, SH_M_KERNCONF },
 	{ "buildopts", F, SH_V_STRING, SH_C_NONE, SH_M_TEXT },
 	{ "patches", F, SH_V_COLL, SH_C_PATCHES, SH_M_COLL },
 	{ "datasets", SH_ALLKINDS, SH_V_COLL, SH_C_DATASETS, SH_M_COLL },
@@ -432,8 +430,13 @@ sc_layer(const struct sh_node *layer, unsigned kinds, const char *file,
 			case SH_V_STRING:
 				(void) sc_string(&x, pr->pr_val);
 				break;
-			case SH_V_FILE:
-				sc_relpath(&x, pr->pr_val, "path");
+			case SH_V_KERNCONF:
+				/* lines, or the config they are added to */
+				if (pr->pr_val->sn_type != SH_STR ||
+				    !pr->pr_val->sn_block)
+					sc_relpath(&x, pr->pr_val, "path");
+				else
+					(void) sc_string(&x, pr->pr_val);
 				break;
 			case SH_V_COLL:
 				sc_coll(&x, rk, pr->pr_val);

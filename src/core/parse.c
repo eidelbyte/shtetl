@@ -164,6 +164,36 @@ pa_try(const char *text, int want_ok, const char *want_a, int at_start)
 	return (kept);
 }
 
+/*
+ * Whether the linked libucl marks a heredoc, and only a heredoc, as
+ * one: kernconf reads its lines from a heredoc and its file from a
+ * string. 1 if it does, 0 if not, -1 out of memory.
+ */
+static int
+pa_try_block(void)
+{
+	static const char text[] = "a = <<EOD\nx\nEOD\nb = \"x\";\n";
+	struct ucl_parser *p;
+	ucl_object_t *top;
+	const ucl_object_t *a, *b;
+	int ok, kept;
+
+	if ((p = pa_ucl(text, sizeof (text) - 1, "(self-check)", &ok)) ==
+	    NULL)
+		return (-1);
+	kept = 0;
+	if (ok && (top = ucl_parser_get_object(p)) != NULL) {
+		a = ucl_object_lookup(top, "a");
+		b = ucl_object_lookup(top, "b");
+		kept = a != NULL && b != NULL &&
+		    (a->flags & UCL_OBJECT_MULTILINE) != 0 &&
+		    (b->flags & UCL_OBJECT_MULTILINE) == 0;
+		ucl_object_unref(top);
+	}
+	ucl_parser_free(p);
+	return (kept);
+}
+
 int
 sh_parse_selfcheck(struct sh_err *e)
 {
@@ -197,6 +227,15 @@ sh_parse_selfcheck(struct sh_err *e)
 			pa_checked = -1;
 			return (-1);
 		}
+	}
+	if ((r = pa_try_block()) < 0) {
+		sh_err_nomem(e);
+		return (-1);
+	}
+	if (r == 0) {
+		sh_errf(e, "unusable libucl: heredocs not marked");
+		pa_checked = -1;
+		return (-1);
 	}
 	pa_checked = 1;
 	return (0);
@@ -293,6 +332,7 @@ pa_conv(const ucl_object_t *o, const char *name, struct sh_path *path,
 		sh_node_free(n);
 		if ((n = sh_node_str(s, len, name)) == NULL)
 			goto nomem;
+		n->sn_block = (o->flags & UCL_OBJECT_MULTILINE) != 0;
 		break;
 	case UCL_BOOLEAN:
 		n->sn_bool = ucl_object_toboolean(o);

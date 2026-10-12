@@ -237,10 +237,10 @@ test_import_errors(void)
 
 /*
  * CC7, CC8: what stacks, and what must agree. Every file's ver is
- * kept, to hold together; buildopts, kernconf_lines and jailconf
+ * kept, to hold together; buildopts, jailconf and kernconf's lines
  * append, a piece from each file keyed by it, lower layers first;
- * src_branch and kernconf_file, one value each, may be given again
- * only alike (ruled 2026-10-12).
+ * src_branch, one value, may be given again only alike; kernconf's
+ * config is given by one file of the stack.
  */
 static void
 test_stacked(void)
@@ -251,17 +251,19 @@ test_stacked(void)
 		"containers/x.conf", "import = \"common/w.conf\";\n"
 		"pkg = [ \"b\" ];\nver = \"<16\";\njailconf = \"j2;\";\n",
 		"common/b.conf", "buildopts = \"A=1\";\n"
-		"kernconf_lines = \"nooptions WITNESS\";\n"
+		"kernconf = <<EOD\nnooptions WITNESS\nEOD\n"
 		"src_branch = \"releng/15.1\";\n",
-		"common/k.conf", "kernconf_file = \"GENERIC\";\n",
+		"common/k.conf", "kernconf = \"GENERIC\";\n",
 		"foundations/f1.conf", "import = [ \"common/k.conf\", "
 		"\"common/b.conf\" ];\n"
-		"src_branch = \"releng/15.1\";\nkernconf_file = \"GENERIC\";\n"
-		"buildopts = \"B=2\";\nkernconf_lines = \"device vmm\";\n",
+		"src_branch = \"releng/15.1\";\n"
+		"buildopts = \"B=2\";\nkernconf = <<EOD\ndevice vmm\nEOD\n",
 		"foundations/f2.conf", "import = \"common/k.conf\";\n"
-		"src_branch = \"main\";\nkernconf_file = \"MINE\";\n",
+		"src_branch = \"main\";\nkernconf = \"MINE\";\n",
 		"foundations/f3.conf", "import = \"common/b.conf\";\n"
 		"src_branch = \"main\";\n",
+		"foundations/f4.conf", "import = \"common/k.conf\";\n"
+		"src_branch = \"main\";\nkernconf = \"GENERIC\";\n",
 		NULL
 	};
 	const struct sh_node *v;
@@ -283,22 +285,27 @@ test_stacked(void)
 	CHECK(is(sh_obj_get(v, "common/w.conf")->sn_str, "j1;"));
 	CHECK(is(sh_obj_get(v, "containers/x.conf")->sn_str, "j2;"));
 
-	/* the same src_branch and kernconf_file again: they agree */
+	/* the same src_branch again: they agree */
 	resolves(root, "foundations/f1");
 	v = M("buildopts");
 	CHECK(is(keys(v), "common/b.conf foundations/f1.conf"));
 	CHECK(is(sh_obj_get(v, "common/b.conf")->sn_str, "A=1"));
 	CHECK(is(sh_obj_get(v, "foundations/f1.conf")->sn_str, "B=2"));
-	v = M("kernconf_lines");
+	/* kernconf: the config from one file, lines from each */
+	v = M("kernconf");
+	CHECK(is(keys(v), "file lines"));
+	CHECK(is(sh_obj_get(v, "file")->sn_str, "GENERIC"));
+	CHECK(is(sh_obj_get(v, "file")->sn_from, "common/k.conf"));
+	v = sh_obj_get(v, "lines");
 	CHECK(is(keys(v), "common/b.conf foundations/f1.conf"));
 	CHECK(is(sh_obj_get(v, "foundations/f1.conf")->sn_str,
 	    "device vmm"));
-	CHECK(is(M("kernconf_file")->sn_str, "GENERIC"));
-	CHECK(is(M("kernconf_file")->sn_from, "common/k.conf"));
 	CHECK(is(M("src_branch")->sn_from, "common/b.conf"));
-	/* given again, not alike */
-	refused(root, "foundations/f2", "foundations/f2.conf: kernconf_file: "
-	    "MINE conflicts with GENERIC in common/k.conf");
+	/* given again: kernconf's config alike or not, src_branch not */
+	refused(root, "foundations/f2", "foundations/f2.conf: kernconf: "
+	    "already defined in common/k.conf");
+	refused(root, "foundations/f4", "foundations/f4.conf: kernconf: "
+	    "already defined in common/k.conf");
 	refused(root, "foundations/f3", "foundations/f3.conf: src_branch: "
 	    "main conflicts with releng/15.1 in common/b.conf");
 }
@@ -506,7 +513,7 @@ test_merged(void)
 		"src_branch = \"main\";\n"
 		"patches { \"github.com/a/b\" { dir = \"15\"; } }\n",
 		"foundations/files.conf",
-		"src_branch = \"main\";\nkernconf_file = \"kernels/NOPE\";\n"
+		"src_branch = \"main\";\nkernconf = \"kernels/NOPE\";\n"
 		"patches { \"patches/gen\" { dir = \"15.1\"; } }\n",
 		"patches/gen/14.3/0-a.patch", "\n",
 		"foundations/pat.conf",
@@ -534,10 +541,10 @@ test_merged(void)
 	resolves(root, "foundations/pdir");
 	CHECK(is(keys(sh_obj_get(M("patches"), "github.com/a/b")),
 	    "ref dir"));
-	/* CC20: kernconf_file and a patch directory, not there */
+	/* CC20: kernconf's config and a patch directory, not there */
 	CHECK(R(root, "foundations/files") == -1);
 	CHECK(c.c_err.se_count == 2);
-	CHECK(cap_has(&c, "foundations/files.conf: kernconf_file: "
+	CHECK(cap_has(&c, "foundations/files.conf: kernconf: "
 	    "kernels/NOPE: no such file\n"));
 	CHECK(cap_has(&c, "foundations/files.conf: patches.\"patches/gen\": "
 	    "patches/gen/15.1: no such directory\n"));
@@ -585,7 +592,7 @@ test_layer_errors(void)
 {
 	static const char *const le[] = {
 		"shtetl.conf", "frob = 1;\n",
-		"common/k.conf", "kernconf_file = \"G\";\npkg = [ \"-x\" ];\n",
+		"common/k.conf", "kernconf = \"G\";\npkg = [ \"-x\" ];\n",
 		"containers/x.conf",
 		"import = \"common/k.conf\";\njailconf = 5;\n",
 		NULL
@@ -594,7 +601,7 @@ test_layer_errors(void)
 	CHECK(R(mkroot("le", le), "containers/x") == -1);
 	CHECK(c.c_err.se_count == 4);
 	CHECK(cap_has(&c, "shtetl.conf: frob: invalid key"));
-	CHECK(cap_has(&c, "common/k.conf: kernconf_file: valid only in "
+	CHECK(cap_has(&c, "common/k.conf: kernconf: valid only in "
 	    "foundation recipe"));
 	CHECK(cap_has(&c, "common/k.conf: pkg[0]: invalid package name"));
 	CHECK(cap_has(&c, "containers/x.conf: jailconf: must be a quoted "
@@ -619,8 +626,7 @@ test_default(void)
 		"import = \"common/dflt.conf\";\n"
 		"ver = \">=15.1\";\n"
 		"src_branch = \"releng/15.1\";\n"
-		"kernconf_file = \"GENERIC\";\n"
-		"kernconf_lines = \"nooptions INVARIANTS\";\n"
+		"kernconf = \"GENERIC\";\n"
 		"jailconf = \"allow.raw_sockets;\";\n"
 		"pkg = [ \"sudo\" ];\n"
 		"datasets { var { compression = \"zstd\"; } }\n"
@@ -629,10 +635,12 @@ test_default(void)
 		"source = \"etc/master.passwd\"; "
 		"command = \"pwd_mkdb\"; } }\n"
 		"patches { \"github.com/a/b\" { ref = \"r1\"; } }\n",
-		"common/dflt.conf", "pkg = [ \"tmux\" ];\n",
+		"common/dflt.conf", "pkg = [ \"tmux\" ];\n"
+		"kernconf = <<EOD\nnooptions INVARIANTS\nEOD\n",
+		"common/vmm.conf", "kernconf = <<EOD\ndevice vmm\nEOD\n",
 		"foundations/f.conf",
-		"src_branch = \"main\";\nkernconf_file = \"MINIMAL\";\n"
-		"kernconf_lines = \"device vmm\";\n"
+		"import = \"common/vmm.conf\";\n"
+		"src_branch = \"main\";\nkernconf = \"MINIMAL\";\n"
 		"patches { \"github.com/a/b\" { ref = \"r2\"; } }\n",
 		"containers/x.conf",
 		"ver = \"<16\";\npkg = [ \"nginx\" ];\n"
@@ -651,8 +659,8 @@ test_default(void)
 	CHECK(r.sr_layers[0].sl_default && r.sr_layers[1].sl_default);
 	CHECK(!r.sr_layers[2].sl_default);
 	/* CC31: a container takes no foundation key, and no setting */
-	CHECK(M("src_branch") == NULL && M("kernconf_file") == NULL);
-	CHECK(M("kernconf_lines") == NULL && M("patches") == NULL);
+	CHECK(M("src_branch") == NULL && M("kernconf") == NULL);
+	CHECK(M("patches") == NULL);
 	CHECK(M("build") == NULL);
 	/* CC33: what stacks, stacks with the default */
 	CHECK(is(keys(M("pkg")), "tmux sudo nginx"));
@@ -673,15 +681,17 @@ test_default(void)
 
 	resolves(root, "foundations/f");
 	CHECK(is(M("src_branch")->sn_str, "main"));
-	CHECK(is(M("kernconf_file")->sn_str, "MINIMAL"));
-	CHECK(is(keys(M("kernconf_lines")),
-	    "shtetl.conf foundations/f.conf"));
+	v = sh_obj_get(M("kernconf"), "file");
+	CHECK(is(v->sn_str, "MINIMAL") && is(v->sn_from,
+	    "foundations/f.conf"));
+	CHECK(is(keys(sh_obj_get(M("kernconf"), "lines")),
+	    "common/dflt.conf common/vmm.conf"));
 	CHECK(is(sh_obj_get(sh_obj_get(M("patches"), "github.com/a/b"),
 	    "ref")->sn_str, "r2"));
 	CHECK(wc.c_err.se_count == 3);
 	CHECK(cap_has(&wc, "foundations/f.conf: src_branch: main overrides "
 	    "releng/15.1 from shtetl.conf"));
-	CHECK(cap_has(&wc, "foundations/f.conf: kernconf_file: MINIMAL "
+	CHECK(cap_has(&wc, "foundations/f.conf: kernconf: MINIMAL "
 	    "overrides GENERIC from shtetl.conf"));
 	CHECK(cap_has(&wc, "foundations/f.conf: "
 	    "patches.\"github.com/a/b\".ref: r2 overrides r1 from "

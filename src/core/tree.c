@@ -79,8 +79,12 @@ sh_node_copy(const struct sh_node *n)
 	const struct sh_pair *pr;
 	size_t i;
 
-	if (n->sn_type == SH_STR)
-		return (sh_node_str(n->sn_str, strlen(n->sn_str), n->sn_from));
+	if (n->sn_type == SH_STR) {
+		c = sh_node_str(n->sn_str, strlen(n->sn_str), n->sn_from);
+		if (c != NULL)
+			c->sn_block = n->sn_block;
+		return (c);
+	}
 	c = sh_node_new(n->sn_type, n->sn_from);
 	if (c == NULL)
 		return (NULL);

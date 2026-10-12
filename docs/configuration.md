@@ -285,8 +285,7 @@ shtetl: shtetl.conf: retention.lake: invalid key
 | `import` | all | a file's path, or a list of them | files merged in before this one |
 | `ver` | all | a version constraint, or a list of them | every one kept; all must hold |
 | `src_branch` | foundation | a string | one value: files that give it agree |
-| `kernconf_file` | foundation | a file's path, or a config's name | one value: files that give it agree |
-| `kernconf_lines` | foundation | text | a piece from each file |
+| `kernconf` | foundation | a config's name or path; or text | the config: one file of the stack; text: a piece from each file |
 | `buildopts` | foundation | text | a piece from each file |
 | `patches` | foundation | keyed by location | the union; an entry's fields given once |
 | `datasets` | all | keyed by path | the union; a property may be overridden, with a warning |
@@ -343,24 +342,30 @@ version comes from its `src_branch` (planning.md 6.1).
 The FreeBSD branch a foundation is built from: `"releng/15.1"`,
 `"stable/15"`, `"main"`. A foundation must have one, from some file.
 
-### kernconf_file and kernconf_lines
+### kernconf
 
 shtetl writes a foundation's kernel config itself: an `include` of
-`kernconf_file`, its own `ident`, then the lines of `kernconf_lines`.
+the config to start from, its own `ident`, then the lines. `kernconf`
+gives either, by how it is written:
 
-- `kernconf_file` is the config to start from. A bare name
-  (`"GENERIC"`, `"MINIMAL"`) is a config in the src tree's `conf`
-  directory for the machine; a name with a `/` is a file in the
-  configuration root, which must exist (section 7). The shipped
-  shtetl.conf gives `"GENERIC"`.
-- `kernconf_lines` is text, config lines added after it:
+- A string is the config to start from. A bare name (`"GENERIC"`,
+  `"MINIMAL"`) is a config in the src tree's `conf` directory for the
+  machine; a name with a `/` is a file in the configuration root,
+  which must exist (section 7). One file of the stack gives it; the
+  shipped shtetl.conf gives `"GENERIC"`, and a foundation may
+  override that.
+- A heredoc is lines, added after it, and stacks, a piece from each
+  file:
 
-      kernconf_lines = <<EOD
+      kernconf = <<EOD
       nooptions INVARIANTS
       device vmm
       EOD
 
-`kernconf` is no key any more, ruled 2026-10-12.
+A heredoc is lines even when it holds one line; a quoted string is
+always the config. A file gives `kernconf` once, so a foundation that
+starts from a config of its own and adds lines to it gives one of the
+two in a file it imports.
 
 ### buildopts
 
@@ -471,12 +476,6 @@ itself, `X { ... }`, with these inside it:
 An option given twice, in two files, is jail(8)'s to settle, not
 shtetl's. `jailconf_file` is no key any more.
 
-### Keys there are no more
-
-`kernconf`, `buildopts_file`, `jailconf_file` and `reset` are
-refused, each with what to write instead; so is `false` as a
-collection's entry. Section 5 says why.
-
 ### Every key at once
 
 <!-- example: keys -->
@@ -484,13 +483,13 @@ collection's entry. Section 5 says why.
 ```ucl
 # shtetl.conf
 ver = ">=15.1";
-kernconf_file = "GENERIC";
+kernconf = "GENERIC";
 ```
 
 ```ucl
 # foundations/generic.conf
 src_branch = "releng/15.1";
-kernconf_lines = <<EOD
+kernconf = <<EOD
 nooptions INVARIANTS
 nooptions WITNESS
 EOD
@@ -545,14 +544,16 @@ $ shtetl config show foundations/generic
 ver = [
     ">=15.1"  # shtetl.conf
 ]
-kernconf_file = "GENERIC";  # shtetl.conf
-src_branch = "releng/15.1";  # foundations/generic.conf
-kernconf_lines {
-    "foundations/generic.conf" = <<EOD
+kernconf {
+    file = "GENERIC";  # shtetl.conf
+    lines {
+        "foundations/generic.conf" = <<EOD
 nooptions INVARIANTS
 nooptions WITNESS
 EOD
+    }
 }
+src_branch = "releng/15.1";  # foundations/generic.conf
 buildopts {
     "foundations/generic.conf" = "WITHOUT_LIB32=yes";
 }
@@ -711,8 +712,9 @@ to drop an entry and no `reset` to empty a collection (ruled
 | `derivations` | the union by path; each derivation given once, whole |
 | `commands` | the union by label; a label's text stacks, a piece from each file |
 | `ver` | every constraint kept; all must hold |
-| `buildopts`, `kernconf_lines`, `jailconf` | a piece from each file, in file order |
-| `src_branch`, `kernconf_file` | one value: the files that give it give the same |
+| `buildopts`, `jailconf`, `kernconf`'s lines | a piece from each file, in file order |
+| `src_branch` | one value: the files that give it give the same |
+| `kernconf`'s config | one file of the stack gives it |
 
 What one file gives, another does not give again: two files that need
 the same thing defined two ways are not a composition of the two
@@ -916,7 +918,9 @@ both, run once, when the foundation is built (planning.md 7.4).
 ```ucl
 # common/build.conf
 buildopts = "WITHOUT_LIB32=yes";
-kernconf_lines = "nooptions INVARIANTS";
+kernconf = <<EOD
+nooptions INVARIANTS
+EOD
 ```
 
 ```ucl
@@ -927,7 +931,9 @@ buildopts = <<EOD
 WITHOUT_TESTS=yes
 WITH_META_MODE=yes
 EOD
-kernconf_lines = "nooptions WITNESS";
+kernconf = <<EOD
+nooptions WITNESS
+EOD
 ```
 
 ```console
@@ -941,17 +947,20 @@ WITHOUT_TESTS=yes
 WITH_META_MODE=yes
 EOD
 }
-kernconf_lines {
-    "common/build.conf" = "nooptions INVARIANTS";
-    "foundations/lean.conf" = "nooptions WITNESS";
+kernconf {
+    lines {
+        "common/build.conf" = "nooptions INVARIANTS";
+        "foundations/lean.conf" = "nooptions WITNESS";
+    }
 }
 src_branch = "releng/15.1";  # foundations/lean.conf
 ```
 
-`buildopts`, `kernconf_lines` and `jailconf` keep a piece from each
-file that gives them, lower files first; shtetl writes the pieces
-into the src.conf, the kernel config and the jail's block in that
-order.
+`buildopts`, `jailconf` and `kernconf`'s lines keep a piece from
+each file that gives them, lower files first; shtetl writes the
+pieces into the src.conf, the jail's block and the kernel config in
+that order. A one-line heredoc prints as a quoted string under
+`lines`.
 
 ### ver: all must hold
 
@@ -1011,7 +1020,7 @@ naming the two constraints that cannot meet and their files. `"=15"`
 takes 15.3, being every 15.x; `">15"` begins at 16.0, past every
 15.x, and so meets no version `"<=15.3"` allows.
 
-### One value: the files agree
+### One value
 
 <!-- example: one-value -->
 
@@ -1032,6 +1041,17 @@ import = "common/branch.conf";
 src_branch = "stable/15";
 ```
 
+```ucl
+# common/kern.conf
+kernconf = "MINIMAL";
+```
+
+```ucl
+# foundations/kern2.conf
+import = [ "common/branch.conf", "common/kern.conf" ];
+kernconf = "MINIMAL";
+```
+
 ```console
 $ shtetl config show foundations/same
 # foundations/same.conf: a foundation's recipe, its layers merged
@@ -1039,12 +1059,14 @@ $ shtetl config show foundations/same
 src_branch = "releng/15.1";  # common/branch.conf
 $ shtetl config show foundations/other
 shtetl: foundations/other.conf: src_branch: stable/15 conflicts with releng/15.1 in common/branch.conf
+$ shtetl config show foundations/kern2
+shtetl: foundations/kern2.conf: kernconf: already defined in common/kern.conf
 ```
 
-`src_branch` and `kernconf_file` may be given in several files when
-they give the same value; two values are refused. The default's
-value is the exception: a recipe overrides it, with a warning
-(section 6).
+`src_branch` may be given in several files when they give the same
+value; two values are refused. `kernconf`'s config is given by one
+file of the stack, alike or not. The default's value is the
+exception: a recipe overrides it, with a warning (section 6).
 
 ## 6. The default: shtetl.conf
 
@@ -1054,16 +1076,16 @@ files it imports (ruled 2026-10-12). The recipes repository ships it
 with:
 
     ver = ">=15.1";
-    kernconf_file = "GENERIC";
+    kernconf = "GENERIC";
 
 The default is the one file a recipe may override:
 
 - It takes every kind's keys, and each recipe takes those of its
-  kind: a container takes no `kernconf_file` from it, a foundation no
+  kind: a container takes no `kernconf` from it, a foundation no
   `jailconf`. Its settings are no recipe's.
 - What would be a redefinition of the default's value overrides it,
   with a warning naming the value replaced and its file: a recipe's
-  `src_branch` or `kernconf_file`, a derivation for the same path, an
+  `src_branch` or `kernconf` config, a derivation for the same path, an
   entry's field, a dataset's property (ruled 2026-10-12). Giving the
   default's value again, alike, is no override and says nothing.
 - What stacks, stacks with the default: its `ver`, `pkg`, datasets,
@@ -1080,7 +1102,7 @@ The default is the one file a recipe may override:
 retention { run = 10; }
 import = "common/site.conf";
 ver = ">=15.1";
-kernconf_file = "GENERIC";
+kernconf = "GENERIC";
 jailconf = "allow.raw_sockets;";
 pkg = [ "sudo" ];
 datasets {
@@ -1102,7 +1124,7 @@ pkg = [ "tmux" ];
 ```ucl
 # foundations/small.conf
 src_branch = "releng/15.1";
-kernconf_file = "MINIMAL";
+kernconf = "MINIMAL";
 ```
 
 ```ucl
@@ -1126,7 +1148,7 @@ ver = "<15";
 
 ```console
 $ shtetl config show foundations/small
-shtetl: warning: foundations/small.conf: kernconf_file: MINIMAL overrides GENERIC from shtetl.conf
+shtetl: warning: foundations/small.conf: kernconf: MINIMAL overrides GENERIC from shtetl.conf
 # foundations/small.conf: a foundation's recipe, its layers merged
 # layers, nearest last: common/site.conf, shtetl.conf, foundations/small.conf
 pkg {
@@ -1136,7 +1158,9 @@ pkg {
 ver = [
     ">=15.1"  # shtetl.conf
 ]
-kernconf_file = "MINIMAL";  # foundations/small.conf, over shtetl.conf
+kernconf {
+    file = "MINIMAL";  # foundations/small.conf, over shtetl.conf
+}
 datasets {
     var {  # shtetl.conf
         compression = "zstd";  # shtetl.conf
@@ -1180,10 +1204,10 @@ $ shtetl config show containers/old
 shtetl: containers/old.conf: ver: >=15.1 in shtetl.conf conflicts with <15 in containers/old.conf
 ```
 
-The foundation overrides `kernconf_file`, with a warning, and takes
-no `jailconf`; the container takes `jailconf` and no
-`kernconf_file`, overrides the property and the derivation, a warning
-for each, and keeps `sudo` and `tmux`. `ver` stacks, so
+The foundation overrides `kernconf`'s config, with a warning, and
+takes no `jailconf`; the container takes `jailconf` and no
+`kernconf`, overrides the property and the derivation, a warning for
+each, and keeps `sudo` and `tmux`. `ver` stacks, so
 `containers/old` cannot be read with this shtetl.conf.
 
 ## 7. Checks after the merge
@@ -1194,7 +1218,7 @@ Some things only the merged recipe can answer:
 |-------|--------------|
 | a foundation has a `src_branch` | missing src_branch |
 | every `ver` holds together | A in FILE conflicts with B in FILE |
-| a `kernconf_file` with a `/` exists in the configuration root | PATH: no such file |
+| a `kernconf` config with a `/` exists in the configuration root | PATH: no such file |
 | a `patches` directory exists in the configuration root | PATH: no such directory |
 | each `requires` is a container recipe, not the container itself | no such container; requires itself |
 
@@ -1202,7 +1226,7 @@ Some things only the merged recipe can answer:
 
 ```ucl
 # foundations/nobranch.conf
-kernconf_file = "conf/MYKERNEL";
+kernconf = "conf/MYKERNEL";
 patches { "patches/mine" {} }
 ```
 
@@ -1214,7 +1238,7 @@ requires = [ "lonely", "ghost" ];
 ```console
 $ shtetl config show foundations/nobranch
 shtetl: foundations/nobranch.conf: missing src_branch
-shtetl: foundations/nobranch.conf: kernconf_file: conf/MYKERNEL: no such file
+shtetl: foundations/nobranch.conf: kernconf: conf/MYKERNEL: no such file
 shtetl: foundations/nobranch.conf: patches."patches/mine": patches/mine: no such directory
 $ shtetl config show containers/lonely
 shtetl: containers/lonely.conf: requires.lonely: requires itself
@@ -1284,9 +1308,10 @@ the file each value came from as a comment:
 | one entry's field (a patch's `ref`), alike or not | refused |
 | one derivation | refused |
 | one commands label | both pieces, in file order |
-| text (`buildopts`, `kernconf_lines`, `jailconf`) | both pieces, in file order |
+| text (`buildopts`, `jailconf`, `kernconf`'s lines) | both pieces, in file order |
 | `ver` | both kept; refused if no version satisfies both |
-| `src_branch` or `kernconf_file`, alike | one value |
-| `src_branch` or `kernconf_file`, different | refused |
+| `src_branch`, alike | one value |
+| `src_branch`, different | refused |
+| `kernconf`'s config, alike or not | refused |
 | anything, one of the two being the default | the recipe's overrides the default's, with a warning, or stacks with it, as section 6 says |
-| `false`, `reset` | refused: nothing is taken away |
+| `false` | refused: dropping values is illegal |

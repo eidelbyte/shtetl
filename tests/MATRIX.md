@@ -71,9 +71,10 @@ check}.
 | CP20 | a directory is refused: not a regular file | covered: check_parse.c |
 | CP21 | a file over the size limit is refused | covered: check_parse.c |
 | CP22 | every node of a parsed tree names its file as its layer | covered: check_parse.c |
-| CP23 | the start-up check passes on the linked libucl: a macro refused at line 1, `$` literal, a duplicate refused | covered: check_parse.c |
+| CP23 | the start-up check passes on the linked libucl: a macro refused at line 1, `$` literal, a duplicate refused, a heredoc marked and a string not | covered: check_parse.c |
 | CP24 | every refusal names the file | covered: check_parse.c |
 | CP25 | a value nested more than 64 deep is refused, naming its key path | covered: check_parse.c |
+| CP26 | a heredoc is marked as lines, one line or many; a quoted string is not, though its text be the same; a copy keeps the mark | covered: check_parse.c |
 
 ## CK: a recipe layer against its kind (planning.md 5.5; src/core/schema.c)
 
@@ -87,11 +88,11 @@ object, string}; entry key syntax per collection; error reporting
 |------|----------|-------------|
 | CK1 | every key of 5.5 is accepted in each kind that has it | covered: check_schema.c |
 | CK2 | an unknown key is refused with the file and its key path | covered: check_schema.c |
-| CK3 | a foundation-only key (src_branch, kernconf_file, kernconf_lines, buildopts, patches) in a container and in a system is refused, naming the kind | covered: check_schema.c |
+| CK3 | a foundation-only key (src_branch, kernconf, buildopts, patches) in a container and in a system is refused: valid only in foundation recipe | covered: check_schema.c |
 | CK4 | a container-only key (requires, jailconf) in a foundation and in a system is refused | covered: check_schema.c |
 | CK5 | a string key given a number or a bool is refused: must be a quoted string | covered: check_schema.c |
 | CK6 | ver, one constraint or a list of them: `>=15`, `=15.1`, `<16`, `<=15.1`, `>14` accepted; ``, `15.1`, `>=`, `=>15`, `>=15.x`, `>=15.` refused | covered: check_schema.c, check_cascade.c test_ver |
-| CK7 | kernconf_file and kernconf_lines in one file; a kernconf_file path in zconfig | covered: check_schema.c |
+| CK7 | kernconf: a string is the config (a name, or a path in zconfig), a heredoc lines, even one line; a quoted string with a newline is a path and refused | covered: check_schema.c |
 | CK8 | a `_file` value: relative paths accepted; absolute, `..`, empty components refused | covered: check_schema.c |
 | CK9 | import: an array of strings, or one string; a non-string element or a bad path refused | covered: check_schema.c |
 | CK11 | pkg: array shorthand; entries true; false refused (dropping values is illegal); an entry with fields refused; bad names (empty, leading `-`, a space) refused | covered: check_schema.c |
@@ -147,8 +148,8 @@ spelling.
 | CC4 | a recipe imported twice merges once, at its first place | covered: check_cascade.c |
 | CC5 | an import cycle is refused, naming the files in it | covered: check_cascade.c |
 | CC6 | an import of a missing file is refused, naming the importing file | covered: check_cascade.c |
-| CC7 | ver: every file's constraints kept, in layer order, each with its file, to hold together (ruled 2026-10-12, Q-S); src_branch and kernconf_file, one value: given again only alike, else refused naming both files (ruled 2026-10-12, Q-AC) | covered: check_cascade.c test_stacked |
-| CC8 | buildopts, kernconf_lines and jailconf append: a piece from each file, keyed by it, lower layers first (ruled 2026-10-12, Q-T, Q-AC) | covered: check_cascade.c test_stacked |
+| CC7 | ver: every file's constraints kept, in layer order, each with its file, to hold together; src_branch, one value: given again only alike, else refused naming both files | covered: check_cascade.c test_stacked |
+| CC8 | buildopts, jailconf and kernconf's lines append: a piece from each file, keyed by it, lower layers first | covered: check_cascade.c test_stacked |
 | CC9 | collections: a key added; an entry's fields compose across files, each given once | covered: check_cascade.c |
 | CC10 | array shorthand merges as name = true; true over an entry with fields keeps the fields | covered: check_cascade.c |
 | CC11 | false as an entry is refused in every kind of recipe: dropping values is illegal | covered: check_cascade.c test_nodrops |
@@ -157,23 +158,24 @@ spelling.
 | CC17 | 5.4's worked example, its default in shtetl.conf: pkg sudo, tmux, apache24, py311-certbot, nginx; datasets tmp, var, usr/local, www; commands certbot, nginx | covered: check_cascade.c |
 | CC18 | a foundation with no src_branch after the merge is refused | covered: check_cascade.c |
 | CC19 | a derivation given in a second file, alike or not, is refused, naming the first (ruled 2026-10-12) | covered: check_cascade.c |
-| CC20 | a kernconf_file path or a patches directory that does not exist in the config root is refused, naming the key | covered: check_cascade.c |
+| CC20 | a kernconf config path or a patches directory that does not exist in the config root is refused, naming the key | covered: check_cascade.c |
 | CC21 | requires naming a container with no recipe, or the container itself, is refused | covered: check_cascade.c |
 | CC22 | targets: `containers/nginx` and `containers/nginx.conf` alike; an unknown kind directory, `..`, a bad name, a nested path, a missing recipe refused | covered: check_cascade.c |
 | CC23 | errors in several layers are all reported, and nothing is merged | covered: check_cascade.c |
 | CC24 | each merged entry names the layer that added it and the one that last set it | covered: check_cascade.c |
 | CC25 | patches: a lower layer's sources come first; a source a nearer layer changes keeps its place (7.1.1) | covered: check_cascade.c |
-| CC26 | every layer is checked against the target's kind: kernconf_file in a fragment a container imports is refused, naming the fragment | covered: check_cascade.c |
+| CC26 | every layer is checked against the target's kind: kernconf in a fragment a container imports is refused, naming the fragment | covered: check_cascade.c |
 | CC27 | the ver constraints of all the files must leave a version: >=16 with <15, =15.1 with >15.1, refused naming the two | covered: check_cascade.c test_ver |
 | CC28 | a dataset property a nearer file gives again, differently, overrides, with a warning naming both values and the first file (ruled 2026-10-12) | covered: check_cascade.c |
 | CC29 | a commands block given in several files stacks: a piece from each, keyed by its file, lower first (ruled 2026-10-12) | covered: check_cascade.c |
 | CC30 | an entry's field a second file gives again, alike or not, is refused (a patch source's ref); a field the first did not give composes (dir) | covered: check_cascade.c |
-| CC31 | a recipe takes from the default only the keys of its kind (a container no kernconf_file, a foundation no jailconf), and none of shtetl.conf's settings | covered: check_cascade.c test_default |
+| CC31 | a recipe takes from the default only the keys of its kind (a container no kernconf, a foundation no jailconf), and none of shtetl.conf's settings | covered: check_cascade.c test_default |
 | CC32 | what a recipe gives again of the default's one-value keys, derivations, entries' fields and dataset properties overrides it, each with a warning naming the value replaced and its file; the default's value given again alike is no override and warns nothing (ruled 2026-10-12) | covered: check_cascade.c test_default; run-cli.sh cl4-generic (GENERIC again, alike) |
 | CC33 | what stacks, stacks with the default: pkg, ver, text, commands | covered: check_cascade.c test_default |
 | CC34 | the files shtetl.conf imports are of the default too | covered: check_cascade.c test_default |
 | CC35 | shtetl.conf is checked whole wherever it is read: a refused setting refuses a recipe's resolve, naming the setting; a file shtetl.conf imports holds no settings (ruled 2026-10-12) | covered: check_cascade.c test_site_checked; configuration.md, example settings-refused |
 | CC36 | in ver a bare major is every minor of it (ruled 2026-10-12): =15 any 15.x, <=15 takes 15.x, >15 begins at 16.0; N.N is that version; each form's range, and the meets they make (=15 with >=15.3; =15 with <15 and >15 with <16 refused) | covered: check_cascade.c test_ver; configuration.md, example ver |
+| CC37 | kernconf: the config from one file of the stack, a second file giving it refused, alike or not; the default's overridden with a warning; lines stack with the default's and the imports'; merged as { file; lines } | covered: check_cascade.c test_stacked, test_default |
 
 ## CW: what config show prints (src/core/show.c)
 
@@ -186,7 +188,8 @@ spelling.
 | CW5 | keys that are not bare words are quoted (`"usr/local"`, a URL) | covered: check_show.c |
 | CW6 | a collection written empty prints as an empty object | covered: check_show.c |
 | CW7 | the site settings print with built-in or shtetl.conf on each value | covered: check_show.c |
-| CW8 | a key that stacks prints its values with their layers: ver a value a line, each ending in its layer (a comment never between [ and the first value, which libucl would read as part of it); buildopts, kernconf_lines, jailconf and each commands block as an object of pieces keyed by their files, heredocs where they hold lines | covered: check_show.c |
+| CW8 | a key that stacks prints its values with their layers: ver a value a line, each ending in its layer (a comment never between [ and the first value, which libucl would read as part of it); buildopts, jailconf and each commands block as an object of pieces keyed by their files, heredocs where they hold lines | covered: check_show.c |
+| CW9 | kernconf prints as { file; lines { pieces } }; only a collection's entries carry a layer comment, so lines prints as text does | covered: run-cli.sh cl4-generic; configuration.md, examples keys and text |
 
 ## CL: the command line (src/main.c; tests/run-cli.sh)
 

@@ -239,7 +239,7 @@ Sharing a file (PROPOSAL): `shtetl share containers/nginx.conf` runs
 never conflicts with upstream's.
 
 Upstream ships `shtetl.conf` with the default recipe in it
-(`ver = ">=15.1"`, `kernconf_file = "GENERIC"`; 5.4), and the site
+(`ver = ">=15.1"`, `kernconf = "GENERIC"`; 5.4), and the site
 writes its settings beside it (5.2). It is tracked, so the site's
 changes to it are local changes git keeps: a pull that brings an
 upstream change to it stops until they are settled. Until the
@@ -406,8 +406,8 @@ Built in M1 (`src/core/parse.c`, the one file that includes `ucl.h`):
   libucl from defining its own.
 - Times are left to libucl: an unquoted `30d` arrives as a number, so
   the schema refuses it as no quoted interval (6.3).
-- Unknown keys, and keys that belong to another kind (`kernconf_file`
-  in a container's files), are errors with the file and the key path
+- Unknown keys, and keys that belong to another kind (`kernconf` in
+  a container's files), are errors with the file and the key path
   (`datasets."usr/local".readonly`), not the line: libucl keeps no
   line on the objects it builds, only on a parse error, and a key
   path names one place, keys being unique in a file. Every problem in
@@ -427,7 +427,7 @@ created (7.4). Each is made of files, nearest last:
 
 There is no built-in recipe and no `default.conf`: what every recipe
 starts from is the site's `shtetl.conf`, which upstream ships with
-`ver = ">=15.1"` and `kernconf_file = "GENERIC"` (4.4). Without a
+`ver = ">=15.1"` and `kernconf = "GENERIC"` (4.4). Without a
 `shtetl.conf` a recipe has no default layer.
 
 Everything stacks: each file adds to what the files below it gave,
@@ -439,12 +439,13 @@ entry and `reset` are refused. How each key stacks:
 |-----|-----------|
 | import | names files; no value of its own |
 | ver | every file's constraint kept, in order; all must hold together, the foundation's and the container's, or the recipe is refused naming two that cannot |
-| buildopts, kernconf_lines, jailconf | text: every file's piece kept, keyed by its file, lower files first |
+| buildopts, jailconf, kernconf's lines | text: every file's piece kept, keyed by its file, lower files first |
 | pkg, requires | the union |
 | datasets, patches | the union by identity (below); an entry's fields compose |
 | derivations | the union by identity; each one given once, whole |
 | commands | the union by label; a label's text stacks, a piece from each file that gives it, keyed by the file |
-| src_branch, kernconf_file | one value: every file that gives it must give the same |
+| src_branch | one value: every file that gives it must give the same |
+| kernconf's config | one value, given by one file of the stack |
 
 A redefinition is refused (ruled 2026-10-12, Q-AC): what one file
 gives, another file does not give again, since two files that need
@@ -468,11 +469,11 @@ again with nothing new (`sudo` in two `pkg` lists, `www {}` beside
 override:
 
 - It may hold any kind's keys; each recipe takes those of its kind
-  and leaves the rest (a container takes no `kernconf_file`, a
+  and leaves the rest (a container takes no `kernconf`, a
   foundation no `jailconf`). shtetl.conf's settings are no recipe's.
 - What would be a redefinition of the default's value is an override
   instead, with a warning naming the value replaced and its file: a
-  recipe's `src_branch` or `kernconf_file` over the default's, its
+  recipe's `src_branch` or `kernconf` config over the default's, its
   derivation over the default's for the same path, its field or
   dataset property over the default's (ruled 2026-10-12).
 - What stacks, stacks with the default too: its `ver`, `pkg`,
@@ -500,7 +501,7 @@ for an object of `name = true` entries.
 
     # shtetl.conf (beside the settings)
     ver = ">=15.1";
-    kernconf_file = "GENERIC";
+    kernconf = "GENERIC";
     pkg = [ "sudo", "tmux" ];
     datasets {
         tmp {}
@@ -532,7 +533,7 @@ for an object of `name = true` entries.
 
 Merged for nginx: pkg = sudo, tmux, apache24, py311-certbot, nginx;
 datasets = tmp, var, usr/local, www; commands = certbot, then nginx;
-ver = `>=15.1`, `>=15` and `<16`, all to hold; no `kernconf_file`, a
+ver = `>=15.1`, `>=15` and `<16`, all to hold; no `kernconf`, a
 container taking none. `shtetl config show containers/nginx` prints
 this, each value with the file it came from, a stacked key as a list
 and a text or a commands block as an object of pieces keyed by file
@@ -573,8 +574,7 @@ dropping what its foundation had.
 | import | all | names | recipes merged in before this file |
 | ver | all | string, or a list of them | version constraint: `">=15"`, `"=15.1"` |
 | src_branch | foundation | string | FreeBSD branch |
-| kernconf_file | foundation | string | the kernel config to start from: a name in the src tree (`GENERIC`), or a path in zconfig |
-| kernconf_lines | foundation | heredoc | config lines added to it |
+| kernconf | foundation | string, or heredoc | a string: the kernel config to start from, a name in the src tree (`GENERIC`) or a path in zconfig; a heredoc: config lines added to it |
 | buildopts | foundation | heredoc | make(1) variables, the lines of the src.conf shtetl writes |
 | patches | foundation | keyed by location: {ref, dir} | patch files applied to the src tree before the build (7.1.1) |
 | datasets | all | keyed | child datasets, created before anything is installed |
@@ -585,9 +585,15 @@ dropping what its foundation had.
 | jailconf | container | heredoc | options, inside the jail's block shtetl writes |
 
 shtetl writes the files these go into, whole: the kernel config
-(`include` of `kernconf_file`, then `ident` and the lines), the
-src.conf, and the jail's `NAME { ... }` block in jail.conf. What
-`jailconf` gives twice
+(`include` of kernconf's config, then `ident` and the lines), the
+src.conf, and the jail's `NAME { ... }` block in jail.conf. Whether
+`kernconf` is the config or lines is how it is written: a heredoc is
+lines even when it holds one line, a quoted string always the config
+(the parse keeps libucl's mark of a heredoc, and the start-up check
+refuses a libucl that does not set it). A file gives a key once, so
+a foundation that starts from a config of its own and adds lines
+gives one of the two in a file it imports. What `jailconf` gives
+twice
 (`allow.raw_sockets` in two files) shtetl does not judge: jail(8)
 does.
 
@@ -620,7 +626,7 @@ component, a jail name and a file name (PROPOSAL, Q-W); a dataset
 path takes what ZFS names take (`valid_char`).
 
 Checked after the merge: a foundation has `src_branch`; every `ver`
-holds together; a `kernconf_file` path (one with a `/`) and a
+holds together; a kernconf config's path (one with a `/`) and a
 patches directory in zconfig exist; `requires` names container
 recipes that exist, and not the container itself.
 
@@ -1441,6 +1447,40 @@ below that change the plan are folded into the sections named.
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-12 (simple messages; kernconf one key)
+
+On reading configuration.md's messages:
+
+- "don't have old support type messages like "kernconf no longer
+  supported". We haven't built anything out yet. no old kruft. just
+  keep us clean and at the most recent understanding of the
+  language."
+- On "false drops nothing: the layers stack, and what one gives stays
+  (ruled 2026-10-12)": "This message sucks. just write "dropping
+  values is illegal"."
+- On "pkgs: not a key a recipe takes": "should just be: "pkgs:
+  invalid key". For a valid key but in the wrong conf type just write
+  "kernconf_lines: valid only in foundation recipe". Your error
+  messages should be much more declarative and free of AI writing
+  quirks."
+- "same with kernconf. not a valid key, don't make a special case.
+  nothing exists yet. don't write ruling dates. just be sane and
+  write simple error messages."
+- "(though really, we should just go back to kernconf being: -
+  heredoc -> lines, stackable - string or path -> kernconf file,
+  stacking disallowed. one per stack only. and then the heredoc lines
+  are appended to the autogenerated final file)."
+- "remember. simple simple simple for errors. don't support or talk
+  about or acknowledge legacy opinions."
+
+So: every refusal is the shortest true statement of what is wrong at
+its key path; a key that was removed is an invalid key like any
+other, with no message of its own; and `kernconf` is one key again
+(5.5): a heredoc is lines, which stack, and a string the config to
+start from, given by one file of the stack, the default's overridden
+with a warning. The design sections and configuration.md say what the
+language is, not what it was; this section keeps the history.
 
 ### 2026-10-12 (overrides warn, shtetl.conf checked, a bare major)
 

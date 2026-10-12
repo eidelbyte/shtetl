@@ -26,7 +26,7 @@ enum sh_vt {
 	SH_V_IMPORT,		/* recipes merged in before this file */
 	SH_V_VER,		/* a version constraint */
 	SH_V_STRING,		/* text, a heredoc */
-	SH_V_FILE,		/* a path in the configuration root */
+	SH_V_KERNCONF,		/* a config's name or path, or lines */
 	SH_V_COLL		/* a keyed collection (5.4) */
 };
 
@@ -42,15 +42,16 @@ enum sh_coll {
 };
 
 /*
- * How a key's values from several files come together (ruled
- * 2026-10-12): everything stacks, nothing is dropped or reset, and no
- * file redefines what another gave, but where a ruling says so.
+ * How a key's values from several files come together: everything
+ * stacks, nothing is dropped, and no file redefines what another gave
+ * but the default.
  */
 enum sh_merge {
 	SH_M_LAYERS,		/* import: names layers, is no value */
 	SH_M_ALL,		/* every file's kept, all to hold: ver */
 	SH_M_TEXT,		/* every file's appended, lower first */
 	SH_M_AGREE,		/* one value; files that give it agree */
+	SH_M_KERNCONF,		/* lines appended; one file, once */
 	SH_M_COLL		/* entries stacked, key by key */
 };
 

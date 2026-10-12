@@ -1,6 +1,6 @@
 /*
  * The parse of one file under planning.md 5.3: tests/MATRIX.md family
- * CP, every cell (CP1 - CP25), against whichever libucl is linked.
+ * CP, every cell (CP1 - CP26), against whichever libucl is linked.
  */
 
 #include <sys/types.h>
@@ -108,11 +108,14 @@ test_scalars(void)
 	sh_node_free(n);
 }
 
-/* CP5, CP16: a heredoc is verbatim, and $ is literal everywhere. */
+/*
+ * CP5, CP16, CP26: a heredoc is verbatim, and $ is literal everywhere;
+ * a heredoc is marked as lines, a quoted string is not.
+ */
 static void
 test_verbatim(void)
 {
-	struct sh_node *n;
+	struct sh_node *n, *cp;
 
 	cap_reset(&c);
 	n = P("h = <<EOD\n"
@@ -126,6 +129,19 @@ test_verbatim(void)
 	    "line \\\"one\\\" \\n\n.include \"x\"\n$FOO ${CURDIR}") == 0);
 	CHECK(strcmp(get(n, "a", SH_STR)->sn_str,
 	    "$FOO ${CURDIR} $FILENAME") == 0);
+	CHECK(get(n, "h", SH_STR)->sn_block);
+	CHECK(!get(n, "a", SH_STR)->sn_block);
+	sh_node_free(n);
+
+	/* CP26: one line, alike but for how it is written */
+	n = P("one = <<EOD\nGENERIC\nEOD\ntwo = \"GENERIC\";\n");
+	CHECK(n != NULL);
+	CHECK(get(n, "one", SH_STR)->sn_block);
+	CHECK(!get(n, "two", SH_STR)->sn_block);
+	CHECK(strcmp(get(n, "one", SH_STR)->sn_str, "GENERIC") == 0);
+	cp = sh_node_copy(get(n, "one", SH_STR));
+	CHECK(cp != NULL && cp->sn_block);
+	sh_node_free(cp);
 	sh_node_free(n);
 }
 

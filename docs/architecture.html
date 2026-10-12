@@ -565,8 +565,8 @@ and nothing is dropped or replaced. Every collection
 (<code>pkg</code>, <code>datasets</code>, <code>derivations</code>,
 <code>requires</code>, <code>commands</code>, <code>patches</code>) is
 an object keyed by name, and their union is taken; texts
-(<code>buildopts</code>, <code>kernconf_lines</code>,
-<code>jailconf</code>) are kept a piece from each file; every
+(<code>buildopts</code>, <code>jailconf</code>, the lines of
+<code>kernconf</code>) are kept a piece from each file; every
 <code>ver</code> must hold. What one file gives, another does not
 give again, except a dataset's property, which may be overridden with
 a warning. The default is the one layer a recipe may override: it

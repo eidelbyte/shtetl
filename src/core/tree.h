@@ -52,6 +52,7 @@ struct sh_obj {
 struct sh_node {
 	enum sh_type	sn_type;
 	const char	*sn_from;	/* the layer that set the value */
+	int		sn_block;	/* a string written as lines */
 	union {
 		int		snu_bool;
 		int64_t		snu_int;

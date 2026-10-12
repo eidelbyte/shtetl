@@ -4,7 +4,15 @@ ver = [
     ">=15.1",  # shtetl.conf
     ">=15"  # foundations/generic.conf
 ]
-kernconf_file = "GENERIC";  # foundations/generic.conf, over shtetl.conf
+kernconf {
+    file = "GENERIC";  # shtetl.conf
+    lines {
+        "foundations/generic.conf" = <<EOD
+nooptions INVARIANTS
+nooptions WITNESS
+EOD
+    }
+}
 pkg {
     sudo = true;  # shtetl.conf
     tmux = true;  # shtetl.conf
@@ -17,12 +25,6 @@ datasets {
     }
 }
 src_branch = "releng/15.1";  # foundations/generic.conf
-kernconf_lines {
-    "foundations/generic.conf" = <<EOD
-nooptions INVARIANTS
-nooptions WITNESS
-EOD
-}
 buildopts {
     "foundations/generic.conf" = <<EOD
 WITHOUT_LIB32=yes

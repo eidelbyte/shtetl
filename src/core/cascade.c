@@ -19,12 +19,12 @@
  * warning); a derivation is given whole, in one file; a commands
  * block's texts stack, a piece from each file. Every file's ver is
  * kept, to hold together, and the ranges they allow must meet;
- * buildopts and kernconf_lines and jailconf append, a piece from each
- * file, lower layers first; src_branch and kernconf_file, one value,
- * may be given again only alike. A recipe takes from the default only
- * its kind's keys, and what would redefine the default's value
- * overrides it instead (ruled 2026-10-12). A key keeps the place where
- * it was first added, so a commands block runs where it was first
+ * buildopts, jailconf and kernconf's lines append, a piece from each
+ * file, lower layers first; src_branch, one value, may be given again
+ * only alike, and kernconf's file is given by one file. A recipe takes
+ * from the default only its kind's keys, and what would redefine the
+ * default's value overrides it instead. A key keeps the place where it
+ * was first added, so a commands block runs where it was first
  * defined.
  */
 
@@ -475,26 +475,67 @@ mg_append(struct mg *m, const char *key, struct sh_node *v)
 		m->mg_nomem = 1;
 }
 
+/* The object KEY of OBJ, made there if it is not yet. */
+static struct sh_node *
+mg_obj(struct mg *m, struct sh_node *obj, const char *key)
+{
+	struct sh_node *o;
+
+	if ((o = sh_obj_get(obj, key)) != NULL)
+		return (o);
+	if ((o = sh_node_new(SH_OBJECT, m->mg_l->sl_file)) == NULL ||
+	    sh_obj_set(obj, key, o, m->mg_l->sl_file) != 0) {
+		m->mg_nomem = 1;
+		return (NULL);
+	}
+	return (o);
+}
+
 /*
- * A piece of text (buildopts, kernconf_lines, jailconf) from this
- * layer onto the key KEY: an object of its pieces, each keyed by the
- * file that gives it, lower files first, a file giving one.
+ * A piece of text (buildopts, jailconf, kernconf's lines) from this
+ * layer onto the key KEY of OBJ: an object of its pieces, each keyed
+ * by the file that gives it, lower files first, a file giving one.
  */
 static void
-mg_text(struct mg *m, const char *key, const struct sh_node *v)
+mg_text(struct mg *m, struct sh_node *obj, const char *key,
+    const struct sh_node *v)
 {
 	struct sh_node *text;
 
-	text = sh_obj_get(m->mg_r->sr_merged, key);
-	if (text == NULL) {
-		if ((text = sh_node_new(SH_OBJECT, m->mg_l->sl_file)) == NULL ||
-		    sh_obj_set(m->mg_r->sr_merged, key, text,
-		    m->mg_l->sl_file) != 0) {
-			m->mg_nomem = 1;
-			return;
-		}
+	if ((text = mg_obj(m, obj, key)) != NULL)
+		mg_set(m, text, m->mg_l->sl_file, v);
+}
+
+/*
+ * kernconf, merged as { file; lines { FILE = TEXT; ... } }: lines, a
+ * heredoc, stack, a piece from each file; a string is the config they
+ * are added to, given by one file of the stack, the default's being
+ * overridden with a warning.
+ */
+static void
+mg_kernconf(struct mg *m, const struct sh_node *v)
+{
+	struct sh_node *kc;
+	const struct sh_pair *have;
+
+	if ((kc = mg_obj(m, m->mg_r->sr_merged, "kernconf")) == NULL)
+		return;
+	if (v->sn_block) {
+		mg_text(m, kc, "lines", v);
+		return;
 	}
-	mg_set(m, text, m->mg_l->sl_file, v);
+	have = sh_obj_find(kc, "file");
+	if (have != NULL && !mg_default(m, have->pr_val)) {
+		sh_err_at(m->mg_err, m->mg_l->sl_file, &m->mg_path,
+		    "already defined in %s", have->pr_val->sn_from);
+		return;
+	}
+	if (have != NULL && m->mg_warn != NULL &&
+	    !sh_node_equal(have->pr_val, v))
+		sh_err_at(m->mg_warn, m->mg_l->sl_file, &m->mg_path,
+		    "%s overrides %s from %s", mg_said(v),
+		    mg_said(have->pr_val), have->pr_val->sn_from);
+	mg_set(m, kc, "file", v);
 }
 
 /* One layer into the merged recipe. */
@@ -535,7 +576,11 @@ mg_layer(struct mg *m)
 				    sh_node_copy(pr->pr_val->sn_arr.ar_v[j]));
 			break;
 		case SH_M_TEXT:
-			mg_text(m, rk->rk_name, pr->pr_val);
+			mg_text(m, m->mg_r->sr_merged, rk->rk_name,
+			    pr->pr_val);
+			break;
+		case SH_M_KERNCONF:
+			mg_kernconf(m, pr->pr_val);
 			break;
 		case SH_M_AGREE:
 			have = sh_obj_find(m->mg_r->sr_merged, rk->rk_name);
@@ -614,11 +659,11 @@ ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
 	if (r->sr_kind == SH_FOUNDATION &&
 	    sh_obj_get(merged, "src_branch") == NULL)
 		sh_errf(e, "%s: missing src_branch", r->sr_file);
-	/* kernconf_file: a name is the src tree's, a path zconfig's */
-	if ((v = sh_obj_get(merged, "kernconf_file")) != NULL &&
-	    strchr(v->sn_str, '/') != NULL &&
+	/* kernconf's file: a name is the src tree's, a path zconfig's */
+	if ((v = sh_obj_get(sh_obj_get(merged, "kernconf"), "file")) !=
+	    NULL && strchr(v->sn_str, '/') != NULL &&
 	    sh_root_kind(root, v->sn_str) != 'f') {
-		(void) sh_path_push(&path, "kernconf_file");
+		(void) sh_path_push(&path, "kernconf");
 		sh_err_at(e, v->sn_from, &path, "%s: no such file",
 		    v->sn_str);
 		sh_path_pop(&path, 0);

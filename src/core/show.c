@@ -13,9 +13,9 @@
  * own that ends with its layer. Not on a line above: libucl 0.9.4
  * reads a comment between [ and the first value as a part of that
  * value, quotes and all (tried; a comment after a value and its comma
- * it reads as a comment). A text that stacks (buildopts,
- * kernconf_lines, jailconf, a commands block) is an object of pieces
- * keyed by their files, which says their layers itself.
+ * it reads as a comment). A text that stacks (buildopts, jailconf,
+ * kernconf's lines, a commands block) is an object of pieces keyed by
+ * their files, which says their layers itself.
  *
  * A string with a newline in it is printed as a heredoc, by libucl
  * 0.9.4's rules (ucl_parse_multiline_string): the opening <<TERM ends
@@ -265,11 +265,12 @@ sw_body(struct sw *w, const struct sh_node *obj, int depth)
 void
 sh_show_recipe(FILE *out, const struct sh_recipe *r)
 {
+	const struct sh_pair *pr;
+	const struct sh_rkey *rk;
 	struct sw w;
 	size_t i;
 
 	w.sw_out = out;
-	w.sw_entries = 1;
 	(void) fprintf(out, "# %s: a %s's recipe, its layers merged\n",
 	    r->sr_file, sh_kind_name(r->sr_kind));
 	(void) fprintf(out, "# layers, nearest last:");
@@ -277,7 +278,13 @@ sh_show_recipe(FILE *out, const struct sh_recipe *r)
 		(void) fprintf(out, "%s %s", i > 0 ? "," : "",
 		    r->sr_layers[i].sl_file);
 	(void) fputc('\n', out);
-	sw_body(&w, r->sr_merged, 0);
+	/* a collection's entries carry their layers, nothing else's */
+	for (i = 0; i < r->sr_merged->sn_obj.ob_n; i++) {
+		pr = &r->sr_merged->sn_obj.ob_v[i];
+		rk = sh_rkey(pr->pr_key);
+		w.sw_entries = rk != NULL && rk->rk_merge == SH_M_COLL ? 1 : -1;
+		sw_pair(&w, pr, 0);
+	}
 }
 
 void
