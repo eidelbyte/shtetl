@@ -1,0 +1,116 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+P15 source: /usr/src, 16.0-CURRENT 8f02ff221666
+P15 older release: /var/cache/shtetl-probes/15.0-RELEASE-base.txz
+# zfs create shprun/foundations/F
+# zfs create -o canmount=off shprun/foundations/F/usr
+# zfs create shprun/foundations/F/usr/local
+# zfs create shprun/foundations/F/var
+# tar -xpf /var/cache/shtetl-probes/15.0-RELEASE-base.txz -C /tmp/shtetl-probe/run/foundations/F
+-> exit 0 in 3.54s
+# zfs snapshot -r -o shtetl:kind=version shprun/foundations/F@old
+# zfs clone shprun/foundations/F@old shprun/containers/X
+# zfs clone -o canmount=off shprun/foundations/F/usr@old shprun/containers/X/usr
+# zfs clone shprun/foundations/F/usr/local@old shprun/containers/X/usr/local
+# zfs clone shprun/foundations/F/var@old shprun/containers/X/var
+# pw -R /tmp/shtetl-probe/run/containers/X useradd probe -m -c 'probe user' -s /bin/sh
+# zfs snapshot -r -o shtetl:kind=save -o 'shtetl:commit=a user, hosts, rc.conf' shprun/containers/X@s1
+# make -C /usr/src installworld DESTDIR=/tmp/shtetl-probe/run/foundations/F  >P15-new-installworld.log
+-> exit 0 in 43.43s
+# make -C /usr/src distribution DESTDIR=/tmp/shtetl-probe/run/foundations/F  >P15-new-distribution.log
+-> exit 0 in 13.45s
+P15 new: installworld and distribution in 56.88s
+# make -C /usr/src delete-old DESTDIR=/tmp/shtetl-probe/run/foundations/F BATCH_DELETE_OLD_FILES=yes >P15-new-delete-old.log
+-> exit 0 in 0.58s
+# make -C /usr/src delete-old-libs DESTDIR=/tmp/shtetl-probe/run/foundations/F BATCH_DELETE_OLD_FILES=yes >P15-new-delete-old-libs.log
+-> exit 0 in 0.12s
+# zfs snapshot -r -o shtetl:kind=version shprun/foundations/F@new
+P15 send -i F@old F@new: 1745.0 MiB
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261012T025426Z/P15-update-root.manifest --from shprun/containers/X@s1 --onto shprun/foundations/F@new --result shprun/containers/X-staging
+zfs_rebase: the base is shprun/foundations/F@old
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261012T025426Z/P15-update-root.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d5989939019c
+zfs_rebase: 21878 pools unchanged
+zfs_rebase: 26540518 bytes compared
+zfs_rebase: applied 0 rm 0 ln 10 cp 0 dup 5 write, 90420 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: 1 conflict; the clean actions are applied and shprun/containers/X-staging waits at conflicts
+zfs_rebase: 1 name unanswered in the resolution /home/miri/shtetl/probes/results/KIDON-20261012T025426Z/P15-update-root.manifest.resolution
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261012T025426Z/P15-update-root.manifest
+zfs_rebase: shprun/containers/X-staging is kept; zfs_rebase --continue shprun/containers/X-staging resumes it; zfs_rebase --abort shprun/containers/X-staging removes it
+-> exit 1 in 2.92s
+P15 update /: exit 1, 2.92s, 26540518 bytes compared, 21878 pools unchanged, 1 conflicted names
+# cat /home/miri/shtetl/probes/results/KIDON-20261012T025426Z/P15-update-root.manifest.resolution
+#rebase-resolution 5
+#base shprun/foundations/F@old 9231019492808604262
+#from shprun/containers/X@s1 10605512349848187071
+#onto shprun/foundations/F@new 14874464899354021231
+#mode strict
+#names 1
+#unanswered 1
+/
+    etc/
+        group conflict 1 -
+        ..
+    ..
+# zfs clone -o canmount=off shprun/foundations/F/usr@new shprun/containers/X-staging/usr
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261012T025426Z/P15-update-usr-local.manifest --from shprun/containers/X/usr/local@s1 --onto shprun/foundations/F/usr/local@new --result shprun/containers/X-staging/usr/local
+zfs_rebase: the base is shprun/foundations/F/usr/local@old
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261012T025426Z/P15-update-usr-local.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d598993f01b2
+zfs_rebase: 1 pools unchanged
+zfs_rebase: 0 bytes compared
+zfs_rebase: applied 0 rm 0 ln 2 cp 0 dup 0 write, 4 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-staging/usr/local is at applying1, held under zr-d598993f01b2
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-staging/usr/local: the manifest, 2 actions
+zfs_rebase:   done 2, first /etc
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-staging/usr/local is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-staging/usr/local or zfs set mountpoint=PATH shprun/containers/X-staging/usr/local
+zfs_rebase: released zr-d598993f01b2 on shprun/foundations/F/usr/local@old
+zfs_rebase: released zr-d598993f01b2 on shprun/containers/X/usr/local@s1
+zfs_rebase: released zr-d598993f01b2 on shprun/foundations/F/usr/local@new
+zfs_rebase: the record is off shprun/containers/X-staging/usr/local
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-staging/usr/local
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261012T025426Z/P15-update-usr-local.manifest
+-> exit 0 in 1.07s
+P15 update /usr/local: exit 0, 1.07s, 0 bytes compared, 1 pools unchanged, 0 conflicted names
+# zfs_rebase -v -o /home/miri/shtetl/probes/results/KIDON-20261012T025426Z/P15-update-var.manifest --from shprun/containers/X/var@s1 --onto shprun/foundations/F/var@new --result shprun/containers/X-staging/var
+zfs_rebase: the base is shprun/foundations/F/var@old
+zfs_rebase: /home/miri/shtetl/probes/results/KIDON-20261012T025426Z/P15-update-var.manifest carries this rebase's header; the decision goes over it
+zfs_rebase: the inputs are held under zr-d598994101c3
+zfs_rebase: 963 pools unchanged
+zfs_rebase: 4195840 bytes compared
+zfs_rebase: applied 0 rm 0 ln 2 cp 0 dup 0 write, 6 bytes
+zfs_rebase: put back 0 restored, 0 removed, 0 relinked
+zfs_rebase: shprun/containers/X-staging/var is at applying1, held under zr-d598994101c3
+zfs_rebase: the final check reads the three trees this run walked
+zfs_rebase: shprun/containers/X-staging/var: the manifest, 2 actions
+zfs_rebase:   done 2, first /log/messages
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: shprun/containers/X-staging/var is the rebased tree, unmounted; place it with zfs inherit mountpoint shprun/containers/X-staging/var or zfs set mountpoint=PATH shprun/containers/X-staging/var
+zfs_rebase: released zr-d598994101c3 on shprun/foundations/F/var@old
+zfs_rebase: released zr-d598994101c3 on shprun/containers/X/var@s1
+zfs_rebase: released zr-d598994101c3 on shprun/foundations/F/var@new
+zfs_rebase: the record is off shprun/containers/X-staging/var
+zfs_rebase: removed /var/db/zfs_rebase/shprun/containers/X-staging/var
+zfs_rebase: the manifest is /home/miri/shtetl/probes/results/KIDON-20261012T025426Z/P15-update-var.manifest
+-> exit 0 in 1.02s
+P15 update /var: exit 0, 1.02s, 4195840 bytes compared, 963 pools unchanged, 0 conflicted names
+P15 answer: across the release: rebase 5.01s, 1 conflicted names (the resolutions are P15-update-*.manifest.resolution), 0 failed; the foundation's incremental is 1745.0 MiB

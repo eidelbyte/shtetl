@@ -1,0 +1,146 @@
+# zfs set shtetl:space=run shprun
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/foundations shprun/foundations
+# zfs create -o mountpoint=/tmp/shtetl-probe/run/containers -o canmount=on shprun/containers
+P6 source: /usr/src, 16.0-CURRENT 8f02ff221666
+P6 older release: /var/cache/shtetl-probes/15.0-RELEASE-base.txz
+# zfs create shprun/foundations/F
+# zfs create -o canmount=off shprun/foundations/F/usr
+# zfs create shprun/foundations/F/usr/local
+# zfs create shprun/foundations/F/var
+# tar -xpf /var/cache/shtetl-probes/15.0-RELEASE-base.txz -C /tmp/shtetl-probe/run/foundations/F
+-> exit 0 in 3.64s
+# zfs snapshot -r shprun/foundations/F@old
+# make -C /usr/src installworld DESTDIR=/tmp/shtetl-probe/run/foundations/F  >P6-new-installworld.log
+-> exit 0 in 43.94s
+# make -C /usr/src distribution DESTDIR=/tmp/shtetl-probe/run/foundations/F  >P6-new-distribution.log
+-> exit 0 in 13.45s
+P6 new: installworld and distribution in 57.39s
+# make -C /usr/src delete-old DESTDIR=/tmp/shtetl-probe/run/foundations/F BATCH_DELETE_OLD_FILES=yes >P6-new-delete-old.log
+-> exit 0 in 0.58s
+# make -C /usr/src delete-old-libs DESTDIR=/tmp/shtetl-probe/run/foundations/F BATCH_DELETE_OLD_FILES=yes >P6-new-delete-old-libs.log
+-> exit 0 in 0.12s
+# zfs snapshot -r shprun/foundations/F@new
+# make -C /usr/src check-old DESTDIR=/tmp/shtetl-probe/run/foundations/F  >P6-new-check-old.log
+-> exit 0 in 0.32s
+# zfs create shprun/foundations/H
+# zfs create -o canmount=off shprun/foundations/H/usr
+# zfs create shprun/foundations/H/usr/local
+# zfs create shprun/foundations/H/var
+# make -C /usr/src installworld DESTDIR=/tmp/shtetl-probe/run/foundations/H  >P6-fresh-installworld.log
+-> exit 0 in 43.65s
+# make -C /usr/src distribution DESTDIR=/tmp/shtetl-probe/run/foundations/H  >P6-fresh-distribution.log
+-> exit 0 in 13.45s
+P6 fresh: installworld and distribution in 57.1s
+# zfs snapshot -r shprun/foundations/H@fresh
+== what remains, by directory
+   429 /var/db
+    56 /etc/ssl
+    20 /usr/share
+     6 /usr/lib
+     4 /usr/include
+     4 /boot
+     2 /libexec
+     1 /usr/tests
+     1 /sys
+     1 /sbin
+/boot/loader.kboot.old
+/boot/loader_4th.old
+/boot/loader_lua.old
+/boot/loader_simp.old
+/etc/ssl/certs/228f89db.0
+/etc/ssl/certs/2b349938.0
+/etc/ssl/certs/4fd49c6c.0
+/etc/ssl/certs/5cd81ad7.0
+/etc/ssl/certs/653b494a.0
+/etc/ssl/certs/706f604c.0
+/etc/ssl/certs/81f2d2b1.0
+/etc/ssl/certs/8312c4c1.0
+/etc/ssl/certs/8d86cdd1.0
+/etc/ssl/certs/93bc0acc.0
+/etc/ssl/certs/9b5697b0.0
+/etc/ssl/certs/9c8dfbd4.0
+/etc/ssl/certs/b66938e9.0
+/etc/ssl/certs/b727005e.0
+/etc/ssl/certs/ba8887ce.0
+/etc/ssl/certs/d887a5bb.0
+/etc/ssl/certs/f249de83.0
+/etc/ssl/certs/f39fc864.0
+/etc/ssl/certs/fa5da96b.0
+/etc/ssl/untrusted/08063a00.0
+/etc/ssl/untrusted/0c4c9b6c.0
+/etc/ssl/untrusted/116bf586.0
+/etc/ssl/untrusted/128805a3.0
+/etc/ssl/untrusted/1320b215.0
+/etc/ssl/untrusted/1636090b.0
+/etc/ssl/untrusted/18856ac4.0
+/etc/ssl/untrusted/26312675.0
+/etc/ssl/untrusted/2e4eed3c.0
+/etc/ssl/untrusted/349f2832.0
+/etc/ssl/untrusted/3e44d2f7.0
+/etc/ssl/untrusted/4304c5e5.0
+/etc/ssl/untrusted/480720ec.0
+/etc/ssl/untrusted/4d4ba017.0
+/etc/ssl/untrusted/57bcb2da.0
+/etc/ssl/untrusted/5a7722fb.0
+/etc/ssl/untrusted/5d3033c5.0
+/etc/ssl/untrusted/62744ee1.0
+/etc/ssl/untrusted/6410666e.0
+/etc/ssl/untrusted/66445960.0
+/etc/ssl/untrusted/7aaf71c0.0
+/etc/ssl/untrusted/7d0b38bd.0
+/etc/ssl/untrusted/8867006a.0
+/etc/ssl/untrusted/a8dee976.0
+/etc/ssl/untrusted/ad088e1d.0
+/etc/ssl/untrusted/b204d74a.0
+/etc/ssl/untrusted/ba89ed3b.0
+/etc/ssl/untrusted/c01cdfa2.0
+/etc/ssl/untrusted/c089bbbd.0
+/etc/ssl/untrusted/c0ff1f52.0
+/etc/ssl/untrusted/c47d9980.0
+/etc/ssl/untrusted/cb59f961.0
+/etc/ssl/untrusted/dc45b0bd.0
+/etc/ssl/untrusted/def36a68.0
+/etc/ssl/untrusted/e2799e36.0
+/etc/ssl/untrusted/ee1365c0.0
+/etc/ssl/untrusted/f90208f7.0
+/libexec/ld-elf.so.1.old
+/libexec/ld-elf32.so.1.old
+/sbin/init.bak
+/sys
+/usr/include/machine/_align.h
+/usr/include/openssl/conf_api.h
+/usr/include/thread_pool_impl.h
+/usr/include/x86/_align.h
+/usr/lib/lib9p.a
+/usr/lib/lib9p.so
+/usr/lib/libkrb5profile.a
+/usr/lib/libprivateclang.so.19
+/usr/lib/libprivatelldb.so.19
+/usr/lib/libprivatellvm.so.19
+/usr/share/examples/sound/oss
+/usr/share/examples/sound/oss/README
+/usr/share/examples/sound/oss/audio.c
+/usr/share/man/man1/ar.1.gz
+/usr/share/man/man1/c++filt.1.gz
+/usr/share/man/man1/gcov.1.gz
+/usr/share/man/man1/nm.1.gz
+/usr/share/man/man1/objcopy.1.gz
+/usr/share/man/man1/ranlib.1.gz
+/usr/share/man/man1/strip.1.gz
+/usr/share/man/man4/aw_gpio.4.gz
+/usr/share/man/man4/aw_mmc.4.gz
+/usr/share/man/man4/aw_rtc.4.gz
+/usr/share/man/man4/aw_sid.4.gz
+/usr/share/man/man4/aw_spi.4.gz
+/usr/share/man/man4/aw_syscon.4.gz
+/usr/share/man/man4/i386/perfmon.4.gz
+/usr/share/man/man4/if_le.4.gz
+/usr/share/man/man8/ipfs.8.gz
+/usr/share/man/man9/vm_page_try_to_free.9.gz
+/usr/tests/cddl/lib/libtpool
+/var/db/etcupdate
+/var/db/etcupdate/current
+/var/db/etcupdate/current/COPYRIGHT
+/var/db/etcupdate/current/boot
+/var/db/etcupdate/current/boot/device.hints
+P6 answer: 524 paths remain that a fresh install does not have (P6-remains.txt; most in /var/db (429), /etc/ssl (56), /usr/share (20)); 0 paths a fresh install has are missing (P6-missing.txt)
