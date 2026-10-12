@@ -114,3 +114,35 @@ Not yet verified, or not built:
 - The default is loaded first, so a file shtetl.conf imports stays
   the default's even when a recipe imports it again (each file merges
   once, at its first place).
+
+## Later the same day: Q-AD ruled, and the configuration reference
+
+| commit | unit |
+|--------|------|
+| 28681db | Q-AD ruled ("1: sounds good 2: give warning for all layers including default 3: agreed"): a dataset property's override warns over the default's value too; the default's imports and its stacking `ver` stay as built |
+| 28bd341 | the header comments of cascade.c, schema.c, show.c and tree.h brought up to the rulings: they still spoke of default.conf, buildopts_file, derivations completed across files and the drop rule |
+| 96eaa0b | docs/configuration.md, every setting and recipe key with run examples; tools/doccheck.py and `make doc`, part of `make check` |
+
+- **Q-AD**: `mg_entry` drops its `mg_default` test before the
+  warning; the other overrides of the default stay without a word, as
+  the ruling was about dataset properties. CC32 now expects the
+  warning. The second item above supersedes "an override of a
+  default's dataset property gives no warning" in the decisions
+  earlier in this log.
+- **The reference's examples are run.** Each `<!-- example: NAME -->`
+  starts an empty root; each ucl block whose first line is
+  `# PATH.conf` is that file; each console block's `$ shtetl ...`
+  runs with `-C` the root, standard error and output together, and
+  `$ echo $?` shows the exit status. `--update` writes the outputs in;
+  every one was read against the prose before the commit. A changed
+  message makes `make check` fail, naming the example and the line.
+- Writing it turned up one thing the plan does not say: a recipe's
+  resolve checks shtetl.conf's recipe keys but not its settings, so
+  `config show containers/x` resolves with a refused setting, which
+  `config show`, `spaces` and `bootstrap` refuse. The reference shows
+  it as it is; whether a recipe should be refused too is the user's
+  call.
+
+Verification: make check (the 8 suites, 21 command-line cases, 33
+doc commands), make gate clean. doccheck run on a copy with one
+output changed: it failed, naming entries, line 819.
