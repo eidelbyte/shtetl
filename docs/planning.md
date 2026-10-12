@@ -478,7 +478,8 @@ override:
 - What stacks, stacks with the default too: its `ver`, `pkg`,
   datasets, texts and commands reach every recipe of the kinds that
   take them. To be rid of one, the site takes it out of shtetl.conf.
-- The files shtetl.conf imports are of the default as well.
+- The files shtetl.conf imports are of the default as well, and hold
+  recipe keys only.
 
 Every collection is an object keyed by its element's identity:
 
@@ -549,9 +550,11 @@ As built (M1, revised 2026-10-12, `src/core/cascade.c`):
   Q-U). A file shtetl.conf imports stays of the default when a
   recipe imports it again.
 - `true` over an entry with fields leaves the fields.
-- The files of the default are checked as files of any kind; every
-  other file against the recipe's kind, so a key only a foundation
-  takes is refused in a container's files.
+- shtetl.conf is checked whole, its settings too, wherever it is
+  read, a recipe's resolve included (ruled 2026-10-12); the files it
+  imports as files of any kind, holding no settings; every other file
+  against the recipe's kind, so a key only a foundation takes is
+  refused in a container's files.
 - Every file is read and checked before anything merges, so one run
   reports the problems of all of them.
 - The warnings go to stderr, apart from what `config show` prints.
@@ -1454,6 +1457,9 @@ So:
   replaces and its file: a one-value key, a derivation, a field, a
   dataset property. The default's value given again alike is no
   override.
+- (5.4) shtetl.conf is checked whole, its settings too, wherever it
+  is read: a refused setting refuses every recipe, not only `config
+  show`, `spaces` and `bootstrap`.
 
 ### 2026-10-12 (Q-AD: the default's edges)
 

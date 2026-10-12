@@ -655,6 +655,34 @@ test_default(void)
 	CHECK(M("jailconf") == NULL);
 }
 
+/*
+ * CC35: shtetl.conf is checked whole wherever it is read (ruled
+ * 2026-10-12): a refused setting refuses every recipe, and a file
+ * shtetl.conf imports holds no settings.
+ */
+static void
+test_site_checked(void)
+{
+	static const char *const sc[] = {
+		"shtetl.conf", "build { make_jobs = -1; }\n"
+		"pkg = [ \"sudo\" ];\n",
+		"containers/x.conf", "pkg = [ \"nginx\" ];\n",
+		NULL
+	};
+	static const char *const si[] = {
+		"shtetl.conf", "import = \"common/site.conf\";\n",
+		"common/site.conf", "retention { run = 10; }\n",
+		"containers/x.conf", "pkg = [ \"nginx\" ];\n",
+		NULL
+	};
+
+	refused(mkroot("sc", sc), "containers/x", "shtetl.conf: "
+	    "build.make_jobs: a count is 0 or more, not -1");
+	CHECK(r.sr_merged == NULL);
+	refused(mkroot("si", si), "containers/x", "common/site.conf: "
+	    "retention: not a key a recipe takes");
+}
+
 /* CC25: patch sources across layers keep their first place. */
 static void
 test_patches(void)
@@ -696,6 +724,7 @@ main(void)
 	test_layer_errors();
 	test_patches();
 	test_default();
+	test_site_checked();
 	sh_recipe_free(&r);
 	cap_close(&wc);
 	cap_close(&c);

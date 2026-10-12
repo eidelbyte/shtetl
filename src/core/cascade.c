@@ -4,10 +4,11 @@
  * Loading: every layer is parsed and checked against the target's
  * kind before anything merges, and a refused layer does not stop the
  * others from being read, so one run reports every layer's problems.
- * The default comes first: shtetl.conf and what it imports, checked
- * as files of any kind. "import" is followed in every layer, the
- * default's included: a file's imports merge before it, each recipe
- * once, at the first place it is reached. A cycle is refused.
+ * The default comes first: shtetl.conf, checked whole, its settings
+ * too, and what it imports, checked as files of any kind. "import"
+ * is followed in every layer, the default's included: a file's
+ * imports merge before it, each recipe once, at the first place it
+ * is reached. A cycle is refused.
  *
  * Merging, layer by layer, with everything stacking (ruled
  * 2026-10-12): nothing is dropped and nothing reset, and no file
@@ -36,6 +37,7 @@
 #include "core/parse.h"
 #include "core/root.h"
 #include "core/schema.h"
+#include "core/site.h"
 #include "core/syntax.h"
 #include "core/tree.h"
 
@@ -172,6 +174,7 @@ ld_load(struct ld *x, const char *name, const char *from,
 	struct sh_node *tree;
 	char *file;
 	size_t i;
+	unsigned n;
 	int missing;
 
 	if (ld_has(x->ld_r, name))
@@ -204,9 +207,18 @@ ld_load(struct ld *x, const char *name, const char *from,
 		free(file);
 		return (0);
 	}
-	if ((x->ld_default ? sh_schema_default(tree, file,
-	    strcmp(file, cascade_default) == 0, x->ld_err) :
-	    sh_schema_recipe(tree, x->ld_r->sr_kind, file, x->ld_err)) != 0)
+	/*
+	 * shtetl.conf is checked whole, its settings too, wherever it is
+	 * read (ruled 2026-10-12); the rest of the default as files of
+	 * any kind, and every other file as one of the recipe's kind.
+	 */
+	if (x->ld_default && strcmp(file, cascade_default) == 0)
+		n = sh_site_check(tree, file, x->ld_err);
+	else if (x->ld_default)
+		n = sh_schema_default(tree, file, 0, x->ld_err);
+	else
+		n = sh_schema_recipe(tree, x->ld_r->sr_kind, file, x->ld_err);
+	if (n != 0)
 		x->ld_failed = 1;
 	x->ld_stack[x->ld_depth++] = file;
 	if (ld_imports(x, file, tree) != 0) {

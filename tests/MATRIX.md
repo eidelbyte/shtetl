@@ -178,6 +178,7 @@ spelling.
 | CC32 | what a recipe gives again of the default's one-value keys, derivations, entries' fields and dataset properties overrides it, each with a warning naming the value replaced and its file; the default's value given again alike is no override and warns nothing (ruled 2026-10-12) | covered: check_cascade.c test_default; run-cli.sh cl4-generic (GENERIC again, alike) |
 | CC33 | what stacks, stacks with the default: pkg, ver, text, commands | covered: check_cascade.c test_default |
 | CC34 | the files shtetl.conf imports are of the default too | covered: check_cascade.c test_default |
+| CC35 | shtetl.conf is checked whole wherever it is read: a refused setting refuses a recipe's resolve, naming the setting; a file shtetl.conf imports holds no settings (ruled 2026-10-12) | covered: check_cascade.c test_site_checked; configuration.md, example settings-refused |
 
 ## CW: what config show prints (src/core/show.c)
 

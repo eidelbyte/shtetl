@@ -259,10 +259,9 @@ shtetl: shtetl.conf: retention.run: expected a count or a quoted interval, not a
 shtetl: shtetl.conf: retention.lake: not a key of retention: it takes run, archive
 ```
 
-The settings are checked by the commands that read them: `config
-show` with no recipe, `spaces` and `bootstrap` now, the builds when
-they come. A recipe reads shtetl.conf as its default and checks its
-recipe keys, not its settings, so it still resolves:
+shtetl.conf is checked whole wherever it is read (ruled 2026-10-12),
+so a refused setting refuses every recipe too, each recipe reading
+shtetl.conf as its default:
 
 ```ucl
 # containers/x.conf
@@ -271,11 +270,13 @@ pkg = [ "nginx" ];
 
 ```console
 $ shtetl config show containers/x
-# containers/x.conf: a container's recipe, its layers merged
-# layers, nearest last: shtetl.conf, containers/x.conf
-pkg {
-    nginx = true;  # containers/x.conf
-}
+shtetl: shtetl.conf: spaces.lake.default: not a dataset's name: a pool's name begins with a letter
+shtetl: shtetl.conf: properties.default.mountpoint: not a property the configuration may set: shtetl sets it itself
+shtetl: shtetl.conf: properties.default.recordsize: expected a string, or true or false, not an integer: quote it
+shtetl: shtetl.conf: build.make_jobs: a count is 0 or more, not -1
+shtetl: shtetl.conf: update.suffix: not a name: it takes only letters, digits, '-' and '_'
+shtetl: shtetl.conf: retention.run: expected a count or a quoted interval, not a number: unquoted, UCL reads 30d as seconds; quote it, "30d"
+shtetl: shtetl.conf: retention.lake: not a key of retention: it takes run, archive
 ```
 
 ## 4. Recipe keys
@@ -1036,7 +1037,8 @@ The default is the one file a recipe may override:
   texts and commands reach every recipe of the kinds that take them.
   A recipe cannot take them away; to be rid of one, take it out of
   shtetl.conf.
-- The files shtetl.conf imports are the default's too.
+- The files shtetl.conf imports are the default's too. They hold
+  recipe keys only: the settings are shtetl.conf's own.
 
 <!-- example: default -->
 
