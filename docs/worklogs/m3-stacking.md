@@ -146,3 +146,39 @@ Not yet verified, or not built:
 Verification: make check (the 8 suites, 21 command-line cases, 33
 doc commands), make gate clean. doccheck run on a copy with one
 output changed: it failed, naming entries, line 819.
+
+## Later still: three rulings on the reference's questions
+
+"1. yes, all should warn. 2. shtetl.conf should be checked for
+correctness in its own right 3. =15 matches 15.x"
+
+| commit | unit |
+|--------|------|
+| c3fee4d | every override of the default warns: src_branch, kernconf_file and a derivation joined the dataset property and the entry's field |
+| 650729d | shtetl.conf is checked whole wherever it is read: the loader checks it with sh_site_check, so a refused setting refuses every recipe; MATRIX CC35 |
+| 7458ef9 | in ver a bare major is every minor of it: =15 is any 15.x, <=15 takes 15.x, >15 begins at 16.0; MATRIX CC36 |
+| 272a413 | MATRIX CK3 and CC26 named buildopts_file and kernconf still; text only |
+
+- **A correction.** 28681db's message, and the reference as first
+  written, said the default's other overrides stayed silent. An
+  entry's field over the default's (a patch's `ref`) warned from
+  28681db on, since that commit dropped the default test from the
+  branch every field goes through; test_default did not look at the
+  warnings of the foundation it resolved. It looks at all five kinds
+  of override now. The lesson for the next test of a rule with
+  exceptions: count the warnings of every resolve, not only the one
+  the change was about.
+- **ver.** The ruling named `=`; `<=` and `>` follow the same
+  principle, a bare N naming every N.x, so `>15` is 16.0 and later.
+  That turned test_ver's case e (`>=15`, `<=15.1`, `>15`) from
+  resolving to refused. If `>15` should mean "after 15.0", it is the
+  `case 3` of sh_ver_range alone.
+- **Gotcha, again**: a Python heredoc that writes C must be raw
+  (`r'''...'''`), or `\n` lands in the source as a newline. And a
+  command chain with `;` after the gate commits whatever the gate
+  says; 650729d was amended before any push to fix a long line the
+  gate had refused.
+
+Verification: make check (8 suites, check_cascade 250 checks; 21
+command-line cases; 35 doc commands in 14 examples), make gate
+clean, xcheck below.
