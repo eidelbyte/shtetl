@@ -139,6 +139,12 @@ test_strings(void)
 	bad("ver = 15.1;", C, "ver: must be a quoted string");
 	bad("jailconf = [ \"a\" ];", C, "jailconf: must be a string");
 	bad("src_branch = \"\";", F, "src_branch: empty");
+	/* CK23 */
+	ok("src_branch = \"stable/15\";", F);
+	ok("src_branch = \"main\";", F);
+	bad("src_branch = \"releng/15\";", F, "src_branch: invalid branch: "
+	    "not main, stable/N or releng/N.M");
+	bad("src_branch = \"origin/main\";", F, "invalid branch");
 	for (i = 0; i < sizeof (good) / sizeof (good[0]); i++) {
 		(void) snprintf(text, sizeof (text), "ver = \"%s\";", good[i]);
 		ok(text, S);

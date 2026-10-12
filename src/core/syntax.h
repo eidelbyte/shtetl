@@ -46,6 +46,22 @@ const char *sh_syn_relpath(const char *s);
  */
 const char *sh_syn_prop(const char *s);
 
+/* A FreeBSD branch, as src_branch names it. */
+enum sh_btype {
+	SH_BR_MAIN,		/* main */
+	SH_BR_STABLE,		/* stable/N */
+	SH_BR_RELENG		/* releng/N.M */
+};
+
+struct sh_branch {
+	enum sh_btype	br_type;
+	long		br_major;	/* stable, releng; main: -1 */
+	long		br_minor;	/* releng; -1 otherwise */
+};
+
+/* S read as a branch into B: main, stable/N or releng/N.M. */
+const char *sh_syn_branch(const char *s, struct sh_branch *b);
+
 /* A version constraint: >=15, =15.1, <16, <=15.1, >14. */
 const char *sh_syn_ver(const char *s);
 

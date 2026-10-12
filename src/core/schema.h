@@ -26,6 +26,7 @@ enum sh_vt {
 	SH_V_IMPORT,		/* recipes merged in before this file */
 	SH_V_VER,		/* a version constraint */
 	SH_V_STRING,		/* text, a heredoc */
+	SH_V_BRANCH,		/* main, stable/N, releng/N.M */
 	SH_V_KERNCONF,		/* a config's name or path, or lines */
 	SH_V_COLL		/* a keyed collection (5.4) */
 };

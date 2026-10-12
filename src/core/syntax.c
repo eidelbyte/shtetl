@@ -191,6 +191,48 @@ sh_syn_prop(const char *s)
 	return (NULL);
 }
 
+/* Digits at *P, a number below 1000, read into *N; *P moved past. */
+static int
+syn_number(const char **p, long *n)
+{
+	const char *q = *p;
+
+	*n = 0;
+	if (!syn_digit(*q))
+		return (0);
+	while (syn_digit(*q) && *n < 1000)
+		*n = *n * 10 + (*q++ - '0');
+	if (syn_digit(*q) || *n >= 1000)
+		return (0);
+	*p = q;
+	return (1);
+}
+
+const char *
+sh_syn_branch(const char *s, struct sh_branch *b)
+{
+	const char *p;
+
+	b->br_major = b->br_minor = -1;
+	if (strcmp(s, "main") == 0) {
+		b->br_type = SH_BR_MAIN;
+		return (NULL);
+	}
+	if (strncmp(s, "stable/", 7) == 0) {
+		b->br_type = SH_BR_STABLE;
+		p = s + 7;
+		if (syn_number(&p, &b->br_major) && *p == '\0')
+			return (NULL);
+	} else if (strncmp(s, "releng/", 7) == 0) {
+		b->br_type = SH_BR_RELENG;
+		p = s + 7;
+		if (syn_number(&p, &b->br_major) && *p++ == '.' &&
+		    syn_number(&p, &b->br_minor) && *p == '\0')
+			return (NULL);
+	}
+	return ("not main, stable/N or releng/N.M");
+}
+
 const char *
 sh_syn_ver(const char *s)
 {

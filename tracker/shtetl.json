@@ -99,7 +99,7 @@
     ],
     "provides": "The name and the version check every build and update use.",
     "estimated_size": "small",
-    "completed": "not-started"
+    "completed": "tested"
   },
   "m3-zfs": {
     "description": "The ZFS calls a build needs, in src/core/zfs.h with the fake (tests/zfake.c) and libzfs (src/fbsd/zfs.c): a recursive snapshot with user properties, atomic (lzc_snapshot); a dataset's snapshots with createtxg, guid and shtetl:kind; rollback to a snapshot; a snapshot destroyed; a property set and inherited; a filesystem and its children mounted and unmounted. Verify: MATRIX cells for the fake's behavior (it is what the build's tests stand on), and tools/xcheck-freebsd.sh for the libzfs side; the box for the libzfs side's behavior.",

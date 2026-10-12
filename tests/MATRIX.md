@@ -106,6 +106,7 @@ object, string}; entry key syntax per collection; error reporting
 | CK19 | every error in a layer is reported, not only the first | covered: check_schema.c |
 | CK20 | the key path quotes a component that is not a bare word (`datasets."usr/local".readonly`) | covered: check_schema.c |
 | CK22 | a file of the default layer takes every kind's keys; shtetl.conf's sections of settings are no recipe keys, and a file it imports may have none; an unknown key is refused | covered: check_schema.c test_default |
+| CK23 | src_branch: main, stable/N or releng/N.M; anything else refused: invalid branch | covered: check_schema.c |
 
 ## CS: shtetl.conf (planning.md 5.2, 6.3; src/core/site.c)
 
@@ -316,3 +317,31 @@ checks, tests/box/results/KIDON-20261012T111021Z.log; as it is, with
 one root to a space, it has not run there yet. B13 ran with git; B8
 with the ashift warning, the memory disks having another ashift than
 12.
+
+# Family V: a foundation version's name and its ver check (M3; planning.md 6.1, 7.1; src/core/version.c)
+
+A version is named from the recipe's src_branch, the checkout's
+REVISION (newvers.sh's, for main's major), the day of the build in
+UTC and the checkout's commit; the recipe's ver is checked against the
+branch before the checkout and against REVISION after it. All of it
+portable, over values the build hands in.
+
+Dimensions: the branch {main, stable/N, releng/N.M, malformed}; the
+REVISION line {as newvers.sh -V prints it, anything else}; the day
+{any, across midnight in a zone east or west of UTC}; the commit
+{40 hex digits, shorter, not hex}; names F's snapshots have {none,
+the same name, .2 already, the -pkg twin, another day's}; the ver
+check {before the checkout: releng exact, stable any N.x, main
+anything; after it: REVISION exact} against constraints that hold or
+do not.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| V1 | branch spellings: main, stable/15, releng/15.1 read with their numbers; releng/15, stable/15.1, stable/, releng/a.b, Main, main/x refused | covered: check_version.c |
+| V2 | the name for each kind of branch: 15.1-releng, 15-stable, 16-current with main's major from REVISION | covered: check_version.c |
+| V3 | the day is the UTC day, whatever TZ says, either side of midnight | covered: check_version.c |
+| V4 | the commit: its first 12 hex digits; one shorter than 12, or not hex, refused | covered: check_version.c |
+| V5 | a second build the same day from the same commit takes .2, a third .3; the -pkg twin and another day's names do not count | covered: check_version.c |
+| V6 | REVISION read from newvers.sh -V's one line, REVISION="16.0"; anything else refused | covered: check_version.c |
+| V7 | before the checkout: releng/N.M must satisfy every ver, stable/N must leave some N.x every ver allows, main passes; the refusal names the constraint and its file | covered: check_version.c |
+| V8 | after the checkout: REVISION must satisfy every ver, the refusal naming the constraint and its file | covered: check_version.c |

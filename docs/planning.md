@@ -549,7 +549,7 @@ As built (`src/core/cascade.c`):
 |-----|-------|------|---------|
 | import | all | names | recipes merged in before this file |
 | ver | all | string, or a list of them | version constraint: `">=15"`, `"=15.1"` |
-| src_branch | foundation | string | FreeBSD branch |
+| src_branch | foundation | string | FreeBSD branch: main, stable/N or releng/N.M |
 | kernconf | foundation | string, or heredoc | a string: the kernel config to start from, a name in the src tree (`GENERIC`) or a path in zconfig; a heredoc: config lines added to it |
 | buildopts | foundation | heredoc | make(1) variables, the lines of the src.conf shtetl writes |
 | patches | foundation | keyed by location: {ref, dir} | patch files applied to the src tree before the build (7.1.1) |

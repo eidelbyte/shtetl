@@ -33,7 +33,7 @@
 static const struct sh_rkey rkeys[] = {
 	{ "import", SH_ALLKINDS, SH_V_IMPORT, SH_C_NONE, SH_M_LAYERS },
 	{ "ver", SH_ALLKINDS, SH_V_VER, SH_C_NONE, SH_M_ALL },
-	{ "src_branch", F, SH_V_STRING, SH_C_NONE, SH_M_AGREE },
+	{ "src_branch", F, SH_V_BRANCH, SH_C_NONE, SH_M_AGREE },
 	{ "kernconf", F, SH_V_KERNCONF, SH_C_NONE, SH_M_KERNCONF },
 	{ "buildopts", F, SH_V_STRING, SH_C_NONE, SH_M_TEXT },
 	{ "patches", F, SH_V_COLL, SH_C_PATCHES, SH_M_COLL },
@@ -394,6 +394,7 @@ sc_layer(const struct sh_node *layer, unsigned kinds, const char *file,
 {
 	const struct sh_rkey *rk;
 	const struct sh_pair *pr;
+	struct sh_branch br;
 	struct sc x;
 	unsigned before;
 	size_t i, was;
@@ -429,6 +430,12 @@ sc_layer(const struct sh_node *layer, unsigned kinds, const char *file,
 				break;
 			case SH_V_STRING:
 				(void) sc_string(&x, pr->pr_val);
+				break;
+			case SH_V_BRANCH:
+				if (sc_string(&x, pr->pr_val))
+					(void) sc_syn(&x, "branch",
+					    sh_syn_branch(pr->pr_val->sn_str,
+					    &br));
 				break;
 			case SH_V_KERNCONF:
 				/* lines, or the config they are added to */

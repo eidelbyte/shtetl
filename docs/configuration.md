@@ -321,8 +321,11 @@ version comes from its `src_branch` (planning.md 6.1).
 
 ### src_branch
 
-The FreeBSD branch a foundation is built from: `"releng/15.1"`,
-`"stable/15"`, `"main"`. A foundation must have one, from some file.
+The FreeBSD branch a foundation is built from: `"releng/N.M"`,
+`"stable/N"` or `"main"`; anything else is refused. A foundation must
+have one, from some file. The branch names the version (planning.md
+6.1: `15.1-releng`, `15-stable`, `16-current`) and is checked against
+`ver` before the checkout; after it, the checkout's own REVISION is.
 
 ### kernconf
 
