@@ -331,8 +331,7 @@ cmd_bootstrap(struct sh_ctx *ctx, int argc, char **argv)
 		req.br_sp[req.br_n++] = opts[j].o_sp;
 	}
 	if (req.br_n == 0)
-		return (die_usage("bootstrap names a dataset: --lake, --run, "
-		    "--config or --build", ""));
+		return (die_usage("bootstrap: no dataset given", ""));
 	sh_err_init(&e, stderr, "shtetl: ");
 	if (ctx_zfs(ctx, &e) != 0)
 		return (SH_EXIT_REFUSED);
@@ -349,9 +348,8 @@ cmd_bootstrap(struct sh_ctx *ctx, int argc, char **argv)
 		(void) fflush(stdout);
 		tty = isatty(STDIN_FILENO);
 		if (!sh_boot_confirm(stdin, stdout, yes, tty)) {
-			sh_errf(&e, "%s", tty ? "nothing done" : "not "
-			    "confirmed, so nothing done: with no terminal to "
-			    "ask, -y confirms");
+			sh_errf(&e, "%s", tty ? "not confirmed" :
+			    "not confirmed: no terminal, use -y");
 			rc = SH_EXIT_REFUSED;
 		} else {
 			rc = sh_boot_apply(ctx->sc_zfs, plan, stdout, &e) ==

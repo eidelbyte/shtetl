@@ -160,75 +160,69 @@ test_refused(void)
 {
 	world();
 	ask("tank/nope", SH_SP_LAKE);
-	refused("tank/nope: no such filesystem: the spaces are datasets you "
-	    "have (zfs create it first)");
+	refused("tank/nope: no such filesystem");
 	world();
 	ask("tank//x", SH_SP_LAKE);
-	refused("tank//x: not a dataset's name");
+	refused("tank//x: invalid dataset name");
 	/* B3 */
 	world();
 	zfake_set("tank/shtetl", SH_SPACE_PROP, "lake");
 	ask("tank/shtetl", SH_SP_LAKE);
-	refused("tank/shtetl is a lake root already");
+	refused("tank/shtetl: already a lake root");
 	world();
 	zfake_set("tank/shtetl", SH_SPACE_PROP, "run");
 	ask("tank/shtetl", SH_SP_LAKE);
-	refused("tank/shtetl is a run root already");
+	refused("tank/shtetl: already a run root");
 	/* B4 */
 	world();
 	zfake_fs("tank/c2");
 	ask("tank/zconfig", SH_SP_CONFIG);
 	ask("tank/c2", SH_SP_CONFIG);
-	refused("two config roots, tank/zconfig and tank/c2: the config "
-	    "space has one");
+	refused("two config roots: tank/zconfig and tank/c2");
 	world();
 	zfake_set("tank/zbuild", SH_SPACE_PROP, "build");
 	zfake_fs("fast/src");
 	ask("fast/src", SH_SP_BUILD);
-	refused("two build roots, tank/zbuild and fast/src");
+	refused("two build roots: tank/zbuild and fast/src");
 	/* B5 */
 	world();
 	zfake_fs("tank/shtetl/run");
 	ask("tank/shtetl", SH_SP_LAKE);
 	ask("tank/shtetl/run", SH_SP_RUN);
-	refused("tank/shtetl/run is inside tank/shtetl: a root inside "
-	    "another root");
+	refused("tank/shtetl/run: inside tank/shtetl");
 	world();
 	zfake_set("fast/run", SH_SPACE_PROP, "run");
 	zfake_fs("fast/run/lake");
 	ask("fast/run/lake", SH_SP_LAKE);
-	refused("fast/run/lake and the run root fast/run: a root inside "
-	    "another root");
+	refused("fast/run/lake: overlaps run root fast/run");
 	world();
 	zfake_set("fast/run", SH_SPACE_PROP, "run");
 	ask("fast", SH_SP_LAKE);
-	refused("fast and the run root fast/run");
+	refused("fast: overlaps run root fast/run");
 	/* B6 */
 	world();
 	zfake_fs("tank/shtetl/home");
 	ask("tank/shtetl", SH_SP_LAKE);
-	refused("tank/shtetl has tank/shtetl/home, which is not shtetl's "
-	    "layout");
+	refused("tank/shtetl: unexpected child tank/shtetl/home");
 	world();
 	zfake_fs("tank/shtetl/archive");
 	zfake_fs("tank/shtetl/archive/old");
 	ask("tank/shtetl", SH_SP_LAKE);
-	refused("tank/shtetl/archive has tank/shtetl/archive/old, which is "
-	    "not shtetl's layout");
+	refused("tank/shtetl/archive: unexpected child "
+	    "tank/shtetl/archive/old");
 	world();
 	zfake_fs("fast/run/archive");
 	ask("fast/run", SH_SP_RUN);
-	refused("fast/run has fast/run/archive, which is not shtetl's");
+	refused("fast/run: unexpected child fast/run/archive");
 	/* B7 */
 	world();
 	zfake_set("tank/zconfig", "mountpoint", "none");
 	ask("tank/zconfig", SH_SP_CONFIG);
-	refused("tank/zconfig has no mountpoint: the config root is used "
-	    "where it is mounted");
+	refused("tank/zconfig: no mountpoint");
 	world();
 	zfake_set("tank/zbuild", "mountpoint", "legacy");
 	ask("tank/zbuild", SH_SP_BUILD);
-	refused("tank/zbuild has no mountpoint: the build root");
+	refused("tank/zbuild: no mountpoint");
 }
 
 /* B8, B10, B11, B17: the whole of a first bootstrap. */
@@ -416,9 +410,8 @@ test_clone(void)
 	CHECK(plan(NULL) == 0);
 	cap_reset(&c);
 	CHECK(apply() == -1);
-	CHECK(cap_has(&c, "tank/zconfig: the recipes were not cloned, and no "
-	    "root is marked: run the same bootstrap again once git can "
-	    "clone"));
+	CHECK(cap_has(&c, "tank/zconfig: cloning "));
+	CHECK(cap_has(&c, " failed; no root marked"));
 	CHECK(is(prop("tank/zconfig", SH_SPACE_PROP, NULL), "-"));
 	CHECK(is(prop("tank/shtetl", SH_SPACE_PROP, NULL), "-"));
 	CHECK(dup2(saved, STDERR_FILENO) != -1);
@@ -494,15 +487,15 @@ test_again(void)
 	zfake_set("fast/run/containers", "mountpoint", "/jails");
 	zfake_set("fast/run/containers", "canmount", "on");
 	ask("fast/run", SH_SP_RUN);
-	refused("fast/run/containers: mountpoint is /jails; shtetl makes it "
-	    "/containers, set locally");
+	refused("fast/run/containers: mountpoint is /jails, must be "
+	    "/containers");
 	world();
 	zfake_fs("fast/run/foundations");
 	ask("fast/run", SH_SP_RUN);
 	refused("fast/run/foundations: mountpoint is /fast/run/foundations "
-	    "(not set locally); shtetl makes it /shtetl/foundations");
-	CHECK(cap_has(&c, "fast/run/foundations: canmount is on (not set "
-	    "locally); shtetl makes it off"));
+	    "(not local), must be /shtetl/foundations");
+	CHECK(cap_has(&c, "fast/run/foundations: canmount is on (not local), "
+	    "must be off"));
 
 	/*
 	 * B18: a pool imported with an altroot shows mountpoints below
@@ -523,8 +516,8 @@ test_again(void)
 	zfake_set("fast/run/containers", "mountpoint", "/containers");
 	zfake_set("fast/run/containers", "canmount", "on");
 	ask("fast/run", SH_SP_RUN);
-	refused("fast/run/containers: mountpoint is /containers; shtetl "
-	    "makes it /mnt/containers, set locally");
+	refused("fast/run/containers: mountpoint is /containers, must be "
+	    "/mnt/containers");
 }
 
 int

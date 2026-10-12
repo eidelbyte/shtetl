@@ -158,7 +158,7 @@ cases() {
 	sht bootstrap --lake $P1/shtetl --run $P2/run --config $P1/zconfig \
 	    --build $P1/zbuild
 	check B16 "exit" "$RC" 1
-	has B16 "the refusal" "$T/err" "not confirmed, so nothing done"
+	has B16 "the refusal" "$T/err" "not confirmed: no terminal, use -y"
 	check B16 "nothing marked" "$(prop $P1/shtetl shtetl:space)" "-"
 	check B16 "nothing made" "$(zfs list -H -o name -r $P1/shtetl |
 	    wc -l | tr -d ' ')" 1
@@ -235,7 +235,7 @@ cases() {
 	echo "== B3: a root named again"
 	sht bootstrap -y --lake $P1/shtetl
 	check B3 "exit" "$RC" 1
-	has B3 "the refusal" "$T/err" "$P1/shtetl is a lake root already"
+	has B3 "the refusal" "$T/err" "$P1/shtetl: already a lake root"
 
 	echo "== B12, D6: a second run root"
 	zfs create $P1/run2
@@ -266,7 +266,7 @@ cases() {
 	sht bootstrap -y --lake $P2/lake2
 	check B6 "exit" "$RC" 1
 	has B6 "the refusal" "$T/err" \
-	    "$P2/lake2 has $P2/lake2/home, which is not shtetl's layout"
+	    "$P2/lake2: unexpected child $P2/lake2/home"
 
 	echo "== D5: two config roots, found"
 	zfs create $P2/c2

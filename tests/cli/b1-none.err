@@ -1,4 +1,4 @@
-shtetl: bootstrap names a dataset: --lake, --run, --config or --build
+shtetl: bootstrap: no dataset given
 usage: shtetl [-C dir] command ...
        shtetl [-C dir] config show [recipe]
        shtetl [-C dir] spaces

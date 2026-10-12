@@ -403,24 +403,24 @@ sh_run(struct sh_run *r, struct sh_err *e)
 
 	if ((sig = ru_caught) != 0) {
 		r->ru_signal = sig;
-		sh_errf(e, "%s: stopped: shtetl was interrupted by %s", name,
+		sh_errf(e, "%s: interrupted by %s", name,
 		    ru_signame(sig, sbuf, sizeof (sbuf)));
 	} else if (n == sizeof (xerr)) {
 		sh_errf(e, "cannot run %s: %s", name, strerror(xerr));
 	} else if (!reaped) {
 		sh_errf(e, "%s: waitpid: %s", name, strerror(errno));
 	} else if (WIFSIGNALED(status)) {
-		sh_errf(e, "%s was killed by %s", name,
+		sh_errf(e, "%s: killed by %s", name,
 		    ru_signame(WTERMSIG(status), sbuf, sizeof (sbuf)));
 	} else if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-		sh_errf(e, "%s exited %d", name, WEXITSTATUS(status));
+		sh_errf(e, "%s: exit status %d", name, WEXITSTATUS(status));
 	} else if (rr.rr_nomem) {
 		sh_err_nomem(e);
 	} else if (rr.rr_overflow) {
-		sh_errf(e, "%s printed more than %zu bytes, the most shtetl "
-		    "reads of it", name, r->ru_capmax);
+		sh_errf(e, "%s: output larger than %zu bytes", name,
+		    r->ru_capmax);
 	} else if (rr.rr_logerr != 0) {
-		sh_errf(e, "%s: its log: %s", name, strerror(rr.rr_logerr));
+		sh_errf(e, "%s: log: %s", name, strerror(rr.rr_logerr));
 	} else {
 		if (r->ru_capmax > 0 && r->ru_out == NULL &&
 		    (r->ru_out = calloc(1, 1)) == NULL) {

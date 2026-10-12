@@ -122,12 +122,12 @@ test_programs(void)
 	CHECK(WIFEXITED(r.ru_status) && WEXITSTATUS(r.ru_status) == 0);
 	setup(three);
 	CHECK(sh_run(&r, &c.c_err) == -1);
-	CHECK(cap_has(&c, "sh exited 3\n"));
+	CHECK(cap_has(&c, "sh: exit status 3\n"));
 	CHECK(WEXITSTATUS(r.ru_status) == 3);
 	/* R5 */
 	setup(killed);
 	CHECK(sh_run(&r, &c.c_err) == -1);
-	CHECK(cap_has(&c, "sh was killed by SIGKILL\n"));
+	CHECK(cap_has(&c, "sh: killed by SIGKILL\n"));
 }
 
 /* R6 - R9, R17: where the output goes. */
@@ -163,7 +163,7 @@ test_output(void)
 	setup(hello);
 	r.ru_capmax = 4;
 	CHECK(sh_run(&r, &c.c_err) == -1);
-	CHECK(cap_has(&c, "echo printed more than 4 bytes"));
+	CHECK(cap_has(&c, "echo: output larger than 4 bytes"));
 	CHECK(r.ru_out == NULL);
 	/* R9: logged, and captured */
 	setup(big);
@@ -237,7 +237,7 @@ test_child(void)
 	(void) snprintf(script, sizeof (script), "echo x >&%d", fd);
 	setup(fdtest);
 	CHECK(sh_run(&r, &c.c_err) == -1);
-	CHECK(cap_has(&c, "sh exited "));
+	CHECK(cap_has(&c, "sh: exit status "));
 	CHECK(fcntl(fd, F_GETFD) != -1);
 	(void) close(fd);
 }
@@ -287,7 +287,7 @@ interrupt(int sig)
 	CHECK(sh_run(&r, &c.c_err) == -1);
 	CHECK(now() - t0 < 10.0);
 	CHECK(r.ru_signal == sig);
-	CHECK(cap_has(&c, "sh: stopped: shtetl was interrupted by SIG"));
+	CHECK(cap_has(&c, "sh: interrupted by SIG"));
 	CHECK(waitpid(killer, NULL, 0) == killer);
 	gpid = (pid_t)atol(slurp(pidf, NULL));
 	CHECK(gpid > 0);

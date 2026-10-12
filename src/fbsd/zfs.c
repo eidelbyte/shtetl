@@ -225,7 +225,7 @@ sh_zfs_get(struct sh_zfs *z, const char *ds, const char *prop, char *val,
 	}
 	if (zfs_prop_get(zhp, p, val, len, &zs, where, sizeof (where),
 	    B_FALSE) != 0) {
-		sh_errf(e, "%s: %s does not apply to it", ds, prop);
+		sh_errf(e, "%s: %s does not apply", ds, prop);
 		zfs_close(zhp);
 		return (-1);
 	}

@@ -215,9 +215,8 @@ bx_kid(void *arg, const char *child)
 		if (strcmp(rel, k->bk_names[i]) == 0)
 			return (0);
 	}
-	sh_errf(k->bk_x->bx_err, "%s has %s, which is not shtetl's layout: "
-	    "bootstrap sets properties every child would inherit",
-	    k->bk_root, child);
+	sh_errf(k->bk_x->bx_err, "%s: unexpected child %s", k->bk_root,
+	    child);
 	k->bk_x->bx_bad = 1;
 	return (0);
 }
@@ -258,9 +257,9 @@ bx_check_kid(struct bx *x, const struct sh_bkid *kid, const char *altroot)
 		    kid->bk_props[i].zp_value);
 		if (strcmp(val, want) == 0 && src == SH_ZSRC_LOCAL)
 			continue;
-		sh_errf(x->bx_err, "%s: %s is %s%s; shtetl makes it %s, set "
-		    "locally", kid->bk_ds, kid->bk_props[i].zp_name, val,
-		    src == SH_ZSRC_LOCAL ? "" : " (not set locally)", want);
+		sh_errf(x->bx_err, "%s: %s is %s%s, must be %s", kid->bk_ds,
+		    kid->bk_props[i].zp_name, val,
+		    src == SH_ZSRC_LOCAL ? "" : " (not local)", want);
 		x->bx_bad = 1;
 	}
 }
@@ -341,9 +340,7 @@ bx_mounted(struct bx *x, struct sh_broot *rt)
 		return;
 	}
 	if (rt->rt_dir[0] != '/') {
-		sh_errf(x->bx_err, "%s has no mountpoint: the %s root is used "
-		    "where it is mounted (zfs set mountpoint=... first)",
-		    rt->rt_ds, sh_space_name(rt->rt_sp));
+		sh_errf(x->bx_err, "%s: no mountpoint", rt->rt_ds);
 		x->bx_bad = 1;
 		return;
 	}
@@ -371,14 +368,14 @@ bx_root(struct bx *x, const struct sh_bootreq *req, size_t i)
 	(void) snprintf(rt->rt_ds, sizeof (rt->rt_ds), "%s", req->br_ds[i]);
 	rt->rt_sp = req->br_sp[i];
 	if ((why = sh_syn_dsname(rt->rt_ds)) != NULL) {
-		sh_errf(x->bx_err, "%s: not a dataset's name: %s", rt->rt_ds,
+		sh_errf(x->bx_err, "%s: invalid dataset name: %s", rt->rt_ds,
 		    why);
 		x->bx_bad = 1;
 		return;
 	}
 	for (j = 0; j < i; j++) {
 		if (strcmp(req->br_ds[j], rt->rt_ds) == 0) {
-			sh_errf(x->bx_err, "%s is named twice", rt->rt_ds);
+			sh_errf(x->bx_err, "%s: named twice", rt->rt_ds);
 			x->bx_bad = 1;
 			return;
 		}
@@ -387,14 +384,13 @@ bx_root(struct bx *x, const struct sh_bootreq *req, size_t i)
 	    &src, x->bx_err);
 	if (r != 0) {
 		if (r == 1)
-			sh_errf(x->bx_err, "%s: no such filesystem: the spaces "
-			    "are datasets you have (zfs create it first)",
+			sh_errf(x->bx_err, "%s: no such filesystem",
 			    rt->rt_ds);
 		x->bx_bad = 1;
 		return;
 	}
 	if (src == SH_ZSRC_LOCAL) {
-		sh_errf(x->bx_err, "%s is a %s root already", rt->rt_ds, val);
+		sh_errf(x->bx_err, "%s: already a %s root", rt->rt_ds, val);
 		x->bx_bad = 1;
 		return;
 	}
@@ -421,9 +417,8 @@ bx_single(struct bx *x, const struct sh_bootreq *req, enum sh_space sp)
 		if (req->br_sp[i] != sp)
 			continue;
 		if (first != NULL) {
-			sh_errf(x->bx_err, "two %s roots, %s and %s: the %s "
-			    "space has one", sh_space_name(sp), first,
-			    req->br_ds[i], sh_space_name(sp));
+			sh_errf(x->bx_err, "two %s roots: %s and %s",
+			    sh_space_name(sp), first, req->br_ds[i]);
 			x->bx_bad = 1;
 			return;
 		}
@@ -444,8 +439,7 @@ bx_nesting(struct bx *x, const struct sh_bootreq *req)
 		for (j = 0; j < req->br_n; j++) {
 			b = req->br_ds[j];
 			if (j != i && bx_inside(a, b)) {
-				sh_errf(x->bx_err, "%s is inside %s: a root "
-				    "inside another root", a, b);
+				sh_errf(x->bx_err, "%s: inside %s", a, b);
 				x->bx_bad = 1;
 			}
 		}
@@ -453,9 +447,8 @@ bx_nesting(struct bx *x, const struct sh_bootreq *req)
 			for (j = 0; j < x->bx_s->ss_n[sp]; j++) {
 				b = x->bx_s->ss_roots[sp][j];
 				if (bx_inside(a, b) || bx_inside(b, a)) {
-					sh_errf(x->bx_err, "%s and the %s root "
-					    "%s: a root inside another root",
-					    a, sh_space_name(sp), b);
+					sh_errf(x->bx_err, "%s: overlaps %s "
+					    "root %s", a, sh_space_name(sp), b);
 					x->bx_bad = 1;
 				}
 			}
@@ -531,8 +524,7 @@ sh_boot_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	(void) memset(p, 0, sizeof (*p));
 	p->bt_recipes = req->br_recipes;
 	if (req->br_n == 0 || req->br_n > SH_BOOT_MAX) {
-		sh_errf(e, "bootstrap names from 1 to %d datasets",
-		    SH_BOOT_MAX);
+		sh_errf(e, "bootstrap takes 1 to %d datasets", SH_BOOT_MAX);
 		return (-1);
 	}
 	if ((built = sh_site_builtins(e)) == NULL)
@@ -688,7 +680,7 @@ bx_clone(struct sh_zfs *z, const struct sh_broot *rt, const char *url,
 	int empty, rc;
 
 	if ((empty = bx_empty(rt->rt_dir)) < 0) {
-		sh_errf(e, "%s: cannot read it", rt->rt_dir);
+		sh_errf(e, "%s: unreadable", rt->rt_dir);
 		return (-1);
 	}
 	if (!empty) {
@@ -730,9 +722,8 @@ bx_clone(struct sh_zfs *z, const struct sh_broot *rt, const char *url,
 	free(u);
 	free(d);
 	if (rc != 0) {
-		sh_errf(e, "%s: the recipes were not cloned, and no root is "
-		    "marked: run the same bootstrap again once git can clone "
-		    "%s", rt->rt_ds, url);
+		sh_errf(e, "%s: cloning %s failed; no root marked", rt->rt_ds,
+		    url);
 		return (-1);
 	}
 	(void) fprintf(out, "cloned %s into %s\n", url, rt->rt_dir);

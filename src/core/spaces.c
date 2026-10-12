@@ -60,8 +60,8 @@ sp_found(void *arg, const char *ds, const char *value)
 			break;
 	}
 	if (i == SH_SP_N) {
-		sh_errf(f->sf_err, "%s: %s is \"%s\", which names no space: "
-		    "lake, config, build or run", ds, SH_SPACE_PROP, value);
+		sh_errf(f->sf_err, "%s: invalid %s \"%s\"", ds, SH_SPACE_PROP,
+		    value);
 		f->sf_bad = 1;
 		return (0);
 	}
@@ -107,9 +107,8 @@ sh_spaces_discover(struct sh_zfs *z, struct sh_spaces *s, struct sh_err *e)
 	}
 	for (a = SH_SP_CONFIG; a <= SH_SP_BUILD; a++) {
 		if (s->ss_n[a] > 1) {
-			sh_errf(e, "two %s roots, %s and %s: the %s space has "
-			    "one", sp_names[a], s->ss_roots[a][0],
-			    s->ss_roots[a][1], sp_names[a]);
+			sh_errf(e, "two %s roots: %s and %s", sp_names[a],
+			    s->ss_roots[a][0], s->ss_roots[a][1]);
 			f.sf_bad = 1;
 		}
 	}
@@ -120,8 +119,8 @@ sh_spaces_discover(struct sh_zfs *z, struct sh_spaces *s, struct sh_err *e)
 					if (!sp_inside(s->ss_roots[a][i],
 					    s->ss_roots[b][j]))
 						continue;
-					sh_errf(e, "%s: a %s root inside "
-					    "the %s root %s", s->ss_roots[a][i],
+					sh_errf(e, "%s: %s root inside %s "
+					    "root %s", s->ss_roots[a][i],
 					    sp_names[a], sp_names[b],
 					    s->ss_roots[b][j]);
 					f.sf_bad = 1;
@@ -175,9 +174,8 @@ sh_spaces_lookup(struct sh_zfs *z, const struct sh_spaces *s,
 			return (-1);
 		}
 		if (first != NULL) {
-			sh_errf(e, "%s is under two %s roots, as %s and %s: "
-			    "one name, one place", rel, sp_names[sp], first,
-			    name);
+			sh_errf(e, "%s: under two %s roots: %s and %s", rel,
+			    sp_names[sp], first, name);
 			free(name);
 			free(first);
 			return (-1);
@@ -242,18 +240,15 @@ sh_spaces_default(const struct sh_spaces *s, const struct sh_node *site,
 	case SP_OK:
 		return (0);
 	case SP_NONE:
-		sh_errf(e, "no %s root: shtetl bootstrap makes one",
-		    sp_names[sp]);
+		sh_errf(e, "no %s root", sp_names[sp]);
 		break;
 	case SP_UNNAMED:
-		sh_errf(e, "%zu %s roots, and shtetl.conf names none of them "
-		    "as spaces.%s.default", s->ss_n[sp], sp_names[sp],
-		    sp_names[sp]);
+		sh_errf(e, "%zu %s roots and no spaces.%s.default",
+		    s->ss_n[sp], sp_names[sp], sp_names[sp]);
 		break;
 	case SP_NOTROOT:
-		sh_errf(e, "%s: spaces.%s.default names %s, which is no %s "
-		    "root", def->sn_from, sp_names[sp], def->sn_str,
-		    sp_names[sp]);
+		sh_errf(e, "%s: spaces.%s.default: %s is not a %s root",
+		    def->sn_from, sp_names[sp], def->sn_str, sp_names[sp]);
 		break;
 	}
 	return (-1);
@@ -291,17 +286,15 @@ sh_spaces_config_dir(struct sh_zfs *z, const struct sh_spaces *s,
 
 	*dir = NULL;
 	if (s->ss_n[SH_SP_CONFIG] == 0) {
-		sh_errf(e, "no config root: shtetl bootstrap makes one, or -C "
-		    "names a directory to read");
+		sh_errf(e, "no config root");
 		return (-1);
 	}
 	root = s->ss_roots[SH_SP_CONFIG][0];
 	if ((r = sp_where(z, root, path, sizeof (path), e)) < 0)
 		return (-1);
 	if (r > 0) {
-		sh_errf(e, "%s, the config root, %s: the configuration is "
-		    "read where it is mounted", root, r == 1 ?
-		    "has no mountpoint" : "is not mounted");
+		sh_errf(e, "config root %s: %s", root, r == 1 ?
+		    "no mountpoint" : "not mounted");
 		return (-1);
 	}
 	if ((*dir = strdup(path)) == NULL) {

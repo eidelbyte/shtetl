@@ -109,8 +109,7 @@ test_refused(void)
 	zfake_set("tank/home", SH_SPACE_PROP, "camp");
 	CHECK(D() == -1);
 	CHECK(c.c_err.se_count == 1);
-	CHECK(cap_has(&c, "tank/home: shtetl:space is \"camp\", which names "
-	    "no space: lake, config, build or run"));
+	CHECK(cap_has(&c, "tank/home: invalid shtetl:space \"camp\""));
 
 	pools();
 	zfake_fs("tank/c1");
@@ -123,9 +122,8 @@ test_refused(void)
 	zfake_set("fast/b2", SH_SPACE_PROP, "build");
 	CHECK(D() == -1);
 	CHECK(c.c_err.se_count == 2);
-	CHECK(cap_has(&c, "two config roots, tank/c1 and tank/c2: the config "
-	    "space has one"));
-	CHECK(cap_has(&c, "two build roots, fast/b1 and fast/b2"));
+	CHECK(cap_has(&c, "two config roots: tank/c1 and tank/c2\n"));
+	CHECK(cap_has(&c, "two build roots: fast/b1 and fast/b2\n"));
 
 	/* D7: inside another root, of the same space or another */
 	pools();
@@ -139,9 +137,9 @@ test_refused(void)
 	zfake_set("fast/deep/lake", SH_SPACE_PROP, "lake");
 	CHECK(D() == -1);
 	CHECK(c.c_err.se_count == 2);
-	CHECK(cap_has(&c, "tank/shtetl/run: a run root inside the lake root "
+	CHECK(cap_has(&c, "tank/shtetl/run: run root inside lake root "
 	    "tank/shtetl"));
-	CHECK(cap_has(&c, "fast/deep/lake: a lake root inside the lake root "
+	CHECK(cap_has(&c, "fast/deep/lake: lake root inside lake root "
 	    "fast"));
 	/* a name that only begins like a root's is not inside it */
 	pools();
@@ -191,9 +189,8 @@ test_lookup(void)
 	CHECK(sh_spaces_lookup(z, &s, SH_SP_LAKE, "foundations/generic", &out,
 	    &c.c_err) == -1);
 	CHECK(out == NULL);
-	CHECK(cap_has(&c, "foundations/generic is under two lake roots, as "
-	    "fast/foundations/generic and tank/shtetl/foundations/generic: "
-	    "one name, one place"));
+	CHECK(cap_has(&c, "foundations/generic: under two lake roots: "
+	    "fast/foundations/generic and tank/shtetl/foundations/generic"));
 	/* ZFS refusing the look */
 	cap_reset(&c);
 	zfake_fail("get");
@@ -224,7 +221,7 @@ test_default(void)
 	CHECK(D() == 0);
 	CHECK(sh_spaces_default(&s, NULL, SH_SP_LAKE, &root, &c.c_err) == -1);
 	CHECK(root == NULL);
-	CHECK(cap_has(&c, "no lake root: shtetl bootstrap makes one"));
+	CHECK(cap_has(&c, "no lake root\n"));
 
 	zfake_fs("tank/shtetl");
 	zfake_set("tank/shtetl", SH_SPACE_PROP, "lake");
@@ -234,15 +231,14 @@ test_default(void)
 	/* one root, and a default that names another: refused */
 	site = conf("spaces { lake { default = \"fast/lake\"; } }");
 	CHECK(sh_spaces_default(&s, site, SH_SP_LAKE, &root, &c.c_err) == -1);
-	CHECK(cap_has(&c, "shtetl.conf: spaces.lake.default names fast/lake, "
-	    "which is no lake root"));
+	CHECK(cap_has(&c, "shtetl.conf: spaces.lake.default: fast/lake is not "
+	    "a lake root"));
 
 	zfake_fs("fast/lake");
 	zfake_set("fast/lake", SH_SPACE_PROP, "lake");
 	CHECK(D() == 0);
 	CHECK(sh_spaces_default(&s, NULL, SH_SP_LAKE, &root, &c.c_err) == -1);
-	CHECK(cap_has(&c, "2 lake roots, and shtetl.conf names none of them "
-	    "as spaces.lake.default"));
+	CHECK(cap_has(&c, "2 lake roots and no spaces.lake.default"));
 	CHECK(sh_spaces_default(&s, site, SH_SP_LAKE, &root, &c.c_err) == 0);
 	CHECK(is(root, "fast/lake"));
 	sh_node_free(site);
@@ -253,7 +249,7 @@ test_default(void)
 	site = conf("spaces { lake { default = \"fast/run\"; } }");
 	cap_reset(&c);
 	CHECK(sh_spaces_default(&s, site, SH_SP_LAKE, &root, &c.c_err) == -1);
-	CHECK(cap_has(&c, "names fast/run, which is no lake root"));
+	CHECK(cap_has(&c, "fast/run is not a lake root"));
 	sh_node_free(site);
 }
 
@@ -267,16 +263,14 @@ test_config_dir(void)
 	CHECK(D() == 0);
 	CHECK(sh_spaces_config_dir(z, &s, &dir, &c.c_err) == -1);
 	CHECK(dir == NULL);
-	CHECK(cap_has(&c, "no config root: shtetl bootstrap makes one, or -C "
-	    "names a directory to read"));
+	CHECK(cap_has(&c, "no config root\n"));
 
 	zfake_fs("tank/zconfig");
 	zfake_set("tank/zconfig", SH_SPACE_PROP, "config");
 	zfake_set("tank/zconfig", "mountpoint", "/zconfig");
 	CHECK(D() == 0);
 	CHECK(sh_spaces_config_dir(z, &s, &dir, &c.c_err) == -1);
-	CHECK(cap_has(&c, "tank/zconfig, the config root, is not mounted: "
-	    "the configuration is read where it is mounted"));
+	CHECK(cap_has(&c, "config root tank/zconfig: not mounted"));
 	zfake_set("tank/zconfig", "mounted", "yes");
 	cap_reset(&c);
 	CHECK(sh_spaces_config_dir(z, &s, &dir, &c.c_err) == 0);
@@ -285,11 +279,11 @@ test_config_dir(void)
 	/* inherited from the pool: tank/zconfig at /tank/zconfig */
 	zfake_set("tank/zconfig", "mountpoint", "none");
 	CHECK(sh_spaces_config_dir(z, &s, &dir, &c.c_err) == -1);
-	CHECK(cap_has(&c, "has no mountpoint"));
+	CHECK(cap_has(&c, "config root tank/zconfig: no mountpoint"));
 	zfake_set("tank/zconfig", "mountpoint", "legacy");
 	cap_reset(&c);
 	CHECK(sh_spaces_config_dir(z, &s, &dir, &c.c_err) == -1);
-	CHECK(cap_has(&c, "has no mountpoint"));
+	CHECK(cap_has(&c, "config root tank/zconfig: no mountpoint"));
 }
 
 /* What sh_spaces_show printed; the last one is freed at the end. */
