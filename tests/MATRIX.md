@@ -259,3 +259,43 @@ that is no root of its space}; ZFS refusing the walk.
 | D15 | the config root refused: none; no mountpoint (none, legacy); not mounted | covered: check_spaces.c |
 | D16 | shtetl spaces: each space's roots, the default lake and run roots marked, config and build with where they are mounted, a space with none saying so | covered: check_spaces.c |
 | D17 | a portable shtetl, with no -C, says it was built without ZFS | covered: run-cli.sh cl3-noroot, d17-spaces |
+
+# Family B: bootstrap and the property table (M2; planning.md 4.2, 4.3; src/core/boot.c)
+
+shtetl bootstrap names one or more datasets the user already has as
+roots of the spaces, shows what it will set and create, and on
+confirmation lays each root out. Planned and applied over the fake
+ZFS on the mac; the same cells on memory-disk pools on the box.
+
+Dimensions: what is named {nothing, each space, several lake and run
+roots, config or build twice}; each named dataset {missing, already a
+root of this space or another, inside or around another root, with
+children not shtetl's, with a partial layout of shtetl's, config or
+build without a mountpoint}; the settings {built-in, shtetl.conf's
+properties.default, properties.<space>}; the pool {ashift as
+recommended or not, autotrim off or on}; the apply {complete,
+interrupted and run again}; a layout child already there {as shtetl
+makes it, otherwise}; the run roots {the first, a later one};
+the recipes clone {asked, not asked, the root not empty, failing};
+confirmation {-y, a terminal's answer, no terminal}.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| B1 | nothing named, an unknown option, an option without its operand: a usage error | covered: run-cli.sh b1-none, b1-option, b1-operand, b1-recipes; b1-nozfs on the portable flavor |
+| B2 | a named dataset that does not exist is refused: shtetl uses datasets the user has | covered: check_boot.c |
+| B3 | a dataset that is already a root, of its space or another, is refused | covered: check_boot.c |
+| B4 | config or build named twice, or named where one exists, is refused | covered: check_boot.c |
+| B5 | a named root inside or around another root, existing or named alongside, is refused | covered: check_boot.c |
+| B6 | a lake or run root with a child that is not shtetl's layout is refused, naming it | covered: check_boot.c |
+| B7 | a config or build root with no mountpoint is refused | covered: check_boot.c |
+| B8 | the table: each root's properties, default, shtetl.conf's, the value used and the value now, the changes marked; the pool's ashift reported, with a warning when not 12, and autotrim | covered: check_boot.c |
+| B9 | a property's value: built-in, then properties.default, then properties.<space> | covered: check_boot.c |
+| B10 | a lake root laid out: foundations, foundation-builds, containers, systems, archive and its two; the root's properties; shtetl:space last | covered: check_boot.c |
+| B11 | the first run root laid out: foundations at /shtetl/foundations and never mounted, containers at /containers and mounted, systems | covered: check_boot.c |
+| B12 | a later run root: its containers inherits /containers but does not mount (canmount=off) | covered: check_boot.c |
+| B13 | the config root: with --recipes and an empty directory, a snapshot and then git clone; not empty, no clone; no --recipes, no clone; a failed clone leaves the root unmarked | covered: check_boot.c |
+| B14 | an apply interrupted (a create fails): no root marked; the same command again finishes, taking the layout already made | covered: check_boot.c |
+| B15 | a layout child already there but not as shtetl makes it is refused, naming the difference | covered: check_boot.c |
+| B16 | without -y and no terminal: refused, nothing done; -y: done; a terminal answers y or yes, anything else is no | covered: check_boot.c (the decision, sh_boot_confirm); the command itself on the box, tests/box |
+| B17 | the pool: autotrim set only when it differs; ashift never set | covered: check_boot.c |
+| B18 | a pool imported with an altroot: the layout's mountpoints are read below it | covered: check_boot.c |

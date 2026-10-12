@@ -38,7 +38,10 @@ struct sh_zfs {
 
 static struct zf_ds zf_ds[ZF_DS];
 static int zf_n;
+static char zf_snaps[ZF_DS][ZF_NAME];
+static int zf_nsnaps;
 static char zf_failing[32];
+static int zf_failin;		/* calls of zf_failing still to pass */
 static struct sh_zfs zf_handle;
 
 /* The native properties the fake knows, and their defaults. */
@@ -114,6 +117,10 @@ zf_fails(const char *what, struct sh_err *e)
 {
 	if (strcmp(zf_failing, what) != 0)
 		return (0);
+	if (zf_failin > 1) {
+		zf_failin--;
+		return (0);
+	}
 	zf_failing[0] = '\0';
 	sh_errf(e, "zfake: %s failed as asked", what);
 	return (1);
@@ -124,6 +131,7 @@ zfake_reset(void)
 {
 	(void) memset(zf_ds, 0, sizeof (zf_ds));
 	zf_n = 0;
+	zf_nsnaps = 0;
 	zf_failing[0] = '\0';
 }
 
@@ -161,6 +169,7 @@ zfake_pool(const char *pool)
 	zf_put(d->zd_pool, &d->zd_npool, "ashift", "12");
 	zf_put(d->zd_pool, &d->zd_npool, "autotrim", "off");
 	zf_put(d->zd_pool, &d->zd_npool, "bootfs", "-");
+	zf_put(d->zd_pool, &d->zd_npool, "altroot", "-");
 }
 
 void
@@ -186,7 +195,14 @@ zfake_set(const char *ds, const char *prop, const char *value)
 void
 zfake_fail(const char *what)
 {
+	zfake_fail_nth(what, 1);
+}
+
+void
+zfake_fail_nth(const char *what, int nth)
+{
 	(void) snprintf(zf_failing, sizeof (zf_failing), "%s", what);
+	zf_failin = nth;
 }
 
 int
@@ -199,6 +215,66 @@ int
 zfake_exists(const char *ds)
 {
 	return (zf_find(ds) != NULL);
+}
+
+int
+zfake_snapshot(const char *name)
+{
+	int i;
+
+	for (i = 0; i < zf_nsnaps; i++) {
+		if (strcmp(zf_snaps[i], name) == 0)
+			return (1);
+	}
+	return (0);
+}
+
+const char *
+zfake_last_snapshot(void)
+{
+	return (zf_nsnaps > 0 ? zf_snaps[zf_nsnaps - 1] : NULL);
+}
+
+int
+sh_zfs_snapshot(struct sh_zfs *z, const char *name,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e)
+{
+	char ds[ZF_NAME];
+	const char *at;
+
+	(void) z;
+	(void) props;
+	(void) nprops;
+	if (zf_fails("snapshot", e))
+		return (-1);
+	if ((at = strchr(name, '@')) == NULL || zf_nsnaps == ZF_DS) {
+		sh_errf(e, "zfake: %s: not a snapshot's name", name);
+		return (-1);
+	}
+	(void) snprintf(ds, sizeof (ds), "%.*s", (int)(at - name), name);
+	if (zf_find(ds) == NULL || zfake_snapshot(name)) {
+		sh_errf(e, "zfake: %s: no such filesystem, or taken", name);
+		return (-1);
+	}
+	(void) snprintf(zf_snaps[zf_nsnaps++], ZF_NAME, "%s", name);
+	return (0);
+}
+
+int
+sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	char mp[ZF_VAL];
+
+	if (zf_fails("mount", e))
+		return (-1);
+	if (sh_zfs_get(z, ds, "mountpoint", mp, sizeof (mp), NULL, e) != 0)
+		return (-1);
+	if (mp[0] != '/') {
+		sh_errf(e, "zfake: %s: no mountpoint", ds);
+		return (-1);
+	}
+	zfake_set(ds, "mounted", "yes");
+	return (0);
 }
 
 int

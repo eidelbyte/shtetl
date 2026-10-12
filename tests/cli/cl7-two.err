@@ -2,6 +2,8 @@ shtetl: config show takes one recipe at most
 usage: shtetl [-C dir] command ...
        shtetl [-C dir] config show [recipe]
        shtetl [-C dir] spaces
+       shtetl [-C dir] bootstrap [--lake ds]... [--run ds]... [--config ds]
+           [--build ds] [--recipes url] [-y]
 
   -C dir  the configuration root (the zshtetl-recipes clone);
           without it, the config root's mountpoint
@@ -9,5 +11,7 @@ usage: shtetl [-C dir] command ...
   config show: the recipe (foundations/F, containers/X, systems/S)
     with its layers merged, or the site's settings
   spaces: each space's roots, and where config and build are mounted
+  bootstrap: datasets you have made the roots of the spaces, and laid
+    out; shown first, done once confirmed (-y confirms)
 
 exit: 0 done, 1 refused (the reasons are on standard error), 2 usage

@@ -65,7 +65,7 @@ ZFS_CFLAGS = -I$(ZFS_TOP)/lib/libspl/include/os/freebsd \
 	-include $(ZFS_TOP)/include/os/freebsd/spl/sys/ccompile.h \
 	-include $(FREEBSD_SRC)/sys/modules/zfs/zfs_config.h \
 	-DNEED_SOLARIS_BOOLEAN -DHAVE_ISSETUGID -DHAVE_STRLCAT -DHAVE_STRLCPY
-ZFS_LIBS = -lzfs -lnvpair
+ZFS_LIBS = -lzfs -lzfs_core -lnvpair
 
 # Which flavor build/ holds, as in zfs_rebase: the two do not share
 # objects, and asking for the other empties build/ first.
@@ -74,7 +74,8 @@ BUILD = build
 
 CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o \
 	$(BUILD)/root.o $(BUILD)/syntax.o $(BUILD)/schema.o $(BUILD)/site.o \
-	$(BUILD)/cascade.o $(BUILD)/show.o $(BUILD)/run.o $(BUILD)/spaces.o
+	$(BUILD)/cascade.o $(BUILD)/show.o $(BUILD)/run.o $(BUILD)/spaces.o \
+	$(BUILD)/boot.o
 # src/core/zfs.h has three implementations, picked at the link: the
 # portable shtetl gets src/core/zstub.c, which refuses every call; the
 # FreeBSD one gets src/fbsd/zfs.c, over libzfs; the unit tests get
@@ -85,7 +86,7 @@ ZFS_OBJS = $(ZFS_OBJS_$(FLAVOR))
 TEST_OBJS = $(BUILD)/zfake.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(ZFS_OBJS) $(UCL_OBJS)
 TESTS = check_parse check_schema check_site check_cascade check_show \
-	check_run check_spaces
+	check_run check_spaces check_boot
 
 all: build shtetl
 
@@ -110,9 +111,9 @@ check-freebsd:
 	$(MAKE) FLAVOR=freebsd UCL=port CFLAGS="$(CFLAGS) -DSH_FREEBSD" \
 	    LDFLAGS="$(LDFLAGS) $(ZFS_LIBS)" check
 
-$(BUILD)/main.o: src/main.c src/core/cascade.h src/core/err.h \
-	src/core/root.h src/core/schema.h src/core/show.h src/core/site.h \
-	src/core/spaces.h src/core/tree.h src/core/zfs.h
+$(BUILD)/main.o: src/main.c src/core/boot.h src/core/cascade.h \
+	src/core/err.h src/core/root.h src/core/schema.h src/core/show.h \
+	src/core/site.h src/core/spaces.h src/core/tree.h src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/main.c
 $(BUILD)/err.o: src/core/err.c src/core/err.h src/core/tree.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/err.c
@@ -145,6 +146,10 @@ $(BUILD)/run.o: src/core/run.c src/core/run.h src/core/err.h
 $(BUILD)/spaces.o: src/core/spaces.c src/core/spaces.h src/core/err.h \
 	src/core/tree.h src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/spaces.c
+$(BUILD)/boot.o: src/core/boot.c src/core/boot.h src/core/err.h \
+	src/core/run.h src/core/site.h src/core/spaces.h src/core/syntax.h \
+	src/core/tree.h src/core/zfs.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/boot.c
 $(BUILD)/zstub.o: src/core/zstub.c src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/zstub.c
 $(BUILD)/fbsd_zfs.o: src/fbsd/zfs.c src/core/zfs.h src/core/err.h

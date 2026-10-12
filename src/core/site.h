@@ -34,4 +34,7 @@ unsigned sh_site_check(const struct sh_node *site, const char *file,
 int sh_site_load(const char *root, struct sh_site *s, struct sh_err *e);
 void sh_site_free(struct sh_site *s);
 
+/* The built-in settings alone (the caller frees them), or NULL. */
+struct sh_node *sh_site_builtins(struct sh_err *e);
+
 #endif	/* SH_SITE_H */

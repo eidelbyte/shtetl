@@ -90,6 +90,27 @@ sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
 }
 
 int
+sh_zfs_snapshot(struct sh_zfs *z, const char *name,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e)
+{
+	(void) z;
+	(void) name;
+	(void) props;
+	(void) nprops;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
+sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	(void) z;
+	(void) ds;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
 sh_zpool_get(struct sh_zfs *z, const char *pool, const char *prop,
     char *val, size_t len, struct sh_err *e)
 {

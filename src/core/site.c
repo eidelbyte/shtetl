@@ -264,6 +264,20 @@ site_merge(struct sh_node *dst, const struct sh_node *layer)
 	return (0);
 }
 
+struct sh_node *
+sh_site_builtins(struct sh_err *e)
+{
+	struct sh_node *built;
+
+	built = sh_parse_buf(site_builtin_text, sizeof (site_builtin_text) - 1,
+	    sh_site_builtin, e);
+	if (built != NULL && sh_site_check(built, sh_site_builtin, e) != 0) {
+		sh_node_free(built);
+		return (NULL);
+	}
+	return (built);
+}
+
 int
 sh_site_load(const char *root, struct sh_site *s, struct sh_err *e)
 {
@@ -272,14 +286,8 @@ sh_site_load(const char *root, struct sh_site *s, struct sh_err *e)
 
 	s->ss_merged = NULL;
 	s->ss_has_conf = 0;
-	built = sh_parse_buf(site_builtin_text, sizeof (site_builtin_text) - 1,
-	    sh_site_builtin, e);
-	if (built == NULL)
+	if ((built = sh_site_builtins(e)) == NULL)
 		return (-1);
-	if (sh_site_check(built, sh_site_builtin, e) != 0) {
-		sh_node_free(built);
-		return (-1);
-	}
 	conf = sh_root_parse(root, sh_site_conf, &missing, e);
 	if (conf == NULL && !missing) {
 		sh_node_free(built);

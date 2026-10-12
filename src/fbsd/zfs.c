@@ -21,6 +21,7 @@
 
 #include <libnvpair.h>
 #include <libzfs.h>
+#include <libzfs_core.h>
 #include <sys/fs/zfs.h>
 #include <sys/nvpair.h>
 
@@ -174,6 +175,25 @@ zz_open(struct sh_zfs *z, const char *ds, zfs_handle_t **zhpp,
 	return (-1);
 }
 
+/* nvlist_t *, built from PROPS; NULL when out of memory. */
+static nvlist_t *
+zz_props(const struct sh_zprop *props, size_t nprops)
+{
+	nvlist_t *nv;
+	size_t i;
+
+	if (nvlist_alloc(&nv, NV_UNIQUE_NAME, 0) != 0)
+		return (NULL);
+	for (i = 0; i < nprops; i++) {
+		if (nvlist_add_string(nv, props[i].zp_name,
+		    props[i].zp_value) != 0) {
+			nvlist_free(nv);
+			return (NULL);
+		}
+	}
+	return (nv);
+}
+
 int
 sh_zfs_get(struct sh_zfs *z, const char *ds, const char *prop, char *val,
     size_t len, enum sh_zsrc *src, struct sh_err *e)
@@ -283,20 +303,11 @@ sh_zfs_create(struct sh_zfs *z, const char *ds,
     const struct sh_zprop *props, size_t nprops, struct sh_err *e)
 {
 	nvlist_t *nv;
-	size_t i;
 	int r;
 
-	if (nvlist_alloc(&nv, NV_UNIQUE_NAME, 0) != 0) {
+	if ((nv = zz_props(props, nprops)) == NULL) {
 		sh_err_nomem(e);
 		return (-1);
-	}
-	for (i = 0; i < nprops; i++) {
-		if (nvlist_add_string(nv, props[i].zp_name,
-		    props[i].zp_value) != 0) {
-			nvlist_free(nv);
-			sh_err_nomem(e);
-			return (-1);
-		}
 	}
 	r = zfs_create(z->zz_hdl, ds, ZFS_TYPE_FILESYSTEM, nv);
 	nvlist_free(nv);
@@ -326,6 +337,87 @@ sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
 	return (r != 0 ? -1 : 0);
 }
 
+/*
+ * lzc_snapshot (lib/libzfs_core/libzfs_core.c): the snapshots as the
+ * keys of one nvlist, the properties in another, all of it one ioctl,
+ * so the snapshot exists with its properties or not at all.
+ */
+int
+sh_zfs_snapshot(struct sh_zfs *z, const char *name,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e)
+{
+	nvlist_t *snaps, *pv, *errlist;
+	int r;
+
+	(void) z;
+	errlist = NULL;
+	if ((pv = zz_props(props, nprops)) == NULL ||
+	    nvlist_alloc(&snaps, NV_UNIQUE_NAME, 0) != 0) {
+		nvlist_free(pv);
+		sh_err_nomem(e);
+		return (-1);
+	}
+	if (nvlist_add_boolean(snaps, name) != 0) {
+		nvlist_free(snaps);
+		nvlist_free(pv);
+		sh_err_nomem(e);
+		return (-1);
+	}
+	r = lzc_snapshot(snaps, nprops > 0 ? pv : NULL, &errlist);
+	nvlist_free(snaps);
+	nvlist_free(pv);
+	nvlist_free(errlist);
+	if (r != 0) {
+		sh_errf(e, "%s: %s", name, strerror(r));
+		return (-1);
+	}
+	return (0);
+}
+
+int
+sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	int r;
+
+	if ((r = zz_open(z, ds, &zhp, e)) != 0) {
+		if (r == 1)
+			sh_errf(e, "%s: no such filesystem", ds);
+		return (-1);
+	}
+	r = zfs_mount(zhp, NULL, 0);
+	if (r != 0)
+		zz_err(z, e, ds);
+	zfs_close(zhp);
+	return (r != 0 ? -1 : 0);
+}
+
+/*
+ * The largest ashift of the pool's top-level vdevs, from its config
+ * (ZPOOL_CONFIG_VDEV_TREE, its children, ZPOOL_CONFIG_ASHIFT).
+ */
+static int
+zz_ashift(zpool_handle_t *zph, char *val, size_t len)
+{
+	nvlist_t *config, *tree, **kids;
+	uint_t nkids, i;
+	uint64_t ashift, best;
+
+	if ((config = zpool_get_config(zph, NULL)) == NULL ||
+	    nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &tree) != 0 ||
+	    nvlist_lookup_nvlist_array(tree, ZPOOL_CONFIG_CHILDREN, &kids,
+	    &nkids) != 0)
+		return (-1);
+	best = 0;
+	for (i = 0; i < nkids; i++) {
+		if (nvlist_lookup_uint64(kids[i], ZPOOL_CONFIG_ASHIFT,
+		    &ashift) == 0 && ashift > best)
+			best = ashift;
+	}
+	(void) snprintf(val, len, "%llu", (unsigned long long)best);
+	return (0);
+}
+
 int
 sh_zpool_get(struct sh_zfs *z, const char *pool, const char *prop,
     char *val, size_t len, struct sh_err *e)
@@ -334,6 +426,18 @@ sh_zpool_get(struct sh_zfs *z, const char *pool, const char *prop,
 	zpool_prop_t p;
 	int r;
 
+	if (strcmp(prop, "ashift") == 0) {
+		if ((zph = zpool_open(z->zz_hdl, pool)) == NULL) {
+			zz_err(z, e, pool);
+			return (-1);
+		}
+		r = zz_ashift(zph, val, len);
+		zpool_close(zph);
+		if (r != 0)
+			sh_errf(e, "pool %s: no vdev tree in its config",
+			    pool);
+		return (r);
+	}
 	if ((p = zpool_name_to_prop(prop)) == ZPOOL_PROP_INVAL) {
 		sh_errf(e, "pool %s: no property %s", pool, prop);
 		return (-1);

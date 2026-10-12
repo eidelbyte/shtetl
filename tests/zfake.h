@@ -21,11 +21,19 @@ void zfake_fs(const char *ds);
 /* PROP of DS set locally. */
 void zfake_set(const char *ds, const char *prop, const char *value);
 
-/* The next call of the interface named WHAT ("local", "get", ...) fails. */
+/*
+ * The next call of the interface named WHAT ("local", "get", ...)
+ * fails; zfake_fail_nth, the Nth from now, counting from 1.
+ */
 void zfake_fail(const char *what);
+void zfake_fail_nth(const char *what, int nth);
 
 /* How many filesystems there are, and whether DS is one. */
 int zfake_count(void);
 int zfake_exists(const char *ds);
+
+/* Whether the snapshot NAME (ds@snap) was taken, and the last one. */
+int zfake_snapshot(const char *name);
+const char *zfake_last_snapshot(void);
 
 #endif	/* SH_ZFAKE_H */

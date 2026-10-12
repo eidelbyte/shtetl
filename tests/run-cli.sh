@@ -80,6 +80,14 @@ t cl6-bad -C tests/conf/site config show containers/bad
 t cl6-drop -C tests/conf/site config show containers/drop
 t cl6-notdir -C tests/conf/nonexistent config show
 t cl6-norecipe -C tests/conf/site config show containers/nope
+# B1: bootstrap's own usage errors.
+t b1-none bootstrap
+t b1-option bootstrap --lake tank/shtetl --frob
+t b1-operand bootstrap --lake
+t b1-recipes bootstrap --config tank/zconfig --recipes
+if [ "$(cat build/.flavor 2>/dev/null)" = portable ]; then
+	t b1-nozfs bootstrap --lake tank/shtetl -y
+fi
 # CL7: more than one recipe.
 t cl7-two -C tests/conf/site config show containers/nginx systems/x
 

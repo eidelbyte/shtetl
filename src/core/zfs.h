@@ -71,7 +71,22 @@ int sh_zfs_create(struct sh_zfs *z, const char *ds,
 int sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
     const char *value, struct sh_err *e);
 
-/* A pool's property, and setting one. */
+/*
+ * A snapshot, NAME being ds@snap, with PROPS set on it from its birth
+ * (lzc_snapshot: atomic).
+ */
+int sh_zfs_snapshot(struct sh_zfs *z, const char *name,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e);
+
+/* DS mounted where its mountpoint says. */
+int sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e);
+
+/*
+ * A pool's property, and setting one. "ashift" is answered with the
+ * ashift of the pool's top-level vdevs (the largest), which is what
+ * the disks were laid out with; the pool property of that name is
+ * only the default for vdevs added later.
+ */
 int sh_zpool_get(struct sh_zfs *z, const char *pool, const char *prop,
     char *val, size_t len, struct sh_err *e);
 int sh_zpool_set(struct sh_zfs *z, const char *pool, const char *prop,

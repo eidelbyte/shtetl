@@ -12,6 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "core/boot.h"
 #include "core/cascade.h"
 #include "core/err.h"
 #include "core/root.h"
@@ -46,6 +47,7 @@ struct sh_cmd {
 	int		(*cm_run)(struct sh_ctx *, int, char **);
 };
 
+static int cmd_bootstrap(struct sh_ctx *, int, char **);
 static int cmd_config_show(struct sh_ctx *, int, char **);
 static int cmd_spaces(struct sh_ctx *, int, char **);
 
@@ -56,6 +58,10 @@ static const struct sh_cmd sh_cmds[] = {
 	    "site's settings", cmd_config_show },
 	{ "spaces", NULL, "", "each space's roots, and where config and "
 	    "build are mounted", cmd_spaces },
+	{ "bootstrap", NULL, "[--lake ds]... [--run ds]... [--config ds]\n"
+	    "           [--build ds] [--recipes url] [-y]", "datasets you "
+	    "have made the roots of the spaces, and laid\n    out; shown "
+	    "first, done once confirmed (-y confirms)", cmd_bootstrap },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -237,6 +243,124 @@ cmd_spaces(struct sh_ctx *ctx, int argc, char **argv)
 	if (have)
 		sh_site_free(&site);
 	return (r == 0 ? out_done() : SH_EXIT_REFUSED);
+}
+
+/*
+ * The settings bootstrap uses: from -C's directory, the config root
+ * that is there already, or the config root being named (--config),
+ * when it is mounted; otherwise the built-in ones. 1 loaded into
+ * SITE, 0 none, -1 refused.
+ */
+static int
+boot_site(struct sh_ctx *ctx, const struct sh_bootreq *req,
+    struct sh_site *site, struct sh_err *e)
+{
+	char dir[SH_ZFS_VALMAX], mounted[SH_ZFS_VALMAX];
+	size_t i;
+
+	if (ctx->sc_root != NULL || ctx->sc_spaces.ss_n[SH_SP_CONFIG] > 0) {
+		if (ctx_root(ctx, e) != 0 ||
+		    sh_site_load(ctx->sc_root, site, e) != 0)
+			return (-1);
+		return (1);
+	}
+	for (i = 0; i < req->br_n; i++) {
+		if (req->br_sp[i] != SH_SP_CONFIG)
+			continue;
+		if (sh_zfs_get(ctx->sc_zfs, req->br_ds[i], "mountpoint", dir,
+		    sizeof (dir), NULL, e) != 0 ||
+		    sh_zfs_get(ctx->sc_zfs, req->br_ds[i], "mounted", mounted,
+		    sizeof (mounted), NULL, e) != 0)
+			return (0);
+		if (dir[0] != '/' || strcmp(mounted, "yes") != 0 ||
+		    sh_root_kind(dir, ".") != 'd')
+			return (0);
+		return (sh_site_load(dir, site, e) == 0 ? 1 : -1);
+	}
+	return (0);
+}
+
+/*
+ * bootstrap: the roots named, planned, shown, confirmed, applied
+ * (planning.md 4.2). --lake and --run as often as wanted.
+ */
+static int
+cmd_bootstrap(struct sh_ctx *ctx, int argc, char **argv)
+{
+	static const struct {
+		const char	*o_name;
+		enum sh_space	o_sp;
+	} opts[] = {
+		{ "--lake", SH_SP_LAKE }, { "--run", SH_SP_RUN },
+		{ "--config", SH_SP_CONFIG }, { "--build", SH_SP_BUILD }
+	};
+	struct sh_bootreq req;
+	struct sh_bplan *plan;
+	struct sh_site site;
+	struct sh_err e;
+	size_t j;
+	int i, yes, have, tty, rc;
+
+	(void) memset(&req, 0, sizeof (req));
+	yes = 0;
+	for (i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "-y") == 0 ||
+		    strcmp(argv[i], "--yes") == 0) {
+			yes = 1;
+			continue;
+		}
+		if (strcmp(argv[i], "--recipes") == 0) {
+			if (i + 1 == argc)
+				return (die_usage("--recipes needs a URL", ""));
+			req.br_recipes = argv[++i];
+			continue;
+		}
+		for (j = 0; j < sizeof (opts) / sizeof (opts[0]); j++) {
+			if (strcmp(argv[i], opts[j].o_name) == 0)
+				break;
+		}
+		if (j == sizeof (opts) / sizeof (opts[0]))
+			return (die_usage("bootstrap: unknown option ",
+			    argv[i]));
+		if (i + 1 == argc)
+			return (die_usage(argv[i], " needs a dataset"));
+		if (req.br_n == SH_BOOT_MAX)
+			return (die_usage("bootstrap: too many datasets", ""));
+		req.br_ds[req.br_n] = argv[++i];
+		req.br_sp[req.br_n++] = opts[j].o_sp;
+	}
+	if (req.br_n == 0)
+		return (die_usage("bootstrap names a dataset: --lake, --run, "
+		    "--config or --build", ""));
+	sh_err_init(&e, stderr, "shtetl: ");
+	if (ctx_zfs(ctx, &e) != 0)
+		return (SH_EXIT_REFUSED);
+	if ((have = boot_site(ctx, &req, &site, &e)) < 0)
+		return (SH_EXIT_REFUSED);
+	if ((plan = calloc(1, sizeof (*plan))) == NULL) {
+		sh_err_nomem(&e);
+		rc = SH_EXIT_REFUSED;
+	} else if (sh_boot_plan(ctx->sc_zfs, &ctx->sc_spaces,
+	    have ? site.ss_merged : NULL, &req, plan, &e) != 0) {
+		rc = SH_EXIT_REFUSED;
+	} else {
+		sh_boot_show(stdout, plan);
+		(void) fflush(stdout);
+		tty = isatty(STDIN_FILENO);
+		if (!sh_boot_confirm(stdin, stdout, yes, tty)) {
+			sh_errf(&e, "%s", tty ? "nothing done" : "not "
+			    "confirmed, so nothing done: with no terminal to "
+			    "ask, -y confirms");
+			rc = SH_EXIT_REFUSED;
+		} else {
+			rc = sh_boot_apply(ctx->sc_zfs, plan, stdout, &e) ==
+			    0 ? out_done() : SH_EXIT_REFUSED;
+		}
+	}
+	free(plan);
+	if (have)
+		sh_site_free(&site);
+	return (rc);
 }
 
 int
