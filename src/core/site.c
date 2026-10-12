@@ -16,15 +16,11 @@ const char sh_site_builtin[] = "(built-in)";
 const char sh_site_conf[] = "shtetl.conf";
 
 /*
- * The built-in settings: no space's default root (spaces is here, empty,
- * so that the sections keep shtetl.conf's order), 4.3's dataset
- * properties (mountpoint and canmount are shtetl's own and no
- * setting's), 6.3's policies at 0, everything, and the staging suffix
- * of 5.2.
+ * The built-in settings: 4.3's dataset properties (mountpoint and
+ * canmount are shtetl's own and no setting's), 6.3's policies at 0,
+ * everything, and the staging suffix of 5.2.
  */
 static const char site_builtin_text[] =
-	"spaces {\n"
-	"}\n"
 	"properties {\n"
 	"    default {\n"
 	"        atime = \"off\";\n"
@@ -46,7 +42,6 @@ static const char site_builtin_text[] =
 
 enum sv {
 	SV_SECTION,	/* an object of the keys in sk_sub */
-	SV_DSNAME,	/* a dataset's whole name */
 	SV_PROPS,	/* ZFS properties */
 	SV_COUNT,	/* an integer, 0 or more */
 	SV_POLICY,	/* 6.3: 0, a count, or a quoted interval */
@@ -61,15 +56,6 @@ struct skey {
 
 #define	SK_END	{ NULL, SV_SECTION, NULL }
 
-static const struct skey sk_space[] = {
-	{ "default", SV_DSNAME, NULL },
-	SK_END
-};
-static const struct skey sk_spaces[] = {
-	{ "lake", SV_SECTION, sk_space },
-	{ "run", SV_SECTION, sk_space },
-	SK_END
-};
 static const struct skey sk_properties[] = {
 	{ "default", SV_PROPS, NULL },
 	{ "lake", SV_PROPS, NULL },
@@ -93,7 +79,6 @@ static const struct skey sk_retention[] = {
 	SK_END
 };
 static const struct skey sk_top[] = {
-	{ "spaces", SV_SECTION, sk_spaces },
 	{ "properties", SV_SECTION, sk_properties },
 	{ "build", SV_SECTION, sk_build },
 	{ "update", SV_SECTION, sk_update },
@@ -192,18 +177,14 @@ ck_value(struct ck *x, const struct skey *k, const struct sh_node *v)
 		/* UCL reads an unquoted 30d as a number of seconds */
 		ck_type(x, "an integer or a quoted interval");
 		return;
-	case SV_DSNAME:
 	case SV_NAME:
 		if (v->sn_type != SH_STR) {
 			ck_type(x, "a string");
 			return;
 		}
-		why = k->sk_type == SV_NAME ? sh_syn_name(v->sn_str) :
-		    sh_syn_dsname(v->sn_str);
-		if (why != NULL)
+		if ((why = sh_syn_name(v->sn_str)) != NULL)
 			sh_err_at(x->ck_err, x->ck_file, &x->ck_path,
-			    "invalid %s: %s", k->sk_type == SV_NAME ? "name" :
-			    "dataset name", why);
+			    "invalid name: %s", why);
 		return;
 	}
 }

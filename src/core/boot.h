@@ -17,7 +17,7 @@
 #include "core/tree.h"
 #include "core/zfs.h"
 
-#define	SH_BOOT_MAX	16	/* roots in one bootstrap */
+#define	SH_BOOT_MAX	SH_SP_N	/* roots in one bootstrap: one a space */
 #define	SH_BOOT_ROWS	24	/* properties of one root */
 #define	SH_BOOT_KIDS	8	/* layout below one root */
 #define	SH_BOOT_NAME	256	/* a dataset's name */
@@ -81,7 +81,7 @@ struct sh_bplan {
  * The plan for REQ into P, given the roots S already found and the
  * settings SITE (the merged tree of src/core/site.c). Refused, with
  * every reason: a dataset that is not there, or is a root already; a
- * second config or build root; a root inside or around another; a
+ * second root of a space; a root inside or around another; a
  * lake or run root with children that are not shtetl's layout, or
  * with layout that is not as shtetl makes it; a config or build root
  * with no mountpoint.

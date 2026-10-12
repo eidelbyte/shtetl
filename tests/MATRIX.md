@@ -239,22 +239,20 @@ a child that leaves a process holding its output open.
 | R16 | a child that exits leaving a process holding its output: the run returns when the child exits | covered: check_run.c |
 | R17 | echo: the output also reaches standard error | covered: check_run.c |
 
-# Family D: discovery and multi-rooting (M2; planning.md 4.1; src/core/spaces.c)
+# Family D: discovery (M2; planning.md 4.1; src/core/spaces.c)
 
-The roots of the four spaces are found by the user property
-shtetl:space, set locally on each root. On the mac, a fake ZFS
+The roots of the four spaces, one to a space, are found by the user
+property shtetl:space, set locally on each root. On the mac, a fake ZFS
 (tests/zfake.c) stands in: an in-memory set of pools and filesystems
 with ZFS's inheritance; on the box, the same cells against pools on
 memory disks (tests/box).
 
 Dimensions: what carries the property {nothing, a pool's root
 dataset, a dataset deeper, a child that inherits it}; its value {each
-space, something else}; how many roots {none, one, several in one
-pool, several across pools} per space {lake and run take several,
-config and build one}; roots nested in roots; lookup of a name under
-a space's roots {no match, one, two}; the default root for something
-new {one root, several with and without spaces.X.default, a default
-that is no root of its space}; ZFS refusing the walk.
+space, something else}; how many roots per space {none, one, two in
+one pool, two across pools}; roots nested in roots; lookup of a name
+under a space's root {there, not there, no root}; ZFS refusing the
+walk.
 
 | cell | scenario | disposition |
 |------|----------|-------------|
@@ -262,37 +260,32 @@ that is no root of its space}; ZFS refusing the walk.
 | D2 | one root per space, a pool's root dataset among them | covered: check_spaces.c |
 | D3 | an inherited value is no root: a root's children are not roots | covered: check_spaces.c |
 | D4 | a value that names no space is refused, naming the dataset and the value | covered: check_spaces.c |
-| D5 | two config roots, or two build roots, are refused, naming both | covered: check_spaces.c |
-| D6 | several lake and run roots, in one pool and across pools, come back sorted by name | covered: check_spaces.c |
+| D5 | two roots of a space, any space, in one pool or across pools, are refused, naming both | covered: check_spaces.c |
 | D7 | a root inside another root is refused, naming both | covered: check_spaces.c |
-| D8 | lookup of a name under a space's roots: one match gives its name; none says so | covered: check_spaces.c |
-| D9 | lookup with the name under two roots is refused, naming both: one name, one place | covered: check_spaces.c |
+| D8 | lookup of a name under a space's root: there gives its name; not there, or no root, says so | covered: check_spaces.c |
 | D10 | lookup takes whole names only: foundations/F is not foundations/F2 | covered: check_spaces.c |
-| D11 | the default root: the only root; with several, spaces.X.default when it names one of them | covered: check_spaces.c |
-| D12 | the default refused: no root; several and no default; a default that is no root of that space | covered: check_spaces.c |
 | D13 | ZFS refusing the walk refuses the discovery, with ZFS's reason | covered: check_spaces.c |
 | D14 | the configuration is read from the config root's mountpoint, where it is mounted | covered: check_spaces.c |
 | D15 | the config root refused: none; no mountpoint (none, legacy); not mounted | covered: check_spaces.c |
-| D16 | shtetl spaces: each space's roots, the default lake and run roots marked, config and build with where they are mounted, a space with none saying so | covered: check_spaces.c |
+| D16 | shtetl spaces: each space's root, config and build with where they are mounted, a space with none saying so | covered: check_spaces.c |
 | D17 | a portable shtetl, with no -C, says it was built without ZFS | covered: run-cli.sh cl3-noroot, d17-spaces |
 
 # Family B: bootstrap and the property table (M2; planning.md 4.2, 4.3; src/core/boot.c)
 
-shtetl bootstrap names one or more datasets the user already has as
-roots of the spaces, shows what it will set and create, and on
+shtetl bootstrap names datasets the user already has as roots of the
+spaces, one to a space, shows what it will set and create, and on
 confirmation lays each root out. Planned and applied over the fake
 ZFS on the mac; the same cells on memory-disk pools on the box.
 
-Dimensions: what is named {nothing, each space, several lake and run
-roots, config or build twice}; each named dataset {missing, already a
+Dimensions: what is named {nothing, each space, a space twice}; each
+named dataset {missing, already a
 root of this space or another, inside or around another root, with
 children not shtetl's, with a partial layout of shtetl's, config or
 build without a mountpoint}; the settings {built-in, shtetl.conf's
 properties.default, properties.<space>}; the pool {ashift as
 recommended or not, autotrim off or on}; the apply {complete,
 interrupted and run again}; a layout child already there {as shtetl
-makes it, otherwise}; the run roots {the first, a later one};
-the recipes clone {asked, not asked, the root not empty, failing};
+makes it, otherwise}; the recipes clone {asked, not asked, the root not empty, failing};
 confirmation {-y, a terminal's answer, no terminal}.
 
 | cell | scenario | disposition |
@@ -300,15 +293,14 @@ confirmation {-y, a terminal's answer, no terminal}.
 | B1 | nothing named, an unknown option, an option without its operand: a usage error | covered: run-cli.sh b1-none, b1-option, b1-operand, b1-recipes; b1-nozfs on the portable flavor |
 | B2 | a named dataset that does not exist is refused: shtetl uses datasets the user has | covered: check_boot.c |
 | B3 | a dataset that is already a root, of its space or another, is refused | covered: check_boot.c |
-| B4 | config or build named twice, or named where one exists, is refused | covered: check_boot.c |
+| B4 | a space named twice, or named where it has a root, is refused: one root to a space | covered: check_boot.c; run-cli.sh for the option given twice |
 | B5 | a named root inside or around another root, existing or named alongside, is refused | covered: check_boot.c |
 | B6 | a lake or run root with a child that is not shtetl's layout is refused, naming it | covered: check_boot.c |
 | B7 | a config or build root with no mountpoint is refused | covered: check_boot.c |
 | B8 | the table: each root's properties, default, shtetl.conf's, the value used and the value now, the changes marked; the pool's ashift reported, with a warning when not 12, and autotrim | covered: check_boot.c |
 | B9 | a property's value: built-in, then properties.default, then properties.<space> | covered: check_boot.c |
 | B10 | a lake root laid out: foundations, foundation-builds, containers, systems, archive and its two; the root's properties; shtetl:space last | covered: check_boot.c |
-| B11 | the first run root laid out: foundations at /shtetl/foundations and never mounted, containers at /containers and mounted, systems | covered: check_boot.c |
-| B12 | a later run root: its containers inherits /containers but does not mount (canmount=off) | covered: check_boot.c |
+| B11 | the run root laid out: foundations at /shtetl/foundations and never mounted, containers at /containers and mounted, systems | covered: check_boot.c |
 | B13 | the config root: with --recipes and an empty directory, a snapshot and then git clone; not empty, no clone; no --recipes, no clone; a failed clone leaves the root unmarked | covered: check_boot.c |
 | B14 | an apply interrupted (a create fails): no root marked; the same command again finishes, taking the layout already made | covered: check_boot.c |
 | B15 | a layout child already there but not as shtetl makes it is refused, naming the difference | covered: check_boot.c |
@@ -316,10 +308,11 @@ confirmation {-y, a terminal's answer, no terminal}.
 | B17 | the pool: autotrim set only when it differs; ashift never set | covered: check_boot.c |
 | B18 | a pool imported with an altroot: the layout's mountpoints are read below it | covered: check_boot.c |
 
-On the box, tests/box/run.sh runs D1, D2, D5, D6, D14, D16, B3, B6,
-B8, B10 - B14 and B16 - B18 again, as commands against two pools on
-memory disks, and logs each by its cell. All passed on KIDON
-(15.1-RELEASE-p2, OpenZFS 2.4.2) at 1ef5e85, 2026-10-12: 53 checks,
-tests/box/results/KIDON-20261012T111021Z.log. B13 ran with git; B8
+On the box, tests/box/run.sh runs D1, D2, D5, D14, D16, B3, B4, B6,
+B8, B10, B11, B13, B14 and B16 - B18 again, as commands against two pools on
+memory disks, and logs each by its cell. The script as it was passed
+on KIDON (15.1-RELEASE-p2, OpenZFS 2.4.2) at 1ef5e85, 2026-10-12: 53
+checks, tests/box/results/KIDON-20261012T111021Z.log; as it is, with
+one root to a space, it has not run there yet. B13 ran with git; B8
 with the ashift warning, the memory disks having another ashift than
 12.

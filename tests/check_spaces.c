@@ -1,12 +1,11 @@
 /*
- * Discovery and multi-rooting (planning.md 4.1): tests/MATRIX.md
- * family D, every cell (D1 - D13), over the fake ZFS of tests/zfake.c.
+ * Discovery (planning.md 4.1): tests/MATRIX.md family D, every cell,
+ * over the fake ZFS of tests/zfake.c.
  */
 
 #include <string.h>
 
 #include "check.h"
-#include "core/parse.h"
 #include "core/spaces.h"
 #include "core/zfs.h"
 #include "zfake.h"
@@ -23,20 +22,11 @@ D(void)
 	return (sh_spaces_discover(z, &s, &c.c_err));
 }
 
-/* The roots of SP, space-separated. */
+/* The root of SP, or "" when it has none. */
 static const char *
-roots(enum sh_space sp)
+root(enum sh_space sp)
 {
-	static char buf[1024];
-	size_t i, n;
-
-	buf[0] = '\0';
-	for (i = 0; i < s.ss_n[sp]; i++) {
-		n = strlen(buf);
-		(void) snprintf(buf + n, sizeof (buf) - n, "%s%s",
-		    i > 0 ? " " : "", s.ss_roots[sp][i]);
-	}
-	return (buf);
+	return (s.ss_root[sp] != NULL ? s.ss_root[sp] : "");
 }
 
 static int
@@ -59,7 +49,7 @@ pools(void)
 	zfake_pool("fast");
 }
 
-/* D1 - D3, D6: finding the roots. */
+/* D1 - D3: finding the roots. */
 static void
 test_found(void)
 {
@@ -68,7 +58,7 @@ test_found(void)
 	pools();
 	CHECK(D() == 0);
 	for (sp = 0; sp < SH_SP_N; sp++)
-		CHECK(s.ss_n[sp] == 0);
+		CHECK(s.ss_root[sp] == NULL);
 
 	/* D2: a pool's root is a root as well as anything deeper */
 	zfake_set("fast", SH_SPACE_PROP, "run");
@@ -82,22 +72,10 @@ test_found(void)
 	zfake_fs("tank/shtetl/foundations");
 	zfake_fs("fast/containers");
 	CHECK(D() == 0);
-	CHECK(is(roots(SH_SP_LAKE), "tank/shtetl"));
-	CHECK(is(roots(SH_SP_CONFIG), "tank/zconfig"));
-	CHECK(is(roots(SH_SP_BUILD), "tank/zbuild"));
-	CHECK(is(roots(SH_SP_RUN), "fast"));
-
-	/* D6: several, across pools, sorted */
-	zfake_fs("tank/run2");
-	zfake_set("tank/run2", SH_SPACE_PROP, "run");
-	zfake_pool("big");
-	zfake_fs("big/lake");
-	zfake_set("big/lake", SH_SPACE_PROP, "lake");
-	zfake_fs("tank/lake0");
-	zfake_set("tank/lake0", SH_SPACE_PROP, "lake");
-	CHECK(D() == 0);
-	CHECK(is(roots(SH_SP_LAKE), "big/lake tank/lake0 tank/shtetl"));
-	CHECK(is(roots(SH_SP_RUN), "fast tank/run2"));
+	CHECK(is(root(SH_SP_LAKE), "tank/shtetl"));
+	CHECK(is(root(SH_SP_CONFIG), "tank/zconfig"));
+	CHECK(is(root(SH_SP_BUILD), "tank/zbuild"));
+	CHECK(is(root(SH_SP_RUN), "fast"));
 	CHECK(strcmp(sh_space_name(SH_SP_RUN), "run") == 0);
 }
 
@@ -120,26 +98,38 @@ test_refused(void)
 	zfake_fs("fast/b2");
 	zfake_set("fast/b1", SH_SPACE_PROP, "build");
 	zfake_set("fast/b2", SH_SPACE_PROP, "build");
+	zfake_pool("big");
+	zfake_fs("big/lake");
+	zfake_set("big/lake", SH_SPACE_PROP, "lake");
+	zfake_fs("tank/lake");
+	zfake_set("tank/lake", SH_SPACE_PROP, "lake");
+	zfake_fs("big/run");
+	zfake_set("big/run", SH_SPACE_PROP, "run");
+	zfake_fs("tank/run");
+	zfake_set("tank/run", SH_SPACE_PROP, "run");
 	CHECK(D() == -1);
-	CHECK(c.c_err.se_count == 2);
+	CHECK(c.c_err.se_count == 4);
 	CHECK(cap_has(&c, "two config roots: tank/c1 and tank/c2\n"));
 	CHECK(cap_has(&c, "two build roots: fast/b1 and fast/b2\n"));
+	CHECK(cap_has(&c, "two lake roots: big/lake and tank/lake\n"));
+	CHECK(cap_has(&c, "two run roots: big/run and tank/run\n"));
+	CHECK(s.ss_root[SH_SP_LAKE] == NULL && s.ss_root[SH_SP_RUN] == NULL);
 
-	/* D7: inside another root, of the same space or another */
+	/* D7: inside another root */
 	pools();
 	zfake_fs("tank/shtetl");
 	zfake_set("tank/shtetl", SH_SPACE_PROP, "lake");
 	zfake_fs("tank/shtetl/run");
 	zfake_set("tank/shtetl/run", SH_SPACE_PROP, "run");
-	zfake_set("fast", SH_SPACE_PROP, "lake");
+	zfake_set("fast", SH_SPACE_PROP, "config");
 	zfake_fs("fast/deep");
-	zfake_fs("fast/deep/lake");
-	zfake_set("fast/deep/lake", SH_SPACE_PROP, "lake");
+	zfake_fs("fast/deep/build");
+	zfake_set("fast/deep/build", SH_SPACE_PROP, "build");
 	CHECK(D() == -1);
 	CHECK(c.c_err.se_count == 2);
 	CHECK(cap_has(&c, "tank/shtetl/run: run root inside lake root "
 	    "tank/shtetl"));
-	CHECK(cap_has(&c, "fast/deep/lake: lake root inside lake root "
+	CHECK(cap_has(&c, "fast/deep/build: build root inside config root "
 	    "fast"));
 	/* a name that only begins like a root's is not inside it */
 	pools();
@@ -155,7 +145,7 @@ test_refused(void)
 	CHECK(cap_has(&c, "zfake: local failed as asked"));
 }
 
-/* D8 - D10: one name, one place. */
+/* D8, D10: a name under its space's root. */
 static void
 test_lookup(void)
 {
@@ -167,8 +157,6 @@ test_lookup(void)
 	zfake_fs("tank/shtetl/foundations");
 	zfake_fs("tank/shtetl/foundations/generic");
 	zfake_fs("tank/shtetl/foundations/F2");
-	zfake_set("fast", SH_SPACE_PROP, "lake");
-	zfake_fs("fast/foundations");
 	CHECK(D() == 0);
 	CHECK(sh_spaces_lookup(z, &s, SH_SP_LAKE, "foundations/generic", &out,
 	    &c.c_err) == 0);
@@ -184,73 +172,12 @@ test_lookup(void)
 	/* nothing in run: no root, no match */
 	CHECK(sh_spaces_lookup(z, &s, SH_SP_RUN, "foundations/generic", &out,
 	    &c.c_err) == 1);
-	/* D9 */
-	zfake_fs("fast/foundations/generic");
-	CHECK(sh_spaces_lookup(z, &s, SH_SP_LAKE, "foundations/generic", &out,
-	    &c.c_err) == -1);
-	CHECK(out == NULL);
-	CHECK(cap_has(&c, "foundations/generic: under two lake roots: "
-	    "fast/foundations/generic and tank/shtetl/foundations/generic"));
 	/* ZFS refusing the look */
 	cap_reset(&c);
 	zfake_fail("get");
 	CHECK(sh_spaces_lookup(z, &s, SH_SP_LAKE, "foundations/x", &out,
 	    &c.c_err) == -1);
 	CHECK(cap_has(&c, "zfake: get failed as asked"));
-}
-
-/* TEXT parsed as shtetl.conf; the caller frees it. */
-static struct sh_node *
-conf(const char *text)
-{
-	struct sh_node *n;
-
-	n = sh_parse_buf(text, strlen(text), "shtetl.conf", &c.c_err);
-	CHECK(n != NULL);
-	return (n);
-}
-
-/* D11, D12: where something new goes. */
-static void
-test_default(void)
-{
-	struct sh_node *site;
-	const char *root;
-
-	pools();
-	CHECK(D() == 0);
-	CHECK(sh_spaces_default(&s, NULL, SH_SP_LAKE, &root, &c.c_err) == -1);
-	CHECK(root == NULL);
-	CHECK(cap_has(&c, "no lake root\n"));
-
-	zfake_fs("tank/shtetl");
-	zfake_set("tank/shtetl", SH_SPACE_PROP, "lake");
-	CHECK(D() == 0);
-	CHECK(sh_spaces_default(&s, NULL, SH_SP_LAKE, &root, &c.c_err) == 0);
-	CHECK(is(root, "tank/shtetl"));
-	/* one root, and a default that names another: refused */
-	site = conf("spaces { lake { default = \"fast/lake\"; } }");
-	CHECK(sh_spaces_default(&s, site, SH_SP_LAKE, &root, &c.c_err) == -1);
-	CHECK(cap_has(&c, "shtetl.conf: spaces.lake.default: fast/lake is not "
-	    "a lake root"));
-
-	zfake_fs("fast/lake");
-	zfake_set("fast/lake", SH_SPACE_PROP, "lake");
-	CHECK(D() == 0);
-	CHECK(sh_spaces_default(&s, NULL, SH_SP_LAKE, &root, &c.c_err) == -1);
-	CHECK(cap_has(&c, "2 lake roots and no spaces.lake.default"));
-	CHECK(sh_spaces_default(&s, site, SH_SP_LAKE, &root, &c.c_err) == 0);
-	CHECK(is(root, "fast/lake"));
-	sh_node_free(site);
-	/* a run root named as the lake's default */
-	zfake_fs("fast/run");
-	zfake_set("fast/run", SH_SPACE_PROP, "run");
-	CHECK(D() == 0);
-	site = conf("spaces { lake { default = \"fast/run\"; } }");
-	cap_reset(&c);
-	CHECK(sh_spaces_default(&s, site, SH_SP_LAKE, &root, &c.c_err) == -1);
-	CHECK(cap_has(&c, "fast/run is not a lake root"));
-	sh_node_free(site);
 }
 
 /* D14, D15: the directory the configuration is read from. */
@@ -290,7 +217,7 @@ test_config_dir(void)
 static char *shownbuf;
 
 static const char *
-shown(const struct sh_node *site)
+shown(void)
 {
 	size_t len;
 	FILE *f;
@@ -299,7 +226,7 @@ shown(const struct sh_node *site)
 	shownbuf = NULL;
 	f = open_memstream(&shownbuf, &len);
 	CHECK(f != NULL);
-	CHECK(sh_spaces_show(f, z, &s, site, &c.c_err) == 0);
+	CHECK(sh_spaces_show(f, z, &s, &c.c_err) == 0);
 	CHECK(fclose(f) == 0);
 	return (shownbuf);
 }
@@ -308,11 +235,9 @@ shown(const struct sh_node *site)
 static void
 test_show(void)
 {
-	struct sh_node *site;
-
 	pools();
 	CHECK(D() == 0);
-	CHECK(is(shown(NULL),
+	CHECK(is(shown(),
 	    "lake    -  none: shtetl bootstrap makes one\n"
 	    "config  -  none: shtetl bootstrap makes one\n"
 	    "build   -  none: shtetl bootstrap makes one\n"
@@ -328,25 +253,12 @@ test_show(void)
 	zfake_set("tank/zbuild", SH_SPACE_PROP, "build");
 	zfake_set("tank/zbuild", "mountpoint", "/usr/src");
 	zfake_set("fast", SH_SPACE_PROP, "run");
-	zfake_fs("tank/run2");
-	zfake_set("tank/run2", SH_SPACE_PROP, "run");
 	CHECK(D() == 0);
-	CHECK(is(shown(NULL),
+	CHECK(is(shown(),
 	    "lake    tank/lake\n"
 	    "config  tank/zconfig  mounted at /zconfig\n"
 	    "build   tank/zbuild  not mounted\n"
-	    "run     fast\n"
-	    "run     tank/run2\n"
-	    "           no default: shtetl.conf names none as "
-	    "spaces.run.default\n"));
-	site = conf("spaces { run { default = \"tank/run2\"; } }");
-	CHECK(is(shown(site),
-	    "lake    tank/lake\n"
-	    "config  tank/zconfig  mounted at /zconfig\n"
-	    "build   tank/zbuild  not mounted\n"
-	    "run     fast\n"
-	    "run     tank/run2  default\n"));
-	sh_node_free(site);
+	    "run     fast\n"));
 }
 
 int
@@ -357,7 +269,6 @@ main(void)
 	test_found();
 	test_refused();
 	test_lookup();
-	test_default();
 	test_config_dir();
 	test_show();
 	free(shownbuf);

@@ -55,11 +55,7 @@ bad(const char *text, const char *want)
 static void
 test_example(void)
 {
-	ok("spaces {\n"
-	    "    lake { default = \"tank/shtetl\"; }   # several lake roots\n"
-	    "    run  { default = \"fast/shtetl/run\"; }\n"
-	    "}\n"
-	    "properties {\n"
+	ok("properties {\n"
 	    "    default { compression = \"zstd\"; }\n"
 	    "    lake    { compression = \"zstd-9\"; }\n"
 	    "}\n"
@@ -76,27 +72,13 @@ test_example(void)
 	    "}\n");
 }
 
-/* CS2, CS3, CS10: sections and keys, spaces. */
+/* CS2, CS10: sections and keys. */
 static void
 test_keys(void)
 {
 	bad("frob { }", "shtetl.conf: frob: invalid key");
 	bad("build { jobs = 1; }", "build.jobs: invalid key");
 	bad("build = 4;", "build: must be an object");
-	/* CS3 */
-	bad("spaces { config { default = \"tank/c\"; } }", "spaces.config: "
-	    "invalid key");
-	bad("spaces { build { default = \"tank/b\"; } }", "spaces.build: "
-	    "invalid key");
-	bad("spaces { lake { other = 1; } }", "spaces.lake.other: invalid "
-	    "key");
-	bad("spaces { lake { default = \"/tank\"; } }", "spaces.lake.default: "
-	    "invalid dataset name: leading /");
-	bad("spaces { run { default = \"1tank/x\"; } }", "invalid dataset "
-	    "name: pool name must begin with a letter");
-	bad("spaces { run { default = 5; } }", "spaces.run.default: must be "
-	    "a string");
-	ok("spaces { lake { default = \"tank\"; } }");
 	/* CS10 */
 	bad("retention { lake = 5; }", "retention.lake: invalid key");
 }
@@ -205,9 +187,7 @@ test_load(void)
 	CHECK(v != NULL && v->sn_type == SH_INT && v->sn_int == 0);
 	v = sh_obj_get(sh_obj_get(s.ss_merged, "build"), "make_jobs");
 	CHECK(v != NULL && v->sn_type == SH_INT && v->sn_int == 0);
-	v = sh_obj_get(s.ss_merged, "spaces");
-	CHECK(v != NULL && v->sn_type == SH_OBJECT && v->sn_obj.ob_n == 0);
-	CHECK(strcmp(s.ss_merged->sn_obj.ob_v[0].pr_key, "spaces") == 0);
+	CHECK(strcmp(s.ss_merged->sn_obj.ob_v[0].pr_key, "properties") == 0);
 	sh_site_free(&s);
 
 	/* shtetl.conf sets one property and adds a section */

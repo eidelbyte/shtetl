@@ -16,11 +16,7 @@
  *	config, build	their own mountpoint, which they must have; the
  *			config root is mounted, being read on every run
  *
- * With several run roots, one containers dataset is mounted at
- * /containers: the first run root's. Every later one inherits the
- * mountpoint with canmount=off, so its containers mount at
- * /containers/X inside the one directory and none hides another
- * (PROPOSAL).
+ * One root to a space: the layout of each is there once.
  *
  * Decided here (PROPOSAL): bootstrap uses datasets the user has and
  * creates none of the roots; it refuses a lake or run root with any
@@ -54,25 +50,26 @@ extern char **environ;
 struct bl_spec {
 	const char	*ls_rel;
 	const char	*ls_mountpoint;
-	const char	*ls_canmount;	/* "own": on for /containers' owner */
+	const char	*ls_canmount;
+	int		ls_mount;	/* mounted once made */
 };
 
 static const struct bl_spec bl_lake[] = {
-	{ "foundations", NULL, NULL },
-	{ "foundation-builds", NULL, NULL },
-	{ "containers", NULL, NULL },
-	{ "systems", NULL, NULL },
-	{ "archive", NULL, NULL },
-	{ "archive/containers", NULL, NULL },
-	{ "archive/systems", NULL, NULL },
-	{ NULL, NULL, NULL }
+	{ "foundations", NULL, NULL, 0 },
+	{ "foundation-builds", NULL, NULL, 0 },
+	{ "containers", NULL, NULL, 0 },
+	{ "systems", NULL, NULL, 0 },
+	{ "archive", NULL, NULL, 0 },
+	{ "archive/containers", NULL, NULL, 0 },
+	{ "archive/systems", NULL, NULL, 0 },
+	{ NULL, NULL, NULL, 0 }
 };
 
 static const struct bl_spec bl_run[] = {
-	{ "foundations", "/shtetl/foundations", "off" },
-	{ "containers", "/containers", "own" },
-	{ "systems", NULL, NULL },
-	{ NULL, NULL, NULL }
+	{ "foundations", "/shtetl/foundations", "off", 0 },
+	{ "containers", "/containers", "on", 1 },
+	{ "systems", NULL, NULL, 0 },
+	{ NULL, NULL, NULL, 0 }
 };
 
 /* One planning. */
@@ -83,7 +80,6 @@ struct bx {
 	const struct sh_node	*bx_built;
 	struct sh_bplan		*bx_p;
 	struct sh_err		*bx_err;
-	const char		*bx_owner;	/* mounts /containers */
 	int			bx_bad;
 };
 
@@ -304,16 +300,9 @@ bx_layout(struct bx *x, struct sh_broot *rt)
 		}
 		if (spec->ls_canmount != NULL) {
 			kid->bk_props[kid->bk_n].zp_name = "canmount";
-			if (strcmp(spec->ls_canmount, "own") == 0) {
-				kid->bk_mount = x->bx_owner != NULL &&
-				    strcmp(x->bx_owner, rt->rt_ds) == 0;
-				kid->bk_props[kid->bk_n++].zp_value =
-				    kid->bk_mount ? "on" : "off";
-			} else {
-				kid->bk_props[kid->bk_n++].zp_value =
-				    spec->ls_canmount;
-			}
+			kid->bk_props[kid->bk_n++].zp_value = spec->ls_canmount;
 		}
+		kid->bk_mount = spec->ls_mount;
 		r = sh_zfs_get(x->bx_z, kid->bk_ds, "type", val, sizeof (val),
 		    NULL, x->bx_err);
 		if (r < 0) {
@@ -405,16 +394,20 @@ bx_root(struct bx *x, const struct sh_bootreq *req, size_t i)
 	bx_now(x, rt);
 }
 
-/* A config or build root more than one: named twice, or one there. */
+/*
+ * A second root of SP: one there already, and another named. Naming
+ * the root itself again is bx_root's "already a root".
+ */
 static void
 bx_single(struct bx *x, const struct sh_bootreq *req, enum sh_space sp)
 {
 	const char *first;
 	size_t i;
 
-	first = x->bx_s->ss_n[sp] > 0 ? x->bx_s->ss_roots[sp][0] : NULL;
+	first = x->bx_s->ss_root[sp];
 	for (i = 0; i < req->br_n; i++) {
-		if (req->br_sp[i] != sp)
+		if (req->br_sp[i] != sp || (first != NULL &&
+		    strcmp(first, req->br_ds[i]) == 0))
 			continue;
 		if (first != NULL) {
 			sh_errf(x->bx_err, "two %s roots: %s and %s",
@@ -444,41 +437,15 @@ bx_nesting(struct bx *x, const struct sh_bootreq *req)
 			}
 		}
 		for (sp = 0; sp < SH_SP_N; sp++) {
-			for (j = 0; j < x->bx_s->ss_n[sp]; j++) {
-				b = x->bx_s->ss_roots[sp][j];
-				if (bx_inside(a, b) || bx_inside(b, a)) {
-					sh_errf(x->bx_err, "%s: overlaps %s "
-					    "root %s", a, sh_space_name(sp), b);
-					x->bx_bad = 1;
-				}
+			if ((b = x->bx_s->ss_root[sp]) == NULL)
+				continue;
+			if (bx_inside(a, b) || bx_inside(b, a)) {
+				sh_errf(x->bx_err, "%s: overlaps %s root %s", a,
+				    sh_space_name(sp), b);
+				x->bx_bad = 1;
 			}
 		}
 	}
-}
-
-/*
- * The run root whose containers is mounted at /containers: a run root
- * found already whose containers has canmount=on, or else the first
- * run root named.
- */
-static const char *
-bx_owner(struct bx *x, const struct sh_bootreq *req)
-{
-	char ds[SH_BOOT_NAME + 16], val[SH_ZFS_VALMAX];
-	size_t i;
-
-	for (i = 0; i < x->bx_s->ss_n[SH_SP_RUN]; i++) {
-		(void) snprintf(ds, sizeof (ds), "%s/containers",
-		    x->bx_s->ss_roots[SH_SP_RUN][i]);
-		if (sh_zfs_get(x->bx_z, ds, "canmount", val, sizeof (val), NULL,
-		    x->bx_err) == 0 && strcmp(val, "on") == 0)
-			return (x->bx_s->ss_roots[SH_SP_RUN][i]);
-	}
-	for (i = 0; i < req->br_n; i++) {
-		if (req->br_sp[i] == SH_SP_RUN)
-			return (req->br_ds[i]);
-	}
-	return (NULL);
 }
 
 static void
@@ -520,6 +487,7 @@ sh_boot_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	struct sh_node *built;
 	struct bx x;
 	size_t i;
+	int sp;
 
 	(void) memset(p, 0, sizeof (*p));
 	p->bt_recipes = req->br_recipes;
@@ -536,11 +504,10 @@ sh_boot_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	x.bx_built = built;
 	x.bx_p = p;
 	x.bx_err = e;
-	bx_single(&x, req, SH_SP_CONFIG);
-	bx_single(&x, req, SH_SP_BUILD);
+	for (sp = 0; sp < SH_SP_N; sp++)
+		bx_single(&x, req, (enum sh_space)sp);
 	bx_nesting(&x, req);
 	if (!x.bx_bad) {
-		x.bx_owner = bx_owner(&x, req);
 		for (i = 0; i < req->br_n; i++)
 			bx_root(&x, req, i);
 		bx_pools(&x);

@@ -184,6 +184,16 @@ test_refused(void)
 	zfake_fs("fast/src");
 	ask("fast/src", SH_SP_BUILD);
 	refused("two build roots: tank/zbuild and fast/src");
+	world();
+	zfake_set("tank/shtetl", SH_SPACE_PROP, "lake");
+	zfake_fs("fast/lake");
+	ask("fast/lake", SH_SP_LAKE);
+	refused("two lake roots: tank/shtetl and fast/lake");
+	world();
+	zfake_fs("tank/run");
+	ask("fast/run", SH_SP_RUN);
+	ask("tank/run", SH_SP_RUN);
+	refused("two run roots: fast/run and tank/run");
 	/* B5 */
 	world();
 	zfake_fs("tank/shtetl/run");
@@ -225,7 +235,7 @@ test_refused(void)
 	refused("tank/zbuild: no mountpoint");
 }
 
-/* B8, B10, B11, B17: the whole of a first bootstrap. */
+/* B4, B8, B10, B11, B17: the whole of a bootstrap. */
 static void
 test_first(void)
 {
@@ -295,21 +305,23 @@ test_first(void)
 	/* the marks come last */
 	CHECK(strstr(out, "is a lake root") > strstr(out, "mounted "));
 	discover();
-	CHECK(s.ss_n[SH_SP_LAKE] == 1 && s.ss_n[SH_SP_RUN] == 1);
-	CHECK(s.ss_n[SH_SP_CONFIG] == 1 && s.ss_n[SH_SP_BUILD] == 1);
+	CHECK(s.ss_root[SH_SP_LAKE] != NULL && s.ss_root[SH_SP_RUN] != NULL);
+	CHECK(s.ss_root[SH_SP_CONFIG] != NULL &&
+	    s.ss_root[SH_SP_BUILD] != NULL);
 
-	/* B12: a later run root */
+	/* B4: one root to a space, so none more */
 	zfake_fs("tank/run2");
 	(void) memset(&req, 0, sizeof (req));
 	ask("tank/run2", SH_SP_RUN);
+	refused("two run roots: fast/run and tank/run2");
+
+	/* B17: a pool's autotrim on already is left alone */
+	world();
+	CHECK(sh_zpool_set(z, "tank", "autotrim", "on", &c.c_err) == 0);
+	ask("tank/shtetl", SH_SP_LAKE);
 	CHECK(plan(NULL) == 0);
-	CHECK(has(out, "  + tank/run2/containers  mountpoint=/containers, "
-	    "canmount=off\n"));
-	/* B17: autotrim is on by now */
 	CHECK(has(out, "pool tank: ashift 12; autotrim on\n"));
 	CHECK(apply() == 0);
-	CHECK(local("tank/run2/containers", "canmount", "off"));
-	CHECK(is(prop("tank/run2/containers", "mounted", NULL), "no"));
 	CHECK(strstr(out, "autotrim") == NULL);
 }
 

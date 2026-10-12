@@ -192,7 +192,7 @@ test_site(void)
 
 	(void) scratch_write("site/shtetl.conf",
 	    "properties { default { compression = \"zstd-9\"; } }\n"
-	    "spaces { lake { default = \"tank/shtetl\"; } }\n");
+	    "update { suffix = \"soak\"; }\n");
 	cap_reset(&c);
 	CHECK(sh_site_load(scratch_path("site"), &s, &c.c_err) == 0);
 	free(out);
@@ -203,8 +203,9 @@ test_site(void)
 	CHECK(fclose(f) == 0);
 	round_trip(s.ss_merged);
 	CHECK(has("# the site's settings: shtetl.conf over the built-in "
-	    "ones\nspaces {\n    lake {\n"
-	    "        default = \"tank/shtetl\";  # shtetl.conf\n"));
+	    "ones\nproperties {\n    default {\n"));
+	CHECK(has("\n    suffix = \"soak\";  # shtetl.conf, over "
+	    "(built-in)\n"));
 	CHECK(has("\n        atime = \"off\";  # (built-in)\n"));
 	CHECK(has("\n        compression = \"zstd-9\";  # shtetl.conf, over "
 	    "(built-in)\n"));

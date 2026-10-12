@@ -85,6 +85,7 @@ t b1-none bootstrap
 t b1-option bootstrap --lake tank/shtetl --frob
 t b1-operand bootstrap --lake
 t b1-recipes bootstrap --config tank/zconfig --recipes
+t b4-twice bootstrap --lake tank/a --lake tank/b
 if [ "$(cat build/.flavor 2>/dev/null)" = portable ]; then
 	t b1-nozfs bootstrap --lake tank/shtetl -y
 fi

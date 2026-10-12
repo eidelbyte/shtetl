@@ -56,8 +56,8 @@ Four logical spaces, names settled:
 | zbuild  | the FreeBSD src checkout               | zshemot (build half)  |
 | zrun    | everything that runs                   | zbereshit             |
 
-Each space is one or more datasets (a pool's root dataset counts) that
-the user already has. shtetl never partitions, encrypts, labels or
+Each space is one dataset, its root (a pool's root dataset counts),
+that the user already has. shtetl never partitions, encrypts, labels or
 creates pools.
 
 ## 3. Ground rules
@@ -79,7 +79,7 @@ creates pools.
 
 ## 4. The four spaces
 
-### 4.1 Discovery and multi-rooting
+### 4.1 Discovery
 
 Bootstrap sets a local user property on each root:
 
@@ -88,43 +88,29 @@ Bootstrap sets a local user property on each root:
 At startup shtetl iterates the imported pools for datasets carrying a
 **local** `shtetl:space` (an inherited value is not a root).
 
-- **lake** and **run** may have several roots, in one pool or across
-  pools (each pool with whatever vdevs it has; the tag is on datasets,
-  not vdevs). A child such as `foundations/F` is looked for under every
-  root of its space. Exactly one match is required; two matches is an
-  error naming both.
-- **config** and **build** have exactly one root each.
-
-Where things are created:
-
-- **An entity lives in the root that holds its foundation.** A clone
-  cannot cross pools, so a container or system is created in the zrun
-  root that holds its foundation's zrun copy, and its zlake mirror in
-  the zlake root that holds the zlake foundation (the mirror is made
-  of clone streams of it, 7.5).
-- A new foundation, or a foundation's first copy on zrun, goes to the
-  root named by `spaces.lake.default` / `spaces.run.default` in
-  shtetl.conf. With one root the key may be omitted; with several it
-  is required.
-- Consequence of "exactly one match": a foundation has one zrun copy,
-  so all containers and systems of that foundation share one pool. To
-  spread load, build a second foundation under another name
-  (accepted 2026-10-09).
+**One root to a space** (ruled 2026-10-12, 14). Its layout, the
+skeleton of 4.4 - 4.7, is there once, made or taken by bootstrap:
+`foundations/` under the lake root, `containers/` under the run root,
+and so on. So every name has one place, and where something new goes
+is no choice: a foundation in the lake root's `foundations/`, its
+copy in the run root's, a container in the run root's `containers/`.
+Everything a space holds clones or renames within it (a container is
+a clone of its foundation, a mirror a clone stream of the lake's, an
+archive a rename), and a clone cannot cross pools, so a space being
+one dataset keeps it in one pool.
 
 As built (M2, `src/core/spaces.c`; `shtetl spaces` lists the roots):
 the walk is libzfs's, every imported pool's filesystems, a user
 property counted only where its source is the dataset itself. Refused:
-a value that names no space; a second config or build root; a root
-inside another root (PROPOSAL, Q-Y), since each root's layout is
-shtetl's own. A pool whose root will not open refuses the walk, naming
-it: a root missed would break "one name, one place". Without `-C`, the
-configuration is read from the config root's mountpoint, where it is
-mounted.
+a value that names no space; two roots of a space; a root inside
+another root (PROPOSAL, Q-Y), since each root's layout is shtetl's
+own. A pool whose root will not open refuses the walk, naming it: a
+root missed could hide a second one. Without `-C`, the configuration
+is read from the config root's mountpoint, where it is mounted.
 
 ### 4.2 Bootstrap
 
-1. The user names the locations for each space: one dataset each for
-   config and build, one or more for lake and run.
+1. The user names the location of each space: one dataset each.
 2. shtetl shows the property table (4.3) for each root: property,
    default, the value shtetl.conf sets if any, and the value it will
    use. Pool properties it cannot set (ashift) are shown read-only with
@@ -135,19 +121,22 @@ mounted.
 
 As built (M2, `src/core/boot.c`):
 
-    shtetl bootstrap [--lake ds]... [--run ds]... [--config ds]
+    shtetl bootstrap [--lake ds] [--run ds] [--config ds]
         [--build ds] [--recipes url] [-y]
 
 - The datasets must exist: the spaces are datasets the user has, and
-  bootstrap creates none of the roots (PROPOSAL, Q-Z).
+  bootstrap creates none of the roots (PROPOSAL, Q-Z). Each root's
+  whole skeleton (4.6, 4.7) is there once bootstrap is done: what is
+  missing it makes, and what is there as shtetl makes it, it takes.
 - Everything is planned and checked before anything is done, and the
   plan is shown: per root, each property with its built-in default,
   shtetl.conf's value, the value used, the value now and its source,
   a mark on what changes; the layout it makes; each pool's ashift
   (the top-level vdevs', with the warning) and autotrim. It acts on
   `-y`, or on y or yes from a terminal; with neither, nothing is done.
-- Refused before anything is done: a dataset that is not there, or is
-  a root already; a second config or build root; a root inside or
+- Refused before anything is done: a space named twice (a usage
+  error); a dataset that is not there, or is a root already; a second
+  root of a space, named or there already; a root inside or
   around another; a lake or run root with any child that is not
   shtetl's layout, so that what bootstrap sets reaches nothing of the
   user's (PROPOSAL, Q-Z); layout there but not as shtetl makes it; a
@@ -197,7 +186,7 @@ Per-role overrides inside the layout:
 
 | dataset | properties |
 |---------|------------|
-| zrun/containers | mountpoint=/containers, canmount=on: the directory every container is in (ruled 2026-10-11). With several run roots the first run root's; a later one's has canmount=off and its containers mount inside the one directory (PROPOSAL, Q-AA) |
+| zrun/containers | mountpoint=/containers, canmount=on: the directory every container is in (ruled 2026-10-11) |
 | zrun/foundations | mountpoint=/shtetl/foundations, inherited below; canmount=off, never mounted itself (ruled 2026-10-11) |
 | zrun/foundations/F and children | canmount=noauto, readonly=on; mounted only while an update reads them (9): zfs_rebase reads a snapshot through the mounted dataset's .zfs |
 | zrun/systems/S | mountpoint=none until deployed; then `zfs set -u mountpoint=/` |
@@ -359,10 +348,6 @@ is the default recipe's and is checked by the recipe schema, so a
 setting never reaches a recipe and a recipe key never reaches the
 settings.
 
-    spaces {
-        lake { default = "tank/shtetl"; }   # needed with several lake roots
-        run  { default = "fast/shtetl/run"; }
-    }
     properties {
         default { compression = "zstd"; }
         lake    { compression = "zstd-9"; }
@@ -1331,7 +1316,7 @@ by the command line run over two configuration roots
 |----|-------|-------|
 | M0 | probes (section 13) | box |
 | M1 | skeleton, UCL loader, schema, cascade, `shtetl config show`; built 2026-10-11, branch impl/m1 (tests/MATRIX.md family C, all covered; make check and make check-freebsd pass on the box); the cascade reworked 2026-10-12 on impl/m3 for the stacking rulings and the default layer (docs/worklogs/m3-stacking.md) | mac |
-| M2 | discovery and multi-rooting, bootstrap, property table; built 2026-10-11, branch impl/m2 (tests/MATRIX.md families R, D, B on the mac; tests/box/run.sh passes on the box, 2026-10-12) | box |
+| M2 | discovery, bootstrap, property table; built 2026-10-11, branch impl/m2 (tests/MATRIX.md families R, D, B on the mac; tests/box/run.sh passes on the box, 2026-10-12) | box |
 | M3 | foundation build and update into zlake, patches and the pause included; pkg-upgrade | box |
 | M4 | beam-down, new container, save with messages, the zlake mirror | box |
 | M5 | update into staging, history replay, gate handling and derivations, cutover, abandon | box |
@@ -1438,6 +1423,28 @@ below that change the plan are folded into the sections named.
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-12 (one root to a space)
+
+On `spaces.lake.default` in configuration.md: "why does this matter?
+why does the lake have a "root"? We should just sniff for
+shtetl:space=lake and find all static expected dataset parents under
+those spaces", then "let's say there are two lake roots. ONLY ONE
+should have foundations/. One MUST have this dataset, detected in
+bootstrap. this is true of the entire skeleton of shtetl. all static
+skeleton members on run, lake, and config must exist during
+bootstrapping." Asked what bootstrap does with a piece missing from
+every root ("ask which root to place it in. we'll make this a
+selection in the eventual tui"), and, clones and renames not crossing
+pools, whether to keep several roots to a space: "One root per
+space", and "we should drop multirooting entirely".
+
+So (4.1, 4.2): each space has one root; its skeleton is there once,
+made or taken by bootstrap; where something new goes follows from
+the skeleton, and `spaces.lake.default` and `spaces.run.default` are
+gone with the several roots they chose between. Were several roots
+ever to come back, a piece missing from all of them would be the
+user's choice, a selection in the TUI.
 
 ### 2026-10-12 (simple messages; kernconf one key)
 
@@ -1741,11 +1748,6 @@ M2's:
   but shtetl's layout, so that the properties it sets on the root
   reach nothing of the user's. The other reading: create a missing
   root, and accept children, listing them as affected.
-- **Q-AA, /containers with several run roots.** Built: the first run
-  root's containers mounts at /containers; a later one's has
-  canmount=off, inherits the mountpoint, and its containers mount at
-  /containers/X inside the one directory. A pool imported after the
-  first one's is mounted can then add containers but never hide any.
 - **Q-AB, the recipes clone.** Built: only with `--recipes URL`, since
   zshtetl-recipes does not exist yet; once it does, the URL can be the
   default. Its seed is `shtetl-recipes/` in this repository (4.4);

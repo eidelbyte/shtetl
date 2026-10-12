@@ -1,12 +1,4 @@
 # the site's settings: shtetl.conf over the built-in ones
-spaces {
-    lake {
-        default = "tank/shtetl";  # shtetl.conf
-    }
-    run {
-        default = "fast/shtetl/run";  # shtetl.conf
-    }
-}
 properties {
     default {
         atime = "off";  # (built-in)

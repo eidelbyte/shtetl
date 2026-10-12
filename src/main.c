@@ -56,9 +56,9 @@ static const struct sh_cmd sh_cmds[] = {
 	{ "config", "show", "[recipe]", "the recipe (foundations/F, "
 	    "containers/X, systems/S)\n    with its layers merged, or the "
 	    "site's settings", cmd_config_show },
-	{ "spaces", NULL, "", "each space's roots, and where config and "
+	{ "spaces", NULL, "", "each space's root, and where config and "
 	    "build are mounted", cmd_spaces },
-	{ "bootstrap", NULL, "[--lake ds]... [--run ds]... [--config ds]\n"
+	{ "bootstrap", NULL, "[--lake ds] [--run ds] [--config ds]\n"
 	    "           [--build ds] [--recipes url] [-y]", "datasets you "
 	    "have made the roots of the spaces, and laid\n    out; shown "
 	    "first, done once confirmed (-y confirms)", cmd_bootstrap },
@@ -211,18 +211,11 @@ std_fds(void)
 	}
 }
 
-/*
- * spaces: the roots. The default lake and run roots need shtetl.conf,
- * so the settings are read when there is a configuration to read
- * them from; without one, no default is marked.
- */
+/* spaces: the roots. */
 static int
 cmd_spaces(struct sh_ctx *ctx, int argc, char **argv)
 {
-	struct sh_site site;
-	struct sh_err e, quiet;
-	FILE *null;
-	int r, have;
+	struct sh_err e;
 
 	(void) argv;
 	if (argc > 0)
@@ -230,20 +223,9 @@ cmd_spaces(struct sh_ctx *ctx, int argc, char **argv)
 	sh_err_init(&e, stderr, "shtetl: ");
 	if (ctx_zfs(ctx, &e) != 0)
 		return (SH_EXIT_REFUSED);
-	if ((null = fopen("/dev/null", "w")) == NULL) {
-		sh_errf(&e, "/dev/null: %s", strerror(errno));
+	if (sh_spaces_show(stdout, ctx->sc_zfs, &ctx->sc_spaces, &e) != 0)
 		return (SH_EXIT_REFUSED);
-	}
-	sh_err_init(&quiet, null, "");
-	have = ctx_root(ctx, &quiet) == 0;
-	(void) fclose(null);
-	if (have && sh_site_load(ctx->sc_root, &site, &e) != 0)
-		return (SH_EXIT_REFUSED);
-	r = sh_spaces_show(stdout, ctx->sc_zfs, &ctx->sc_spaces,
-	    have ? site.ss_merged : NULL, &e);
-	if (have)
-		sh_site_free(&site);
-	return (r == 0 ? out_done() : SH_EXIT_REFUSED);
+	return (out_done());
 }
 
 /*
@@ -259,7 +241,8 @@ boot_site(struct sh_ctx *ctx, const struct sh_bootreq *req,
 	char dir[SH_ZFS_VALMAX], mounted[SH_ZFS_VALMAX];
 	size_t i;
 
-	if (ctx->sc_root != NULL || ctx->sc_spaces.ss_n[SH_SP_CONFIG] > 0) {
+	if (ctx->sc_root != NULL || ctx->sc_spaces.ss_root[SH_SP_CONFIG] !=
+	    NULL) {
 		if (ctx_root(ctx, e) != 0 ||
 		    sh_site_load(ctx->sc_root, site, e) != 0)
 			return (-1);
@@ -283,7 +266,7 @@ boot_site(struct sh_ctx *ctx, const struct sh_bootreq *req,
 
 /*
  * bootstrap: the roots named, planned, shown, confirmed, applied
- * (planning.md 4.2). --lake and --run as often as wanted.
+ * (planning.md 4.2), one to a space.
  */
 static int
 cmd_bootstrap(struct sh_ctx *ctx, int argc, char **argv)
@@ -299,7 +282,7 @@ cmd_bootstrap(struct sh_ctx *ctx, int argc, char **argv)
 	struct sh_bplan *plan;
 	struct sh_site site;
 	struct sh_err e;
-	size_t j;
+	size_t j, k;
 	int i, yes, have, tty, rc;
 
 	(void) memset(&req, 0, sizeof (req));
@@ -325,8 +308,10 @@ cmd_bootstrap(struct sh_ctx *ctx, int argc, char **argv)
 			    argv[i]));
 		if (i + 1 == argc)
 			return (die_usage(argv[i], " needs a dataset"));
-		if (req.br_n == SH_BOOT_MAX)
-			return (die_usage("bootstrap: too many datasets", ""));
+		for (k = 0; k < req.br_n; k++) {
+			if (req.br_sp[k] == opts[j].o_sp)
+				return (die_usage(argv[i], " given twice"));
+		}
 		req.br_ds[req.br_n] = argv[++i];
 		req.br_sp[req.br_n++] = opts[j].o_sp;
 	}

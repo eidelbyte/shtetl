@@ -130,16 +130,14 @@ in section 4.
 
 ## 3. shtetl.conf: the settings
 
-shtetl.conf holds two things. Its sections, `spaces`, `properties`,
-`build`, `update` and `retention`, are the site's settings: about
+shtetl.conf holds two things. Its sections, `properties`, `build`,
+`update` and `retention`, are the site's settings: about
 this machine, never about a recipe. Every other key at its top is the
 default recipe's (section 6). The settings have built-in values; a
 setting shtetl.conf gives replaces the built-in one, key by key.
 
 | setting | value | built-in | meaning |
 |---------|-------|----------|---------|
-| `spaces.lake.default` | a dataset's name | none | the lake root to use when there are several (planning.md 4.1); with one root it may be left out |
-| `spaces.run.default` | a dataset's name | none | the same, for the run roots |
 | `properties.default` | ZFS properties | `atime = "off"`, `compression = "zstd"`, `aclmode = "passthrough"` | set on every space's root at bootstrap, and inherited below it (planning.md 4.3) |
 | `properties.lake`, `.run`, `.config`, `.build` | ZFS properties | none | one space's, each over `properties.default`'s of the same name |
 | `build.make_jobs` | a count | `0` | make's `-j` for a foundation's build; 0 is `hw.ncpu` |
@@ -150,8 +148,6 @@ setting shtetl.conf gives replaces the built-in one, key by key.
 
 The forms:
 
-- **A dataset's name**: `pool/path`, what ZFS takes in a name, the
-  pool's name beginning with a letter.
 - **ZFS properties**: an object, `{ compression = "zstd-9"; }`. A
   value is a string, or `true` or `false` for `on` and `off`; a
   number is refused (quote `"1M"`). `mountpoint`, `canmount` and
@@ -167,16 +163,13 @@ The forms:
   or a digit.
 
 There is no `retention.lake`: zlake holds exactly what zrun holds.
-M2 uses `spaces` and `properties`; the others are
-read and checked now and used by the milestones that need them.
+M2 uses `properties`; the others are read and checked now and used by
+the milestones that need them.
 
 <!-- example: settings -->
 
 ```ucl
 # shtetl.conf
-spaces {
-    lake { default = "tank/shtetl"; }
-}
 properties {
     lake { compression = "zstd-9"; }
 }
@@ -192,11 +185,6 @@ retention {
 ```console
 $ shtetl config show
 # the site's settings: shtetl.conf over the built-in ones
-spaces {
-    lake {
-        default = "tank/shtetl";  # shtetl.conf
-    }
-}
 properties {
     default {
         atime = "off";  # (built-in)
@@ -229,9 +217,6 @@ built-in value. `properties.lake` gives the lake's root `zstd-9` over
 
 ```ucl
 # shtetl.conf
-spaces {
-    lake { default = "1tank/shtetl"; }
-}
 properties {
     default { mountpoint = "/shtetl"; recordsize = 1M; }
 }
@@ -249,7 +234,6 @@ retention {
 
 ```console
 $ shtetl config show
-shtetl: shtetl.conf: spaces.lake.default: invalid dataset name: pool name must begin with a letter
 shtetl: shtetl.conf: properties.default.mountpoint: invalid property: reserved
 shtetl: shtetl.conf: properties.default.recordsize: must be a quoted string
 shtetl: shtetl.conf: build.make_jobs: must be 0 or more
@@ -268,7 +252,6 @@ pkg = [ "nginx" ];
 
 ```console
 $ shtetl config show containers/x
-shtetl: shtetl.conf: spaces.lake.default: invalid dataset name: pool name must begin with a letter
 shtetl: shtetl.conf: properties.default.mountpoint: invalid property: reserved
 shtetl: shtetl.conf: properties.default.recordsize: must be a quoted string
 shtetl: shtetl.conf: build.make_jobs: must be 0 or more
@@ -1260,7 +1243,7 @@ shtetl: config show takes one recipe at most
 usage: shtetl [-C dir] command ...
        shtetl [-C dir] config show [recipe]
        shtetl [-C dir] spaces
-       shtetl [-C dir] bootstrap [--lake ds]... [--run ds]... [--config ds]
+       shtetl [-C dir] bootstrap [--lake ds] [--run ds] [--config ds]
            [--build ds] [--recipes url] [-y]
 
   -C dir  the configuration root (the zshtetl-recipes clone);
@@ -1268,7 +1251,7 @@ usage: shtetl [-C dir] command ...
 
   config show: the recipe (foundations/F, containers/X, systems/S)
     with its layers merged, or the site's settings
-  spaces: each space's roots, and where config and build are mounted
+  spaces: each space's root, and where config and build are mounted
   bootstrap: datasets you have made the roots of the spaces, and laid
     out; shown first, done once confirmed (-y confirms)
 

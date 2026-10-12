@@ -154,6 +154,19 @@ cases() {
 	check D1 "every space none" \
 	    "$(grep -c 'none: shtetl bootstrap makes one' "$T/out")" 4
 
+	echo "== B6: a child that is not shtetl's"
+	zfs create $P1/shtetl/home
+	sht bootstrap -y --lake $P1/shtetl
+	check B6 "exit" "$RC" 1
+	has B6 "the refusal" "$T/err" \
+	    "$P1/shtetl: unexpected child $P1/shtetl/home"
+	check B6 "nothing marked" "$(prop $P1/shtetl shtetl:space)" "-"
+	zfs destroy $P1/shtetl/home
+
+	# B14, B18: a piece of the run layout made by hand, as shtetl
+	# makes it, for the bootstrap below to take
+	zfs create -o mountpoint=/containers -o canmount=on $P2/run/containers
+
 	echo "== B16, B8: shown, and not confirmed"
 	sht bootstrap --lake $P1/shtetl --run $P2/run --config $P1/zconfig \
 	    --build $P1/zbuild
@@ -172,11 +185,13 @@ cases() {
 	fi
 	has B8 "autotrim" "$T/out" "autotrim off, set to on"
 
-	echo "== B10, B11, B13, B17: bootstrap, confirmed"
+	echo "== B10, B11, B13, B14, B17, B18: bootstrap, confirmed"
 	sht bootstrap -y --lake $P1/shtetl --run $P2/run \
 	    --config $P1/zconfig --build $P1/zbuild $RECIPES
 	check B10 "exit" "$RC" 0
 	[ "$RC" = 0 ] || sed 's/^/    /' "$T/err"
+	_l="$P2/run/containers  mountpoint=/containers, canmount=on, mounted"
+	has B14 "the layout there, taken" "$T/out" "  $_l (there)"
 	check B10 "lake mountpoint" "$(prop $P1/shtetl mountpoint)" none
 	check B10 "lake canmount" "$(prop $P1/shtetl canmount)" noauto
 	check B10 "lake atime" "$(prop $P1/shtetl atime)" off
@@ -237,36 +252,12 @@ cases() {
 	check B3 "exit" "$RC" 1
 	has B3 "the refusal" "$T/err" "$P1/shtetl: already a lake root"
 
-	echo "== B12, D6: a second run root"
+	echo "== B4: a second run root"
 	zfs create $P1/run2
 	sht bootstrap -y --run $P1/run2
-	check B12 "exit" "$RC" 0
-	check B12 "containers' canmount" "$(prop $P1/run2/containers canmount)" \
-	    off
-	check B12 "containers not mounted" \
-	    "$(prop $P1/run2/containers mounted)" no
-	check B12 "containers below /containers" \
-	    "$(prop $P1/run2/containers mountpoint)" "$ALT/containers"
-	sht spaces
-	has D6 "two run roots, no default" "$T/out" \
-	    "no default: shtetl.conf names none as spaces.run.default"
-
-	echo "== B14, B18: layout already there, read below the altroot"
-	zfs create $P2/run3
-	zfs create -o mountpoint=/containers -o canmount=off $P2/run3/containers
-	sht bootstrap -y --run $P2/run3
-	check B14 "exit" "$RC" 0
-	has B14 "the layout there, taken" "$T/out" \
-	    "$P2/run3/containers  mountpoint=/containers, canmount=off (there)"
-	check B14 "marked" "$(prop $P2/run3 shtetl:space)" run
-
-	echo "== B6: a child that is not shtetl's"
-	zfs create $P2/lake2
-	zfs create $P2/lake2/home
-	sht bootstrap -y --lake $P2/lake2
-	check B6 "exit" "$RC" 1
-	has B6 "the refusal" "$T/err" \
-	    "$P2/lake2: unexpected child $P2/lake2/home"
+	check B4 "exit" "$RC" 1
+	has B4 "the refusal" "$T/err" "two run roots: $P2/run and $P1/run2"
+	check B4 "nothing marked" "$(prop $P1/run2 shtetl:space)" "-"
 
 	echo "== D5: two config roots, found"
 	zfs create $P2/c2

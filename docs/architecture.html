@@ -208,11 +208,10 @@ you cut over or abandon.</p>
 <h2>Four spaces</h2>
 
 <p>The user hands shtetl existing datasets at bootstrap; shtetl never
-touches devices. Each root carries a <code>shtetl:space</code> user
-property. <strong>zlake</strong> and <strong>zrun</strong> may have
-several roots, across pools: a child is looked for under every root of
-its space, and two matches is an error. An entity always lives in the
-root that holds its foundation, because a clone cannot cross pools.
+touches devices. Each space has one root, which carries a
+<code>shtetl:space</code> user property, and its layout is there once,
+so every name has one place. A space is one dataset, and so one pool,
+which is what its clones and renames need.
 Layouts are created with the property defaults inherited from parasa
 (<code>atime=off</code>, <code>compression=zstd</code>,
 <code>aclmode=passthrough</code>, <code>mountpoint=none</code>,
