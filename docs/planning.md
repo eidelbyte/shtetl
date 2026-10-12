@@ -1,11 +1,13 @@
 # shtetl: planning
 
 Status: draft 4, 2026-10-09. M0 is done (13.1); M1, the configuration,
-is built on branch impl/m1 (2026-10-11, section 12). Drafts 1 to 3 were
-reviewed and every ruling is folded in; section 14 lists them so each
-can be traced. Section 15 gathers what M1 decided where the plan was
-silent, for a ruling. A detail marked PROPOSAL has not been ruled on
-but blocks nothing.
+is built and passes on the box (branch impl/m1); M2, discovery and
+bootstrap, is built on branch impl/m2 and waits for its box run
+(2026-10-11, section 12). Drafts 1 to 3 were reviewed and every ruling
+is folded in; section 14 lists them so each can be traced. Section 15
+gathers what M1 and M2 decided where the plan was silent, for a
+ruling. A detail marked PROPOSAL has not been ruled on but blocks
+nothing.
 docs/story.html walks one cycle of this design frame by frame.
 
 ## 1. What shtetl is
@@ -109,6 +111,16 @@ Where things are created:
   spread load, build a second foundation under another name
   (accepted 2026-10-09).
 
+As built (M2, `src/core/spaces.c`; `shtetl spaces` lists the roots):
+the walk is libzfs's, every imported pool's filesystems, a user
+property counted only where its source is the dataset itself. Refused:
+a value that names no space; a second config or build root; a root
+inside another root (PROPOSAL, Q-Y), since each root's layout is
+shtetl's own. A pool whose root will not open refuses the walk, naming
+it: a root missed would break "one name, one place". Without `-C`, the
+configuration is read from the config root's mountpoint, where it is
+mounted.
+
 ### 4.2 Bootstrap
 
 1. The user names the locations for each space: one dataset each for
@@ -120,6 +132,35 @@ Where things are created:
 3. On confirmation it creates the layout under each root (4.4 - 4.7)
    with those properties, and sets `shtetl:space` on each root.
 4. If the config root is empty, it clones zshtetl-recipes into it.
+
+As built (M2, `src/core/boot.c`):
+
+    shtetl bootstrap [--lake ds]... [--run ds]... [--config ds]
+        [--build ds] [--recipes url] [-y]
+
+- The datasets must exist: the spaces are datasets the user has, and
+  bootstrap creates none of the roots (PROPOSAL, Q-Z).
+- Everything is planned and checked before anything is done, and the
+  plan is shown: per root, each property with its built-in default,
+  shtetl.conf's value, the value used, the value now and its source,
+  a mark on what changes; the layout it makes; each pool's ashift
+  (the top-level vdevs', with the warning) and autotrim. It acts on
+  `-y`, or on y or yes from a terminal; with neither, nothing is done.
+- Refused before anything is done: a dataset that is not there, or is
+  a root already; a second config or build root; a root inside or
+  around another; a lake or run root with any child that is not
+  shtetl's layout, so that what bootstrap sets reaches nothing of the
+  user's (PROPOSAL, Q-Z); layout there but not as shtetl makes it; a
+  config or build root with no mountpoint.
+- Order: pools (autotrim), the roots' properties, the layout, mounts,
+  the recipes clone, and `shtetl:space` on each root **last**. A
+  bootstrap stopped part way is finished by the same command again,
+  which takes the layout already made.
+- The recipes are cloned only with `--recipes`, since zshtetl-recipes
+  does not exist yet, and only into an empty config root, after a
+  snapshot of it (4.4). A failed clone marks no root (PROPOSAL, Q-AB).
+- A pool imported with an altroot shows mountpoints below it; the
+  layout already there is read below the altroot.
 
 **A zrun root on a pool that cannot boot is allowed** (ruled). shtetl
 still builds system datasets there and lets the user create systems,
@@ -136,7 +177,7 @@ Pool properties (reported, set only where `zpool set` can):
 
 | property | default | note |
 |----------|---------|------|
-| ashift   | 12      | fixed at pool creation; report only |
+| ashift   | 12      | fixed at pool creation; report only (M2: the top-level vdevs' ashift, from the pool's config; the pool property of that name is only the default for vdevs added later) |
 | autotrim | on      | settable |
 
 Dataset properties on each space root, inherited below except for
@@ -156,9 +197,9 @@ Per-role overrides inside the layout:
 
 | dataset | properties |
 |---------|------------|
-| zrun/containers | mountpoint=/containers, canmount=on (the one auto-mounted parent) |
-| zrun/foundations | mountpoint=/shtetl/foundations, inherited below |
-| zrun/foundations/F and children | canmount=noauto, readonly=on; mounted only while an update reads them (9) |
+| zrun/containers | mountpoint=/containers, canmount=on: the directory every container is in (ruled 2026-10-11). With several run roots the first run root's; a later one's has canmount=off and its containers mount inside the one directory (PROPOSAL, Q-AA) |
+| zrun/foundations | mountpoint=/shtetl/foundations, inherited below; canmount=off, never mounted itself (ruled 2026-10-11) |
+| zrun/foundations/F and children | canmount=noauto, readonly=on; mounted only while an update reads them (9): zfs_rebase reads a snapshot through the mounted dataset's .zfs |
 | zrun/systems/S | mountpoint=none until deployed; then `zfs set -u mountpoint=/` |
 | zlake/** | mountpoint=none, inherited from the root: this is what keeps zlake unmounted; mounted only while built into |
 | config root, build root | a mountpoint; config is read on every run |
@@ -1186,6 +1227,16 @@ every refusal goes through. `src/main.c` is the command table. The
 portable build compiles libucl from a FreeBSD tree's `contrib/libucl`
 (`FREEBSD_SRC`, default /usr/src); `make freebsd` links the port.
 
+As built in M2: `src/core/zfs.h` is what the core asks of ZFS, with
+three implementations picked at the link: `src/fbsd/zfs.c` over
+libzfs and libzfs_core, `src/core/zstub.c` (the portable build: every
+call refused), and `tests/zfake.c` (pools in memory, for the tests).
+`src/core/run.c` runs every program shtetl runs (git first). `spaces`
+is discovery, `boot` bootstrap. `tools/xcheck-freebsd.sh` compiles
+every source for FreeBSD on the mac against a FreeBSD tree's headers;
+`tests/box/run.sh` runs the commands on the box against pools on
+memory disks.
+
 Libraries: libzfs, libzfs_core and libnvpair (headers from /usr/src,
 as zfs_rebase's Makefile does), libucl (port), libjail (base), curses
 (base) for the TUI. Programs run with argv arrays, never a shell: make,
@@ -1225,7 +1276,7 @@ by the command line run over two configuration roots
 |----|-------|-------|
 | M0 | probes (section 13) | box |
 | M1 | skeleton, UCL loader, schema, cascade, `shtetl config show`; built 2026-10-11, branch impl/m1 (tests/MATRIX.md family C, all covered; make check and make check-freebsd pass on the box) | mac |
-| M2 | discovery and multi-rooting, bootstrap, property table | box |
+| M2 | discovery and multi-rooting, bootstrap, property table; built 2026-10-11, branch impl/m2 (tests/MATRIX.md families R, D, B on the mac; tests/box/run.sh to run on the box) | box |
 | M3 | foundation build and update into zlake, patches and the pause included; pkg-upgrade | box |
 | M4 | beam-down, new container, save with messages, the zlake mirror | box |
 | M5 | update into staging, history replay, gate handling and derivations, cutover, abandon | box |
@@ -1332,6 +1383,20 @@ below that change the plan are folded into the sections named.
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-11 (the run layout's mounts; UCL kept)
+
+- "zrun/containers is the root dir of all containers and should be
+  mounted at /containers. zrun/foundations doesn't need to be mounted
+  anywhere ever, including all its children (I think)." Built so:
+  containers at /containers and mounted; foundations canmount=off.
+  The foundations F below it keep a mountpoint and canmount=noauto,
+  since an update mounts them read-only while zfs_rebase reads their
+  snapshots (ruled 2026-10-09; P16); they are never mounted otherwise.
+- Lua as the configuration language was asked about and UCL kept
+  ("ok I'm ok keeping UCL for now"): a Lua table does not keep the
+  order keys were written in, which commands and patches rely on
+  (Q-Q), and takes a key written twice without a word.
 
 ### 2026-10-11 (Q-Q, Q-R: patches)
 
@@ -1444,8 +1509,28 @@ below that change the plan are folded into the sections named.
 
 ## 15. Open questions
 
-M1 decided these where the plan was silent; each is built as written
-and marked PROPOSAL where it lives. None blocks M2.
+M1 and M2 decided these where the plan was silent; each is built as
+written and marked PROPOSAL where it lives. None blocks M3.
+
+M2's:
+
+- **Q-Y, nested roots.** Built: a root inside another root, of any
+  space, is refused, since each root's layout is shtetl's own.
+- **Q-Z, what bootstrap takes.** Built: only datasets that exist (it
+  creates no root), and a lake or run root only if it has no child
+  but shtetl's layout, so that the properties it sets on the root
+  reach nothing of the user's. The other reading: create a missing
+  root, and accept children, listing them as affected.
+- **Q-AA, /containers with several run roots.** Built: the first run
+  root's containers mounts at /containers; a later one's has
+  canmount=off, inherits the mountpoint, and its containers mount at
+  /containers/X inside the one directory. A pool imported after the
+  first one's is mounted can then add containers but never hide any.
+- **Q-AB, the recipes clone.** Built: only with `--recipes URL`, since
+  zshtetl-recipes does not exist yet; once it does, the URL can be the
+  default.
+
+M1's:
 
 - **Q-S, `ver` across layers.** Built: a nearer layer's `ver`
   replaces a lower layer's, as every scalar does. The other reading:
