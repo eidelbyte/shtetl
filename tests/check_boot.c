@@ -367,8 +367,8 @@ test_clone(void)
 
 	(void) snprintf(repo, sizeof (repo), "%s", scratch_path("recipes"));
 	(void) snprintf(cmd, sizeof (cmd), "set -e; git init -q '%s'; "
-	    "echo 'pkg = [ \"sudo\" ];' > '%s/default.conf'; cd '%s'; "
-	    "git add default.conf; git -c user.name=t -c user.email=t@t "
+	    "echo 'pkg = [ \"sudo\" ];' > '%s/shtetl.conf'; cd '%s'; "
+	    "git add shtetl.conf; git -c user.name=t -c user.email=t@t "
 	    "commit -qm recipes", repo, repo, repo);
 	CHECK(system(cmd) == 0);
 
@@ -379,7 +379,7 @@ test_clone(void)
 	CHECK(strstr(out, "git clone") == NULL);
 	CHECK(apply() == 0);
 	CHECK(zfake_last_snapshot() == NULL);
-	(void) snprintf(file, sizeof (file), "%s/default.conf", confdir);
+	(void) snprintf(file, sizeof (file), "%s/shtetl.conf", confdir);
 	CHECK(stat(file, &st) == -1);
 
 	/* --recipes and an empty root: a snapshot, then the clone */

@@ -102,6 +102,18 @@ static const struct skey sk_top[] = {
 	SK_END
 };
 
+int
+sh_site_section(const char *key)
+{
+	const struct skey *k;
+
+	for (k = sk_top; k->sk_name != NULL; k++) {
+		if (strcmp(k->sk_name, key) == 0)
+			return (1);
+	}
+	return (0);
+}
+
 struct ck {
 	const char	*ck_file;
 	struct sh_err	*ck_err;
@@ -142,6 +154,9 @@ ck_section(struct ck *x, const struct skey *table, const char *what,
 	(void) snprintf(section, sizeof (section), "%s", what);
 	for (i = 0; i < v->sn_obj.ob_n; i++) {
 		pr = &v->sn_obj.ob_v[i];
+		/* the default recipe's keys: sh_schema_default's to check */
+		if (table == sk_top && !sh_site_section(pr->pr_key))
+			continue;
 		was = sh_path_push(&x->ck_path, pr->pr_key);
 		for (k = table; k->sk_name != NULL; k++) {
 			if (strcmp(k->sk_name, pr->pr_key) == 0)
@@ -221,6 +236,10 @@ ck_value(struct ck *x, const struct skey *k, const struct sh_node *v)
 	}
 }
 
+/*
+ * shtetl.conf whole: its sections of settings here, and the keys of
+ * the default recipe it holds beside them by the recipe's schema.
+ */
 unsigned
 sh_site_check(const struct sh_node *site, const char *file,
     struct sh_err *e)
@@ -233,6 +252,8 @@ sh_site_check(const struct sh_node *site, const char *file,
 	x.ck_err = e;
 	sh_path_init(&x.ck_path);
 	ck_section(&x, sk_top, "shtetl.conf", site);
+	if (site->sn_type == SH_OBJECT)
+		(void) sh_schema_default(site, file, 1, e);
 	return (e->se_count - before);
 }
 
@@ -242,7 +263,7 @@ sh_site_check(const struct sh_node *site, const char *file,
  * it; the values copied keep the layer they came from.
  */
 static int
-site_merge(struct sh_node *dst, const struct sh_node *layer)
+site_merge(struct sh_node *dst, const struct sh_node *layer, int top)
 {
 	const struct sh_pair *pr;
 	struct sh_node *have, *v;
@@ -250,10 +271,13 @@ site_merge(struct sh_node *dst, const struct sh_node *layer)
 
 	for (i = 0; i < layer->sn_obj.ob_n; i++) {
 		pr = &layer->sn_obj.ob_v[i];
+		/* the settings only: the default recipe is the cascade's */
+		if (top && !sh_site_section(pr->pr_key))
+			continue;
 		have = sh_obj_get(dst, pr->pr_key);
 		if (have != NULL && have->sn_type == SH_OBJECT &&
 		    pr->pr_val->sn_type == SH_OBJECT) {
-			if (site_merge(have, pr->pr_val) != 0)
+			if (site_merge(have, pr->pr_val, 0) != 0)
 				return (-1);
 			continue;
 		}
@@ -298,7 +322,7 @@ sh_site_load(const char *root, struct sh_site *s, struct sh_err *e)
 		sh_node_free(built);
 		return (-1);
 	}
-	if (conf != NULL && site_merge(built, conf) != 0) {
+	if (conf != NULL && site_merge(built, conf, 1) != 0) {
 		sh_err_nomem(e);
 		sh_node_free(conf);
 		sh_node_free(built);

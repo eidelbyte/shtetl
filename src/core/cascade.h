@@ -16,14 +16,17 @@
 #define	SH_IMPORT_DEPTH	16
 
 struct sh_layer {
-	char		*sl_file;	/* common/web.conf, or (built-in) */
+	char		*sl_file;	/* common/web.conf */
 	struct sh_node	*sl_tree;	/* as parsed */
+	int		sl_default;	/* shtetl.conf, or what it imports */
 };
 
 /*
- * A resolved recipe. The layers come in merge order: the built-in
- * layer when it has anything, default.conf after what it imports,
- * then the target's imports, each after its own, and the target.
+ * A resolved recipe. The layers come in merge order: the default
+ * (shtetl.conf, after what it imports), then the recipe's imports,
+ * each after its own, and the recipe's file. What a recipe's files
+ * give again of the default's overrides it; the rest stacks
+ * (planning.md 5.4).
  * In sr_merged a key's pr_from is the layer that added it and a
  * value's sn_from the layer that last set it, both pointers to a
  * layer's sl_file.

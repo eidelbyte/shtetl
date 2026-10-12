@@ -80,8 +80,7 @@ test_example(void)
 static void
 test_keys(void)
 {
-	bad("frob { }", "shtetl.conf: frob: not a key of shtetl.conf: it "
-	    "takes spaces, properties, build, update, retention");
+	bad("frob { }", "shtetl.conf: frob: not a key shtetl.conf takes");
 	bad("build { jobs = 1; }", "build.jobs: not a key of build: it takes "
 	    "make_jobs");
 	bad("build = 4;", "build: expected an object, not an integer");
@@ -255,6 +254,24 @@ test_load(void)
 	CHECK(sh_site_load(root, &s, &c.c_err) == -1);
 	CHECK(s.ss_merged == NULL);
 	CHECK(cap_has(&c, "shtetl.conf: retention.lake: not a key"));
+	/* CS11: the default recipe beside the settings, out of their view */
+	(void) scratch_write("four/shtetl.conf",
+	    "build { make_jobs = 2; }\nver = \">=15.1\";\n"
+	    "kernconf_file = \"GENERIC\";\npkg = [ \"sudo\" ];\n");
+	(void) snprintf(root, sizeof (root), "%s", scratch_path("four"));
+	cap_reset(&c);
+	CHECK(sh_site_load(root, &s, &c.c_err) == 0);
+	CHECK(sh_obj_get(s.ss_merged, "ver") == NULL);
+	CHECK(sh_obj_get(s.ss_merged, "pkg") == NULL);
+	v = sh_obj_get(sh_obj_get(s.ss_merged, "build"), "make_jobs");
+	CHECK(v != NULL && v->sn_int == 2);
+	sh_site_free(&s);
+	(void) scratch_write("five/shtetl.conf", "ver = 15;\n");
+	(void) snprintf(root, sizeof (root), "%s", scratch_path("five"));
+	cap_reset(&c);
+	CHECK(sh_site_load(root, &s, &c.c_err) == -1);
+	CHECK(cap_has(&c, "shtetl.conf: ver: expected a version constraint, "
+	    "not an integer: quote it"));
 	(void) scratch_write("three/shtetl.conf", ".include \"x\"\n");
 	(void) snprintf(root, sizeof (root), "%s", scratch_path("three"));
 	cap_reset(&c);

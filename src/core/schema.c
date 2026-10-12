@@ -14,6 +14,7 @@
 
 #include "core/err.h"
 #include "core/schema.h"
+#include "core/site.h"
 #include "core/syntax.h"
 #include "core/tree.h"
 
@@ -21,31 +22,28 @@
 #define	C	SH_CONTAINER
 
 /*
- * buildopts_file gives its file's text in the place of the text
- * buildopts would give: a piece of buildopts. kernconf_file is the
- * kernel config the foundation's starts from (a name in the src
- * tree's conf directory, GENERIC; or a file in zconfig, a path) and
- * kernconf_lines the lines added to it; shtetl writes the config
- * itself (planning.md 5.5).
+ * kernconf_file is the kernel config the foundation's starts from (a
+ * name in the src tree's conf directory, GENERIC; or a file in
+ * zconfig, a path) and kernconf_lines the lines added to it; shtetl
+ * writes the config itself (planning.md 5.5), as it writes the
+ * src.conf buildopts goes into and the jail's block jailconf goes
+ * into.
  */
 static const struct sh_rkey rkeys[] = {
-	{ "import", SH_ALLKINDS, SH_V_IMPORT, SH_C_NONE, SH_M_LAYERS, NULL },
-	{ "ver", SH_ALLKINDS, SH_V_VER, SH_C_NONE, SH_M_ALL, NULL },
-	{ "src_branch", F, SH_V_STRING, SH_C_NONE, SH_M_AGREE, NULL },
-	{ "kernconf_file", F, SH_V_FILE, SH_C_NONE, SH_M_AGREE, NULL },
-	{ "kernconf_lines", F, SH_V_STRING, SH_C_NONE, SH_M_TEXT, NULL },
-	{ "buildopts", F, SH_V_STRING, SH_C_NONE, SH_M_TEXT, NULL },
-	{ "buildopts_file", F, SH_V_FILE, SH_C_NONE, SH_M_TEXT,
-	    "buildopts" },
-	{ "patches", F, SH_V_COLL, SH_C_PATCHES, SH_M_COLL, NULL },
-	{ "datasets", SH_ALLKINDS, SH_V_COLL, SH_C_DATASETS, SH_M_COLL, NULL },
-	{ "pkg", SH_ALLKINDS, SH_V_COLL, SH_C_PKG, SH_M_COLL, NULL },
-	{ "commands", SH_ALLKINDS, SH_V_COLL, SH_C_COMMANDS, SH_M_COLL, NULL },
-	{ "derivations", SH_ALLKINDS, SH_V_COLL, SH_C_DERIVATIONS, SH_M_COLL,
-	    NULL },
-	{ "requires", C, SH_V_COLL, SH_C_REQUIRES, SH_M_COLL, NULL },
-	{ "jailconf", C, SH_V_STRING, SH_C_NONE, SH_M_TEXT, NULL },
-	{ NULL, 0, SH_V_STRING, SH_C_NONE, SH_M_LAYERS, NULL }
+	{ "import", SH_ALLKINDS, SH_V_IMPORT, SH_C_NONE, SH_M_LAYERS },
+	{ "ver", SH_ALLKINDS, SH_V_VER, SH_C_NONE, SH_M_ALL },
+	{ "src_branch", F, SH_V_STRING, SH_C_NONE, SH_M_AGREE },
+	{ "kernconf_file", F, SH_V_FILE, SH_C_NONE, SH_M_AGREE },
+	{ "kernconf_lines", F, SH_V_STRING, SH_C_NONE, SH_M_TEXT },
+	{ "buildopts", F, SH_V_STRING, SH_C_NONE, SH_M_TEXT },
+	{ "patches", F, SH_V_COLL, SH_C_PATCHES, SH_M_COLL },
+	{ "datasets", SH_ALLKINDS, SH_V_COLL, SH_C_DATASETS, SH_M_COLL },
+	{ "pkg", SH_ALLKINDS, SH_V_COLL, SH_C_PKG, SH_M_COLL },
+	{ "commands", SH_ALLKINDS, SH_V_COLL, SH_C_COMMANDS, SH_M_COLL },
+	{ "derivations", SH_ALLKINDS, SH_V_COLL, SH_C_DERIVATIONS, SH_M_COLL },
+	{ "requires", C, SH_V_COLL, SH_C_REQUIRES, SH_M_COLL },
+	{ "jailconf", C, SH_V_STRING, SH_C_NONE, SH_M_TEXT },
+	{ NULL, 0, SH_V_STRING, SH_C_NONE, SH_M_LAYERS }
 };
 
 /* Keys there are no more, and what to write instead. */
@@ -59,6 +57,8 @@ static const struct {
 	    "kernconf_lines adds to it (ruled 2026-10-12)" },
 	{ "jailconf_file", "shtetl writes the jail's block itself, and "
 	    "jailconf gives the options in it (ruled 2026-10-12)" },
+	{ "buildopts_file", "shtetl writes the src.conf itself, and "
+	    "buildopts gives the lines in it (ruled 2026-10-12)" },
 	{ NULL, NULL }
 };
 
@@ -97,7 +97,7 @@ static const struct cdesc {
 /* One check's place: the file, the kind, where in the tree. */
 struct sc {
 	const char	*sc_file;
-	enum sh_kind	sc_kind;
+	unsigned	sc_kind;	/* kinds taken: one, or all */
 	struct sh_err	*sc_err;
 	struct sh_path	sc_path;
 };
@@ -428,9 +428,14 @@ sc_whose(unsigned kinds)
 	return ("another kind's");
 }
 
-unsigned
-sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
-    const char *file, struct sh_err *e)
+/*
+ * One layer against the keys of the kinds in KINDS: one kind for a
+ * recipe's own files, all of them for the default's. SETTINGS: the
+ * file is shtetl.conf, whose site settings are not recipe keys.
+ */
+static unsigned
+sc_layer(const struct sh_node *layer, unsigned kinds, const char *file,
+    int settings, struct sh_err *e)
 {
 	const struct sh_rkey *rk;
 	const struct sh_pair *pr;
@@ -440,7 +445,7 @@ sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
 
 	before = e->se_count;
 	x.sc_file = file;
-	x.sc_kind = kind;
+	x.sc_kind = kinds;
 	x.sc_err = e;
 	sh_path_init(&x.sc_path);
 	if (layer->sn_type != SH_OBJECT) {
@@ -449,6 +454,8 @@ sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
 	}
 	for (i = 0; i < layer->sn_obj.ob_n; i++) {
 		pr = &layer->sn_obj.ob_v[i];
+		if (settings && sh_site_section(pr->pr_key))
+			continue;
 		was = sh_path_push(&x.sc_path, pr->pr_key);
 		rk = sh_rkey(pr->pr_key);
 		for (j = 0; gone[j].g_name != NULL; j++) {
@@ -459,11 +466,12 @@ sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
 			sh_err_at(e, file, &x.sc_path, "not a key any more: %s",
 			    gone[j].g_why);
 		} else if (rk == NULL) {
-			sh_err_at(e, file, &x.sc_path, "not a key a recipe "
-			    "takes");
-		} else if ((rk->rk_kinds & kind) == 0) {
+			sh_err_at(e, file, &x.sc_path, "not a key %s takes",
+			    settings ? "shtetl.conf" : "a recipe");
+		} else if ((rk->rk_kinds & kinds) == 0) {
 			sh_err_at(e, file, &x.sc_path, "not a key of a %s's "
-			    "recipe: only %s takes it", sh_kind_name(kind),
+			    "recipe: only %s takes it",
+			    sh_kind_name((enum sh_kind)kinds),
 			    sc_whose(rk->rk_kinds));
 		} else {
 			switch (rk->rk_vt) {
@@ -487,4 +495,18 @@ sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
 		sh_path_pop(&x.sc_path, was);
 	}
 	return (e->se_count - before);
+}
+
+unsigned
+sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
+    const char *file, struct sh_err *e)
+{
+	return (sc_layer(layer, (unsigned)kind, file, 0, e));
+}
+
+unsigned
+sh_schema_default(const struct sh_node *layer, const char *file,
+    int settings, struct sh_err *e)
+{
+	return (sc_layer(layer, SH_ALLKINDS, file, settings, e));
 }

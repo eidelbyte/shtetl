@@ -77,8 +77,7 @@ test_every_key(void)
 	    "commands { motd = \"echo hi > /etc/motd\"; }\n"
 	    "derivations { \"etc/pwd.db\" { source = \"etc/master.passwd\"; "
 	    "command = \"pwd_mkdb -d etc etc/master.passwd\"; } }\n", F);
-	ok("kernconf_file = \"kernels/GAMING\";\n"
-	    "buildopts_file = \"build/src.conf\";\n", F);
+	ok("kernconf_file = \"kernels/GAMING\";\n", F);
 	ok("import = \"common/web.conf\";\n"
 	    "ver = \"=15.1\";\n"
 	    "pkg { nginx = true; }\n"
@@ -106,7 +105,7 @@ test_kinds(void)
 {
 	static const char *const fonly[] = { "src_branch = \"main\";",
 	    "kernconf_lines = \"G\";", "kernconf_file = \"k\";",
-	    "buildopts = \"x\";", "buildopts_file = \"b\";",
+	    "buildopts = \"x\";",
 	    "patches = [ \"p/q\" ];" };
 	char want[128];
 	size_t i;
@@ -163,16 +162,17 @@ test_strings(void)
 }
 
 /*
- * CK7, CK8: kernconf_file and kernconf_lines, buildopts and its file,
- * and paths in the configuration root. A file may give both
- * buildopts and buildopts_file: they stack.
+ * CK7, CK8: kernconf_file and kernconf_lines, and paths in the
+ * configuration root; buildopts_file is no key any more.
  */
 static void
 test_files(void)
 {
 	ok("kernconf_file = \"GENERIC\"; kernconf_lines = \"device vmm\";",
 	    F);
-	ok("buildopts_file = \"b\"; buildopts = \"x\";", F);
+	bad("buildopts_file = \"b\";", F, "buildopts_file: not a key any "
+	    "more: shtetl writes the src.conf itself, and buildopts gives "
+	    "the lines in it (ruled 2026-10-12)");
 	ok("kernconf_file = \"kernels/GAMING\";", F);
 	bad("kernconf_file = \"/etc/GAMING\";", F, "kernconf_file: not a "
 	    "file's path: it is absolute");
@@ -180,7 +180,7 @@ test_files(void)
 	bad("kernconf_file = \"./b\";", F, "a '.' or '..' component");
 	bad("kernconf_file = \"a//b\";", F, "an empty component");
 	bad("kernconf_file = \"a/\";", F, "it ends with '/'");
-	bad("buildopts_file = 5;", F, "expected a file's path, not an "
+	bad("kernconf_file = 5;", F, "expected a file's path, not an "
 	    "integer: quote it");
 }
 
@@ -378,6 +378,42 @@ test_reporting(void)
 	    "dataset path");
 }
 
+/* TEXT checked as a file of the default layer: the count. */
+static unsigned
+DF(const char *text, int settings)
+{
+	struct sh_node *n;
+	unsigned bad;
+
+	cap_reset(&c);
+	n = sh_parse_buf(text, strlen(text), "shtetl.conf", &c.c_err);
+	CHECK(n != NULL);
+	bad = sh_schema_default(n, "shtetl.conf", settings, &c.c_err);
+	sh_node_free(n);
+	return (bad);
+}
+
+/*
+ * CK22: the default layer takes every kind's keys; shtetl.conf's
+ * settings are not recipe keys, and a file it imports has none.
+ */
+static void
+test_default(void)
+{
+	CHECK(DF("build { make_jobs = 4; }\nver = \">=15.1\";\n"
+	    "kernconf_file = \"GENERIC\";\nrequires = [ \"db\" ];\n"
+	    "jailconf = \"allow.raw_sockets;\";\npkg = [ \"sudo\" ];\n", 1) ==
+	    0);
+	CHECK(DF("frob = 1;\n", 1) == 1);
+	CHECK(cap_has(&c, "shtetl.conf: frob: not a key shtetl.conf takes"));
+	CHECK(DF("reset = [ \"pkg\" ];\n", 1) == 1);
+	CHECK(cap_has(&c, "reset: not a key any more"));
+	CHECK(DF("build { make_jobs = 4; }\n", 0) == 1);
+	CHECK(cap_has(&c, "build: not a key a recipe takes"));
+	CHECK(DF("kernconf_file = 5;\n", 1) == 1);
+	CHECK(cap_has(&c, "kernconf_file: expected a file's path"));
+}
+
 int
 main(void)
 {
@@ -392,6 +428,7 @@ main(void)
 	test_commands();
 	test_requires_patches();
 	test_reporting();
+	test_default();
 	cap_close(&c);
 	printf("check_schema: %d checks\n", checks);
 	return (0);

@@ -149,7 +149,7 @@ a key is seen twice under the default strategy (`append`):
 
 Lines starting with `.` are macros:
 
-    .include "default.conf"
+    .include "common.conf"
     .include(priority=5, duplicate="merge") "site.conf"
     .try_include "/usr/local/etc/local.conf"
     .priority 3
@@ -181,16 +181,16 @@ in a value is a literal `$`.
 
 ## 4. How shtetl layers files
 
-`shtetl.conf` is about the machine (where things go, properties,
-retention) and has its own schema; it is not part of any recipe. A
-recipe is built from layers, nearest last:
+`shtetl.conf` holds two things: the machine's settings (where things
+go, properties, retention), in their own schema, and beside them the
+default recipe, the layer every recipe starts from. There is no
+`default.conf`. A recipe is built from layers, nearest last:
 
-1. built-in recipe defaults
-2. `default.conf`
-3. each recipe named in the target's `import`, in order, each after
+1. the default: `shtetl.conf`, after what it imports
+2. each recipe named in the target's `import`, in order, each after
    what it imports in turn (a recipe reached twice merges once, at
    its first place)
-4. the target recipe (`foundations/F.conf`, `containers/X.conf`,
+3. the target recipe (`foundations/F.conf`, `containers/X.conf`,
    `systems/S.conf`)
 
 Each file is parsed alone, strictly (no duplicates, no macros, no
@@ -198,10 +198,13 @@ variables). shtetl merges the parsed layers itself:
 
 | value | rule |
 |-------|------|
-| `ver` | every file's constraint kept; all must hold |
-| `buildopts`, `jailconf` (and their `_file` twins) | appended, lower files first |
-| a collection (`pkg`, `datasets`, `derivations`, `requires`, `commands`, `patches`) | an object keyed by name: the union, key by key, an entry's fields joining |
-| `src_branch`, `kernconf` | one value (planning.md 15, Q-AC, still asked) |
+| `ver` | every file's constraint kept; all must hold together |
+| `buildopts`, `kernconf_lines`, `jailconf` | text: a piece from each file, kept in order, lower files first |
+| `pkg`, `requires` | the union |
+| `datasets`, `patches` | an object keyed by name: the union, an entry's fields composing |
+| `derivations` | the union; each one given whole, in one file |
+| `commands` | the union by label; one label's texts stack, a piece from each file |
+| `src_branch`, `kernconf_file` | one value: every file that gives it gives the same |
 
 Everything stacks (planning.md 14, ruled 2026-10-12): a file adds to
 what the files below gave, and nothing takes anything away or takes
@@ -209,22 +212,40 @@ another file's place. There is no `false` to drop an element and no
 `reset` to empty a collection; shtetl refuses both. So whatever its
 foundation provides, a container keeps.
 
+What one file gives, another does not give again: a second value for
+a one-value key, a derivation given in two files, a patch source's
+`ref` given twice, are each refused, naming both files. Listing an
+entry again with nothing new (`sudo` in two `pkg` lists) is fine. A
+dataset's property is the exception: a nearer file may give it again,
+with a warning, the property being the container's own clone's.
+
+The default is the one layer a recipe may override. It may hold any
+kind's keys, and each recipe takes those of its kind (a container
+takes no `kernconf_file`). What a recipe gives again of its one-value
+keys, derivations, fields or dataset properties replaces the
+default's, without a warning. What stacks, stacks with it: its `pkg`
+and `ver` reach every recipe, and the way to be rid of one is to take
+it out of `shtetl.conf`.
+
 | to | write |
 |----|-------|
 | add an element | a new key: `pkg { nginx = true; }` |
 | add to an element | the same key with new fields: `datasets { www { readonly = true; } }` |
+| change a default | give it again: `kernconf_file = "MINIMAL";` |
 
 An array of names is shorthand for an object of `name = true` entries,
 for the common case: `pkg = [ "nginx", "git" ];`.
 
-Order follows the first definition: a `commands` block a later layer
-overrides runs where an earlier layer first put it. A container does
-not run a block its foundation already ran (same label, same text):
-`default.conf` is a layer of both, and its blocks run once, when the
-foundation is built.
+Order follows the first definition: a `commands` label a later file
+gives again runs where an earlier file first put it, its pieces in
+file order. A container does not run a piece its foundation already
+ran (same label, same file, same text): `shtetl.conf` is a layer of
+both, and its pieces run once, when the foundation is built.
 
-Unknown keys, and keys that belong to another kind (`kernconf` in a
-container), are errors, not warnings.
+Unknown keys, keys that belong to another kind (`kernconf_file` in a
+container's files), and keys that are gone (`kernconf`,
+`buildopts_file`, `jailconf_file`, `reset`) are errors, not warnings;
+a gone key's error says what to write instead.
 
 `shtetl -C <zconfig> config show TARGET` (built in M1) prints the
 merged result as UCL, each value with the file it came from. libucl
@@ -233,7 +254,23 @@ path (`datasets."usr/local".readonly`) instead.
 
 ## 5. Examples
 
-`default.conf`
+`shtetl.conf`, the default recipe beside the settings
+
+    properties {
+        default { compression = "zstd"; }
+        lake    { compression = "zstd-9"; }
+    }
+    update {
+        suffix = "staging";
+        depth = 0;          # replay every save zrun holds
+    }
+    retention {
+        run = 10;
+        archive = "1y";
+    }
+
+    ver = ">=15.1";
+    kernconf_file = "GENERIC";
 
     datasets {
         tmp {}
@@ -265,14 +302,11 @@ path (`datasets."usr/local".readonly`) instead.
 `foundations/generic.conf`
 
     src_branch = "releng/15.1";
-    kernconf = "GENERIC";
 
 `foundations/gaming.conf`
 
     src_branch = "stable/15";
-    kernconf = <<EOD
-    include         GENERIC
-    ident           LEETGAMING
+    kernconf_lines = <<EOD
     device          drm
     options         SCHED_ULE
     EOD
@@ -286,6 +320,9 @@ path (`datasets."usr/local".readonly`) instead.
     EOD
     }
 
+shtetl writes the kernel config itself: `include GENERIC` (the
+default's `kernconf_file`), an `ident` of its own, then the lines.
+
 `common/web.conf`
 
     pkg = [ "apache24", "py311-certbot" ];
@@ -297,7 +334,7 @@ path (`datasets."usr/local".readonly`) instead.
 
 `containers/nginx.conf`
 
-    ver = ">=15";
+    ver = "<16";
     import = [ "common/web.conf" ];
 
     pkg { nginx = true; }
@@ -309,12 +346,17 @@ path (`datasets."usr/local".readonly`) instead.
     sysrc nginx_enable=YES
     EOD
     }
+    jailconf = <<EOD
+    allow.raw_sockets;
+    EOD
 
 Merged for nginx: pkg = sudo, tmux, apache24, py311-certbot, nginx;
-datasets = tmp, var, usr/local, www; commands = certbot, then nginx.
-Everything stacks, so a container ends with everything its foundation
-provides, `default.conf` being a file of the foundation's recipe too
-(planning.md 7.4).
+datasets = tmp, var, usr/local, www; commands = certbot, then nginx;
+ver `>=15.1` and `<16`, both to hold. Everything stacks, so a
+container ends with everything its foundation provides, `shtetl.conf`
+being a file of the foundation's recipe too (planning.md 7.4).
+`jailconf` is only the options: shtetl writes the `nginx { ... }`
+block around them.
 
 A container recipe names no foundation: `ver` says which foundations it
 fits, and the foundation is chosen with `shtetl create nginx --on
@@ -328,25 +370,10 @@ generic`.
         "www/recipya" { from = "nginx"; }
     }
 
-`shtetl.conf`
-
-    properties {
-        default { compression = "zstd"; }
-        lake    { compression = "zstd-9"; }
-    }
-    update {
-        suffix = "staging";
-        depth = 0;          # replay every save zrun holds
-    }
-    retention {
-        run = 10;
-        archive = "1y";
-    }
-
 ### Differences from mishkan's grammar
 
-- `import default.conf` is gone: default.conf is always a layer.
-  `import` remains for sharing between recipes
+- `import default.conf` is gone: the default is `shtetl.conf`, always
+  a layer. `import` remains for sharing between recipes
   (`import = [ "common/web.conf" ];`).
 - `+=` is gone: collections merge by key, and everything stacks;
   nothing takes an element away.

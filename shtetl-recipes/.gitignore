@@ -1,0 +1,7 @@
+# What a site keeps in its configuration root is its own: nothing
+# reaches a remote unless it is shared on purpose (planning.md 4.4).
+# Only what upstream ships is tracked.
+/*
+!/.gitignore
+!/README.md
+!/shtetl.conf

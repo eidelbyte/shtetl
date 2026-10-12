@@ -83,7 +83,7 @@ static void
 test_recipes(void)
 {
 	static const char *const ex[] = {
-		"default.conf",
+		"shtetl.conf",
 		"pkg = [ \"sudo\", \"tmux\" ];\n"
 		"datasets { tmp {} var {} \"usr/local\" {} }\n",
 		"common/web.conf",
@@ -101,9 +101,7 @@ test_recipes(void)
 		"src_branch = \"main\";\n"
 		"patches { \"github.com/a/b\" { ref = \"r\"; dir = \"15\"; } "
 		"\"https://x.org/p.git\" = true; }\n"
-		"buildopts = \"A=1\\nB=2\";\n"
-		"buildopts_file = \"build/b.conf\";\n",
-		"build/b.conf", "C=3\n",
+		"buildopts = \"A=1\\nB=2\";\n",
 		NULL
 	};
 	static const char *const em[] = {
@@ -114,10 +112,10 @@ test_recipes(void)
 	show(mkroot("ex", ex), "containers/nginx");
 	CHECK(has("# containers/nginx.conf: a container's recipe, its layers "
 	    "merged\n"));
-	CHECK(has("# layers, nearest last: default.conf, common/web.conf, "
+	CHECK(has("# layers, nearest last: shtetl.conf, common/web.conf, "
 	    "containers/nginx.conf\n"));
 	/* CW2 */
-	CHECK(has("\n    sudo = true;  # default.conf\n"));
+	CHECK(has("\n    sudo = true;  # shtetl.conf\n"));
 	CHECK(has("\n    nginx = true;  # containers/nginx.conf\n"));
 	CHECK(has("\n    www {  # common/web.conf\n"
 	    "        readonly = true;  # common/web.conf\n"
@@ -128,18 +126,17 @@ test_recipes(void)
 	CHECK(has("\nver = [\n    \">=15\",  # common/web.conf\n"
 	    "    \"<16\"  # containers/nginx.conf\n]\n"));
 	/* CW5 */
-	CHECK(has("\n    \"usr/local\" {}  # default.conf\n"));
+	CHECK(has("\n    \"usr/local\" {}  # shtetl.conf\n"));
 	CHECK(has("\n    py311-certbot = true;"));
 	CHECK(has("\n    \"c.d\" {  # containers/nginx.conf\n"
 	    "        \"containers/nginx.conf\" = \"x\";\n    }\n"));
 
-	/* CW1 on a foundation; CW5's URLs; CW8, text and a file stacked */
+	/* CW1 on a foundation; CW5's URLs; CW8, text a piece per file */
 	show(root, "foundations/f");
 	CHECK(has("\n    \"github.com/a/b\" {  # foundations/f.conf\n"));
 	CHECK(has("\n    \"https://x.org/p.git\" = true;"));
-	CHECK(has("\nbuildopts = [\n    \"A=1\\nB=2\",  # foundations/f.conf\n"
-	    "    {\n        file = \"build/b.conf\";  # foundations/f.conf\n"
-	    "    }  # foundations/f.conf\n]\n"));
+	CHECK(has("\nbuildopts {\n    \"foundations/f.conf\" = <<EOD\n"
+	    "A=1\nB=2\nEOD\n}\n"));
 
 	/* CW6: a collection written empty */
 	show(mkroot("em", em), "systems/e");

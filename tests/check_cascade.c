@@ -114,7 +114,7 @@ is(const char *got, const char *want)
 
 /* The 5.4 example, as the plan writes it. */
 static const char *const example[] = {
-	"default.conf",
+	"shtetl.conf",
 	"pkg = [ \"sudo\", \"tmux\" ];\n"
 	"datasets {\n"
 	"    tmp {}\n"
@@ -153,7 +153,7 @@ test_example(void)
 	CHECK(r.sr_kind == SH_CONTAINER);
 	CHECK(is(r.sr_name, "nginx"));
 	CHECK(is(r.sr_file, "containers/nginx.conf"));
-	CHECK(is(layers(), "default.conf common/web.conf "
+	CHECK(is(layers(), "shtetl.conf common/web.conf "
 	    "containers/nginx.conf"));
 	CHECK(is(keys(M("pkg")), "sudo tmux apache24 py311-certbot nginx"));
 	CHECK(is(keys(M("datasets")), "tmp var usr/local www"));
@@ -177,7 +177,7 @@ test_example(void)
 	CHECK(M("import") == NULL);
 }
 
-/* CC2, CC3, CC4: default.conf absent; imports nested and repeated. */
+/* CC2, CC3, CC4: shtetl.conf absent; imports nested and repeated. */
 static void
 test_layers(void)
 {
@@ -186,7 +186,7 @@ test_layers(void)
 		NULL
 	};
 	static const char *const nest[] = {
-		"default.conf", "import = \"common/base.conf\";\n",
+		"shtetl.conf", "import = \"common/base.conf\";\n",
 		"common/base.conf", "pkg = [ \"zsh\" ];\n",
 		"common/c.conf", "pkg = [ \"c\" ];\n",
 		"common/a.conf", "import = [ \"common/c.conf\" ];\n",
@@ -194,7 +194,7 @@ test_layers(void)
 		"import = [ \"common/c.conf\", \"common/base.conf\" ];\n",
 		"containers/x.conf",
 		"import = [ \"common/a.conf\", \"common/b.conf\", "
-		"\"default.conf\" ];\n",
+		"\"shtetl.conf\" ];\n",
 		NULL
 	};
 
@@ -203,7 +203,7 @@ test_layers(void)
 	CHECK(is(keys(M("pkg")), "a"));
 
 	resolves(mkroot("nest", nest), "containers/x");
-	CHECK(is(layers(), "common/base.conf default.conf common/c.conf "
+	CHECK(is(layers(), "common/base.conf shtetl.conf common/c.conf "
 	    "common/a.conf common/b.conf containers/x.conf"));
 	CHECK(is(keys(M("pkg")), "zsh c"));
 }
@@ -237,7 +237,7 @@ test_import_errors(void)
 /*
  * CC7, CC8: what stacks, and what must agree. Every file's ver is
  * kept, to hold together; buildopts, kernconf_lines and jailconf
- * append, lower layers first, a buildopts_file's file in its place;
+ * append, a piece from each file keyed by it, lower layers first;
  * src_branch and kernconf_file, one value each, may be given again
  * only alike (ruled 2026-10-12).
  */
@@ -245,15 +245,13 @@ static void
 test_stacked(void)
 {
 	static const char *const st[] = {
-		"default.conf", "ver = \">=14\";\npkg = [ \"a\" ];\n",
+		"shtetl.conf", "ver = \">=14\";\npkg = [ \"a\" ];\n",
 		"common/w.conf", "ver = \">=15\";\njailconf = \"j1;\";\n",
 		"containers/x.conf", "import = \"common/w.conf\";\n"
 		"pkg = [ \"b\" ];\nver = \"<16\";\njailconf = \"j2;\";\n",
 		"common/b.conf", "buildopts = \"A=1\";\n"
-		"buildopts_file = \"build/b.conf\";\n"
 		"kernconf_lines = \"nooptions WITNESS\";\n"
 		"src_branch = \"releng/15.1\";\n",
-		"build/b.conf", "WITHOUT_X=yes\n",
 		"common/k.conf", "kernconf_file = \"GENERIC\";\n",
 		"foundations/f1.conf", "import = [ \"common/k.conf\", "
 		"\"common/b.conf\" ];\n"
@@ -272,29 +270,28 @@ test_stacked(void)
 	v = M("ver");
 	CHECK(v->sn_type == SH_ARRAY && v->sn_arr.ar_n == 3);
 	CHECK(is(v->sn_arr.ar_v[0]->sn_str, ">=14"));
-	CHECK(is(v->sn_arr.ar_v[0]->sn_from, "default.conf"));
+	CHECK(is(v->sn_arr.ar_v[0]->sn_from, "shtetl.conf"));
 	CHECK(is(v->sn_arr.ar_v[1]->sn_str, ">=15"));
 	CHECK(is(v->sn_arr.ar_v[1]->sn_from, "common/w.conf"));
 	CHECK(is(v->sn_arr.ar_v[2]->sn_str, "<16"));
 	CHECK(is(v->sn_arr.ar_v[2]->sn_from, "containers/x.conf"));
+	/* text: a piece from each file, keyed by it, lower first */
 	v = M("jailconf");
-	CHECK(v->sn_type == SH_ARRAY && v->sn_arr.ar_n == 2);
-	CHECK(is(v->sn_arr.ar_v[0]->sn_str, "j1;"));
-	CHECK(is(v->sn_arr.ar_v[1]->sn_str, "j2;"));
+	CHECK(v->sn_type == SH_OBJECT);
+	CHECK(is(keys(v), "common/w.conf containers/x.conf"));
+	CHECK(is(sh_obj_get(v, "common/w.conf")->sn_str, "j1;"));
+	CHECK(is(sh_obj_get(v, "containers/x.conf")->sn_str, "j2;"));
 
 	/* the same src_branch and kernconf_file again: they agree */
 	resolves(root, "foundations/f1");
 	v = M("buildopts");
-	CHECK(v->sn_type == SH_ARRAY && v->sn_arr.ar_n == 3);
-	CHECK(is(v->sn_arr.ar_v[0]->sn_str, "A=1"));
-	CHECK(is(sh_obj_get(v->sn_arr.ar_v[1], "file")->sn_str,
-	    "build/b.conf"));
-	CHECK(is(v->sn_arr.ar_v[2]->sn_str, "B=2"));
-	CHECK(is(v->sn_arr.ar_v[2]->sn_from, "foundations/f1.conf"));
+	CHECK(is(keys(v), "common/b.conf foundations/f1.conf"));
+	CHECK(is(sh_obj_get(v, "common/b.conf")->sn_str, "A=1"));
+	CHECK(is(sh_obj_get(v, "foundations/f1.conf")->sn_str, "B=2"));
 	v = M("kernconf_lines");
-	CHECK(v->sn_arr.ar_n == 2);
-	CHECK(is(v->sn_arr.ar_v[0]->sn_str, "nooptions WITNESS"));
-	CHECK(is(v->sn_arr.ar_v[1]->sn_str, "device vmm"));
+	CHECK(is(keys(v), "common/b.conf foundations/f1.conf"));
+	CHECK(is(sh_obj_get(v, "foundations/f1.conf")->sn_str,
+	    "device vmm"));
 	CHECK(is(M("kernconf_file")->sn_str, "GENERIC"));
 	CHECK(is(M("kernconf_file")->sn_from, "common/k.conf"));
 	CHECK(is(M("src_branch")->sn_from, "common/b.conf"));
@@ -312,7 +309,7 @@ static void
 test_ver(void)
 {
 	static const char *const vr[] = {
-		"default.conf", "ver = \"<15\";\n",
+		"shtetl.conf", "ver = \"<15\";\n",
 		"containers/a.conf", "ver = \">=16\";\n",
 		"containers/b.conf", "ver = \">=14.2\";\n",
 		"common/x.conf", "ver = \"=15.1\";\n",
@@ -331,7 +328,7 @@ test_ver(void)
 	};
 
 	refused(mkroot("vr", vr), "containers/a", "containers/a.conf: ver: "
-	    "no version is >=16 (containers/a.conf) and <15 (default.conf) "
+	    "no version is >=16 (containers/a.conf) and <15 (shtetl.conf) "
 	    "at once");
 	resolves(root, "containers/b");
 	refused(mkroot("vr2", vr2), "containers/c", "ver: no version is "
@@ -350,7 +347,7 @@ static void
 test_collections(void)
 {
 	static const char *const co[] = {
-		"default.conf",
+		"shtetl.conf",
 		"datasets { var {} }\n"
 		"commands { a = \"1\"; b = \"2\"; }\n",
 		"common/f.conf",
@@ -393,10 +390,10 @@ test_collections(void)
 	 */
 	v = sh_obj_get(cmd, "a");
 	CHECK(v->sn_type == SH_OBJECT);
-	CHECK(is(keys(v), "default.conf common/f.conf"));
-	CHECK(is(sh_obj_get(v, "default.conf")->sn_str, "1"));
+	CHECK(is(keys(v), "shtetl.conf common/f.conf"));
+	CHECK(is(sh_obj_get(v, "shtetl.conf")->sn_str, "1"));
 	CHECK(is(sh_obj_get(v, "common/f.conf")->sn_str, "1b"));
-	CHECK(is(keys(sh_obj_get(cmd, "b")), "default.conf containers/x.conf"));
+	CHECK(is(keys(sh_obj_get(cmd, "b")), "shtetl.conf containers/x.conf"));
 	CHECK(is(keys(sh_obj_get(cmd, "d")), "containers/x.conf"));
 
 	/* CC10: a list of names over an entry with fields */
@@ -410,14 +407,14 @@ test_collections(void)
 
 /*
  * CC11, CC12, CC14, CC15: nothing is dropped and nothing reset (ruled
- * 2026-10-12), in any kind of recipe; so what default.conf and its
+ * 2026-10-12), in any kind of recipe; so what shtetl.conf and its
  * imports give, every recipe keeps, commands included.
  */
 static void
 test_nodrops(void)
 {
 	static const char *const nd[] = {
-		"default.conf",
+		"shtetl.conf",
 		"import = \"common/base.conf\";\n"
 		"pkg = [ \"sudo\", \"tmux\" ];\n"
 		"datasets { tmp {} }\n"
@@ -473,9 +470,7 @@ test_merged(void)
 		"patches { \"github.com/a/b\" { dir = \"15\"; } }\n",
 		"foundations/files.conf",
 		"src_branch = \"main\";\nkernconf_file = \"kernels/NOPE\";\n"
-		"buildopts_file = \"build/src.conf\";\n"
 		"patches { \"patches/gen\" { dir = \"15.1\"; } }\n",
-		"build/src.conf", "WITHOUT_X=yes\n",
 		"patches/gen/14.3/0-a.patch", "\n",
 		"foundations/pat.conf",
 		"src_branch = \"main\";\n"
@@ -504,7 +499,7 @@ test_merged(void)
 	resolves(root, "foundations/pdir");
 	CHECK(is(keys(sh_obj_get(M("patches"), "github.com/a/b")),
 	    "ref dir"));
-	/* CC20: buildopts_file is there; the others are not */
+	/* CC20: kernconf_file and a patch directory, not there */
 	CHECK(R(root, "foundations/files") == -1);
 	CHECK(c.c_err.se_count == 2);
 	CHECK(cap_has(&c, "foundations/files.conf: kernconf_file: "
@@ -554,7 +549,7 @@ static void
 test_layer_errors(void)
 {
 	static const char *const le[] = {
-		"default.conf", "frob = 1;\n",
+		"shtetl.conf", "frob = 1;\n",
 		"common/k.conf", "kernconf_file = \"G\";\npkg = [ \"-x\" ];\n",
 		"containers/x.conf",
 		"import = \"common/k.conf\";\njailconf = 5;\n",
@@ -563,7 +558,7 @@ test_layer_errors(void)
 
 	CHECK(R(mkroot("le", le), "containers/x") == -1);
 	CHECK(c.c_err.se_count == 4);
-	CHECK(cap_has(&c, "default.conf: frob: not a key a recipe takes"));
+	CHECK(cap_has(&c, "shtetl.conf: frob: not a key shtetl.conf takes"));
 	CHECK(cap_has(&c, "common/k.conf: kernconf_file: not a key of a "
 	    "container's recipe: only a foundation's takes it"));
 	CHECK(cap_has(&c, "common/k.conf: pkg[0]: not a package's name"));
@@ -572,12 +567,88 @@ test_layer_errors(void)
 	CHECK(r.sr_merged == NULL);
 }
 
+/*
+ * CC31 - CC34: shtetl.conf, the default (ruled 2026-10-12). Every
+ * recipe takes the keys of its kind from it; what a recipe gives again
+ * of the default's one-value keys, derivations, entries' fields and
+ * dataset properties overrides it (no warning: a default is there to
+ * be overridden); what stacks stacks with it; its settings are no
+ * recipe's.
+ */
+static void
+test_default(void)
+{
+	static const char *const df[] = {
+		"shtetl.conf",
+		"build { make_jobs = 2; }\n"
+		"import = \"common/dflt.conf\";\n"
+		"ver = \">=15.1\";\n"
+		"src_branch = \"releng/15.1\";\n"
+		"kernconf_file = \"GENERIC\";\n"
+		"kernconf_lines = \"nooptions INVARIANTS\";\n"
+		"jailconf = \"allow.raw_sockets;\";\n"
+		"pkg = [ \"sudo\" ];\n"
+		"datasets { var { compression = \"zstd\"; } }\n"
+		"commands { motd = \"echo default\"; }\n"
+		"derivations { \"etc/pwd.db\" { "
+		"source = \"etc/master.passwd\"; "
+		"command = \"pwd_mkdb\"; } }\n"
+		"patches { \"github.com/a/b\" { ref = \"r1\"; } }\n",
+		"common/dflt.conf", "pkg = [ \"tmux\" ];\n",
+		"foundations/f.conf",
+		"src_branch = \"main\";\nkernconf_file = \"MINIMAL\";\n"
+		"kernconf_lines = \"device vmm\";\n"
+		"patches { \"github.com/a/b\" { ref = \"r2\"; } }\n",
+		"containers/x.conf",
+		"ver = \"<16\";\npkg = [ \"nginx\" ];\n"
+		"datasets { var { compression = \"lz4\"; } }\n"
+		"commands { motd = \"echo mine\"; }\n"
+		"derivations { \"etc/pwd.db\" { "
+		"source = \"etc/master.passwd\"; "
+		"command = \"pwd_mkdb -p\"; } }\n"
+		"jailconf = \"allow.sysvipc;\";\n",
+		NULL
+	};
+	const struct sh_node *v;
+
+	resolves(mkroot("df", df), "containers/x");
+	CHECK(is(layers(), "common/dflt.conf shtetl.conf containers/x.conf"));
+	CHECK(r.sr_layers[0].sl_default && r.sr_layers[1].sl_default);
+	CHECK(!r.sr_layers[2].sl_default);
+	/* CC31: a container takes no foundation key, and no setting */
+	CHECK(M("src_branch") == NULL && M("kernconf_file") == NULL);
+	CHECK(M("kernconf_lines") == NULL && M("patches") == NULL);
+	CHECK(M("build") == NULL);
+	/* CC33: what stacks, stacks with the default */
+	CHECK(is(keys(M("pkg")), "tmux sudo nginx"));
+	CHECK(M("ver")->sn_arr.ar_n == 2);
+	CHECK(is(keys(M("jailconf")), "shtetl.conf containers/x.conf"));
+	CHECK(is(keys(sh_obj_get(M("commands"), "motd")),
+	    "shtetl.conf containers/x.conf"));
+	/* CC32: what is given again of the default's, overrides it */
+	v = sh_obj_get(sh_obj_get(M("datasets"), "var"), "compression");
+	CHECK(is(v->sn_str, "lz4") && is(v->sn_from, "containers/x.conf"));
+	CHECK(wc.c_err.se_count == 0);
+	v = sh_obj_get(sh_obj_get(M("derivations"), "etc/pwd.db"), "command");
+	CHECK(is(v->sn_str, "pwd_mkdb -p"));
+
+	resolves(root, "foundations/f");
+	CHECK(is(M("src_branch")->sn_str, "main"));
+	CHECK(is(M("kernconf_file")->sn_str, "MINIMAL"));
+	CHECK(is(keys(M("kernconf_lines")),
+	    "shtetl.conf foundations/f.conf"));
+	CHECK(is(sh_obj_get(sh_obj_get(M("patches"), "github.com/a/b"),
+	    "ref")->sn_str, "r2"));
+	/* CC34: a foundation takes no container key */
+	CHECK(M("jailconf") == NULL);
+}
+
 /* CC25: patch sources across layers keep their first place. */
 static void
 test_patches(void)
 {
 	static const char *const pt[] = {
-		"default.conf", "patches = [ \"github.com/a/one\" ];\n",
+		"shtetl.conf", "patches = [ \"github.com/a/one\" ];\n",
 		"common/p.conf", "patches = [ \"github.com/b/two\" ];\n",
 		"patches/local/0-x.patch", "\n",
 		"foundations/f.conf",
@@ -612,6 +683,7 @@ main(void)
 	test_targets();
 	test_layer_errors();
 	test_patches();
+	test_default();
 	sh_recipe_free(&r);
 	cap_close(&wc);
 	cap_close(&c);

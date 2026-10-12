@@ -240,7 +240,7 @@ inherits <code>canmount</code>), each overridable in
 <text class="label" x="36" y="46" style="fill: var(--config)">zconfig</text>
 <text class="small" x="36" y="64">the recipes clone</text>
 <text class="item" x="36" y="88">zshtetl-recipes (git)</text>
-<text class="item" x="36" y="108">shtetl.conf default.conf</text>
+<text class="item" x="36" y="108">shtetl.conf (the default)</text>
 
 <!-- zbuild -->
 <rect class="box" x="20" y="250" width="250" height="110" rx="8" style="stroke: var(--build)"/>
@@ -319,8 +319,7 @@ everything it does not ship, and a user shares a file by adding it
 explicitly.</p>
 <pre><code>.git/
 .gitignore
-shtetl.conf      site settings
-default.conf     base of every recipe
+shtetl.conf      site settings, and the default recipe
 foundations/
 containers/
 systems/</code></pre>
@@ -549,26 +548,30 @@ The soak is a one-shot boot into the staging tree.</p>
 ctld, bhyve and iovctl (read with <code>textproc/libucl</code>; base's
 copy is private). Each file is parsed strictly: no duplicate keys, no
 macros, no variables. <code>shtetl.conf</code> holds what is about the
-machine; a recipe is built from layers, nearest last:</p>
+machine, and beside it the default recipe; a recipe is built from
+layers, nearest last:</p>
 
 <div class="tablewrap">
 <table>
 <tr><th>layer</th><th>file</th></tr>
-<tr><td>1</td><td>built-in recipe defaults</td></tr>
-<tr><td>2</td><td><code>default.conf</code></td></tr>
-<tr><td>3</td><td>recipes named in the target's <code>import</code></td></tr>
-<tr><td>4</td><td>the target recipe</td></tr>
+<tr><td>1</td><td>the default: <code>shtetl.conf</code>, after what it imports</td></tr>
+<tr><td>2</td><td>recipes named in the target's <code>import</code></td></tr>
+<tr><td>3</td><td>the target recipe</td></tr>
 </table>
 </div>
 
-<p>Nearer layers replace scalars and merge objects. Every collection
+<p>Everything stacks: a file adds to what the files below it gave,
+and nothing is dropped or replaced. Every collection
 (<code>pkg</code>, <code>datasets</code>, <code>derivations</code>,
-<code>requires</code>, <code>commands</code>) is an object keyed by
-name, and lists are additive: a recipe adds an element by naming it,
-changes one by naming it with new fields, drops one with
-<code>name = false</code>, and drops everything inherited with
-<code>reset</code>. A container must still end with a superset of what
-its foundation provides. A container recipe names no foundation; its
+<code>requires</code>, <code>commands</code>, <code>patches</code>) is
+an object keyed by name, and their union is taken; texts
+(<code>buildopts</code>, <code>kernconf_lines</code>,
+<code>jailconf</code>) are kept a piece from each file; every
+<code>ver</code> must hold. What one file gives, another does not
+give again, except a dataset's property, which may be overridden with
+a warning. The default is the one layer a recipe may override: it
+holds any kind's keys, and each recipe takes those of its kind. So a
+container ends with everything its foundation provides. A container recipe names no foundation; its
 <code>ver</code> says which ones it fits, and the foundation is chosen
 at <code>shtetl create X --on F</code>. See
 <code>docs/ucl-primer.md</code>.</p>

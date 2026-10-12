@@ -92,7 +92,7 @@ object, string}; entry key syntax per collection; error reporting
 | CK4 | a container-only key (requires, jailconf) in a foundation and in a system is refused | covered: check_schema.c |
 | CK5 | a string key given a number or a bool is refused; a number says to quote it | covered: check_schema.c |
 | CK6 | ver, one constraint or a list of them: `>=15`, `=15.1`, `<16`, `<=15.1`, `>14` accepted; ``, `15.1`, `>=`, `=>15`, `>=15.x`, `>=15.` refused | covered: check_schema.c, check_cascade.c test_ver |
-| CK7 | kernconf_file and kernconf_lines in one file; buildopts and buildopts_file in one file, which stack | covered: check_schema.c |
+| CK7 | kernconf_file and kernconf_lines in one file; a kernconf_file path in zconfig | covered: check_schema.c |
 | CK8 | a `_file` value: relative paths accepted; absolute, `..`, empty components refused | covered: check_schema.c |
 | CK9 | import: an array of strings, or one string; a non-string element or a bad path refused | covered: check_schema.c |
 | CK10 | reset is refused: nothing is reset, the layers stack (ruled 2026-10-12) | covered: check_schema.c |
@@ -106,7 +106,8 @@ object, string}; entry key syntax per collection; error reporting
 | CK18 | a collection given as a scalar is refused | covered: check_schema.c |
 | CK19 | every error in a layer is reported, not only the first | covered: check_schema.c |
 | CK20 | the key path quotes a component that is not a bare word (`datasets."usr/local".readonly`) | covered: check_schema.c |
-| CK21 | a key there is no more (reset, kernconf, jailconf_file) is refused, saying what to write instead | covered: check_schema.c |
+| CK21 | a key there is no more (reset, kernconf, jailconf_file, buildopts_file) is refused, saying what to write instead | covered: check_schema.c |
+| CK22 | a file of the default layer takes every kind's keys; shtetl.conf's sections of settings are no recipe keys, and a file it imports may have none; an unknown key or a key there is no more is refused | covered: check_schema.c test_default |
 
 ## CS: shtetl.conf (planning.md 5.2, 6.3; src/core/site.c)
 
@@ -118,7 +119,7 @@ forms of 6.3 {0, a count, an interval, each malformed one}; layers
 | cell | scenario | disposition |
 |------|----------|-------------|
 | CS1 | 5.2's example is accepted as written | covered: check_site.c |
-| CS2 | an unknown section, or an unknown key in a section, is refused | covered: check_site.c |
+| CS2 | an unknown section, or an unknown key in a section, is refused; a key at the top that is neither a section nor a recipe's key is refused | covered: check_site.c |
 | CS3 | spaces: lake and run take `default`, a dataset name; config or build with one is refused; a bad name is refused | covered: check_site.c |
 | CS4 | properties: sections default, lake, run, config, build; string or bool values; a number refused; mountpoint, canmount, shtetl:* refused | covered: check_site.c |
 | CS5 | build.make_jobs: 0 or more; negative, a string, a float refused | covered: check_site.c |
@@ -127,38 +128,42 @@ forms of 6.3 {0, a count, an interval, each malformed one}; layers
 | CS8 | with no shtetl.conf the settings are the built-in ones (4.3's properties, 6.3's zeros, suffix staging) | covered: check_site.c |
 | CS9 | shtetl.conf sets one property; the rest stay built-in, each with its layer | covered: check_site.c |
 | CS10 | retention.lake is refused: zlake keeps what zrun keeps | covered: check_site.c |
+| CS11 | the default recipe's keys beside the settings: checked by the recipe schema, and out of the settings' view | covered: check_site.c |
 
 ## CC: the cascade (planning.md 5.4; src/core/cascade.c)
 
-Dimensions: layers {built-in, default.conf present or absent,
-imports flat, nested, repeated, cyclic, missing, the target};
-merge {scalar, twin, collection add, change, drop, array shorthand,
-true over fields, reset}; the drop rule {kind, the collection, the
-layer that added the element}; order; checks after the merge;
-the target's spelling.
+Dimensions: layers {the default (shtetl.conf present or absent, its
+imports), imports flat, nested, repeated, cyclic, missing, the
+target}; merge {one value (agree, disagree, over the default), text
+pieces, ver, collection add, a field given again (over a recipe file,
+over the default), a dataset property overridden, a derivation given
+again, a commands piece, array shorthand, true over fields; drops and
+reset retired}; the default's keys {of the recipe's kind, of another
+kind, settings}; order; checks after the merge; the target's
+spelling.
 
 | cell | scenario | disposition |
 |------|----------|-------------|
-| CC1 | layer order: built-in, default.conf, the imports in order, the target | covered: check_cascade.c |
-| CC2 | no default.conf: the recipe resolves without it | covered: check_cascade.c |
+| CC1 | layer order: shtetl.conf (the default) after what it imports, then the recipe's imports in order, then the recipe | covered: check_cascade.c |
+| CC2 | no shtetl.conf: the recipe resolves with no default layer | covered: check_cascade.c |
 | CC3 | an import's own imports merge before it | covered: check_cascade.c |
 | CC4 | a recipe imported twice merges once, at its first place | covered: check_cascade.c |
 | CC5 | an import cycle is refused, naming the files in it | covered: check_cascade.c |
 | CC6 | an import of a missing file is refused, naming the importing file | covered: check_cascade.c |
 | CC7 | ver: every file's constraints kept, in layer order, each with its file, to hold together (ruled 2026-10-12, Q-S); src_branch and kernconf_file, one value: given again only alike, else refused naming both files (ruled 2026-10-12, Q-AC) | covered: check_cascade.c test_stacked |
-| CC8 | buildopts, kernconf_lines and jailconf append, lower layers first, a buildopts_file's file in its place (ruled 2026-10-12, Q-T, Q-AC) | covered: check_cascade.c test_stacked |
+| CC8 | buildopts, kernconf_lines and jailconf append: a piece from each file, keyed by it, lower layers first (ruled 2026-10-12, Q-T, Q-AC) | covered: check_cascade.c test_stacked |
 | CC9 | collections: a key added; an entry's fields compose across files, each given once | covered: check_cascade.c |
 | CC10 | array shorthand merges as name = true; true over an entry with fields keeps the fields | covered: check_cascade.c |
 | CC11 | false and reset are refused in every kind of recipe: nothing is dropped, nothing reset (ruled 2026-10-12) | covered: check_cascade.c test_nodrops |
-| CC12 | what default.conf and its imports give, every recipe keeps, commands included (once the drop rule; retired with drops, 2026-10-12) | covered: check_cascade.c test_nodrops |
+| CC12 | what stacks in the default (shtetl.conf and its imports), every recipe keeps, commands included | covered: check_cascade.c test_nodrops, test_default |
 | CC13 | retired 2026-10-12: a container dropped what its own import added (5.4's apache24); nothing is dropped now | retired: no drops (CC11) |
 | CC14 | retired 2026-10-12: a foundation dropped a default.conf element; nothing is dropped now | retired: no drops (CC11) |
 | CC15 | retired 2026-10-12: reset emptied an inherited collection; reset is refused now | retired: no reset (CC11, CK10) |
 | CC16 | order: keys keep their first place across layers; an overridden commands block stays where it was first defined | covered: check_cascade.c |
-| CC17 | 5.4's worked example, nothing dropped: pkg sudo, tmux, apache24, py311-certbot, nginx; datasets tmp, var, usr/local, www; commands certbot, nginx | covered: check_cascade.c |
+| CC17 | 5.4's worked example, nothing dropped, its default in shtetl.conf: pkg sudo, tmux, apache24, py311-certbot, nginx; datasets tmp, var, usr/local, www; commands certbot, nginx | covered: check_cascade.c |
 | CC18 | a foundation with no src_branch after the merge is refused | covered: check_cascade.c |
 | CC19 | a derivation given in a second file, alike or not, is refused, naming the first (ruled 2026-10-12) | covered: check_cascade.c |
-| CC20 | a file a _file names (kernconf, buildopts, jailconf) or a patches directory that does not exist in the config root is refused, naming the key | covered: check_cascade.c |
+| CC20 | a kernconf_file path or a patches directory that does not exist in the config root is refused, naming the key | covered: check_cascade.c |
 | CC21 | requires naming a container with no recipe, or the container itself, is refused | covered: check_cascade.c |
 | CC22 | targets: `containers/nginx` and `containers/nginx.conf` alike; an unknown kind directory, `..`, a bad name, a nested path, a missing recipe refused | covered: check_cascade.c |
 | CC23 | errors in several layers are all reported, and nothing is merged | covered: check_cascade.c |
@@ -169,6 +174,10 @@ the target's spelling.
 | CC28 | a dataset property a nearer file gives again, differently, overrides, with a warning naming both values and the first file (ruled 2026-10-12) | covered: check_cascade.c |
 | CC29 | a commands block given in several files stacks: a piece from each, keyed by its file, lower first (ruled 2026-10-12) | covered: check_cascade.c |
 | CC30 | an entry's field a second file gives again, alike or not, is refused (a patch source's ref); a field the first did not give composes (dir) | covered: check_cascade.c |
+| CC31 | a recipe takes from the default only the keys of its kind (a container no kernconf_file, a foundation no jailconf), and none of shtetl.conf's settings | covered: check_cascade.c test_default |
+| CC32 | what a recipe gives again of the default's one-value keys, derivations, entries' fields and dataset properties overrides it, with no warning (ruled 2026-10-12) | covered: check_cascade.c test_default |
+| CC33 | what stacks, stacks with the default: pkg, ver, text, commands | covered: check_cascade.c test_default |
+| CC34 | the files shtetl.conf imports are of the default too | covered: check_cascade.c test_default |
 
 ## CW: what config show prints (src/core/show.c)
 
@@ -181,7 +190,7 @@ the target's spelling.
 | CW5 | keys that are not bare words are quoted (`"usr/local"`, a URL) | covered: check_show.c |
 | CW6 | a collection written empty prints as an empty object | covered: check_show.c |
 | CW7 | the site settings print with built-in or shtetl.conf on each value | covered: check_show.c |
-| CW8 | a list that stacks (ver, buildopts, jailconf) prints a value a line, each ending in its layer; a { file } piece as an object; a comment never sits between [ and the first value, which libucl would read as part of it | covered: check_show.c |
+| CW8 | a key that stacks prints its values with their layers: ver a value a line, each ending in its layer (a comment never between [ and the first value, which libucl would read as part of it); buildopts, kernconf_lines, jailconf and each commands block as an object of pieces keyed by their files, heredocs where they hold lines | covered: check_show.c |
 
 ## CL: the command line (src/main.c; tests/run-cli.sh)
 

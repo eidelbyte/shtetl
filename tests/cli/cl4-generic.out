@@ -1,27 +1,34 @@
 # foundations/generic.conf: a foundation's recipe, its layers merged
-# layers, nearest last: default.conf, foundations/generic.conf
+# layers, nearest last: shtetl.conf, foundations/generic.conf
+ver = [
+    ">=15.1",  # shtetl.conf
+    ">=15"  # foundations/generic.conf
+]
+kernconf_file = "GENERIC";  # foundations/generic.conf, over shtetl.conf
 pkg {
-    sudo = true;  # default.conf
-    tmux = true;  # default.conf
+    sudo = true;  # shtetl.conf
+    tmux = true;  # shtetl.conf
 }
 datasets {
-    tmp {}  # default.conf
-    var {}  # default.conf
-    "usr/local" {  # default.conf
+    tmp {}  # shtetl.conf
+    var {}  # shtetl.conf
+    "usr/local" {  # shtetl.conf
         compression = "zstd-9";  # foundations/generic.conf
     }
 }
-ver = [
-    ">=15"  # foundations/generic.conf
-]
 src_branch = "releng/15.1";  # foundations/generic.conf
-kernconf_file = "GENERIC";  # foundations/generic.conf
-kernconf_lines = [
-    "nooptions INVARIANTS\nnooptions WITNESS"  # foundations/generic.conf
-]
-buildopts = [
-    "WITHOUT_LIB32=yes\nWITH_META_MODE=yes"  # foundations/generic.conf
-]
+kernconf_lines {
+    "foundations/generic.conf" = <<EOD
+nooptions INVARIANTS
+nooptions WITNESS
+EOD
+}
+buildopts {
+    "foundations/generic.conf" = <<EOD
+WITHOUT_LIB32=yes
+WITH_META_MODE=yes
+EOD
+}
 patches {
     "github.com/eidelbyte/freebsd-patches" {  # foundations/generic.conf
         ref = "releng-15.1";  # foundations/generic.conf

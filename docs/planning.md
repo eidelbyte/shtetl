@@ -215,8 +215,8 @@ The config root **is** the zshtetl-recipes working tree:
     <config root>/
         .git/
         .gitignore             upstream: ignore everything it does not ship
-        shtetl.conf            site settings (5.2)
-        default.conf           base layer of every recipe
+        shtetl.conf            site settings (5.2), and the default
+                               layer of every recipe (5.4)
         foundations/
         containers/
         systems/
@@ -237,6 +237,15 @@ Sharing a file (PROPOSAL): `shtetl share containers/nginx.conf` runs
 `git add -f` on it. A tracked file is no longer subject to
 `.gitignore`, so the shared `.gitignore` is never edited locally and
 never conflicts with upstream's.
+
+Upstream ships `shtetl.conf` with the default recipe in it
+(`ver = ">=15.1"`, `kernconf_file = "GENERIC"`; 5.4), and the site
+writes its settings beside it (5.2). It is tracked, so the site's
+changes to it are local changes git keeps: a pull that brings an
+upstream change to it stops until they are settled. Until the
+zshtetl-recipes repository exists, its seed lives in shtetl's own
+repository, `shtetl-recipes/`: the shipped `shtetl.conf`, the
+`.gitignore` and a README.
 
 A hazard, tested 2026-10-09 with git on the mac: git treats ignored
 files as expendable. A local, ignored `containers/nginx.conf` was
@@ -338,8 +347,14 @@ the `textproc/libucl` port.
 
 ### 5.2 shtetl.conf (site settings)
 
-Its own schema, separate from the recipe cascade: it holds what is
-about this machine, never what is about a recipe.
+It holds two things (ruled 2026-10-12): the site's settings, below,
+in their own schema, about this machine and never about a recipe; and
+beside them, at the top level, the default recipe (5.4), every key any
+kind of recipe takes. The settings are its sections (`spaces`,
+`properties`, `build`, `update`, `retention`); any other top-level key
+is the default recipe's and is checked by the recipe schema, so a
+setting never reaches a recipe and a recipe key never reaches the
+settings. There is no `default.conf`.
 
     spaces {
         lake { default = "tank/shtetl"; }   # needed with several lake roots
@@ -388,8 +403,8 @@ Built in M1 (`src/core/parse.c`, the one file that includes `ucl.h`):
   libucl from defining its own.
 - Times are left to libucl: an unquoted `30d` arrives as a number, so
   the schema can say to quote it (6.3).
-- Unknown keys, and keys that belong to another kind (`kernconf` in a
-  container), are errors with the file and the key path
+- Unknown keys, and keys that belong to another kind (`kernconf_file`
+  in a container's files), are errors with the file and the key path
   (`datasets."usr/local".readonly`), not the line: libucl keeps no
   line on the objects it builds, only on a parse error, and a key
   path names one place, keys being unique in a file. Every problem in
@@ -402,26 +417,65 @@ had before. There are two layers: a foundation's recipe, and a
 container's or system's, which stacks on its foundation's when it is
 created (7.4). Each is made of files, nearest last:
 
-1. built-in recipe defaults
-2. `default.conf`, after what it imports
-3. each recipe named in `import`, in order, each after its own imports
-4. the recipe itself (`foundations/F.conf`, `containers/X.conf`,
+1. the default: `shtetl.conf`, after what it imports
+2. each recipe named in `import`, in order, each after its own imports
+3. the recipe itself (`foundations/F.conf`, `containers/X.conf`,
    `systems/S.conf`)
 
+There is no built-in recipe and no `default.conf`: what every recipe
+starts from is the site's `shtetl.conf`, which upstream ships with
+`ver = ">=15.1"` and `kernconf_file = "GENERIC"` (4.4). Without a
+`shtetl.conf` a recipe has no default layer.
+
 Everything stacks: each file adds to what the files below it gave,
-and no file takes anything away or takes another's place. There is no
-way to drop an element, to empty an inherited collection or to
-replace a value: `false` as an entry and `reset` are refused. How each
-key stacks:
+and no file takes anything away. There is no way to drop an element,
+to empty an inherited collection or to replace a value: `false` as an
+entry and `reset` are refused. How each key stacks:
 
 | key | stacks as |
 |-----|-----------|
 | import | names files; no value of its own |
-| ver | every file's constraint kept, in order; all must hold, the foundation's and the container's together |
-| buildopts, jailconf, and their `_file` twins | appended, lower files first; a `_file`'s file in its place |
+| ver | every file's constraint kept, in order; all must hold together, the foundation's and the container's, or the recipe is refused naming two that cannot |
+| buildopts, kernconf_lines, jailconf | text: every file's piece kept, keyed by its file, lower files first |
 | pkg, requires | the union |
-| datasets, patches, derivations, commands | the union by identity (below); an entry's fields join |
-| src_branch, kernconf, kernconf_file | one value: what two files giving two values means is asked (15, Q-AC); until it is ruled the nearer file's stands |
+| datasets, patches | the union by identity (below); an entry's fields compose |
+| derivations | the union by identity; each one given once, whole |
+| commands | the union by label; a label's text stacks, a piece from each file that gives it, keyed by the file |
+| src_branch, kernconf_file | one value: every file that gives it must give the same |
+
+A redefinition is refused (ruled 2026-10-12, Q-AC): what one file
+gives, another file does not give again, since two files that need
+the same element defined two ways are not a composition of the two.
+So two files giving a one-value key two values, a derivation given in
+two files, or a field of an entry (a patch source's `ref`) given
+twice, each refuse the recipe, naming both files. Listing an entry
+again with nothing new (`sudo` in two `pkg` lists, `www {}` beside
+`www { readonly = true; }`) is no redefinition. Two exceptions:
+
+- a dataset's property may be given again, the nearer file's value
+  standing, with a warning naming the file it overrides: the property
+  is the clone's own (P9), so a container may set what its
+  foundation's dataset had, and shtetl sets it locally on every clone
+  it makes, at create (7.4) and on each update's staging clones
+  (7.6);
+- a commands label stacks, each file's text a piece of its own; a
+  piece runs once (7.4).
+
+**The default** (ruled 2026-10-12) is the one file a recipe may
+override:
+
+- It may hold any kind's keys; each recipe takes those of its kind
+  and leaves the rest (a container takes no `kernconf_file`, a
+  foundation no `jailconf`). shtetl.conf's settings are no recipe's.
+- What would be a redefinition of the default's value is an override
+  instead, without a warning: a recipe's `src_branch` or
+  `kernconf_file` over the default's, its derivation over the
+  default's for the same path, its field or dataset property over the
+  default's.
+- What stacks, stacks with the default too: its `ver`, `pkg`,
+  datasets, texts and commands reach every recipe of the kinds that
+  take them. To be rid of one, the site takes it out of shtetl.conf.
+- The files shtetl.conf imports are of the default as well.
 
 Every collection is an object keyed by its element's identity:
 
@@ -440,7 +494,9 @@ files, so a `commands` block runs where it was first defined. The
 common case stays short: an array of names is accepted as shorthand
 for an object of `name = true` entries.
 
-    # default.conf
+    # shtetl.conf (beside the settings)
+    ver = ">=15.1";
+    kernconf_file = "GENERIC";
     pkg = [ "sudo", "tmux" ];
     datasets {
         tmp {}
@@ -472,9 +528,11 @@ for an object of `name = true` entries.
 
 Merged for nginx: pkg = sudo, tmux, apache24, py311-certbot, nginx;
 datasets = tmp, var, usr/local, www; commands = certbot, then nginx;
-ver = `>=15` and `<16`, both to hold. `shtetl config show
-containers/nginx` prints this, each value with the file it came from,
-a stacked key as a list (tests/cli/cl4-nginx.out).
+ver = `>=15.1`, `>=15` and `<16`, all to hold; no `kernconf_file`, a
+container taking none. `shtetl config show containers/nginx` prints
+this, each value with the file it came from, a stacked key as a list
+and a text or a commands block as an object of pieces keyed by file
+(tests/cli/cl4-nginx.out).
 
 A container keeps everything its foundation has (7.4, ruled H) by
 construction now: nothing can be taken away, by the container's files
@@ -482,15 +540,18 @@ or by anyone's.
 
 As built (M1, revised 2026-10-12, `src/core/cascade.c`):
 
-- `import` is followed in every file, default.conf's included: a
+- `import` is followed in every file, shtetl.conf's included: a
   file's imports merge before it, each file once, at the first place
   it is reached, and a cycle is an error naming its files (PROPOSAL,
-  Q-U).
+  Q-U). A file shtetl.conf imports stays of the default when a
+  recipe imports it again.
 - `true` over an entry with fields leaves the fields.
-- default.conf is checked against the recipe's kind like every file,
-  so a key only a foundation takes refuses every container there.
+- The files of the default are checked as files of any kind; every
+  other file against the recipe's kind, so a key only a foundation
+  takes is refused in a container's files.
 - Every file is read and checked before anything merges, so one run
   reports the problems of all of them.
+- The warnings go to stderr, apart from what `config show` prints.
 
 Before the ruling, a recipe could take away an inherited element
 (`name = false`) or a whole collection (`reset`), and the ways to do
@@ -504,20 +565,27 @@ dropping what its foundation had.
 | key | kinds | type | meaning |
 |-----|-------|------|---------|
 | import | all | names | recipes merged in before this file |
-| ver | all | string | version constraint: `">=15"`, `"=15.1"` |
+| ver | all | string, or a list of them | version constraint: `">=15"`, `"=15.1"` |
 | src_branch | foundation | string | FreeBSD branch |
-| kernconf | foundation | string or heredoc | config name, or an inline kernel config |
-| buildopts | foundation | heredoc | make(1) variables / src.conf |
+| kernconf_file | foundation | string | the kernel config to start from: a name in the src tree (`GENERIC`), or a path in zconfig |
+| kernconf_lines | foundation | heredoc | config lines added to it |
+| buildopts | foundation | heredoc | make(1) variables, the lines of the src.conf shtetl writes |
 | patches | foundation | keyed by location: {ref, dir} | patch files applied to the src tree before the build (7.1.1) |
 | datasets | all | keyed | child datasets, created before anything is installed |
 | pkg | all | keyed | packages, installed at creation |
 | commands | all | keyed heredocs, sh | run once at creation, after pkg; never on update |
 | derivations | all | keyed by derived path: {source, command} | how to regenerate a binary from its text source when a rebase conflicts on it (7.7) |
 | requires | container | keyed | containers that must exist first |
-| jailconf | container | heredoc | appended to the jail's jail.conf block |
+| jailconf | container | heredoc | options, inside the jail's block shtetl writes |
 
-A heredoc may name a file instead (`kernconf_file = "gaming.kernconf"`)
-so kernel configs and shell stay in files their own tools can check.
+shtetl writes the files these go into, whole: the kernel config
+(`include` of `kernconf_file`, then `ident` and the lines), the
+src.conf, and the jail's `NAME { ... }` block in jail.conf. So
+`kernconf`, `buildopts_file` and `jailconf_file` are not keys any
+more, and neither is `reset`; each is refused with what to write
+instead (ruled 2026-10-12, Q-AC). What `jailconf` gives twice
+(`allow.raw_sockets` in two files) shtetl does not judge: jail(8)
+does.
 
 A container or system recipe names no foundation (ruled 2026-10-09).
 It fits any foundation whose version satisfies its `ver`; the foundation
@@ -534,22 +602,20 @@ refused since 2026-10-12, nothing being dropped): `pkg` and
 recordsize = "1M"; }`: strings, or true and false for on and off; a
 number is refused with "quote it", since UCL reads `1M` as 1000000;
 `mountpoint`, `canmount` and `shtetl:*` are shtetl's own); `commands`
-a string or heredoc; `derivations` `{ source; command; }`; `patches`
-`true` or `{ ref; dir; }`. A list of names stands for `name = true`
-where an entry needs nothing more (pkg, datasets, requires, patches).
-The heredoc keys with a `_file` twin are kernconf, buildopts and
-jailconf. buildopts and jailconf stack (5.4): every file's text, a
-`_file`'s file in its place, appended. kernconf holds one value, its
-name or its text or its file, and a file gives it once (Q-AC).
+a string or heredoc; `derivations` `{ source; command; }`, both in one
+file; `patches` `true` or `{ ref; dir; }`. A list of names stands for
+`name = true` where an entry needs nothing more (pkg, datasets,
+requires, patches). A `ver` no version can satisfy (`">=16"` and
+`"<15"`) is refused when the recipe is read, naming the two files.
 Names: a recipe's (and a `requires` entry, `update.suffix`) takes
 letters, digits, `-` and `_`, so that it is at once a dataset
 component, a jail name and a file name (PROPOSAL, Q-W); a dataset
 path takes what ZFS names take (`valid_char`).
 
-Checked after the merge: a foundation has `src_branch`; a derivation
-has both fields from some layer; a `_file` and a patches directory in
-zconfig exist; `requires` names container recipes that exist, and not
-the container itself.
+Checked after the merge: a foundation has `src_branch`; every `ver`
+holds together; a `kernconf_file` path (one with a `/`) and a
+patches directory in zconfig exist; `requires` names container
+recipes that exist, and not the container itself.
 
 ## 6. Snapshots
 
@@ -840,14 +906,19 @@ mountpoint and refuses one that is not mounted (9).
    first. A clone keeps none of its origin's local properties, so a
    placeholder is cloned `-o canmount=off`; without it `usr` mounts
    and hides the root dataset's `usr/` (P9). Never `zfs clone -p`: it
-   makes a missing parent as a plain dataset, not a clone (P9).
+   makes a missing parent as a plain dataset, not a clone (P9). A
+   property the container's recipe gives a dataset is set on its
+   clone, locally (5.4).
 4. Create the recipe's container-only datasets as children of X.
 5. Write the jail.conf block; start the jail.
 6. `pkg -j X install`, then commands. A command block the foundation
-   already ran (same label, same text, in the foundation's recipe as of
-   its `shtetl:config`) is not run again (ruled 2026-10-09):
-   `default.conf` is a layer of both recipes, so without this its
-   blocks would run twice. Packages need no such rule: pkg skips what
+   already ran is not run again (ruled 2026-10-09), and neither is a
+   piece of one (ruled 2026-10-12, Q-AC): a block is made of pieces,
+   one from each file that gives its label (5.4), and a piece with
+   the same label, file and text in the foundation's recipe as of its
+   `shtetl:config` was run when the foundation was made. shtetl.conf
+   is a layer of both recipes, so without this its blocks would run
+   twice. Packages need no such rule: pkg skips what
    is installed.
 7. Save (7.5).
 
@@ -894,6 +965,8 @@ a 15.2 target at check time.
      `/containers/X-staging/...`), because steps 2 and on are dataset
      form rebases of it, and the dataset form takes only a mounted
      dataset.
+   Each staging dataset then gets, set locally, the properties X's
+   recipe gives it (5.4; ruled 2026-10-12, Q-AC).
    Each dataset's whole replay, its conflicts gate included, ends
    before any child of it is made: a dataset form step on a parent with
    a child mounted below it is refused (exit 2, in use), while both
@@ -1362,6 +1435,73 @@ below that change the plan are folded into the sections named.
 
 ## 14. Rulings
 
+### 2026-10-12 (the default: shtetl.conf)
+
+Asked: may the default file hold any kind's keys, each recipe taking
+those of its kind (A), or should there be a default per kind (B); are
+its values defaults a recipe may replace, or a floor; and does
+`buildopts_file` go, as `jailconf_file` did.
+
+- "1. option A) default.conf takes all, only provides as necessary
+  2. default is a special overridable file. 3. yes. key takeaways.
+  default provides everything, and all standard parse errors are
+  overrides. all stackables simply stack. user needs to delete a
+  stackable value if they want it overriden. and yes, shtetl.conf is
+  the default.conf. default.conf isn't a real file. yes we need to
+  add it to shtetl-recipes/ git"
+
+So (5.4): the default layer is shtetl.conf, beside its settings, with
+no built-in recipe under it; it holds any kind's keys and each recipe
+takes those of its kind; what would be a redefinition of its values
+(a one-value key, a derivation, a field, a dataset's property) is an
+override; what stacks stacks with it. `buildopts_file` is gone. Its
+seed, with `ver = ">=15.1"` and `kernconf_file = "GENERIC"`, is in
+`shtetl-recipes/` (4.4).
+
+### 2026-10-12 (Q-AC: keys that hold one value, and redefinitions)
+
+- "splitting kernconf seems ok. Additionally, overriding dataset
+  parameters seems ok. I think commands label should stack comands.
+  Two commands for one derivations path is a parse error. and
+  src_branch is all-must-agree-if-set."
+- On the table of every key that followed, with nine points asked:
+  "so is there a kernconf_lines and kernconf_file and kernconf now? I
+  think there should just be a _file and _lines option now.
+  jailconf_file is just options, right? we actually write the final
+  jailconf file with the NAME {[shtetl options here]} wrapper, so
+  that should be disallowed. datasets, warn about overrides of
+  properties. yes, shtetl.conf over built-in is override, same with
+  properties.<space>. 1./2. Both redefinitions of a key are errors.
+  Two included files that require redefinitions of the same elements
+  of the greater patches/derivations/whatever keys are not true
+  compositions. we should take this philosophy. 3. each piece runs
+  once, yes 4. ver can't hold is a parse error, yes 5. get the
+  default from the default conf. (this is the shtetl.conf in the
+  repo. yes we should set ver >= 15.1 and kenconf=GENERIC) 6. ok 7.
+  agree, let jail(8) be the problem 8. I like this 9. kernconf_lines
+  is fine"
+
+So (5.4, 5.5):
+
+- `kernconf_file` (one value, all must agree) and `kernconf_lines`
+  (stacked) replace `kernconf`; `jailconf_file` is gone, shtetl
+  writing the jail's block.
+- What one file gives, another does not give again: a patch source's
+  `ref` or `dir` (1), a derivation, even with the same text (2), any
+  field of an entry. A derivation is given whole in one file.
+- A dataset's property may be given again, with a warning; shtetl
+  sets it locally on every clone it makes, at create and on each
+  update's staging clones (6).
+- A commands label stacks, and each piece runs once (3; 7.4).
+- A `ver` no version satisfies is refused when the recipe is read (4).
+- The default comes from shtetl.conf, the recipes repository's (5;
+  then the default ruling, above).
+- What `jailconf` gives twice is jail(8)'s to settle (7).
+- `config show containers/X --on F`, the two layers stacked as create
+  stacks them (8), is agreed; it is not built yet.
+- The site's overrides stay: shtetl.conf over the built-in settings,
+  `properties.<space>` over `properties.default`.
+
 ### 2026-10-12 (Q-S, Q-T, Q-X: everything stacks)
 
 - Q-S, Q-T: "To be clear, there are really only two layers,
@@ -1377,7 +1517,8 @@ below that change the plan are folded into the sections named.
   container's together; `buildopts` (and `jailconf`) append, lower
   layers first. What a key holding one value does when two files set
   it, and whether a container may set a property on a dataset its
-  foundation has, were asked back the same day (15, Q-AC).
+  foundation has, were asked back the same day and ruled (Q-AC,
+  above).
 - Q-X: "Good enough for now", with an issue in the tracker's future
   work to settle hosts against directories (top-level domains, and
   the author's idea of trying each dotted candidate in DNS before
@@ -1508,22 +1649,18 @@ below that change the plan are folded into the sections named.
 
 ## 15. Open questions
 
-Asked 2026-10-12, with the stacking ruling (14):
+Q-AC is ruled (14, 2026-10-12), and with it the default.
 
-- **Q-AC, keys that hold one value, under stacking.** `src_branch`
-  (a foundation is built from one branch), a `kernconf` that names a
-  base config, and a collection entry's values (a dataset property
-  given two values, two texts for one `commands` label, two commands
-  for one `derivations` path, two refs for one patch source) cannot
-  append. Proposed: they must agree, every file that sets one giving
-  the same value, or the recipe is refused naming both files; and
-  `kernconf` split in two, the base config's name (one, must agree)
-  and lines added to it (appended). The overwrites that stay are the
-  site's: shtetl.conf over the built-in settings, and
-  `properties.<space>` over `properties.default`. Also asked: may a
-  container set a property on a dataset its foundation has
-  (`var { compression = "lz4"; }` where the foundation set zstd), the
-  property being its own clone's, or is that a conflict?
+Built with the default ruling, where it was silent:
+
+- **Q-AD, the default's edges.** Built: the files shtetl.conf imports
+  are of the default too, so a recipe overrides what they give as it
+  overrides shtetl.conf's own; overriding a default's dataset property
+  gives no warning, being what the default is for; and `ver` stacks
+  with the default like every list, so a recipe whose `ver` cannot
+  meet shtetl.conf's `>=15.1` is refused, the site taking it out of
+  shtetl.conf if it wants it gone. The other reading of the last:
+  the default's `ver` yields, as its one-value keys do.
 
 M1 and M2 decided these where the plan was silent; each is built as
 written and marked PROPOSAL where it lives. None blocks M3. Q-S, Q-T
@@ -1545,7 +1682,8 @@ M2's:
   first one's is mounted can then add containers but never hide any.
 - **Q-AB, the recipes clone.** Built: only with `--recipes URL`, since
   zshtetl-recipes does not exist yet; once it does, the URL can be the
-  default.
+  default. Its seed is `shtetl-recipes/` in this repository (4.4);
+  making the repository from it is the author's to do.
 
 M1's:
 

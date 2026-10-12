@@ -60,7 +60,6 @@ struct sh_rkey {
 	enum sh_vt	rk_vt;
 	enum sh_coll	rk_coll;
 	enum sh_merge	rk_merge;
-	const char	*rk_into;	/* buildopts_file: into buildopts */
 };
 
 /* KEY's row, or NULL when no recipe takes it. */
@@ -74,6 +73,16 @@ const struct sh_rkey *sh_rkey(const char *key);
  */
 unsigned sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
     const char *file, struct sh_err *e);
+
+/*
+ * Checks LAYER, a file of the default layer (planning.md 5.4):
+ * shtetl.conf, or a file it imports. It may give any kind's keys,
+ * each recipe taking those of its own; SETTINGS says the file is
+ * shtetl.conf itself, whose site settings (5.2) are left to
+ * sh_site_check.
+ */
+unsigned sh_schema_default(const struct sh_node *layer, const char *file,
+    int settings, struct sh_err *e);
 
 /*
  * Checks PROPS, an object of ZFS properties at PATH in FILE: a

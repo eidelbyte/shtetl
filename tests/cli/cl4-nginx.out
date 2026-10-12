@@ -1,24 +1,25 @@
 # containers/nginx.conf: a container's recipe, its layers merged
-# layers, nearest last: default.conf, common/web.conf, containers/nginx.conf
+# layers, nearest last: shtetl.conf, common/web.conf, containers/nginx.conf
+ver = [
+    ">=15.1",  # shtetl.conf
+    ">=15",  # common/web.conf
+    "<16"  # containers/nginx.conf
+]
 pkg {
-    sudo = true;  # default.conf
-    tmux = true;  # default.conf
+    sudo = true;  # shtetl.conf
+    tmux = true;  # shtetl.conf
     apache24 = true;  # common/web.conf
     py311-certbot = true;  # common/web.conf
     nginx = true;  # containers/nginx.conf
 }
 datasets {
-    tmp {}  # default.conf
-    var {}  # default.conf
-    "usr/local" {}  # default.conf
+    tmp {}  # shtetl.conf
+    var {}  # shtetl.conf
+    "usr/local" {}  # shtetl.conf
     www {  # containers/nginx.conf
         readonly = true;  # containers/nginx.conf
     }
 }
-ver = [
-    ">=15",  # common/web.conf
-    "<16"  # containers/nginx.conf
-]
 commands {
     certbot {  # common/web.conf
         "common/web.conf" = "sysrc certbot_enable=YES";
@@ -27,7 +28,10 @@ commands {
         "containers/nginx.conf" = "sysrc nginx_enable=YES";
     }
 }
-jailconf = [
-    "allow.raw_sockets;",  # common/web.conf
-    "allow.sysvipc;\nhost.hostname = \"nginx\";"  # containers/nginx.conf
-]
+jailconf {
+    "common/web.conf" = "allow.raw_sockets;";
+    "containers/nginx.conf" = <<EOD
+allow.sysvipc;
+host.hostname = "nginx";
+EOD
+}

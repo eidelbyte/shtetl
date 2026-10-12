@@ -37,4 +37,11 @@ void sh_site_free(struct sh_site *s);
 /* The built-in settings alone (the caller frees them), or NULL. */
 struct sh_node *sh_site_builtins(struct sh_err *e);
 
+/*
+ * Whether KEY, at the top of shtetl.conf, is one of its sections of
+ * settings (spaces, properties, build, update, retention) rather than
+ * a key of the default recipe (planning.md 5.4).
+ */
+int sh_site_section(const char *key);
+
 #endif	/* SH_SITE_H */

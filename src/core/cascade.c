@@ -36,10 +36,8 @@
 #include "core/syntax.h"
 #include "core/tree.h"
 
-static const char cascade_builtin[] = "(built-in)";
-
-/* The built-in recipe defaults, 5.4's first layer: none yet. */
-static const char cascade_builtin_text[] = "";
+/* The file of the default layer (planning.md 5.4). */
+static const char cascade_default[] = "shtetl.conf";
 
 /* One load: the stack of files being read, for cycles. */
 struct ld {
@@ -48,6 +46,7 @@ struct ld {
 	struct sh_err		*ld_err;
 	const char		*ld_stack[SH_IMPORT_DEPTH];
 	size_t			ld_depth;
+	int			ld_default;	/* loading the default */
 	int			ld_failed;
 };
 
@@ -85,6 +84,7 @@ ld_append(struct ld *x, char *file, struct sh_node *tree)
 	r->sr_layers = nl;
 	nl[r->sr_nlayers].sl_file = file;
 	nl[r->sr_nlayers].sl_tree = tree;
+	nl[r->sr_nlayers].sl_default = x->ld_default;
 	r->sr_nlayers++;
 	return (0);
 }
@@ -201,7 +201,9 @@ ld_load(struct ld *x, const char *name, const char *from,
 		free(file);
 		return (0);
 	}
-	if (sh_schema_recipe(tree, x->ld_r->sr_kind, file, x->ld_err) != 0)
+	if ((x->ld_default ? sh_schema_default(tree, file,
+	    strcmp(file, cascade_default) == 0, x->ld_err) :
+	    sh_schema_recipe(tree, x->ld_r->sr_kind, file, x->ld_err)) != 0)
 		x->ld_failed = 1;
 	x->ld_stack[x->ld_depth++] = file;
 	if (ld_imports(x, file, tree) != 0) {
@@ -211,37 +213,6 @@ ld_load(struct ld *x, const char *name, const char *from,
 		return (-1);
 	}
 	x->ld_depth--;
-	if (ld_append(x, file, tree) != 0) {
-		sh_node_free(tree);
-		free(file);
-		return (-1);
-	}
-	return (0);
-}
-
-/* The built-in layer, when it holds anything. */
-static int
-ld_builtin(struct ld *x)
-{
-	struct sh_node *tree;
-	char *file;
-
-	if ((file = strdup(cascade_builtin)) == NULL)
-		return (-1);
-	tree = sh_parse_buf(cascade_builtin_text,
-	    sizeof (cascade_builtin_text) - 1, file, x->ld_err);
-	if (tree == NULL) {
-		free(file);
-		x->ld_failed = 1;
-		return (0);
-	}
-	if (tree->sn_obj.ob_n == 0) {
-		sh_node_free(tree);
-		free(file);
-		return (0);
-	}
-	if (sh_schema_recipe(tree, x->ld_r->sr_kind, file, x->ld_err) != 0)
-		x->ld_failed = 1;
 	if (ld_append(x, file, tree) != 0) {
 		sh_node_free(tree);
 		free(file);
@@ -301,6 +272,16 @@ rs_target(const char *target, struct sh_recipe *r, struct sh_err *e)
 	(void) snprintf(r->sr_file, flen, "%s/%s.conf", dirs[i].t_dir,
 	    r->sr_name);
 	return (0);
+}
+
+/* Whether the value V came from the default layer. */
+static int
+mg_default(const struct mg *m, const struct sh_node *v)
+{
+	const struct sh_layer *l;
+
+	l = sh_recipe_layer(m->mg_r, v->sn_from);
+	return (l != NULL && l->sl_default);
 }
 
 static void
@@ -374,8 +355,12 @@ mg_entry(struct mg *m, struct sh_node *coll, const struct sh_rkey *rk,
 		return;
 	}
 	if (rk->rk_coll == SH_C_DERIVATIONS && cur != NULL) {
-		sh_err_at(m->mg_err, m->mg_l->sl_file, &m->mg_path, "given "
-		    "in %s already: a derivation is given once", cur->pr_from);
+		if (mg_default(m, cur->pr_val))
+			mg_set(m, coll, ek, ev);
+		else
+			sh_err_at(m->mg_err, m->mg_l->sl_file, &m->mg_path,
+			    "given in %s already: a derivation is given once",
+			    cur->pr_from);
 		return;
 	}
 	if (ev->sn_type == SH_BOOL) {
@@ -391,12 +376,14 @@ mg_entry(struct mg *m, struct sh_node *coll, const struct sh_rkey *rk,
 		f = &ev->sn_obj.ob_v[i];
 		have = sh_obj_find(cur->pr_val, f->pr_key);
 		was = sh_path_push(&m->mg_path, f->pr_key);
-		if (have != NULL && rk->rk_coll != SH_C_DATASETS) {
+		if (have != NULL && rk->rk_coll != SH_C_DATASETS &&
+		    !mg_default(m, have->pr_val)) {
 			sh_err_at(m->mg_err, m->mg_l->sl_file, &m->mg_path,
 			    "given in %s already: what one file gives, another "
 			    "does not give again", have->pr_val->sn_from);
 		} else {
 			if (have != NULL && m->mg_warn != NULL &&
+			    !mg_default(m, have->pr_val) &&
 			    !sh_node_equal(have->pr_val, f->pr_val))
 				sh_err_at(m->mg_warn, m->mg_l->sl_file,
 				    &m->mg_path, "%s overrides %s, from %s",
@@ -447,29 +434,7 @@ mg_coll(struct mg *m, const struct sh_rkey *rk, const struct sh_node *v)
 	}
 }
 
-/*
- * What a _file key gives: { file = "path" }, standing in the place of
- * the text its file holds.
- */
-static struct sh_node *
-mg_file(struct mg *m, const struct sh_node *path)
-{
-	struct sh_node *o, *v;
-
-	if ((o = sh_node_new(SH_OBJECT, m->mg_l->sl_file)) == NULL)
-		return (NULL);
-	if ((v = sh_node_copy(path)) == NULL ||
-	    sh_obj_set(o, "file", v, m->mg_l->sl_file) != 0) {
-		sh_node_free(o);
-		return (NULL);
-	}
-	return (o);
-}
-
-/*
- * V onto the list KEY of the merged recipe, made where it is not yet:
- * a value of ver, or a piece of buildopts or jailconf.
- */
+/* V onto the list KEY of the merged recipe, made where it is not yet. */
 static void
 mg_append(struct mg *m, const char *key, struct sh_node *v)
 {
@@ -493,6 +458,28 @@ mg_append(struct mg *m, const char *key, struct sh_node *v)
 		m->mg_nomem = 1;
 }
 
+/*
+ * A piece of text (buildopts, kernconf_lines, jailconf) from this
+ * layer onto the key KEY: an object of its pieces, each keyed by the
+ * file that gives it, lower files first, a file giving one.
+ */
+static void
+mg_text(struct mg *m, const char *key, const struct sh_node *v)
+{
+	struct sh_node *text;
+
+	text = sh_obj_get(m->mg_r->sr_merged, key);
+	if (text == NULL) {
+		if ((text = sh_node_new(SH_OBJECT, m->mg_l->sl_file)) == NULL ||
+		    sh_obj_set(m->mg_r->sr_merged, key, text,
+		    m->mg_l->sl_file) != 0) {
+			m->mg_nomem = 1;
+			return;
+		}
+	}
+	mg_set(m, text, m->mg_l->sl_file, v);
+}
+
 /* One layer into the merged recipe. */
 static void
 mg_layer(struct mg *m)
@@ -505,8 +492,14 @@ mg_layer(struct mg *m)
 
 	for (i = 0; i < tree->sn_obj.ob_n; i++) {
 		pr = &tree->sn_obj.ob_v[i];
-		rk = sh_rkey(pr->pr_key);
-		into = rk->rk_into != NULL ? rk->rk_into : rk->rk_name;
+		/*
+		 * The default gives any kind's keys and shtetl.conf's
+		 * settings besides; a recipe takes the keys of its kind.
+		 */
+		if ((rk = sh_rkey(pr->pr_key)) == NULL ||
+		    (rk->rk_kinds & m->mg_r->sr_kind) == 0)
+			continue;
+		into = rk->rk_name;
 		was = sh_path_push(&m->mg_path, rk->rk_name);
 		switch (rk->rk_merge) {
 		case SH_M_LAYERS:
@@ -525,12 +518,11 @@ mg_layer(struct mg *m)
 				    sh_node_copy(pr->pr_val->sn_arr.ar_v[j]));
 			break;
 		case SH_M_TEXT:
-			mg_append(m, into, rk->rk_vt == SH_V_FILE ?
-			    mg_file(m, pr->pr_val) : sh_node_copy(pr->pr_val));
+			mg_text(m, rk->rk_name, pr->pr_val);
 			break;
 		case SH_M_AGREE:
 			have = sh_obj_find(m->mg_r->sr_merged, rk->rk_name);
-			if (have == NULL)
+			if (have == NULL || mg_default(m, have->pr_val))
 				mg_set(m, m->mg_r->sr_merged, rk->rk_name,
 				    pr->pr_val);
 			else if (!sh_node_equal(have->pr_val, pr->pr_val))
@@ -543,27 +535,6 @@ mg_layer(struct mg *m)
 		}
 		sh_path_pop(&m->mg_path, was);
 	}
-}
-
-/*
- * A file named in the merged recipe, FILE (a { file } node) under
- * KEY, that the configuration root must hold.
- */
-static void
-ck_file(const char *root, const char *key, const struct sh_node *file,
-    struct sh_err *e)
-{
-	const struct sh_node *path;
-	struct sh_path p;
-
-	if (file->sn_type != SH_OBJECT ||
-	    (path = sh_obj_get(file, "file")) == NULL ||
-	    sh_root_kind(root, path->sn_str) == 'f')
-		return;
-	sh_path_init(&p);
-	(void) sh_path_push(&p, key);
-	sh_err_at(e, path->sn_from, &p, "%s: no such file in the "
-	    "configuration root", path->sn_str);
 }
 
 /*
@@ -608,26 +579,19 @@ ck_ver(const struct sh_recipe *r, struct sh_err *e)
 static void
 ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
 {
-	static const char *const texts[] = { "buildopts" };
 	const struct sh_node *merged = r->sr_merged;
 	const struct sh_node *v, *coll, *dir;
 	const struct sh_pair *pr;
 	struct sh_path path;
 	enum sh_loc loc;
 	char *sub, rel[1100];
-	size_t i, j;
+	size_t i;
 
 	sh_path_init(&path);
 	if (r->sr_kind == SH_FOUNDATION &&
 	    sh_obj_get(merged, "src_branch") == NULL)
 		sh_errf(e, "%s: no layer gives src_branch: a foundation is "
 		    "built from a FreeBSD branch", r->sr_file);
-	for (i = 0; i < sizeof (texts) / sizeof (texts[0]); i++) {
-		if ((v = sh_obj_get(merged, texts[i])) == NULL)
-			continue;
-		for (j = 0; j < v->sn_arr.ar_n; j++)
-			ck_file(root, texts[i], v->sn_arr.ar_v[j], e);
-	}
 	/* kernconf_file: a name is the src tree's, a path zconfig's */
 	if ((v = sh_obj_get(merged, "kernconf_file")) != NULL &&
 	    strchr(v->sn_str, '/') != NULL &&
@@ -698,9 +662,10 @@ sh_recipe_resolve(const char *root, const char *target,
 	x.ld_root = root;
 	x.ld_r = r;
 	x.ld_err = e;
-	if (ld_builtin(&x) != 0 ||
-	    ld_load(&x, "default.conf", NULL, NULL, 1) != 0)
+	x.ld_default = 1;
+	if (ld_load(&x, cascade_default, NULL, NULL, 1) != 0)
 		goto nomem;
+	x.ld_default = 0;
 	if (ld_load(&x, r->sr_file, NULL, NULL, 0) != 0)
 		goto nomem;
 	if (x.ld_failed)

@@ -142,8 +142,8 @@ cases() {
 	RECIPES=
 	if [ -n "$GIT" ]; then
 		"$GIT" init -q "$T/repo" &&
-		    printf 'pkg = [ "sudo" ];\n' > "$T/repo/default.conf" &&
-		    (cd "$T/repo" && "$GIT" add default.conf &&
+		    printf 'pkg = [ "sudo" ];\n' > "$T/repo/shtetl.conf" &&
+		    (cd "$T/repo" && "$GIT" add shtetl.conf &&
 		    "$GIT" -c user.name=box -c user.email=box@box commit \
 		    -qm recipes) && RECIPES="--recipes $T/repo"
 	fi
@@ -208,7 +208,7 @@ cases() {
 	check B17 "autotrim on $P2" "$(zpool get -H -o value autotrim $P2)" on
 	if [ -n "$RECIPES" ]; then
 		check B13 "the recipes cloned" \
-		    "$(cat "$ALT/zconfig/default.conf" 2>/dev/null)" \
+		    "$(cat "$ALT/zconfig/shtetl.conf" 2>/dev/null)" \
 		    'pkg = [ "sudo" ];'
 		check B13 "a snapshot before the clone" \
 		    "$(zfs list -H -t snapshot -o name -r $P1/zconfig |
