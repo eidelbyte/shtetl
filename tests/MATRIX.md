@@ -375,3 +375,32 @@ snapshots}; ZFS refusing.
 | Z9 | unmount after mount | covered: check_zfs.c |
 | Z10 | each call refused when ZFS refuses, with ZFS's reason | covered: check_zfs.c |
 | Z11 | the same cells against libzfs on real pools | deferred: the M3 box run (tests/box), which the build's box cases need anyway |
+
+# Family F: building a foundation (M3; planning.md 7.1; src/core/build.c)
+
+shtetl build F: planned in full and checked, shown, confirmed, then
+run. The plan's cells run over the fake ZFS and a configuration root in
+the scratch directory; the run's over the same, with make, git, pkg,
+chroot and mount played by scripts that log what they were asked.
+
+Dimensions: the target {F, foundations/F, foundations/F.conf,
+another kind's path, a bad name}; the roots {lake, build, config
+there or not}; the recipe {accepted, refused}; src_branch against ver
+{met, not}; the build root {free, a build under way, no mountpoint,
+not mounted}; F {new, there already}; the recipe's datasets {none,
+nested with the parent named, nested without, a parent named after
+its child, with properties, more than fit}; the obj cache {there,
+not}.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| F1 | the target: generic, foundations/generic and foundations/generic.conf alike; containers/x and a bad name refused | covered: check_build.c |
+| F2 | no lake, build or config root: each refused, by name | covered: check_build.c |
+| F3 | the recipe refused: its reasons, and nothing planned | covered: check_build.c |
+| F4 | src_branch not meeting ver, refused naming the constraint and its file | covered: check_build.c |
+| F5 | a build under way (shtetl:build set on the build root) refused, naming it | covered: check_build.c |
+| F6 | the build root with no mountpoint, or not mounted, refused | covered: check_build.c |
+| F7 | a foundation of that name already there, refused | covered: check_build.c |
+| F8 | F's datasets: F first, the recipe's in its order, a placeholder for each parent it does not name, a parent named after its child made real, properties carried; more than 32 refused | covered: check_build.c |
+| F9 | the obj cache: made when missing, taken when there | covered: check_build.c |
+| F10 | the plan shown: the branch and the version's pattern, each dataset with what it is set to, the obj cache, the checkout, the kernel and its lines, src.conf, make -j, the install, pkg, commands, the snapshot | covered: check_build.c |
