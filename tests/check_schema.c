@@ -65,7 +65,6 @@ static void
 test_every_key(void)
 {
 	ok("import = [ \"common/base.conf\" ];\n"
-	    "reset = [ \"pkg\" ];\n"
 	    "ver = \">=15\";\n"
 	    "src_branch = \"releng/15.1\";\n"
 	    "kernconf = \"GENERIC\";\n"
@@ -81,7 +80,7 @@ test_every_key(void)
 	    "buildopts_file = \"build/src.conf\";\n", F);
 	ok("import = \"common/web.conf\";\n"
 	    "ver = \"=15.1\";\n"
-	    "pkg { nginx = true; apache24 = false; }\n"
+	    "pkg { nginx = true; }\n"
 	    "datasets { www { readonly = true; } }\n"
 	    "commands { nginx = <<EOD\nsysrc nginx_enable=YES\nEOD\n}\n"
 	    "derivations { x { command = \"true\"; } }\n"
@@ -89,7 +88,6 @@ test_every_key(void)
 	    "jailconf = \"allow.raw_sockets;\";\n", C);
 	ok("jailconf_file = \"jails/nginx.jail\";\n", C);
 	ok("import = [ \"common/base.conf\" ];\n"
-	    "reset = [ \"datasets\" ];\n"
 	    "ver = \"<16\";\n"
 	    "datasets { home {} }\n"
 	    "pkg { zsh = true; }\n"
@@ -158,17 +156,19 @@ test_strings(void)
 	}
 }
 
-/* CK7, CK8: the twins, and paths in the configuration root. */
+/*
+ * CK7, CK8: the twins, and paths in the configuration root. kernconf
+ * holds one value, so a file gives it once; buildopts and jailconf
+ * stack, so a file may give its text and a file of it both.
+ */
 static void
 test_files(void)
 {
 	bad("kernconf = \"G\"; kernconf_file = \"k\";", F,
-	    "kernconf: and kernconf_file both: a layer gives one or the "
-	    "other");
-	bad("buildopts_file = \"b\"; buildopts = \"x\";", F,
-	    "buildopts: and buildopts_file both");
-	bad("jailconf = \"x\"; jailconf_file = \"j\";", C,
-	    "jailconf: and jailconf_file both");
+	    "kernconf_file: and kernconf both: two values for the one "
+	    "kernconf");
+	ok("buildopts_file = \"b\"; buildopts = \"x\";", F);
+	ok("jailconf = \"x\"; jailconf_file = \"j\";", C);
 	ok("kernconf_file = \"kernels/GAMING\";", F);
 	bad("kernconf_file = \"/etc/GAMING\";", F, "kernconf_file: not a "
 	    "file's path: it is absolute");
@@ -180,7 +180,7 @@ test_files(void)
 	    "integer: quote it");
 }
 
-/* CK9, CK10: import and reset. */
+/* CK9, CK10: import, and reset refused. */
 static void
 test_import_reset(void)
 {
@@ -193,17 +193,11 @@ test_import_reset(void)
 	bad("import { a = 1; }", C, "import: expected a list of recipes' "
 	    "paths, not an object");
 
-	ok("reset = [ \"pkg\", \"datasets\" ];", C);
-	ok("reset = \"commands\";", S);
-	ok("reset = [ \"patches\" ];", F);
-	bad("reset = [ \"ver\" ];", C, "reset[0]: not a collection a "
-	    "container's recipe has: \"ver\"");
-	bad("reset = [ \"bogus\" ];", C, "not a collection");
-	bad("reset = [ \"patches\" ];", C, "not a collection a container's "
-	    "recipe has: \"patches\"");
-	bad("reset = [ \"requires\" ];", S, "not a collection a system's");
-	bad("reset = { pkg = true; }", C, "reset: expected a list of "
-	    "collections' names, not an object");
+	bad("reset = [ \"pkg\", \"datasets\" ];", C, "t.conf: reset: "
+	    "nothing is reset: the layers stack, and what one gives stays "
+	    "(ruled 2026-10-12)");
+	bad("reset = \"commands\";", S, "reset: nothing is reset");
+	bad("reset = [ \"patches\" ];", F, "reset: nothing is reset");
 }
 
 /* CK11, CK18: pkg, and collections given as scalars. */
@@ -212,11 +206,13 @@ test_pkg(void)
 {
 	ok("pkg = [ \"a\", \"py311-certbot\", \"www/nginx\", \"gtk+3\" ];",
 	    C);
-	ok("pkg { a = true; b = false; }", C);
-	bad("pkg { a { x = 1; } }", C, "pkg.a: expected true, or false to "
-	    "drop it, not an object");
-	bad("pkg { a = \"yes\"; }", C, "pkg.a: expected true, or false to "
-	    "drop it, not a string");
+	ok("pkg { a = true; b = true; }", C);
+	bad("pkg { a = true; b = false; }", C, "pkg.b: false drops nothing: "
+	    "the layers stack, and what one gives stays (ruled 2026-10-12)");
+	bad("pkg { a { x = 1; } }", C, "pkg.a: expected true, not an "
+	    "object");
+	bad("pkg { a = \"yes\"; }", C, "pkg.a: expected true, not a "
+	    "string");
 	bad("pkg = [ \"\" ];", C, "pkg[0]: not a package's name: empty");
 	bad("pkg = [ \"-x\" ];", C, "pkg[0]: not a package's name: it "
 	    "begins with '-'");
@@ -271,16 +267,19 @@ test_datasets(void)
 	bad("datasets { www { readonly = \"\"; } }", C, "datasets.www."
 	    "readonly: empty");
 	bad("datasets { www = \"on\"; }", C, "datasets.www: expected true, "
-	    "its properties, or false to drop it, not a string");
+	    "or its properties, not a string");
+	bad("datasets { www = false; }", C, "datasets.www: false drops "
+	    "nothing");
 }
 
 /* CK14, CK15: commands and derivations. */
 static void
 test_commands(void)
 {
-	ok("commands { a = \"x\"; b = false; \"c.d\" = \"y\"; }", S);
-	bad("commands { a = true; }", S, "commands.a: expected its commands "
-	    "as a string or heredoc, or false to drop it, not true");
+	ok("commands { a = \"x\"; \"c.d\" = \"y\"; }", S);
+	bad("commands { a = true; }", S, "commands.a: expected its commands, "
+	    "as a string or heredoc, not true");
+	bad("commands { a = false; }", S, "commands.a: false drops nothing");
 	bad("commands { a { x = 1; } }", S, "not an object");
 	bad("commands { a = 5; }", S, "not an integer: quote it");
 	bad("commands = [ \"a\" ];", S, "commands: expected an object keyed "
@@ -290,7 +289,7 @@ test_commands(void)
 	    "it must begin with a letter or a digit");
 
 	ok("derivations { \"etc/pwd.db\" { source = \"etc/master.passwd\"; "
-	    "command = \"pwd_mkdb\"; } x = false; }", C);
+	    "command = \"pwd_mkdb\"; } }", C);
 	ok("derivations { x { source = \"s\"; } }", C);
 	bad("derivations { x { bogus = \"1\"; } }", C, "derivations.x.bogus: "
 	    "not a field of a derivation: it takes source and command");
@@ -304,7 +303,8 @@ test_commands(void)
 	bad("derivations = [ \"x\" ];", C, "derivations: expected an object "
 	    "keyed by a derived file's path, not a list");
 	bad("derivations { x = true; }", C, "expected { source; command; }, "
-	    "or false to drop it, not true");
+	    "not true");
+	bad("derivations { x = false; }", C, "false drops nothing");
 }
 
 /* CK16, CK17: requires, and patch sources. */
@@ -314,16 +314,20 @@ test_requires_patches(void)
 	enum sh_loc k;
 
 	ok("requires = [ \"db\", \"cache-1\" ];", C);
-	ok("requires { db = true; old = false; }", C);
+	ok("requires { db = true; }", C);
+	bad("requires { old = false; }", C, "requires.old: false drops "
+	    "nothing");
 	bad("requires = [ \"a.b\" ];", C, "requires[0]: not a container's "
 	    "name: it takes only letters, digits, '-' and '_'");
 	bad("requires { db { x = 1; } }", C, "requires.db: expected true, "
-	    "or false to drop it, not an object");
+	    "not an object");
 
 	ok("patches = [ \"github.com/eidelbyte/freebsd-patches\", "
 	    "\"https://git.example.org/p.git\", \"patches/generic\" ];", F);
 	ok("patches { \"github.com/x/y\" { ref = \"releng-15.1\"; dir = "
-	    "\"15.1\"; } \"patches/local\" {} old = false; }", F);
+	    "\"15.1\"; } \"patches/local\" {} }", F);
+	bad("patches { old = false; }", F, "patches.old: false drops "
+	    "nothing");
 	bad("patches = [ \"/abs/dir\" ];", F, "patches[0]: not a patch "
 	    "source's location: it is absolute");
 	bad("patches = [ \"patches/../x\" ];", F, "a '.' or '..' component");

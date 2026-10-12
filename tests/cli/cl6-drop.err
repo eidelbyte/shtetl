@@ -1,1 +1,1 @@
-shtetl: containers/drop.conf: pkg.tmux: false drops what default.conf gives, and default.conf is a layer of every foundation's recipe too: a container keeps everything its foundation has
+shtetl: containers/drop.conf: pkg.tmux: false drops nothing: the layers stack, and what one gives stays (ruled 2026-10-12)

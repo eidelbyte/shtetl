@@ -18,18 +18,12 @@
 struct sh_layer {
 	char		*sl_file;	/* common/web.conf, or (built-in) */
 	struct sh_node	*sl_tree;	/* as parsed */
-	int		sl_shared;	/* a layer of every foundation too */
 };
 
 /*
  * A resolved recipe. The layers come in merge order: the built-in
  * layer when it has anything, default.conf after what it imports,
  * then the target's imports, each after its own, and the target.
- * A layer is shared when every foundation's recipe has it as well
- * (the built-in layer, default.conf, and what default.conf imports):
- * what a shared layer gives a container's pkg or datasets, the
- * container may not drop, since its foundation has it (7.4).
- *
  * In sr_merged a key's pr_from is the layer that added it and a
  * value's sn_from the layer that last set it, both pointers to a
  * layer's sl_file.

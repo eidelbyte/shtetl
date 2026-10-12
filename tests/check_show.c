@@ -87,22 +87,27 @@ test_recipes(void)
 		"pkg = [ \"sudo\", \"tmux\" ];\n"
 		"datasets { tmp {} var {} \"usr/local\" {} }\n",
 		"common/web.conf",
+		"ver = \">=15\";\n"
 		"pkg = [ \"apache24\", \"py311-certbot\" ];\n"
 		"datasets { www { readonly = true; compression = \"lz4\"; } }\n"
 		"commands { certbot = \"sysrc certbot_enable=YES\"; }\n",
 		"containers/nginx.conf",
 		"import = [ \"common/web.conf\" ];\n"
-		"ver = \">=15\";\n"
-		"pkg { nginx = true; apache24 = false; }\n"
+		"ver = \"<16\";\n"
+		"pkg { nginx = true; }\n"
 		"datasets { www { compression = \"zstd\"; } }\n"
 		"commands { \"c.d\" = \"x\"; }\n",
 		"foundations/f.conf",
 		"src_branch = \"main\";\n"
 		"patches { \"github.com/a/b\" { ref = \"r\"; dir = \"15\"; } "
 		"\"https://x.org/p.git\" = true; }\n"
-		"datasets { tmp = false; var = false; \"usr/local\" = false; "
-		"}\n"
-		"pkg { sudo = false; tmux = false; }\n",
+		"buildopts = \"A=1\\nB=2\";\n"
+		"buildopts_file = \"build/b.conf\";\n",
+		"build/b.conf", "C=3\n",
+		NULL
+	};
+	static const char *const em[] = {
+		"systems/e.conf", "pkg {}\ndatasets {}\n",
 		NULL
 	};
 
@@ -118,17 +123,25 @@ test_recipes(void)
 	    "        readonly = true;  # common/web.conf\n"
 	    "        compression = \"zstd\";  # containers/nginx.conf, over "
 	    "common/web.conf\n    }\n"));
-	CHECK(has("\nver = \">=15\";  # containers/nginx.conf\n"));
-	CHECK(strstr(out, "apache24") == NULL);
+	CHECK(has("\n    apache24 = true;  # common/web.conf\n"));
+	/* CW8: a list that stacks, each value with its layer */
+	CHECK(has("\nver = [\n    \">=15\",  # common/web.conf\n"
+	    "    \"<16\"  # containers/nginx.conf\n]\n"));
 	/* CW5 */
 	CHECK(has("\n    \"usr/local\" {}  # default.conf\n"));
 	CHECK(has("\n    py311-certbot = true;"));
 	CHECK(has("\n    \"c.d\" = \"x\";"));
 
-	/* CW1 on a foundation; CW5's URLs; CW6, collections emptied */
+	/* CW1 on a foundation; CW5's URLs; CW8, text and a file stacked */
 	show(root, "foundations/f");
 	CHECK(has("\n    \"github.com/a/b\" {  # foundations/f.conf\n"));
 	CHECK(has("\n    \"https://x.org/p.git\" = true;"));
+	CHECK(has("\nbuildopts = [\n    \"A=1\\nB=2\",  # foundations/f.conf\n"
+	    "    {\n        file = \"build/b.conf\";  # foundations/f.conf\n"
+	    "    }  # foundations/f.conf\n]\n"));
+
+	/* CW6: a collection written empty */
+	show(mkroot("em", em), "systems/e");
 	CHECK(has("\npkg {}\n"));
 	CHECK(has("\ndatasets {}\n"));
 }

@@ -198,25 +198,21 @@ variables). shtetl merges the parsed layers itself:
 
 | value | rule |
 |-------|------|
-| scalar (string, number, boolean) | the nearer layer replaces |
-| object | merged key by key, recursively |
-| a collection (`pkg`, `datasets`, `derivations`, `requires`, `commands`, `patches`) | an object keyed by name: merged key by key |
+| `ver` | every file's constraint kept; all must hold |
+| `buildopts`, `jailconf` (and their `_file` twins) | appended, lower files first |
+| a collection (`pkg`, `datasets`, `derivations`, `requires`, `commands`, `patches`) | an object keyed by name: the union, key by key, an entry's fields joining |
+| `src_branch`, `kernconf` | one value (planning.md 15, Q-AC, still asked) |
 
-So editing an inherited collection uses the one rule objects already
-follow:
+Everything stacks (planning.md 14, ruled 2026-10-12): a file adds to
+what the files below gave, and nothing takes anything away or takes
+another file's place. There is no `false` to drop an element and no
+`reset` to empty a collection; shtetl refuses both. So whatever its
+foundation provides, a container keeps.
 
 | to | write |
 |----|-------|
 | add an element | a new key: `pkg { nginx = true; }` |
-| change one element | the same key with new fields: `datasets { www { readonly = true; } }` |
-| drop one element | set it to `false`: `pkg { apache24 = false; }` |
-| drop everything inherited | `reset = [ "pkg" ];` at the top of the layer |
-
-Lists are additive (planning.md 14, H): a layer adds to what the layers
-below gave, and in `pkg` and `datasets` a drop or a `reset` may only
-take away what the container's own layers added. Whatever its
-foundation provides, the container keeps. A drop of something no layer
-below gave is an error too.
+| add to an element | the same key with new fields: `datasets { www { readonly = true; } }` |
 
 An array of names is shorthand for an object of `name = true` entries,
 for the common case: `pkg = [ "nginx", "git" ];`.
@@ -304,7 +300,7 @@ path (`datasets."usr/local".readonly`) instead.
     ver = ">=15";
     import = [ "common/web.conf" ];
 
-    pkg { nginx = true; apache24 = false; }
+    pkg { nginx = true; }
     datasets {
         www { readonly = true; }
     }
@@ -314,13 +310,11 @@ path (`datasets."usr/local".readonly`) instead.
     EOD
     }
 
-Merged for nginx: pkg = sudo, tmux, py311-certbot, nginx; datasets =
-tmp, var, usr/local, www; commands = certbot, then nginx. Lists are
-additive, and a drop is legal only for what the container's own layers
-added (`apache24` came from `common/web.conf`). A container must end
-with a superset of what its foundation provides, and `default.conf` is a
-layer of the foundation too, so `tmp = false` or `tmux = false` here
-would be errors (planning.md 7.4).
+Merged for nginx: pkg = sudo, tmux, apache24, py311-certbot, nginx;
+datasets = tmp, var, usr/local, www; commands = certbot, then nginx.
+Everything stacks, so a container ends with everything its foundation
+provides, `default.conf` being a file of the foundation's recipe too
+(planning.md 7.4).
 
 A container recipe names no foundation: `ver` says which foundations it
 fits, and the foundation is chosen with `shtetl create nginx --on
@@ -354,8 +348,8 @@ generic`.
 - `import default.conf` is gone: default.conf is always a layer.
   `import` remains for sharing between recipes
   (`import = [ "common/web.conf" ];`).
-- `+=` is gone: collections merge by key; `false` drops one element and
-  `reset` drops them all.
+- `+=` is gone: collections merge by key, and everything stacks;
+  nothing takes an element away.
 - `()` line lists and `[]` word lists are both keyed objects, with an
   array as shorthand for plain names.
 - `{}` text literals are heredocs.
@@ -380,5 +374,5 @@ generic`.
     - no key twice in one file
     - no macros (.include, .priority, ...); use import
     - no $variables
-    - collections are keyed: name = false drops one, reset drops all
+    - collections are keyed, and everything stacks: nothing is dropped
     - ASCII only

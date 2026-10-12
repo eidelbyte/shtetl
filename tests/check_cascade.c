@@ -88,9 +88,8 @@ layers(void)
 	buf[0] = '\0';
 	for (i = 0; i < r.sr_nlayers; i++) {
 		n = strlen(buf);
-		(void) snprintf(buf + n, sizeof (buf) - n, "%s%s%s",
-		    i > 0 ? " " : "", r.sr_layers[i].sl_file,
-		    r.sr_layers[i].sl_shared ? "*" : "");
+		(void) snprintf(buf + n, sizeof (buf) - n, "%s%s",
+		    i > 0 ? " " : "", r.sr_layers[i].sl_file);
 	}
 	return (buf);
 }
@@ -129,7 +128,7 @@ static const char *const example[] = {
 	"}\n",
 	"containers/nginx.conf",
 	"import = [ \"common/web.conf\" ];\n"
-	"pkg { nginx = true; apache24 = false; }\n"
+	"pkg { nginx = true; }\n"
 	"datasets {\n"
 	"    www { readonly = true; }\n"
 	"}\n"
@@ -152,9 +151,9 @@ test_example(void)
 	CHECK(r.sr_kind == SH_CONTAINER);
 	CHECK(is(r.sr_name, "nginx"));
 	CHECK(is(r.sr_file, "containers/nginx.conf"));
-	CHECK(is(layers(), "default.conf* common/web.conf "
+	CHECK(is(layers(), "default.conf common/web.conf "
 	    "containers/nginx.conf"));
-	CHECK(is(keys(M("pkg")), "sudo tmux py311-certbot nginx"));
+	CHECK(is(keys(M("pkg")), "sudo tmux apache24 py311-certbot nginx"));
 	CHECK(is(keys(M("datasets")), "tmp var usr/local www"));
 	CHECK(is(keys(M("commands")), "certbot nginx"));
 	CHECK(is(sh_obj_get(M("commands"), "certbot")->sn_str,
@@ -202,7 +201,7 @@ test_layers(void)
 	CHECK(is(keys(M("pkg")), "a"));
 
 	resolves(mkroot("nest", nest), "containers/x");
-	CHECK(is(layers(), "common/base.conf* default.conf* common/c.conf "
+	CHECK(is(layers(), "common/base.conf default.conf common/c.conf "
 	    "common/a.conf common/b.conf containers/x.conf"));
 	CHECK(is(keys(M("pkg")), "zsh c"));
 }
@@ -233,40 +232,77 @@ test_import_errors(void)
 	    "no such recipe in the configuration root"));
 }
 
-/* CC7, CC8: scalars, and the heredoc twins. */
+/*
+ * CC7, CC8: what stacks. Every file's ver is kept, to hold together;
+ * buildopts and jailconf append, lower layers first, a _file's file in
+ * its place; kernconf, one value, is the nearer file's until Q-AC is
+ * ruled (planning.md 15).
+ */
 static void
-test_scalars(void)
+test_stacked(void)
 {
-	static const char *const sc[] = {
+	static const char *const st[] = {
 		"default.conf", "ver = \">=14\";\npkg = [ \"a\" ];\n",
-		"containers/x.conf", "pkg = [ \"b\" ];\nver = \">=15\";\n",
+		"common/w.conf", "ver = \">=15\";\njailconf = \"j1;\";\n",
+		"containers/x.conf", "import = \"common/w.conf\";\n"
+		"pkg = [ \"b\" ];\nver = \"<16\";\n"
+		"jailconf_file = \"jails/x\";\njailconf = \"j2;\";\n",
+		"jails/x", "allow.raw_sockets;\n",
+		"common/b.conf", "buildopts = \"A=1\";\n"
+		"buildopts_file = \"build/b.conf\";\n",
+		"build/b.conf", "WITHOUT_X=yes\n",
 		"common/k1.conf", "kernconf = \"GENERIC\";\n",
 		"common/k2.conf", "kernconf_file = \"kernels/G\";\n",
 		"kernels/G", "ident G\n",
-		"foundations/f1.conf", "import = \"common/k1.conf\";\n"
-		"src_branch = \"main\";\nkernconf_file = \"kernels/G\";\n",
+		"foundations/f1.conf", "import = [ \"common/k1.conf\", "
+		"\"common/b.conf\" ];\n"
+		"src_branch = \"main\";\nkernconf_file = \"kernels/G\";\n"
+		"buildopts = \"B=2\";\n",
 		"foundations/f2.conf", "import = \"common/k2.conf\";\n"
 		"src_branch = \"main\";\nkernconf = \"MINE\";\n",
 		NULL
 	};
-	const struct sh_pair *pr;
+	const struct sh_node *v, *el;
 
-	resolves(mkroot("sc", sc), "containers/x");
-	CHECK(is(keys(r.sr_merged), "ver pkg"));
-	pr = sh_obj_find(r.sr_merged, "ver");
-	CHECK(is(pr->pr_val->sn_str, ">=15"));
-	CHECK(is(pr->pr_from, "default.conf"));
-	CHECK(is(pr->pr_val->sn_from, "containers/x.conf"));
+	resolves(mkroot("st", st), "containers/x");
+	CHECK(is(keys(r.sr_merged), "ver pkg jailconf"));
+	v = M("ver");
+	CHECK(v->sn_type == SH_ARRAY && v->sn_arr.ar_n == 3);
+	CHECK(is(v->sn_arr.ar_v[0]->sn_str, ">=14"));
+	CHECK(is(v->sn_arr.ar_v[0]->sn_from, "default.conf"));
+	CHECK(is(v->sn_arr.ar_v[1]->sn_str, ">=15"));
+	CHECK(is(v->sn_arr.ar_v[1]->sn_from, "common/w.conf"));
+	CHECK(is(v->sn_arr.ar_v[2]->sn_str, "<16"));
+	CHECK(is(v->sn_arr.ar_v[2]->sn_from, "containers/x.conf"));
+	v = M("jailconf");
+	CHECK(v->sn_type == SH_ARRAY && v->sn_arr.ar_n == 3);
+	CHECK(is(v->sn_arr.ar_v[0]->sn_str, "j1;"));
+	el = v->sn_arr.ar_v[1];
+	CHECK(el->sn_type == SH_OBJECT);
+	CHECK(is(sh_obj_get(el, "file")->sn_str, "jails/x"));
+	CHECK(is(el->sn_from, "containers/x.conf"));
+	CHECK(is(v->sn_arr.ar_v[2]->sn_str, "j2;"));
 
 	resolves(root, "foundations/f1");
-	CHECK(M("kernconf") == NULL);
-	CHECK(is(M("kernconf_file")->sn_str, "kernels/G"));
-	resolves(root, "foundations/f2");
+	v = M("buildopts");
+	CHECK(v->sn_type == SH_ARRAY && v->sn_arr.ar_n == 3);
+	CHECK(is(v->sn_arr.ar_v[0]->sn_str, "A=1"));
+	CHECK(is(sh_obj_get(v->sn_arr.ar_v[1], "file")->sn_str,
+	    "build/b.conf"));
+	CHECK(is(v->sn_arr.ar_v[2]->sn_str, "B=2"));
+	CHECK(is(v->sn_arr.ar_v[2]->sn_from, "foundations/f1.conf"));
+	/* kernconf: one value; the file's stands for it */
 	CHECK(M("kernconf_file") == NULL);
+	CHECK(is(sh_obj_get(M("kernconf"), "file")->sn_str, "kernels/G"));
+	resolves(root, "foundations/f2");
 	CHECK(is(M("kernconf")->sn_str, "MINE"));
 }
 
-/* CC9, CC10, CC11, CC16: entries added, changed, dropped; order. */
+/*
+ * CC9, CC10, CC16: entries added and stacked; order. A field or a
+ * commands block given twice is the nearer file's until Q-AC is ruled
+ * (planning.md 15).
+ */
 static void
 test_collections(void)
 {
@@ -280,20 +316,18 @@ test_collections(void)
 		"commands { c = \"3\"; a = \"1b\"; }\n",
 		"containers/x.conf",
 		"import = \"common/f.conf\";\n"
-		"datasets { www { compression = \"zstd\"; } cache = false; "
-		"db {} }\n"
+		"datasets { www { compression = \"zstd\"; } db {} }\n"
 		"commands { b = \"2b\"; d = \"4\"; }\n",
 		"containers/y.conf",
 		"import = \"common/f.conf\";\n"
 		"datasets = [ \"www\", \"x\" ];\n",
-		"containers/z.conf", "pkg { nope = false; }\n",
 		NULL
 	};
 	const struct sh_node *www, *cmd;
 	const struct sh_pair *pr;
 
 	resolves(mkroot("co", co), "containers/x");
-	CHECK(is(keys(M("datasets")), "var www db"));
+	CHECK(is(keys(M("datasets")), "var www cache db"));
 	www = sh_obj_get(M("datasets"), "www");
 	CHECK(is(keys(www), "readonly compression"));
 	CHECK(sh_obj_get(www, "readonly")->sn_bool);
@@ -317,69 +351,47 @@ test_collections(void)
 	CHECK(www->sn_type == SH_OBJECT);
 	CHECK(sh_obj_get(www, "readonly")->sn_bool);
 	CHECK(sh_obj_get(M("datasets"), "x")->sn_type == SH_BOOL);
-
-	/* CC11 */
-	refused(root, "containers/z", "containers/z.conf: pkg.nope: false "
-	    "drops nothing: no layer before this one gives it");
 }
 
-/* CC12, CC14, CC15: the drop rule, by false and by reset. */
+/*
+ * CC11, CC12, CC14, CC15: nothing is dropped and nothing reset (ruled
+ * 2026-10-12), in any kind of recipe; so what default.conf and its
+ * imports give, every recipe keeps, commands included.
+ */
 static void
-test_drop_rule(void)
+test_nodrops(void)
 {
-	static const char *const dr[] = {
+	static const char *const nd[] = {
 		"default.conf",
 		"import = \"common/base.conf\";\n"
 		"pkg = [ \"sudo\", \"tmux\" ];\n"
 		"datasets { tmp {} }\n"
 		"commands { motd = \"echo\"; }\n",
 		"common/base.conf", "pkg = [ \"zsh\" ];\n",
-		"common/own.conf", "pkg = [ \"mine\" ];\n",
 		"containers/tmux.conf", "pkg { tmux = false; }\n",
 		"containers/tmp.conf", "datasets { tmp = false; }\n",
-		"containers/zsh.conf", "pkg { zsh = false; }\n",
-		"systems/tmux.conf", "pkg { tmux = false; }\n",
-		"containers/motd.conf", "commands { motd = false; }\n",
+		"systems/motd.conf", "commands { motd = false; }\n",
 		"foundations/f.conf",
-		"src_branch = \"main\";\npkg { tmux = false; }\n"
-		"datasets { tmp = false; }\n",
+		"src_branch = \"main\";\npkg { tmux = false; }\n",
 		"foundations/g.conf",
-		"src_branch = \"main\";\nreset = [ \"pkg\" ];\n"
-		"pkg = [ \"only\" ];\n",
-		"containers/reset.conf", "reset = \"pkg\";\n",
-		"containers/rcmd.conf", "reset = [ \"commands\" ];\n",
-		"containers/rown.conf",
-		"import = \"common/own.conf\";\nreset = [ \"datasets\" ];\n",
+		"src_branch = \"main\";\nreset = [ \"pkg\" ];\n",
+		"containers/keep.conf", "pkg = [ \"mine\" ];\n",
 		NULL
 	};
 
-	refused(mkroot("dr", dr), "containers/tmux", "containers/tmux.conf: "
-	    "pkg.tmux: false drops what default.conf gives, and default.conf "
-	    "is a layer of every foundation's recipe too: a container keeps "
-	    "everything its foundation has");
-	refused(root, "containers/tmp", "datasets.tmp: false drops what "
-	    "default.conf gives");
-	refused(root, "containers/zsh", "pkg.zsh: false drops what "
-	    "common/base.conf gives, and common/base.conf is a layer of "
-	    "every foundation's recipe too");
-	refused(root, "systems/tmux", "a system keeps everything its "
-	    "foundation has");
-	/* commands are not under the rule */
-	resolves(root, "containers/motd");
-	CHECK(is(keys(M("commands")), ""));
-	/* CC14 */
-	resolves(root, "foundations/f");
-	CHECK(is(keys(M("pkg")), "zsh sudo"));
-	CHECK(is(keys(M("datasets")), ""));
-	/* CC15 */
-	resolves(root, "foundations/g");
-	CHECK(is(keys(M("pkg")), "only"));
-	refused(root, "containers/reset", "containers/reset.conf: reset: "
-	    "emptying pkg drops zsh, which common/base.conf gives");
-	resolves(root, "containers/rcmd");
-	CHECK(M("commands") == NULL);
-	refused(root, "containers/rown", "reset[0]: emptying datasets drops "
-	    "tmp, which default.conf gives");
+	refused(mkroot("nd", nd), "containers/tmux", "containers/tmux.conf: "
+	    "pkg.tmux: false drops nothing: the layers stack, and what one "
+	    "gives stays (ruled 2026-10-12)");
+	refused(root, "containers/tmp", "datasets.tmp: false drops nothing");
+	refused(root, "systems/motd", "commands.motd: false drops nothing");
+	refused(root, "foundations/f", "foundations/f.conf: pkg.tmux: false "
+	    "drops nothing");
+	refused(root, "foundations/g", "foundations/g.conf: reset: nothing is "
+	    "reset: the layers stack");
+	resolves(root, "containers/keep");
+	CHECK(is(keys(M("pkg")), "zsh sudo tmux mine"));
+	CHECK(is(keys(M("datasets")), "tmp"));
+	CHECK(is(keys(M("commands")), "motd"));
 }
 
 /* CC18 - CC21: what only the merged recipe can answer. */
@@ -422,14 +434,14 @@ test_merged(void)
 	/* CC20: buildopts_file is there; the others are not */
 	CHECK(R(root, "foundations/files") == -1);
 	CHECK(c.c_err.se_count == 2);
-	CHECK(cap_has(&c, "foundations/files.conf: kernconf_file: "
+	CHECK(cap_has(&c, "foundations/files.conf: kernconf: "
 	    "kernels/NOPE: no such file in the configuration root"));
 	CHECK(cap_has(&c, "foundations/files.conf: patches.\"patches/gen\": "
 	    "patches/gen/15.1: no such directory in the configuration root"));
 	refused(root, "foundations/pat", "foundations/pat.conf: "
 	    "patches.\"patches/gone\": patches/gone: no such directory");
-	refused(root, "containers/jail", "jailconf_file: jails/x: no such "
-	    "file");
+	refused(root, "containers/jail", "containers/jail.conf: jailconf: "
+	    "jails/x: no such file");
 	/* CC21 */
 	CHECK(R(root, "containers/req") == -1);
 	CHECK(c.c_err.se_count == 2);
@@ -520,9 +532,9 @@ main(void)
 	test_example();
 	test_layers();
 	test_import_errors();
-	test_scalars();
+	test_stacked();
 	test_collections();
-	test_drop_rule();
+	test_nodrops();
 	test_merged();
 	test_targets();
 	test_layer_errors();

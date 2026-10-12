@@ -9,7 +9,11 @@
  * The first names the layer that set the value; "over" names the one
  * that added the key, when that was another. A collection's entries
  * carry their own comments and the collection none, since many
- * layers fill it.
+ * layers fill it; so does a list that stacks (ver, buildopts), each
+ * of its values on a line of its own that ends with its layer. Not on
+ * a line above: libucl 0.9.4 reads a comment between [ and the first
+ * value as a part of that value, quotes and all (tried; a comment
+ * after a value and its comma it reads as a comment).
  *
  * A string with a newline in it is printed as a heredoc, by libucl
  * 0.9.4's rules (ucl_parse_multiline_string): the opening <<TERM ends
@@ -176,6 +180,27 @@ sw_element(struct sw *w, const struct sh_node *v, int depth)
 	}
 }
 
+/* A list of values from several layers, each line ending in its layer. */
+static void
+sw_list(struct sw *w, const struct sh_pair *pr, int depth)
+{
+	const struct sh_node *v = pr->pr_val, *el;
+	size_t i;
+
+	sw_indent(w, depth);
+	sw_key(w, pr->pr_key);
+	(void) fputs(" = [\n", w->sw_out);
+	for (i = 0; i < v->sn_arr.ar_n; i++) {
+		el = v->sn_arr.ar_v[i];
+		sw_indent(w, depth + 1);
+		sw_element(w, el, depth + 1);
+		(void) fprintf(w->sw_out, "%s  # %s\n",
+		    i + 1 < v->sn_arr.ar_n ? "," : "", el->sn_from);
+	}
+	sw_indent(w, depth);
+	(void) fputs("]\n", w->sw_out);
+}
+
 static void
 sw_pair(struct sw *w, const struct sh_pair *pr, int depth)
 {
@@ -183,6 +208,10 @@ sw_pair(struct sw *w, const struct sh_pair *pr, int depth)
 	char term[SW_TERM_MAX + 2];
 	int entry = depth == w->sw_entries;
 
+	if (v->sn_type == SH_ARRAY && v->sn_arr.ar_n > 0) {
+		sw_list(w, pr, depth);
+		return;
+	}
 	if (v->sn_type == SH_STR && sw_heredoc(v->sn_str, term)) {
 		sw_indent(w, depth);
 		sw_from(w, pr, "");

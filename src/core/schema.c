@@ -17,31 +17,39 @@
 #include "core/syntax.h"
 #include "core/tree.h"
 
+#define	F	SH_FOUNDATION
+#define	C	SH_CONTAINER
+
+/*
+ * A _file key gives its file's text in the place of the text the key
+ * it goes into would give, so kernconf and kernconf_file are one
+ * value, and buildopts_file's file is a piece of buildopts.
+ */
 static const struct sh_rkey rkeys[] = {
-	{ "import", SH_ALLKINDS, SH_V_IMPORT, SH_C_NONE, NULL },
-	{ "reset", SH_ALLKINDS, SH_V_RESET, SH_C_NONE, NULL },
-	{ "ver", SH_ALLKINDS, SH_V_VER, SH_C_NONE, NULL },
-	{ "src_branch", SH_FOUNDATION, SH_V_STRING, SH_C_NONE, NULL },
-	{ "kernconf", SH_FOUNDATION, SH_V_STRING, SH_C_NONE,
-	    "kernconf_file" },
-	{ "kernconf_file", SH_FOUNDATION, SH_V_FILE, SH_C_NONE, "kernconf" },
-	{ "buildopts", SH_FOUNDATION, SH_V_STRING, SH_C_NONE,
-	    "buildopts_file" },
-	{ "buildopts_file", SH_FOUNDATION, SH_V_FILE, SH_C_NONE,
+	{ "import", SH_ALLKINDS, SH_V_IMPORT, SH_C_NONE, SH_M_LAYERS, NULL },
+	{ "ver", SH_ALLKINDS, SH_V_VER, SH_C_NONE, SH_M_ALL, NULL },
+	{ "src_branch", F, SH_V_STRING, SH_C_NONE, SH_M_ONE, NULL },
+	{ "kernconf", F, SH_V_STRING, SH_C_NONE, SH_M_ONE, NULL },
+	{ "kernconf_file", F, SH_V_FILE, SH_C_NONE, SH_M_ONE, "kernconf" },
+	{ "buildopts", F, SH_V_STRING, SH_C_NONE, SH_M_TEXT, NULL },
+	{ "buildopts_file", F, SH_V_FILE, SH_C_NONE, SH_M_TEXT,
 	    "buildopts" },
-	{ "patches", SH_FOUNDATION, SH_V_COLL, SH_C_PATCHES, NULL },
-	{ "datasets", SH_ALLKINDS, SH_V_COLL, SH_C_DATASETS, NULL },
-	{ "pkg", SH_ALLKINDS, SH_V_COLL, SH_C_PKG, NULL },
-	{ "commands", SH_ALLKINDS, SH_V_COLL, SH_C_COMMANDS, NULL },
-	{ "derivations", SH_ALLKINDS, SH_V_COLL, SH_C_DERIVATIONS, NULL },
-	{ "requires", SH_CONTAINER, SH_V_COLL, SH_C_REQUIRES, NULL },
-	{ "jailconf", SH_CONTAINER, SH_V_STRING, SH_C_NONE,
-	    "jailconf_file" },
-	{ "jailconf_file", SH_CONTAINER, SH_V_FILE, SH_C_NONE, "jailconf" },
-	{ NULL, 0, SH_V_STRING, SH_C_NONE, NULL }
+	{ "patches", F, SH_V_COLL, SH_C_PATCHES, SH_M_COLL, NULL },
+	{ "datasets", SH_ALLKINDS, SH_V_COLL, SH_C_DATASETS, SH_M_COLL, NULL },
+	{ "pkg", SH_ALLKINDS, SH_V_COLL, SH_C_PKG, SH_M_COLL, NULL },
+	{ "commands", SH_ALLKINDS, SH_V_COLL, SH_C_COMMANDS, SH_M_COLL, NULL },
+	{ "derivations", SH_ALLKINDS, SH_V_COLL, SH_C_DERIVATIONS, SH_M_COLL,
+	    NULL },
+	{ "requires", C, SH_V_COLL, SH_C_REQUIRES, SH_M_COLL, NULL },
+	{ "jailconf", C, SH_V_STRING, SH_C_NONE, SH_M_TEXT, NULL },
+	{ "jailconf_file", C, SH_V_FILE, SH_C_NONE, SH_M_TEXT, "jailconf" },
+	{ NULL, 0, SH_V_STRING, SH_C_NONE, SH_M_ONE, NULL }
 };
 
-/* The forms a collection's entry takes besides false, which drops. */
+#undef	F
+#undef	C
+
+/* The forms a collection's entry takes. */
 #define	E_TRUE	0x1
 #define	E_OBJ	0x2
 #define	E_STR	0x4
@@ -57,18 +65,17 @@ static const struct cdesc {
 	const char	*cd_forms;	/* the entry's forms, for messages */
 } cdescs[] = {
 	[SH_C_NONE] = { NULL, NULL, 0, 0, NULL },
-	[SH_C_PKG] = { "a package's name", sh_syn_pkg, 1, E_TRUE,
-	    "true, or false to drop it" },
+	[SH_C_PKG] = { "a package's name", sh_syn_pkg, 1, E_TRUE, "true" },
 	[SH_C_DATASETS] = { "a dataset path", sh_syn_dataset, 1,
-	    E_TRUE | E_OBJ, "true, its properties, or false to drop it" },
+	    E_TRUE | E_OBJ, "true, or its properties" },
 	[SH_C_COMMANDS] = { "a label", sh_syn_label, 0, E_STR,
-	    "its commands as a string or heredoc, or false to drop it" },
+	    "its commands, as a string or heredoc" },
 	[SH_C_DERIVATIONS] = { "a derived file's path", sh_syn_relpath, 0,
-	    E_OBJ, "{ source; command; }, or false to drop it" },
+	    E_OBJ, "{ source; command; }" },
 	[SH_C_REQUIRES] = { "a container's name", sh_syn_name, 1, E_TRUE,
-	    "true, or false to drop it" },
+	    "true" },
 	[SH_C_PATCHES] = { "a patch source's location", cd_location, 1,
-	    E_TRUE | E_OBJ, "true, { ref; dir; }, or false to drop it" }
+	    E_TRUE | E_OBJ, "true, or { ref; dir; }" }
 };
 
 /* One check's place: the file, the kind, where in the tree. */
@@ -111,12 +118,6 @@ sh_rkey(const char *key)
 			return (rk);
 	}
 	return (NULL);
-}
-
-int
-sh_coll_superset(enum sh_coll coll)
-{
-	return (coll == SH_C_PKG || coll == SH_C_DATASETS);
 }
 
 /*
@@ -188,43 +189,6 @@ sc_import(struct sc *x, const struct sh_node *v)
 	for (i = 0; i < v->sn_arr.ar_n; i++) {
 		was = sh_path_index(&x->sc_path, i);
 		sc_relpath(x, v->sn_arr.ar_v[i], "a recipe's path");
-		sh_path_pop(&x->sc_path, was);
-	}
-}
-
-/* reset: names of collections this kind of recipe has. */
-static void
-sc_reset_one(struct sc *x, const struct sh_node *v)
-{
-	const struct sh_rkey *rk;
-
-	if (!sc_string(x, v, "a collection's name"))
-		return;
-	rk = sh_rkey(v->sn_str);
-	if (rk == NULL || rk->rk_vt != SH_V_COLL ||
-	    (rk->rk_kinds & x->sc_kind) == 0) {
-		sh_err_at(x->sc_err, x->sc_file, &x->sc_path,
-		    "not a collection a %s's recipe has: \"%s\"",
-		    sh_kind_name(x->sc_kind), v->sn_str);
-	}
-}
-
-static void
-sc_reset(struct sc *x, const struct sh_node *v)
-{
-	size_t i, was;
-
-	if (v->sn_type == SH_STR) {
-		sc_reset_one(x, v);
-		return;
-	}
-	if (v->sn_type != SH_ARRAY) {
-		sc_type(x, "a list of collections' names", v, 0);
-		return;
-	}
-	for (i = 0; i < v->sn_arr.ar_n; i++) {
-		was = sh_path_index(&x->sc_path, i);
-		sc_reset_one(x, v->sn_arr.ar_v[i]);
 		sh_path_pop(&x->sc_path, was);
 	}
 }
@@ -327,7 +291,13 @@ sc_entry(struct sc *x, const struct sh_rkey *rk, const struct sh_node *v)
 
 	switch (v->sn_type) {
 	case SH_BOOL:
-		if (!v->sn_bool || (cd->cd_entry & E_TRUE) != 0)
+		if (!v->sn_bool) {
+			sh_err_at(x->sc_err, x->sc_file, &x->sc_path,
+			    "false drops nothing: the layers stack, and what "
+			    "one gives stays (ruled 2026-10-12)");
+			return;
+		}
+		if ((cd->cd_entry & E_TRUE) != 0)
 			return;
 		break;
 	case SH_OBJECT:
@@ -432,7 +402,11 @@ sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
 		pr = &layer->sn_obj.ob_v[i];
 		was = sh_path_push(&x.sc_path, pr->pr_key);
 		rk = sh_rkey(pr->pr_key);
-		if (rk == NULL) {
+		if (strcmp(pr->pr_key, "reset") == 0) {
+			sh_err_at(e, file, &x.sc_path, "nothing is reset: the "
+			    "layers stack, and what one gives stays (ruled "
+			    "2026-10-12)");
+		} else if (rk == NULL) {
 			sh_err_at(e, file, &x.sc_path, "not a key a recipe "
 			    "takes");
 		} else if ((rk->rk_kinds & kind) == 0) {
@@ -443,9 +417,6 @@ sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
 			switch (rk->rk_vt) {
 			case SH_V_IMPORT:
 				sc_import(&x, pr->pr_val);
-				break;
-			case SH_V_RESET:
-				sc_reset(&x, pr->pr_val);
 				break;
 			case SH_V_VER:
 				if (sc_string(&x, pr->pr_val,
@@ -464,11 +435,11 @@ sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
 				sc_coll(&x, rk, pr->pr_val);
 				break;
 			}
-			if (rk->rk_twin != NULL && rk->rk_vt != SH_V_FILE &&
-			    sh_obj_find(layer, rk->rk_twin) != NULL)
+			if (rk->rk_merge == SH_M_ONE && rk->rk_into != NULL &&
+			    sh_obj_find(layer, rk->rk_into) != NULL)
 				sh_err_at(e, file, &x.sc_path, "and %s both: "
-				    "a layer gives one or the other",
-				    rk->rk_twin);
+				    "two values for the one %s", rk->rk_into,
+				    rk->rk_into);
 		}
 		sh_path_pop(&x.sc_path, was);
 	}

@@ -395,30 +395,35 @@ Built in M1 (`src/core/parse.c`, the one file that includes `ucl.h`):
   path names one place, keys being unique in a file. Every problem in
   every layer is reported, not only the first.
 
-### 5.4 Recipe cascade: lists are additive
+### 5.4 Recipe cascade: everything stacks
 
-Layers, nearest last:
+Ruled 2026-10-12 (14), replacing the drops and `reset` this section
+had before. There are two layers: a foundation's recipe, and a
+container's or system's, which stacks on its foundation's when it is
+created (7.4). Each is made of files, nearest last:
 
 1. built-in recipe defaults
-2. `default.conf`
-3. each recipe named in the target's `import`, in order
-4. the target recipe (`foundations/F.conf`, `containers/X.conf`,
+2. `default.conf`, after what it imports
+3. each recipe named in `import`, in order, each after its own imports
+4. the recipe itself (`foundations/F.conf`, `containers/X.conf`,
    `systems/S.conf`)
 
-Lists are additive (ruled 2026-10-09, H): each layer adds to what the
-layers below it gave. Q5 of draft 1 asked how a recipe replaces a list
-instead; look at what recipes actually need to do to an inherited list:
+Everything stacks: each file adds to what the files below it gave,
+and no file takes anything away or takes another's place. There is no
+way to drop an element, to empty an inherited collection or to
+replace a value: `false` as an entry and `reset` are refused. How each
+key stacks:
 
-- drop one element: no `apache24` from a shared web recipe;
-- change one element: a different command for `etc/pwd.db`, a dataset
-  made readonly;
-- add elements: the common case;
-- throw the whole inherited list away: rare ("exactly these packages").
+| key | stacks as |
+|-----|-----------|
+| import | names files; no value of its own |
+| ver | every file's constraint kept, in order; all must hold, the foundation's and the container's together |
+| buildopts, jailconf, and their `_file` twins | appended, lower files first; a `_file`'s file in its place |
+| pkg, requires | the union |
+| datasets, patches, derivations, commands | the union by identity (below); an entry's fields join |
+| src_branch, kernconf, kernconf_file | one value: what two files giving two values means is asked (15, Q-AC); until it is ruled the nearer file's stands |
 
-Whole-list replacement is the rare case, and editing one element is
-the common one. So the useful answer is not a way to replace lists,
-but to stop having lists that cannot be edited by element. Every
-list in the schema already has a natural identity:
+Every collection is an object keyed by its element's identity:
 
 | key | identity |
 |-----|----------|
@@ -429,24 +434,11 @@ list in the schema already has a natural identity:
 | commands | a label the recipe gives the block |
 | patches | the source's location |
 
-So every collection is an object keyed by that identity, and the
-cascade merges objects the way it already merges any object, key by
-key, nearer layer winning. Then:
-
-- add: write a new key;
-- change one: write the same key with new fields (fields merge);
-- drop one: set it to `false`;
-- drop the whole inherited collection: `reset = [ "pkg" ];` at the top
-  of the layer, which empties that key before this layer merges in.
-
-Order is kept: libucl iterates object keys in insertion order and a
-replaced key keeps its place (`DL_APPEND`, `DL_REPLACE_ELEM` in
-ucl_hash.c), and the cascade does the same across layers. A
-`commands` block overridden by a later layer runs where it was first
-defined.
-
-The common case stays short: an array of names is accepted as
-shorthand for an object of `name = true` entries.
+Order is kept: libucl iterates object keys in insertion order
+(`DL_APPEND` in ucl_hash.c), and the cascade does the same across
+files, so a `commands` block runs where it was first defined. The
+common case stays short: an array of names is accepted as shorthand
+for an object of `name = true` entries.
 
     # default.conf
     pkg = [ "sudo", "tmux" ];
@@ -457,6 +449,7 @@ shorthand for an object of `name = true` entries.
     }
 
     # common/web.conf
+    ver = ">=15";
     pkg = [ "apache24", "py311-certbot" ];
     commands {
         certbot = <<EOD
@@ -466,7 +459,8 @@ shorthand for an object of `name = true` entries.
 
     # containers/nginx.conf
     import = [ "common/web.conf" ];
-    pkg { nginx = true; apache24 = false; }
+    ver = "<16";
+    pkg { nginx = true; }
     datasets {
         www { readonly = true; }
     }
@@ -476,57 +470,40 @@ shorthand for an object of `name = true` entries.
     EOD
     }
 
-Merged for nginx: pkg = sudo, tmux, py311-certbot, nginx; datasets =
-tmp, var, usr/local, www; commands = certbot, then nginx (M1: `shtetl
-config show containers/nginx` prints exactly this, each value with
-the file it came from; tests/cli/cl4-nginx.out).
+Merged for nginx: pkg = sudo, tmux, apache24, py311-certbot, nginx;
+datasets = tmp, var, usr/local, www; commands = certbot, then nginx;
+ver = `>=15` and `<16`, both to hold. `shtetl config show
+containers/nginx` prints this, each value with the file it came from,
+a stacked key as a list (tests/cli/cl4-nginx.out).
 
-A drop is legal only for what the container's own layers added:
-`apache24` came from `common/web.conf`. `tmp = false` or `tmux = false`
-would be errors here, because `default.conf` is a layer of the
-foundation's recipe too, so the foundation already splits `tmp` and
-installs `tmux`, and a container must end with a superset of what its
-foundation provides (7.4).
+A container keeps everything its foundation has (7.4, ruled H) by
+construction now: nothing can be taken away, by the container's files
+or by anyone's.
 
-As built (M1, `src/core/cascade.c`):
+As built (M1, revised 2026-10-12, `src/core/cascade.c`):
 
-- `import` is followed in every layer, default.conf's included: a
-  file's imports merge before it, each recipe once, at the first
-  place it is reached, and a cycle is an error naming its files
-  (PROPOSAL, Q-U).
-- The layers shared with every foundation's recipe are the built-in
-  one, default.conf and what default.conf imports. A container or
-  system may not drop, by `false` or by `reset`, a `pkg` or
-  `datasets` element one of them gave; the error names the layer. A
-  `commands` block it may drop (the superset ruled in H is of
-  datasets and pkgs).
-- A drop of what no lower layer gives is an error (PROPOSAL, Q-V).
+- `import` is followed in every file, default.conf's included: a
+  file's imports merge before it, each file once, at the first place
+  it is reached, and a cycle is an error naming its files (PROPOSAL,
+  Q-U).
 - `true` over an entry with fields leaves the fields.
-- default.conf is checked against the target's kind like every
-  layer, so a key only a foundation takes refuses every container
-  there.
-- Every layer is read and checked before anything merges, so one run
+- default.conf is checked against the recipe's kind like every file,
+  so a key only a foundation takes refuses every container there.
+- Every file is read and checked before anything merges, so one run
   reports the problems of all of them.
 
-Alternatives considered:
-
-- **A `-` prefix in arrays** (`pkg = [ "-apache24", "nginx" ];`,
-  like Portage USE flags). Concise for name lists, but it cannot change
-  one field of a structured element, and a leading `-` must then be
-  forbidden in every name.
-- **Verb objects per key** (`pkg { add = [...]; remove = [...];
-  replace = [...]; }`). Explicit, but three spellings for one idea and
-  still no way to change a field.
-- **Separate keys** (`pkg_replace`, `pkg_remove`). Doubles the schema.
-- **UCL priorities**. Rejected with the macros: the result depends on
-  numbers scattered across files.
+Before the ruling, a recipe could take away an inherited element
+(`name = false`) or a whole collection (`reset`), and the ways to do
+that were weighed against a `-` prefix in arrays, verb objects per
+key, separate keys and UCL priorities. The ruling removed taking
+away altogether, and with it the drop rule that kept a container from
+dropping what its foundation had.
 
 ### 5.5 Recipe keys (from mishkan, adapted)
 
 | key | kinds | type | meaning |
 |-----|-------|------|---------|
 | import | all | names | recipes merged in before this file |
-| reset | all | key names | empty these inherited collections first |
 | ver | all | string | version constraint: `">=15"`, `"=15.1"` |
 | src_branch | foundation | string | FreeBSD branch |
 | kernconf | foundation | string or heredoc | config name, or an inline kernel config |
@@ -550,8 +527,9 @@ generic`) and recorded by the clone's `origin`, as parasa did.
 `make_jobs` moved to shtetl.conf: it is about the machine, not the
 recipe.
 
-The forms of an entry, as built in M1 (`src/core/schema.c`): `false`
-drops it in every collection; `pkg` and `requires` take `true`;
+The forms of an entry, as built in M1 (`src/core/schema.c`; `false`
+refused since 2026-10-12, nothing being dropped): `pkg` and
+`requires` take `true`;
 `datasets` take `true` or ZFS properties (`www { readonly = true;
 recordsize = "1M"; }`: strings, or true and false for on and off; a
 number is refused with "quote it", since UCL reads `1M` as 1000000;
@@ -560,9 +538,9 @@ a string or heredoc; `derivations` `{ source; command; }`; `patches`
 `true` or `{ ref; dir; }`. A list of names stands for `name = true`
 where an entry needs nothing more (pkg, datasets, requires, patches).
 The heredoc keys with a `_file` twin are kernconf, buildopts and
-jailconf; a layer gives one of a pair, and a nearer layer's replaces
-a lower layer's whichever it is. Scalars, `ver` and the heredocs
-included, are replaced by a nearer layer (PROPOSAL, Q-S and Q-T).
+jailconf. buildopts and jailconf stack (5.4): every file's text, a
+`_file`'s file in its place, appended. kernconf holds one value, its
+name or its text or its file, and a file gives it once (Q-AC).
 Names: a recipe's (and a `requires` entry, `update.suffix`) takes
 letters, digits, `-` and `_`, so that it is at once a dataset
 component, a jail name and a file name (PROPOSAL, Q-W); a dataset
@@ -694,8 +672,8 @@ or, with options:
         "patches/generic" {}        # a directory in zconfig
     }
 
-A source is keyed by its location, like every collection (5.4), so a
-layer drops an inherited one with `"github.com/..." = false`. A
+A source is keyed by its location, like every collection (5.4), and
+sources stack: no file drops one another gave (ruled 2026-10-12). A
 location with no scheme is https (`github.com/eidelbyte/freebsd-patches`
 is `https://github.com/eidelbyte/freebsd-patches`); a relative path is
 a directory in zconfig, which zconfig's snapshot (`shtetl:config`)
@@ -851,11 +829,11 @@ mountpoint and refuses one that is not mounted (9).
 
 1. Checks, beyond parse and schema: X's recipe `ver` allows F's newest
    version (or V); X's own datasets do not collide with F's; and every
-   list F provides is kept. Lists are additive; a recipe that overrides
-   one (`reset`, or `name = false` for an inherited element) must still
-   end with a superset of F's: every dataset F splits and every package
-   F installed (ruled 2026-10-09). F's lists at version V are its recipe
-   as of the config snapshot V records in `shtetl:config`.
+   list F provides is kept. Everything stacks (ruled 2026-10-12), so
+   X ends with a superset of F's by construction: every dataset F
+   splits and every package F installed; and every `ver` of F's files
+   and of X's must hold for F's version. F's lists at version V are its
+   recipe as of the config snapshot V records in `shtetl:config`.
 2. The foundation version on zrun (7.3), building it first if asked.
 3. `zfs clone` each dataset of `F@vN` to the matching name under
    `containers/X` (clone is not recursive; one per dataset), parent

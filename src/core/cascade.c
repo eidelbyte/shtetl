@@ -8,21 +8,18 @@
  * file's imports merge before it, each recipe once, at the first
  * place it is reached. A cycle is refused.
  *
- * Merging, layer by layer: reset empties the collections it names;
- * a scalar is replaced and keeps its place (a heredoc key replaces
- * its _file twin too); a collection merges entry by entry, a list
- * of names standing for name = true. In an entry, false drops it,
- * true adds it or leaves it as it is, fields merge field by field,
- * and a string replaces. A key keeps the place where it was first
- * added, so a commands block a later layer overrides runs where it
- * was first defined.
- *
- * The drop rule: a container or system may not drop, by false or by
- * reset, a pkg or dataset that a shared layer gave, since its
- * foundation has it too and a container keeps everything its
- * foundation has (7.4). A drop of what no layer gave is refused as
- * well: it is a misspelling, or a layer imported where it does not
- * belong.
+ * Merging, layer by layer, with everything stacking (ruled
+ * 2026-10-12): nothing is dropped and nothing reset, and a file's
+ * value takes no other's place. A collection merges entry by entry, a
+ * list of names standing for name = true: true adds an entry or leaves
+ * it as it is, an entry's fields join those lower layers gave. Every
+ * file's ver is kept, to hold together; buildopts and jailconf append,
+ * lower layers first, a _file twin's file in its place. A key keeps
+ * the place where it was first added, so a commands block runs where
+ * it was first defined. What a key holding one value does when two
+ * files set it (src_branch, kernconf, an entry's field, a commands
+ * block's text) is asked (planning.md 15, Q-AC): until it is ruled,
+ * the nearer file's stands.
  */
 
 #include <stdio.h>
@@ -49,7 +46,6 @@ struct ld {
 	struct sh_err		*ld_err;
 	const char		*ld_stack[SH_IMPORT_DEPTH];
 	size_t			ld_depth;
-	int			ld_shared;	/* loading default.conf's */
 	int			ld_failed;
 };
 
@@ -86,7 +82,6 @@ ld_append(struct ld *x, char *file, struct sh_node *tree)
 	r->sr_layers = nl;
 	nl[r->sr_nlayers].sl_file = file;
 	nl[r->sr_nlayers].sl_tree = tree;
-	nl[r->sr_nlayers].sl_shared = x->ld_shared;
 	r->sr_nlayers++;
 	return (0);
 }
@@ -305,21 +300,6 @@ rs_target(const char *target, struct sh_recipe *r, struct sh_err *e)
 	return (0);
 }
 
-/*
- * The shared layer whose element a drop would take, when the drop
- * rule forbids it: a container or system, pkg or datasets.
- */
-static const struct sh_layer *
-mg_forbidden(const struct mg *m, enum sh_coll coll, const char *from)
-{
-	const struct sh_layer *l;
-
-	if (m->mg_r->sr_kind == SH_FOUNDATION || !sh_coll_superset(coll))
-		return (NULL);
-	l = sh_recipe_layer(m->mg_r, from);
-	return (l != NULL && l->sl_shared ? l : NULL);
-}
-
 static void
 mg_set(struct mg *m, struct sh_node *obj, const char *key,
     const struct sh_node *v)
@@ -331,34 +311,21 @@ mg_set(struct mg *m, struct sh_node *obj, const char *key,
 		m->mg_nomem = 1;
 }
 
-/* One entry, EV under key EK, into the merged collection COLL. */
+/*
+ * One entry, EV under key EK, into the merged collection COLL: added,
+ * or stacked on the entry a lower layer gave. true adds the entry or
+ * leaves it as it is; fields join the entry's; a string (a commands
+ * block) takes the entry's place until Q-AC is ruled (planning.md 15).
+ */
 static void
-mg_entry(struct mg *m, struct sh_node *coll, const struct sh_rkey *rk,
-    const char *ek, const struct sh_node *ev)
+mg_entry(struct mg *m, struct sh_node *coll, const char *ek,
+    const struct sh_node *ev)
 {
 	struct sh_pair *cur;
-	const struct sh_layer *sl;
 	const struct sh_pair *f;
 	size_t i;
 
 	cur = sh_obj_find(coll, ek);
-	if (ev->sn_type == SH_BOOL && !ev->sn_bool) {
-		if (cur == NULL) {
-			sh_err_at(m->mg_err, m->mg_l->sl_file, &m->mg_path,
-			    "false drops nothing: no layer before this one "
-			    "gives it");
-		} else if ((sl = mg_forbidden(m, rk->rk_coll,
-		    cur->pr_from)) != NULL) {
-			sh_err_at(m->mg_err, m->mg_l->sl_file, &m->mg_path,
-			    "false drops what %s gives, and %s is a layer of "
-			    "every foundation's recipe too: a %s keeps "
-			    "everything its foundation has", sl->sl_file,
-			    sl->sl_file, sh_kind_name(m->mg_r->sr_kind));
-		} else {
-			(void) sh_obj_del(coll, ek);
-		}
-		return;
-	}
 	if (ev->sn_type == SH_BOOL && cur != NULL)
 		return;
 	if (ev->sn_type == SH_OBJECT && cur != NULL &&
@@ -378,7 +345,7 @@ mg_coll(struct mg *m, const struct sh_rkey *rk, const struct sh_node *v)
 	struct sh_node *coll, yes;
 	const struct sh_node *el;
 	const struct sh_pair *pr;
-	size_t i, was;
+	size_t i;
 
 	coll = sh_obj_get(m->mg_r->sr_merged, rk->rk_name);
 	if (coll == NULL) {
@@ -397,65 +364,60 @@ mg_coll(struct mg *m, const struct sh_rkey *rk, const struct sh_node *v)
 		yes.sn_from = m->mg_l->sl_file;
 		for (i = 0; i < v->sn_arr.ar_n; i++) {
 			el = v->sn_arr.ar_v[i];
-			was = sh_path_push(&m->mg_path, el->sn_str);
-			mg_entry(m, coll, rk, el->sn_str, &yes);
-			sh_path_pop(&m->mg_path, was);
+			mg_entry(m, coll, el->sn_str, &yes);
 		}
 		return;
 	}
 	for (i = 0; i < v->sn_obj.ob_n; i++) {
 		pr = &v->sn_obj.ob_v[i];
-		was = sh_path_push(&m->mg_path, pr->pr_key);
-		mg_entry(m, coll, rk, pr->pr_key, pr->pr_val);
-		sh_path_pop(&m->mg_path, was);
+		mg_entry(m, coll, pr->pr_key, pr->pr_val);
 	}
 }
 
-/* reset: one collection NAME emptied, unless the drop rule says no. */
-static void
-mg_reset_one(struct mg *m, const char *name)
+/*
+ * What a _file key gives: { file = "path" }, standing in the place of
+ * the text its file holds.
+ */
+static struct sh_node *
+mg_file(struct mg *m, const struct sh_node *path)
 {
-	struct sh_node *merged = m->mg_r->sr_merged;
-	const struct sh_node *have;
-	const struct sh_layer *sl;
-	const struct sh_rkey *rk;
-	size_t i;
+	struct sh_node *o, *v;
 
-	if ((have = sh_obj_get(merged, name)) == NULL ||
-	    (rk = sh_rkey(name)) == NULL)
+	if ((o = sh_node_new(SH_OBJECT, m->mg_l->sl_file)) == NULL)
+		return (NULL);
+	if ((v = sh_node_copy(path)) == NULL ||
+	    sh_obj_set(o, "file", v, m->mg_l->sl_file) != 0) {
+		sh_node_free(o);
+		return (NULL);
+	}
+	return (o);
+}
+
+/*
+ * V onto the list KEY of the merged recipe, made where it is not yet:
+ * a value of ver, or a piece of buildopts or jailconf.
+ */
+static void
+mg_append(struct mg *m, const char *key, struct sh_node *v)
+{
+	struct sh_node *list;
+
+	if (v == NULL) {
+		m->mg_nomem = 1;
 		return;
-	for (i = 0; i < have->sn_obj.ob_n; i++) {
-		sl = mg_forbidden(m, rk->rk_coll,
-		    have->sn_obj.ob_v[i].pr_from);
-		if (sl != NULL) {
-			sh_err_at(m->mg_err, m->mg_l->sl_file, &m->mg_path,
-			    "emptying %s drops %s, which %s gives, and %s is "
-			    "a layer of every foundation's recipe too: a %s "
-			    "keeps everything its foundation has", name,
-			    have->sn_obj.ob_v[i].pr_key, sl->sl_file,
-			    sl->sl_file, sh_kind_name(m->mg_r->sr_kind));
+	}
+	list = sh_obj_get(m->mg_r->sr_merged, key);
+	if (list == NULL) {
+		if ((list = sh_node_new(SH_ARRAY, m->mg_l->sl_file)) == NULL ||
+		    sh_obj_set(m->mg_r->sr_merged, key, list,
+		    m->mg_l->sl_file) != 0) {
+			sh_node_free(v);
+			m->mg_nomem = 1;
 			return;
 		}
 	}
-	(void) sh_obj_del(merged, name);
-}
-
-static void
-mg_reset(struct mg *m, const struct sh_node *v)
-{
-	size_t i, was;
-
-	was = sh_path_push(&m->mg_path, "reset");
-	if (v->sn_type == SH_STR) {
-		mg_reset_one(m, v->sn_str);
-	} else {
-		for (i = 0; i < v->sn_arr.ar_n; i++) {
-			(void) sh_path_index(&m->mg_path, i);
-			mg_reset_one(m, v->sn_arr.ar_v[i]->sn_str);
-			sh_path_pop(&m->mg_path, strlen("reset"));
-		}
-	}
-	sh_path_pop(&m->mg_path, was);
+	if (sh_arr_push(list, v) != 0)
+		m->mg_nomem = 1;
 }
 
 /* One layer into the merged recipe. */
@@ -465,27 +427,56 @@ mg_layer(struct mg *m)
 	const struct sh_node *tree = m->mg_l->sl_tree;
 	const struct sh_rkey *rk;
 	const struct sh_pair *pr;
-	const struct sh_node *v;
-	size_t i, was;
+	struct sh_node *v;
+	const char *into;
+	size_t i;
 
-	if ((v = sh_obj_get(tree, "reset")) != NULL)
-		mg_reset(m, v);
 	for (i = 0; i < tree->sn_obj.ob_n; i++) {
 		pr = &tree->sn_obj.ob_v[i];
 		rk = sh_rkey(pr->pr_key);
-		if (rk->rk_vt == SH_V_IMPORT || rk->rk_vt == SH_V_RESET)
-			continue;
-		was = sh_path_push(&m->mg_path, pr->pr_key);
-		if (rk->rk_vt == SH_V_COLL) {
+		into = rk->rk_into != NULL ? rk->rk_into : rk->rk_name;
+		switch (rk->rk_merge) {
+		case SH_M_LAYERS:
+			break;
+		case SH_M_COLL:
 			mg_coll(m, rk, pr->pr_val);
-		} else {
-			if (rk->rk_twin != NULL)
-				(void) sh_obj_del(m->mg_r->sr_merged,
-				    rk->rk_twin);
-			mg_set(m, m->mg_r->sr_merged, pr->pr_key, pr->pr_val);
+			break;
+		case SH_M_ALL:
+		case SH_M_TEXT:
+			mg_append(m, into, rk->rk_vt == SH_V_FILE ?
+			    mg_file(m, pr->pr_val) : sh_node_copy(pr->pr_val));
+			break;
+		case SH_M_ONE:
+			/* replaced, until Q-AC is ruled (planning.md 15) */
+			v = rk->rk_vt == SH_V_FILE ? mg_file(m, pr->pr_val) :
+			    sh_node_copy(pr->pr_val);
+			if (v == NULL || sh_obj_set(m->mg_r->sr_merged, into,
+			    v, m->mg_l->sl_file) != 0)
+				m->mg_nomem = 1;
+			break;
 		}
-		sh_path_pop(&m->mg_path, was);
 	}
+}
+
+/*
+ * A file named in the merged recipe, FILE (a { file } node) under
+ * KEY, that the configuration root must hold.
+ */
+static void
+ck_file(const char *root, const char *key, const struct sh_node *file,
+    struct sh_err *e)
+{
+	const struct sh_node *path;
+	struct sh_path p;
+
+	if (file->sn_type != SH_OBJECT ||
+	    (path = sh_obj_get(file, "file")) == NULL ||
+	    sh_root_kind(root, path->sn_str) == 'f')
+		return;
+	sh_path_init(&p);
+	(void) sh_path_push(&p, key);
+	sh_err_at(e, path->sn_from, &p, "%s: no such file in the "
+	    "configuration root", path->sn_str);
 }
 
 /*
@@ -496,29 +487,30 @@ mg_layer(struct mg *m)
 static void
 ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
 {
-	static const char *const files[] = { "kernconf_file",
-	    "buildopts_file", "jailconf_file" };
+	static const char *const texts[] = { "kernconf", "buildopts",
+	    "jailconf" };
 	const struct sh_node *merged = r->sr_merged;
 	const struct sh_node *v, *coll, *dir;
 	const struct sh_pair *pr;
 	struct sh_path path;
 	enum sh_loc loc;
 	char *sub, rel[1100];
-	size_t i;
+	size_t i, j;
 
 	sh_path_init(&path);
 	if (r->sr_kind == SH_FOUNDATION &&
 	    sh_obj_get(merged, "src_branch") == NULL)
 		sh_errf(e, "%s: no layer gives src_branch: a foundation is "
 		    "built from a FreeBSD branch", r->sr_file);
-	for (i = 0; i < sizeof (files) / sizeof (files[0]); i++) {
-		if ((v = sh_obj_get(merged, files[i])) == NULL ||
-		    sh_root_kind(root, v->sn_str) == 'f')
+	for (i = 0; i < sizeof (texts) / sizeof (texts[0]); i++) {
+		if ((v = sh_obj_get(merged, texts[i])) == NULL)
 			continue;
-		(void) sh_path_push(&path, files[i]);
-		sh_err_at(e, v->sn_from, &path, "%s: no such file in the "
-		    "configuration root", v->sn_str);
-		sh_path_pop(&path, 0);
+		if (v->sn_type != SH_ARRAY) {
+			ck_file(root, texts[i], v, e);
+			continue;
+		}
+		for (j = 0; j < v->sn_arr.ar_n; j++)
+			ck_file(root, texts[i], v->sn_arr.ar_v[j], e);
 	}
 	coll = sh_obj_get(merged, "derivations");
 	for (i = 0; coll != NULL && i < coll->sn_obj.ob_n; i++) {
@@ -593,11 +585,9 @@ sh_recipe_resolve(const char *root, const char *target,
 	x.ld_root = root;
 	x.ld_r = r;
 	x.ld_err = e;
-	x.ld_shared = 1;
 	if (ld_builtin(&x) != 0 ||
 	    ld_load(&x, "default.conf", NULL, NULL, 1) != 0)
 		goto nomem;
-	x.ld_shared = 0;
 	if (ld_load(&x, r->sr_file, NULL, NULL, 0) != 0)
 		goto nomem;
 	if (x.ld_failed)

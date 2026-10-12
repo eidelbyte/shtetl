@@ -1,8 +1,10 @@
 The rule this file follows: plot each phase's problem space before
 writing its tests. Enumerate the dimensions, cross them into cells,
 and give every cell a disposition: planned (names the test that will
-close it), covered (the test exists and names the cell), or deferred
-(with the reason and the work that unblocks it). A cell with no row
+close it), covered (the test exists and names the cell), deferred
+(with the reason and the work that unblocks it), or retired (a ruling
+took the behavior away; the row says which, and what covers the
+ruling instead). A cell with no row
 is a hole. Each test's comment names the cells it closes. When a cell
 flips from planned to covered, the row changes with it.
 
@@ -90,17 +92,17 @@ object, string}; entry key syntax per collection; error reporting
 | CK4 | a container-only key (requires, jailconf, jailconf_file) in a foundation and in a system is refused | covered: check_schema.c |
 | CK5 | a string key given a number or a bool is refused; a number says to quote it | covered: check_schema.c |
 | CK6 | ver: `>=15`, `=15.1`, `<16`, `<=15.1`, `>14` accepted; ``, `15.1`, `>=`, `=>15`, `>=15.x`, `>=15.` refused | covered: check_schema.c |
-| CK7 | kernconf and kernconf_file in one file are refused; so for buildopts and jailconf | covered: check_schema.c |
+| CK7 | kernconf and kernconf_file in one file are refused, one value given twice; buildopts and buildopts_file, jailconf and jailconf_file, in one file, stack | covered: check_schema.c |
 | CK8 | a `_file` value: relative paths accepted; absolute, `..`, empty components refused | covered: check_schema.c |
 | CK9 | import: an array of strings, or one string; a non-string element or a bad path refused | covered: check_schema.c |
-| CK10 | reset: collection names only; an unknown key or a scalar key refused | covered: check_schema.c |
-| CK11 | pkg: array shorthand; entries true and false; an entry with fields refused; bad names (empty, leading `-`, a space) refused | covered: check_schema.c |
+| CK10 | reset is refused: nothing is reset, the layers stack (ruled 2026-10-12) | covered: check_schema.c |
+| CK11 | pkg: array shorthand; entries true; false refused (nothing is dropped); an entry with fields refused; bad names (empty, leading `-`, a space) refused | covered: check_schema.c |
 | CK12 | datasets: paths by ZFS's characters; leading or trailing `/`, `//`, `.`, `..`, `@` refused | covered: check_schema.c |
-| CK13 | dataset entries: true, false, or properties with string or bool values; a number refused (quote it); mountpoint, canmount and shtetl:* refused; a bad property name refused | covered: check_schema.c |
-| CK14 | commands: a string or false; true, an object or an array of names refused; an empty string refused; label syntax | covered: check_schema.c |
-| CK15 | derivations: {source, command} or false; an unknown field, a non-string field refused; key path syntax | covered: check_schema.c |
-| CK16 | requires: container names, array shorthand; a bad name refused | covered: check_schema.c |
-| CK17 | patches: array shorthand; {ref, dir}; the three location forms (a URL, host/path, a zconfig directory); an absolute path, `..`, an scp-style address and an unknown field refused | covered: check_schema.c |
+| CK13 | dataset entries: true, or properties with string or bool values; false refused; a number refused (quote it); mountpoint, canmount and shtetl:* refused; a bad property name refused | covered: check_schema.c |
+| CK14 | commands: a string; true, false, an object or an array of names refused; an empty string refused; label syntax | covered: check_schema.c |
+| CK15 | derivations: {source, command}; false, an unknown field, a non-string field refused; key path syntax | covered: check_schema.c |
+| CK16 | requires: container names, array shorthand; false and a bad name refused | covered: check_schema.c |
+| CK17 | patches: array shorthand; {ref, dir}; the three location forms (a URL, host/path, a zconfig directory); false, an absolute path, `..`, an scp-style address and an unknown field refused | covered: check_schema.c |
 | CK18 | a collection given as a scalar is refused | covered: check_schema.c |
 | CK19 | every error in a layer is reported, not only the first | covered: check_schema.c |
 | CK20 | the key path quotes a component that is not a bare word (`datasets."usr/local".readonly`) | covered: check_schema.c |
@@ -142,20 +144,20 @@ the target's spelling.
 | CC4 | a recipe imported twice merges once, at its first place | covered: check_cascade.c |
 | CC5 | an import cycle is refused, naming the files in it | covered: check_cascade.c |
 | CC6 | an import of a missing file is refused, naming the importing file | covered: check_cascade.c |
-| CC7 | a scalar: the nearer layer wins and keeps the key's place | covered: check_cascade.c |
-| CC8 | a twin: a nearer kernconf_file replaces a lower kernconf, and the other way | covered: check_cascade.c |
-| CC9 | collections: add a key, change one field (fields merge), drop with false | covered: check_cascade.c |
+| CC7 | ver: every file's constraint kept, in layer order, each with its file, to hold together (ruled 2026-10-12, Q-S); src_branch and kernconf, one value: the nearer file's, until Q-AC is ruled | covered: check_cascade.c test_stacked |
+| CC8 | kernconf_file stands for kernconf as { file }; buildopts and jailconf append, lower layers first, a _file's file in its place (ruled 2026-10-12, Q-T) | covered: check_cascade.c test_stacked |
+| CC9 | collections: a key added; an entry's fields join those lower layers gave (a field given twice: the nearer file's, until Q-AC is ruled) | covered: check_cascade.c |
 | CC10 | array shorthand merges as name = true; true over an entry with fields keeps the fields | covered: check_cascade.c |
-| CC11 | a drop of something no lower layer added is refused | covered: check_cascade.c |
-| CC12 | a container or system dropping a pkg or dataset that built-in, default.conf or one of its imports added is refused (5.4's tmp and tmux) | covered: check_cascade.c |
-| CC13 | a container dropping what its own import added is fine (5.4's apache24) | covered: check_cascade.c |
-| CC14 | a foundation dropping a default.conf element is fine | covered: check_cascade.c |
-| CC15 | reset empties an inherited collection before the layer merges; a container's reset of default.conf's pkg is refused by the drop rule | covered: check_cascade.c |
+| CC11 | false and reset are refused in every kind of recipe: nothing is dropped, nothing reset (ruled 2026-10-12) | covered: check_cascade.c test_nodrops |
+| CC12 | what default.conf and its imports give, every recipe keeps, commands included (once the drop rule; retired with drops, 2026-10-12) | covered: check_cascade.c test_nodrops |
+| CC13 | retired 2026-10-12: a container dropped what its own import added (5.4's apache24); nothing is dropped now | retired: no drops (CC11) |
+| CC14 | retired 2026-10-12: a foundation dropped a default.conf element; nothing is dropped now | retired: no drops (CC11) |
+| CC15 | retired 2026-10-12: reset emptied an inherited collection; reset is refused now | retired: no reset (CC11, CK10) |
 | CC16 | order: keys keep their first place across layers; an overridden commands block stays where it was first defined | covered: check_cascade.c |
-| CC17 | 5.4's worked example merges to pkg sudo, tmux, py311-certbot, nginx; datasets tmp, var, usr/local, www; commands certbot, nginx | covered: check_cascade.c |
+| CC17 | 5.4's worked example, nothing dropped: pkg sudo, tmux, apache24, py311-certbot, nginx; datasets tmp, var, usr/local, www; commands certbot, nginx | covered: check_cascade.c |
 | CC18 | a foundation with no src_branch after the merge is refused | covered: check_cascade.c |
 | CC19 | a derivation lacking source or command after the merge is refused | covered: check_cascade.c |
-| CC20 | a `_file` or a patches directory that does not exist in the config root is refused | covered: check_cascade.c |
+| CC20 | a file a _file names (kernconf, buildopts, jailconf) or a patches directory that does not exist in the config root is refused, naming the key | covered: check_cascade.c |
 | CC21 | requires naming a container with no recipe, or the container itself, is refused | covered: check_cascade.c |
 | CC22 | targets: `containers/nginx` and `containers/nginx.conf` alike; an unknown kind directory, `..`, a bad name, a nested path, a missing recipe refused | covered: check_cascade.c |
 | CC23 | errors in several layers are all reported, and nothing is merged | covered: check_cascade.c |
@@ -172,8 +174,9 @@ the target's spelling.
 | CW3 | quotes, backslashes and control characters are escaped, and come back the same | covered: check_show.c |
 | CW4 | a multi-line string prints as a heredoc; one ending in a newline, or holding the terminator line, still comes back the same | covered: check_show.c |
 | CW5 | keys that are not bare words are quoted (`"usr/local"`, a URL) | covered: check_show.c |
-| CW6 | an emptied collection prints as an empty object | covered: check_show.c |
+| CW6 | a collection written empty prints as an empty object | covered: check_show.c |
 | CW7 | the site settings print with built-in or shtetl.conf on each value | covered: check_show.c |
+| CW8 | a list that stacks (ver, buildopts, jailconf) prints a value a line, each ending in its layer; a { file } piece as an object; a comment never sits between [ and the first value, which libucl would read as part of it | covered: check_show.c |
 
 ## CL: the command line (src/main.c; tests/run-cli.sh)
 
