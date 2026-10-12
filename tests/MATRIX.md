@@ -186,3 +186,39 @@ the target's spelling.
 | CL5 | config show: the site settings, exit 0 | covered: run-cli.sh cl5-site, cl5-builtin |
 | CL6 | a refused configuration, a missing recipe, a root that is not a directory: the reasons on stderr, nothing on stdout, exit 1 | covered: run-cli.sh cl6-bad, cl6-drop, cl6-notdir, cl6-norecipe |
 | CL7 | config show with two recipes: the usage, exit 2 | covered: run-cli.sh cl7-two |
+
+# Family R: running a program (M2; src/core/run.c)
+
+shtetl runs other programs (git from M2, then make, pkg, jail and
+zfs_rebase) one way: an argument list, never a shell (planning.md
+10). Observed on the mac with the system's own programs as stand-ins,
+and a small sh script where a case needs a child that misbehaves.
+
+Dimensions: finding the program {by name on shtetl's fixed PATH, by
+path, missing, not executable}; its end {exit 0, exit non-zero,
+killed by a signal}; output {logged (stdout and stderr together),
+echoed to the terminal, stdout captured, over the capture limit, more
+than a pipe holds}; what the child gets {stdin, working directory,
+environment, open descriptors}; interruption {shtetl signalled while
+the child runs, the child's own children, shtetl's handlers after};
+a child that leaves a process holding its output open.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| R1 | a program named without a '/' is found on the fixed PATH; one with a '/' is run as given | covered: check_run.c |
+| R2 | a program on no directory of the PATH is refused before anything is forked, naming it | covered: check_run.c |
+| R3 | a file that cannot be executed is refused with exec's reason | covered: check_run.c |
+| R4 | exit 0 is success; exit 3 is a refusal naming the program and the status | covered: check_run.c |
+| R5 | a child killed by a signal is a refusal naming the signal | covered: check_run.c |
+| R6 | logged: stdout and stderr both reach the log | covered: check_run.c |
+| R7 | captured: stdout comes back byte for byte; stderr goes to the log | covered: check_run.c |
+| R8 | captured output over its limit is refused | covered: check_run.c |
+| R9 | 8 MiB of output passes through the pipe whole | covered: check_run.c |
+| R10 | the child's stdin is /dev/null | covered: check_run.c |
+| R11 | the working directory is the one asked for | covered: check_run.c |
+| R12 | an environment given replaces shtetl's; none given, the child inherits it | covered: check_run.c |
+| R13 | the child holds no descriptor of shtetl's beyond 0, 1 and 2 | covered: check_run.c |
+| R14 | shtetl interrupted (SIGINT, SIGTERM) while a child runs: the child and its own children are stopped and reaped, and the run is refused as interrupted | covered: check_run.c |
+| R15 | shtetl's signal handlers and mask are as they were after a run | covered: check_run.c |
+| R16 | a child that exits leaving a process holding its output: the run returns when the child exits | covered: check_run.c |
+| R17 | echo: the output also reaches standard error | covered: check_run.c |

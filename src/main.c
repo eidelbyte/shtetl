@@ -6,6 +6,7 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -142,6 +143,23 @@ cmd_config_show(struct sh_ctx *ctx, int argc, char **argv)
 	return (rc == 0 ? out_done() : SH_EXIT_REFUSED);
 }
 
+/*
+ * Descriptors 0, 1 and 2 open, on /dev/null where they were not: a
+ * pipe shtetl makes for a child must never be one of them, or the
+ * child's redirections would clobber it (src/core/run.c).
+ */
+static void
+std_fds(void)
+{
+	int fd;
+
+	for (fd = 0; fd <= 2; fd++) {
+		if (fcntl(fd, F_GETFD) == -1 &&
+		    open("/dev/null", fd == 0 ? O_RDONLY : O_WRONLY) != fd)
+			exit(SH_EXIT_REFUSED);
+	}
+}
+
 int
 main(int argc, char **argv)
 {
@@ -150,6 +168,7 @@ main(int argc, char **argv)
 	char opt[3];
 	int ch;
 
+	std_fds();
 	memset(&ctx, 0, sizeof (ctx));
 	opterr = 0;
 	while ((ch = getopt(argc, argv, "C:h")) != -1) {

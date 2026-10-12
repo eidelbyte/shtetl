@@ -59,9 +59,10 @@ BUILD = build
 
 CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o \
 	$(BUILD)/root.o $(BUILD)/syntax.o $(BUILD)/schema.o $(BUILD)/site.o \
-	$(BUILD)/cascade.o $(BUILD)/show.o
+	$(BUILD)/cascade.o $(BUILD)/show.o $(BUILD)/run.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(UCL_OBJS)
-TESTS = check_parse check_schema check_site check_cascade check_show
+TESTS = check_parse check_schema check_site check_cascade check_show \
+	check_run
 
 all: build shtetl
 
@@ -114,6 +115,8 @@ $(BUILD)/cascade.o: src/core/cascade.c src/core/cascade.h src/core/err.h \
 $(BUILD)/show.o: src/core/show.c src/core/show.h src/core/cascade.h \
 	src/core/schema.h src/core/site.h src/core/err.h src/core/tree.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/show.c
+$(BUILD)/run.o: src/core/run.c src/core/run.h src/core/err.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/run.c
 
 $(BUILD)/ucl/ucl_emitter_streamline.o:
 	$(UCL_CHECK)
