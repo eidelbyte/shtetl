@@ -1,0 +1,69 @@
+{
+  "_meta": {
+    "project": "shtetl",
+    "created": "2026-10-12",
+    "note": "The backlog of shtetl, the ZFS-only successor to mishkan and parasa, built on zfs_rebase. One file for the whole project rather than one per sprint: milestones are planning.md section 12, plus \"future\" for work kept out of every milestone. Drive it with: python3 tools/tracker.py <cmd> (list, show, status, note). STATE 2026-10-12: M0 done; M1 and M2 built and passing on the box; M3 next.",
+    "planning_docs": [
+      "docs/planning.md"
+    ],
+    "coding_guidelines": "the zfs rebase project's CLAUDE.md: ASCII only, cstyle, commits signed off as Eidel Solomon, a test matrix before tests",
+    "epics": [
+      "config",
+      "spaces",
+      "build",
+      "lifecycle",
+      "housekeeping"
+    ],
+    "milestones": {
+      "M0": "probes (planning.md 13)",
+      "M1": "skeleton, UCL loader, schema, cascade, shtetl config show",
+      "M2": "discovery and multi-rooting, bootstrap, property table",
+      "M3": "foundation build and update into zlake, patches and the pause; pkg-upgrade",
+      "M4": "beam-down, new container, save with messages, the zlake mirror",
+      "M5": "update into staging, history replay, gate handling and derivations, cutover, abandon",
+      "M6": "systems: outer space, one-shot boot, update",
+      "M7": "restore, prune, archives",
+      "M8": "TUI",
+      "future": "kept out of every milestone until someone takes it up"
+    },
+    "worklogs": "One markdown worklog per milestone or issue in docs/worklogs/, written when its code lands."
+  },
+  "_schema": {
+    "purpose": "Field vocabulary for every issue object in this file. Use these exact terms; do not invent synonyms.",
+    "issue_fields": {
+      "description": "required, string. What to build and how to verify it.",
+      "requires": "required, array of issue keys from THIS file. Empty array means no dependency.",
+      "epic": "required, exactly one value from _meta.epics.",
+      "milestone": "required, the milestone this issue must be complete for, from _meta.milestones.",
+      "expected_changed_files": "required, array of paths, relative to the repository root.",
+      "provides": "required, string. What the rest of the work can rely on once this is tested.",
+      "estimated_size": "required, one of: small | medium | large.",
+      "completed": "required, exactly one value from _schema.status.",
+      "note": "optional, string. Append with tracker.py note; never replace without cause."
+    },
+    "status": {
+      "order": "not-started > code > testing > tested",
+      "not-started": "no code written yet",
+      "code": "implementation written and compiling, not yet exercised",
+      "testing": "being exercised; tests being written or findings being fixed",
+      "tested": "verified working; issue closed"
+    }
+  },
+  "patch-location-hosts": {
+    "description": "Settle how a patch source's location is told to be a host or a directory in zconfig (planning.md 7.1.1). Today (M1, src/core/syntax.c sh_syn_location; Q-X, accepted 2026-10-12 as good enough for now): a location with a scheme is a URL; with none, a location whose first component has a \".\" is a host, read as https, and anything else a directory in zconfig. So a zconfig directory whose first component has a dot cannot be named, a host is never checked, and a single-label host or an IP literal is not a host at all. To settle: which names count as hosts (the list of top-level domains changes, so a fixed list of gTLDs goes stale), single-label hosts, IP literals, a port. An idea of the author's to try first, being simple: try each dotted candidate, the whole name included, against DNS, and where none resolves, look for it locally in zconfig. That makes the reading depend on the network at the time of the build, which the build records (7.1.1, the record) and which is worth deciding knowingly. Verify: tests/MATRIX.md cells for every form, read both ways, and a build that names a source each way.",
+    "requires": [],
+    "epic": "build",
+    "milestone": "future",
+    "expected_changed_files": [
+      "src/core/syntax.c",
+      "src/core/schema.c",
+      "tests/check_schema.c",
+      "tests/MATRIX.md",
+      "docs/planning.md"
+    ],
+    "provides": "One rule for what a patch location is, holding for every name a person is likely to write.",
+    "estimated_size": "small",
+    "completed": "not-started",
+    "note": "Raised by the author 2026-10-12 with the ruling on Q-X: \"Good enough for now, put an issue on the backlog tracker ... in future work to nail down gtlds etc etc. In that future work issue we could also try a fairly simple solution of 'try every '.' including name against dns and if it fails, try to find it locally'.\""
+  }
+}

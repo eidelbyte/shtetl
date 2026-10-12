@@ -1384,6 +1384,27 @@ below that change the plan are folded into the sections named.
 
 ## 14. Rulings
 
+### 2026-10-12 (Q-S, Q-T, Q-X: everything stacks)
+
+- Q-S, Q-T: "To be clear, there are really only two layers,
+  foundation and container/system. Each foundation or system
+  component can be multiple included files however. For all layers,
+  including foundation and container/system interplay, yes, all
+  stacking constraints must hold. This is true of stacking buildopts
+  too (Q-T). In fact, I don't think there's a reason to have an
+  overwrite (eg in overwrite list dropping previous, or overwrite key)
+  option at all. Everything must stack, except "name"."
+  So: no `false` drops and no `reset` (5.4's drops are gone); every
+  file's `ver` constraint must hold, the foundation's and the
+  container's together; `buildopts` (and `jailconf`) append, lower
+  layers first. What a key holding one value does when two files set
+  it, and whether a container may set a property on a dataset its
+  foundation has, were asked back the same day (15, Q-AC).
+- Q-X: "Good enough for now", with an issue in the tracker's future
+  work to settle hosts against directories (top-level domains, and
+  the author's idea of trying each dotted candidate in DNS before
+  looking locally): tracker/shtetl.json, patch-location-hosts.
+
 ### 2026-10-11 (the run layout's mounts; UCL kept)
 
 - "zrun/containers is the root dir of all containers and should be
@@ -1509,8 +1530,26 @@ below that change the plan are folded into the sections named.
 
 ## 15. Open questions
 
+Asked 2026-10-12, with the stacking ruling (14):
+
+- **Q-AC, keys that hold one value, under stacking.** `src_branch`
+  (a foundation is built from one branch), a `kernconf` that names a
+  base config, and a collection entry's values (a dataset property
+  given two values, two texts for one `commands` label, two commands
+  for one `derivations` path, two refs for one patch source) cannot
+  append. Proposed: they must agree, every file that sets one giving
+  the same value, or the recipe is refused naming both files; and
+  `kernconf` split in two, the base config's name (one, must agree)
+  and lines added to it (appended). The overwrites that stay are the
+  site's: shtetl.conf over the built-in settings, and
+  `properties.<space>` over `properties.default`. Also asked: may a
+  container set a property on a dataset its foundation has
+  (`var { compression = "lz4"; }` where the foundation set zstd), the
+  property being its own clone's, or is that a conflict?
+
 M1 and M2 decided these where the plan was silent; each is built as
-written and marked PROPOSAL where it lives. None blocks M3.
+written and marked PROPOSAL where it lives. None blocks M3. Q-S, Q-T
+and Q-X are ruled (14, 2026-10-12), and Q-V is moot with drops gone.
 
 M2's:
 
@@ -1532,25 +1571,30 @@ M2's:
 
 M1's:
 
-- **Q-S, `ver` across layers.** Built: a nearer layer's `ver`
+- **Q-S, `ver` across layers.** RULED 2026-10-12 (14): every
+  constraint must hold; the rest of this entry is what M1 built first.
+  Built: a nearer layer's `ver`
   replaces a lower layer's, as every scalar does. The other reading:
   every layer's constraint must hold, so a fragment that needs `>=15`
   keeps needing it whatever the recipe that imports it says.
-- **Q-T, heredocs across layers.** Built: `jailconf` and `buildopts`
+- **Q-T, heredocs across layers.** RULED 2026-10-12 (14): they
+  append. Built first: `jailconf` and `buildopts`
   are replaced by a nearer layer. The other reading: appended layer by
   layer, since 5.5 says jailconf is "appended to the jail's
   jail.conf block".
 - **Q-U, imports of imports.** Built: followed, each file merged
   once, cycles refused, as 5.5's "recipes merged in before this file"
   reads for every file.
-- **Q-V, a drop of nothing.** Built: `x = false` where no lower layer
+- **Q-V, a drop of nothing.** Moot: there are no drops (14,
+  2026-10-12). Built first: `x = false` where no lower layer
   gives `x` is an error, being a misspelling or a layer imported where
   it does not belong. The other reading: a no-op, so a fragment can
   say "never x" wherever it is imported.
 - **Q-W, names.** Built: a recipe's name takes letters, digits, `-`
   and `_` only (no `.`), since it is a dataset component, a jail name
   (where `.` means a child jail) and a file name at once.
-- **Q-X, patch locations.** Built: with no scheme, a location whose
+- **Q-X, patch locations.** ACCEPTED 2026-10-12 for now (14), with
+  the tracker issue patch-location-hosts. Built: with no scheme, a location whose
   first component has a `.` is a host and anything else a zconfig
   directory, so a zconfig directory whose first component has a `.`
   cannot be named.
