@@ -1326,7 +1326,7 @@ by the command line run over two configuration roots
 | M  | scope | where |
 |----|-------|-------|
 | M0 | probes (section 13) | box |
-| M1 | skeleton, UCL loader, schema, cascade, `shtetl config show`; built 2026-10-11, branch impl/m1 (tests/MATRIX.md family C, all covered; make check and make check-freebsd pass on the box) | mac |
+| M1 | skeleton, UCL loader, schema, cascade, `shtetl config show`; built 2026-10-11, branch impl/m1 (tests/MATRIX.md family C, all covered; make check and make check-freebsd pass on the box); the cascade reworked 2026-10-12 on impl/m3 for the stacking rulings and the default layer (docs/worklogs/m3-stacking.md) | mac |
 | M2 | discovery and multi-rooting, bootstrap, property table; built 2026-10-11, branch impl/m2 (tests/MATRIX.md families R, D, B on the mac; tests/box/run.sh passes on the box, 2026-10-12) | box |
 | M3 | foundation build and update into zlake, patches and the pause included; pkg-upgrade | box |
 | M4 | beam-down, new container, save with messages, the zlake mirror | box |
