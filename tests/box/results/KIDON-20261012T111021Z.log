@@ -1,0 +1,76 @@
+shtetl box tests 2026-10-12T11:10:21Z on KIDON, 15.1-RELEASE-p2, zfs-2.4.2-1-FreeBSD_g6330a45b0, shtetl 1ef5e85
+== D1: no roots yet
+# shtetl spaces -> 0
+ok   D1 exit
+ok   D1 every space none
+== B16, B8: shown, and not confirmed
+# shtetl bootstrap --lake shbtank/shtetl --run shbfast/run --config shbtank/zconfig --build shbtank/zbuild -> 1
+ok   B16 exit
+ok   B16 the refusal
+ok   B16 nothing marked
+ok   B16 nothing made
+ok   B8 the lake root's table
+ok   B8 the ashift warning
+ok   B8 autotrim
+== B10, B11, B13, B17: bootstrap, confirmed
+# shtetl bootstrap -y --lake shbtank/shtetl --run shbfast/run --config shbtank/zconfig --build shbtank/zbuild --recipes /tmp/shtetl-box/repo -> 0
+ok   B10 exit
+ok   B10 lake mountpoint
+ok   B10 lake canmount
+ok   B10 lake atime
+ok   B10 lake compression
+ok   B10 lake aclmode
+ok   B10 lake layout
+ok   B10 lake mark
+ok   B10 the mark is local
+ok   B10 config mark
+ok   B10 build mark
+ok   B11 run mark
+ok   B11 foundations' mountpoint
+ok   B11 foundations' canmount
+ok   B11 foundations not mounted
+ok   B11 containers' mountpoint
+ok   B11 containers' canmount
+ok   B11 containers mounted
+ok   B11 systems' mountpoint
+ok   B17 autotrim on shbtank
+ok   B17 autotrim on shbfast
+ok   B13 the recipes cloned
+ok   B13 a snapshot before the clone
+== D2, D16: shtetl spaces
+# shtetl spaces -> 0
+ok   D16 exit
+ok   D16 the lake root
+ok   D16 the config root, mounted
+ok   D16 the build root, mounted
+ok   D16 the run root
+== D14: the configuration found without -C
+# shtetl config show -> 0
+ok   D14 exit
+ok   D14 the settings
+== B3: a root named again
+# shtetl bootstrap -y --lake shbtank/shtetl -> 1
+ok   B3 exit
+ok   B3 the refusal
+== B12, D6: a second run root
+# shtetl bootstrap -y --run shbtank/run2 -> 0
+ok   B12 exit
+ok   B12 containers' canmount
+ok   B12 containers not mounted
+ok   B12 containers below /containers
+# shtetl spaces -> 0
+ok   D6 two run roots, no default
+== B14, B18: layout already there, read below the altroot
+# shtetl bootstrap -y --run shbfast/run3 -> 0
+ok   B14 exit
+ok   B14 the layout there, taken
+ok   B14 marked
+== B6: a child that is not shtetl's
+# shtetl bootstrap -y --lake shbfast/lake2 -> 1
+ok   B6 exit
+ok   B6 the refusal
+== D5: two config roots, found
+# shtetl spaces -> 1
+ok   D5 exit
+ok   D5 the refusal
+== 53 ok, 0 failed
