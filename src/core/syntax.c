@@ -231,7 +231,7 @@ void
 sh_ver_range(const char *s, long *lo, long *hi)
 {
 	const char *p;
-	long major, minor, v;
+	long major, minor, first, last;
 	int op;
 
 	/* op: 0 =, 1 >=, 2 <=, 3 >, 4 < */
@@ -254,29 +254,36 @@ sh_ver_range(const char *s, long *lo, long *hi)
 	major = strtol(p, (char **)NULL, 10);
 	while (syn_digit(*p))
 		p++;
-	minor = *p == '.' ? strtol(p + 1, (char **)NULL, 10) : 0;
 	if (major > 999)
 		major = 999;
-	if (minor >= SH_VER_MINORS)
-		minor = SH_VER_MINORS - 1;
-	v = major * SH_VER_MINORS + minor;
+	/* the versions S names: N.M alone, or N, every N.x */
+	if (*p == '.') {
+		minor = strtol(p + 1, (char **)NULL, 10);
+		if (minor >= SH_VER_MINORS)
+			minor = SH_VER_MINORS - 1;
+		first = last = major * SH_VER_MINORS + minor;
+	} else {
+		first = major * SH_VER_MINORS;
+		last = first + SH_VER_MINORS - 1;
+	}
 	*lo = SH_VER_LOW;
 	*hi = SH_VER_HIGH;
 	switch (op) {
 	case 0:
-		*lo = *hi = v;
+		*lo = first;
+		*hi = last;
 		break;
 	case 1:
-		*lo = v;
+		*lo = first;
 		break;
 	case 2:
-		*hi = v;
+		*hi = last;
 		break;
 	case 3:
-		*lo = v + 1;
+		*lo = last + 1;
 		break;
 	default:
-		*hi = v - 1;
+		*hi = first - 1;
 		break;
 	}
 }

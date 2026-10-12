@@ -51,9 +51,11 @@ const char *sh_syn_ver(const char *s);
 
 /*
  * The versions constraint S (which sh_syn_ver took) allows, as a range
- * of major * SH_VER_MINORS + minor, both ends in it; a version written
- * N is N.0. Every constraint of a recipe must hold together (ruled
- * 2026-10-12), so their ranges must meet.
+ * of major * SH_VER_MINORS + minor, both ends in it. A version written
+ * N is every N.x (ruled 2026-10-12, "=15 matches 15.x"): =15 is 15.0
+ * to the last 15.x, <=15 takes 15.x, >15 begins at 16.0, and >=15 and
+ * <15 are where they were. Every constraint of a recipe must hold
+ * together (ruled 2026-10-12), so their ranges must meet.
  */
 #define	SH_VER_MINORS	100000L
 #define	SH_VER_LOW	(-1L)

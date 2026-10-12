@@ -8,6 +8,7 @@
 
 #include "check.h"
 #include "core/cascade.h"
+#include "core/syntax.h"
 #include "core/tree.h"
 
 static struct cap c;
@@ -326,6 +327,32 @@ test_ver(void)
 		"containers/f.conf", "ver = [ \">=15.1\", \"<15.1\" ];\n",
 		NULL
 	};
+	/* a bare major is every minor of it (ruled 2026-10-12) */
+	static const char *const vr3[] = {
+		"containers/g.conf", "ver = [ \"=15\", \">=15.3\" ];\n",
+		"containers/h.conf", "ver = [ \"=15\", \"<15\" ];\n",
+		"containers/i.conf", "ver = [ \"<=15\", \">=15.9\" ];\n",
+		"containers/j.conf", "ver = [ \">15\", \"<16\" ];\n",
+		"containers/k.conf", "ver = [ \">15\", \"<=16\", "
+		"\"=16.2\" ];\n",
+		NULL
+	};
+	static const struct {
+		const char	*vr_s;
+		long		vr_lo, vr_hi;
+	} ranges[] = {
+		{ "=15", 15 * SH_VER_MINORS, 16 * SH_VER_MINORS - 1 },
+		{ "=15.1", 15 * SH_VER_MINORS + 1, 15 * SH_VER_MINORS + 1 },
+		{ ">=15", 15 * SH_VER_MINORS, SH_VER_HIGH },
+		{ ">15", 16 * SH_VER_MINORS, SH_VER_HIGH },
+		{ ">15.1", 15 * SH_VER_MINORS + 2, SH_VER_HIGH },
+		{ "<=15", SH_VER_LOW, 16 * SH_VER_MINORS - 1 },
+		{ "<=15.1", SH_VER_LOW, 15 * SH_VER_MINORS + 1 },
+		{ "<15", SH_VER_LOW, 15 * SH_VER_MINORS - 1 },
+		{ "<15.1", SH_VER_LOW, 15 * SH_VER_MINORS }
+	};
+	long lo, hi;
+	size_t i;
 
 	refused(mkroot("vr", vr), "containers/a", "containers/a.conf: ver: "
 	    "no version is >=16 (containers/a.conf) and <15 (shtetl.conf) "
@@ -334,8 +361,23 @@ test_ver(void)
 	refused(mkroot("vr2", vr2), "containers/c", "ver: no version is "
 	    ">15.1 (containers/c.conf) and =15.1 (common/x.conf) at once");
 	resolves(root, "containers/d");
-	resolves(root, "containers/e");
+	refused(root, "containers/e", "ver: no version is >15 "
+	    "(containers/e.conf) and <=15.1 (containers/e.conf) at once");
 	refused(root, "containers/f", "no version is >=15.1");
+
+	for (i = 0; i < sizeof (ranges) / sizeof (ranges[0]); i++) {
+		sh_ver_range(ranges[i].vr_s, &lo, &hi);
+		if (lo != ranges[i].vr_lo || hi != ranges[i].vr_hi)
+			printf("%s: %ld to %ld\n", ranges[i].vr_s, lo, hi);
+		CHECK(lo == ranges[i].vr_lo && hi == ranges[i].vr_hi);
+	}
+	resolves(mkroot("vr3", vr3), "containers/g");
+	refused(root, "containers/h", "no version is =15 "
+	    "(containers/h.conf) and <15 (containers/h.conf) at once");
+	resolves(root, "containers/i");
+	refused(root, "containers/j", "no version is >15 "
+	    "(containers/j.conf) and <16 (containers/j.conf) at once");
+	resolves(root, "containers/k");
 }
 
 /*

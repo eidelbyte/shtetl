@@ -611,7 +611,9 @@ number is refused with "quote it", since UCL reads `1M` as 1000000;
 a string or heredoc; `derivations` `{ source; command; }`, both in one
 file; `patches` `true` or `{ ref; dir; }`. A list of names stands for
 `name = true` where an entry needs nothing more (pkg, datasets,
-requires, patches). A `ver` no version can satisfy (`">=16"` and
+requires, patches). In `ver`, `N.N` is that version and a bare `N`
+every `N.x`: `=15` is any 15.x, `<=15` takes 15.x, `>15` begins at
+16.0 (ruled 2026-10-12). A `ver` no version can satisfy (`">=16"` and
 `"<15"`) is refused when the recipe is read, naming the two files.
 Names: a recipe's (and a `requires` entry, `update.suffix`) takes
 letters, digits, `-` and `_`, so that it is at once a dataset
@@ -1460,6 +1462,10 @@ So:
 - (5.4) shtetl.conf is checked whole, its settings too, wherever it
   is read: a refused setting refuses every recipe, not only `config
   show`, `spaces` and `bootstrap`.
+- (5.5) In `ver`, a bare major is every minor of it: `=15` is any
+  15.x. Read the same way for the other comparisons, as the ruling's
+  principle: `<=15` takes 15.x, and `>15` begins at 16.0; `>=15` and
+  `<15` are as they were.
 
 ### 2026-10-12 (Q-AD: the default's edges)
 

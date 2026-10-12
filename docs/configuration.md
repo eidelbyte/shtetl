@@ -320,11 +320,24 @@ component. Section 5 says how imports are followed.
 
 The FreeBSD versions the recipe fits: `">=15"`, `"<16"`, `"=15.1"`,
 or a list, `[ ">=15", "<16" ]`. A constraint is one of `>=`, `<=`,
-`>`, `<` and `=`, then `N` or `N.N`; `N` is `N.0`, so `"=15"` is 15.0
-alone and `"<=15"` does not take 15.1. Every `ver` of every file of
-the recipe must hold, a container's together with its foundation's
-when it is created. A foundation's version comes from its
-`src_branch` (planning.md 6.1).
+`>`, `<` and `=`, then `N` or `N.N`. `N.N` is that version; a bare
+`N` is every `N.x` (ruled 2026-10-12):
+
+| constraint | versions |
+|------------|----------|
+| `"=15"` | every 15.x |
+| `"=15.1"` | 15.1 |
+| `">=15"` | 15.0 and later |
+| `">15"` | 16.0 and later |
+| `">15.1"` | 15.2 and later |
+| `"<=15"` | up to the last 15.x |
+| `"<=15.1"` | up to 15.1 |
+| `"<15"` | before 15.0 |
+| `"<15.1"` | before 15.1 |
+
+Every `ver` of every file of the recipe must hold, a container's
+together with its foundation's when it is created. A foundation's
+version comes from its `src_branch` (planning.md 6.1).
 
 ### src_branch
 
@@ -962,6 +975,16 @@ import = "common/new.conf";
 ver = "<14";
 ```
 
+```ucl
+# containers/any15.conf
+ver = [ "=15", ">=15.3" ];
+```
+
+```ucl
+# containers/past15.conf
+ver = [ ">15", "<=15.3" ];
+```
+
 ```console
 $ shtetl config show containers/fits
 # containers/fits.conf: a container's recipe, its layers merged
@@ -973,10 +996,21 @@ ver = [
 ]
 $ shtetl config show containers/never
 shtetl: containers/never.conf: ver: no version is >=15 (common/new.conf) and <14 (containers/never.conf) at once
+$ shtetl config show containers/any15
+# containers/any15.conf: a container's recipe, its layers merged
+# layers, nearest last: containers/any15.conf
+ver = [
+    "=15",  # containers/any15.conf
+    ">=15.3"  # containers/any15.conf
+]
+$ shtetl config show containers/past15
+shtetl: containers/past15.conf: ver: no version is >15 (containers/past15.conf) and <=15.3 (containers/past15.conf) at once
 ```
 
 A `ver` no version can satisfy is refused when the recipe is read,
-naming the two constraints that cannot meet and their files.
+naming the two constraints that cannot meet and their files. `"=15"`
+takes 15.3, being every 15.x; `">15"` begins at 16.0, past every
+15.x, and so meets no version `"<=15.3"` allows.
 
 ### One value: the files agree
 

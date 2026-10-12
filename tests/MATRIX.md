@@ -179,6 +179,7 @@ spelling.
 | CC33 | what stacks, stacks with the default: pkg, ver, text, commands | covered: check_cascade.c test_default |
 | CC34 | the files shtetl.conf imports are of the default too | covered: check_cascade.c test_default |
 | CC35 | shtetl.conf is checked whole wherever it is read: a refused setting refuses a recipe's resolve, naming the setting; a file shtetl.conf imports holds no settings (ruled 2026-10-12) | covered: check_cascade.c test_site_checked; configuration.md, example settings-refused |
+| CC36 | in ver a bare major is every minor of it (ruled 2026-10-12): =15 any 15.x, <=15 takes 15.x, >15 begins at 16.0; N.N is that version; each form's range, and the meets they make (=15 with >=15.3; =15 with <15 and >15 with <16 refused) | covered: check_cascade.c test_ver; configuration.md, example ver |
 
 ## CW: what config show prints (src/core/show.c)
 
