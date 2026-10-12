@@ -299,3 +299,9 @@ confirmation {-y, a terminal's answer, no terminal}.
 | B16 | without -y and no terminal: refused, nothing done; -y: done; a terminal answers y or yes, anything else is no | covered: check_boot.c (the decision, sh_boot_confirm); the command itself on the box, tests/box |
 | B17 | the pool: autotrim set only when it differs; ashift never set | covered: check_boot.c |
 | B18 | a pool imported with an altroot: the layout's mountpoints are read below it | covered: check_boot.c |
+
+On the box, tests/box/run.sh runs D1, D2, D5, D6, D14, D16, B3, B6,
+B8, B10 - B14 and B16 - B18 again, as commands against two pools on
+memory disks, and logs each by its cell. Until a log of it comes back
+from the box, those cells stand on the fake ZFS alone, and the libzfs
+layer (src/fbsd/zfs.c) on the cross-compile of tools/xcheck-freebsd.sh.
