@@ -643,6 +643,16 @@ test_failures(void)
 	CHECK(strstr(slurp(scratch_path("tools.log")), "devfs") == NULL);
 }
 
+/* Whether the file of the run directory REL is there. */
+static int
+inrun(const char *rel)
+{
+	char path[1400];
+
+	(void) snprintf(path, sizeof (path), "%s/generic/%s", runbase, rel);
+	return (access(path, F_OK) == 0);
+}
+
 /* Whether REL in F's mount, the run's root, is there. */
 static int
 inroot(const char *rel)
@@ -761,6 +771,116 @@ test_update(void)
 	CHECK(is(zfake_last_rollback(), F "@" VERSION ".2"));
 	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "-"));
 	CHECK(!zfake_snapshot(F "@" VERSION ".3"));
+}
+
+/* The pkg-upgrade plan for TARGET: 0, or -1 with the reasons in c. */
+static int
+pkgplan(const char *target)
+{
+	sh_build_free(&p);
+	cap_reset(&c);
+	return (sh_pkg_plan(z, &s, target, runbase, &p, &c.c_err));
+}
+
+/* pkg-upgrade of generic run with MSG: its return. */
+static int
+pkgup(const char *msg)
+{
+	size_t len;
+	FILE *f;
+	int rc;
+
+	if (pkgplan("generic") != 0) {
+		printf("pkg plan refused:\n%s", cap_text(&c));
+		CHECK(0);
+	}
+	free(ran);
+	ran = NULL;
+	f = open_memstream(&ran, &len);
+	CHECK(f != NULL);
+	cap_reset(&c);
+	rc = sh_pkg_run(z, &p, &fake, msg, f, &c.c_err);
+	CHECK(fclose(f) == 0);
+	return (rc);
+}
+
+/* F28 - F31: shtetl pkg-upgrade F. */
+static void
+test_pkgup(void)
+{
+	static const char *const steps[] = {
+		"mount -t devfs devfs ", "run/generic/root/dev",
+		"pkg -c ", "run/generic/root upgrade -y",
+		"umount ", "run/generic/root/dev", NULL
+	};
+	char *out;
+	size_t len;
+	FILE *f;
+
+	runworld();
+	fakes("15.1");
+	config("k", recipe);
+	/* F29 */
+	CHECK(pkgplan("generic") == -1);
+	CHECK(cap_has(&c, "no foundation generic"));
+	CHECK(pkgplan("Gen.eric") == -1);
+	zfake_fs(F);
+	CHECK(pkgplan("generic") == -1);
+	CHECK(cap_has(&c, "foundation generic exists without a version"));
+	CHECK(sh_zfs_destroy(z, F, &wc.c_err) == 0);
+	CHECK(build(NULL) == 0);
+	zfake_set("tank/zbuild", "shtetl:build", "gaming");
+	CHECK(pkgplan("generic") == -1);
+	CHECK(cap_has(&c, "build of gaming in progress"));
+	CHECK(sh_zfs_inherit(z, "tank/zbuild", "shtetl:build",
+	    &wc.c_err) == 0);
+	/* F28 */
+	CHECK(pkgplan("generic") == 0);
+	CHECK(is(p.fp_last, VERSION) && is(p.fp_next, VERSION "-pkg"));
+	out = NULL;
+	f = open_memstream(&out, &len);
+	CHECK(f != NULL);
+	sh_pkg_show(f, &p);
+	CHECK(fclose(f) == 0);
+	CHECK(strstr(out, "foundation generic, its packages upgraded, from @"
+	    VERSION "\n") != NULL);
+	CHECK(strstr(out, "  snapshot -r " F "@" VERSION "-pkg\n") != NULL);
+	free(out);
+	/* F30 */
+	(void) unlink(scratch_path("tools.log"));
+	CHECK(pkgup(NULL) == 0);
+	CHECK(in_order(slurp(scratch_path("tools.log")), steps));
+	CHECK(strstr(ran, "upgraded " F "@" VERSION "-pkg\n") != NULL);
+	CHECK(is(prop(F "/usr/local@" VERSION "-pkg", "shtetl:kind", NULL),
+	    "pkg"));
+	CHECK(is(prop(F "@" VERSION "-pkg", "shtetl:commit", NULL),
+	    "pkg upgrade of " VERSION));
+	CHECK(is(prop(F "@" VERSION "-pkg", "shtetl:config", NULL),
+	    prop(F "@" VERSION, "shtetl:config", NULL)));
+	CHECK(is(prop(F "@" VERSION "-pkg", "shtetl:patches", NULL), "-"));
+	CHECK(is(prop(F, "mounted", NULL), "no"));
+	CHECK(is(prop(F "/usr/local", "mounted", NULL), "no"));
+	CHECK(is(prop(F "/usr", "mounted", NULL), "no"));
+	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "-"));
+	/* again: from the -pkg, its version's -pkg.2 */
+	CHECK(pkgplan("generic") == 0);
+	CHECK(is(p.fp_last, VERSION "-pkg") &&
+	    is(p.fp_next, VERSION "-pkg.2"));
+	CHECK(pkgup("the message") == 0);
+	CHECK(is(prop(F "@" VERSION "-pkg.2", "shtetl:commit", NULL),
+	    "the message"));
+	/* F31 */
+	(void) scratch_write("fail/pkg", "");
+	CHECK(pkgup(NULL) == -1);
+	(void) unlink(scratch_path("fail/pkg"));
+	CHECK(cap_has(&c, "pkg upgrade of generic failed; log "));
+	CHECK(strstr(ran, "rolled back " F " to @" VERSION "-pkg.2\n") !=
+	    NULL);
+	CHECK(!zfake_snapshot(F "@" VERSION "-pkg.3"));
+	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "-"));
+	CHECK(inrun("pkg.log"));
+	/* an update after it starts from the -pkg */
+	CHECK(plan("generic") == 0 && is(p.fp_last, VERSION "-pkg.2"));
 }
 
 /* ---- family P: patches ------------------------------------------ */
@@ -1111,16 +1231,6 @@ pausepatches(int third)
 		    "%s/3-l1.patch && git checkout -q m.c", tree, dir);
 }
 
-/* Whether the file of the run directory REL is there. */
-static int
-inrun(const char *rel)
-{
-	char path[1400];
-
-	(void) snprintf(path, sizeof (path), "%s/generic/%s", runbase, rel);
-	return (access(path, F_OK) == 0);
-}
-
 /* P8 - P13: a patch that does not apply, the pause, and its verbs. */
 static void
 test_pause(void)
@@ -1288,6 +1398,7 @@ main(void)
 	test_run();
 	test_failures();
 	test_update();
+	test_pkgup();
 	test_patches();
 	test_pause();
 	free(ran);

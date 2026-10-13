@@ -56,6 +56,7 @@ struct sh_fplan {
 	char		fp_ds[SH_BUILD_NAME];	/* lake/foundations/F */
 	int		fp_update;	/* F there: its next version (7.2) */
 	char		fp_last[SH_BUILD_NAME];	/* an update's last, @... */
+	char		fp_next[SH_BUILD_NAME];	/* pkg-upgrade's, @... */
 	char		fp_obj[SH_BUILD_NAME];	/* lake/foundation-builds/F */
 	int		fp_obj_there;
 	char		fp_src[SH_BUILD_NAME];	/* the build root */
@@ -141,6 +142,25 @@ void sh_build_show(FILE *out, const struct sh_fplan *p);
  */
 int sh_build_run(struct sh_zfs *z, struct sh_fplan *p,
     const struct sh_tools *t, const char *msg, time_t now, FILE *out,
+    struct sh_err *e);
+
+/*
+ * shtetl pkg-upgrade F (planning.md 7.2, 6.1): F's last snapshot, a
+ * version or the pkg upgrade of one, its packages upgraded in a chroot
+ * of F, and F and its datasets snapshotted as that version's -pkg
+ * (-pkg.2 and on after the first), shtetl:kind=pkg, carrying the
+ * version's shtetl:config, shtetl:config-guid and shtetl:patches.
+ * Planned into P: refused with no lake or build root, no such
+ * foundation, F with no version, a build under way or paused (the
+ * upgrade takes the build root's mark too). Run like a build, undone
+ * like an update: F back to its last snapshot on a failure.
+ */
+int sh_pkg_plan(struct sh_zfs *z, const struct sh_spaces *s,
+    const char *target, const char *runbase, struct sh_fplan *p,
+    struct sh_err *e);
+void sh_pkg_show(FILE *out, const struct sh_fplan *p);
+int sh_pkg_run(struct sh_zfs *z, struct sh_fplan *p,
+    const struct sh_tools *t, const char *msg, FILE *out,
     struct sh_err *e);
 
 void sh_build_free(struct sh_fplan *p);

@@ -95,6 +95,13 @@ t f18-msg build generic -m
 t p18-two build --continue --skip generic
 t p18-abortmsg build --abort -m why generic
 t p18-nozfs build --continue generic
+
+# F32: pkg-upgrade
+t f32-none pkg-upgrade
+t f32-two pkg-upgrade generic gaming
+t f32-option pkg-upgrade --frob generic
+t f32-msg pkg-upgrade generic -m
+t f32-nozfs pkg-upgrade generic
 if [ "$(cat build/.flavor 2>/dev/null)" = portable ]; then
 	t b1-nozfs bootstrap --lake tank/shtetl -y
 	t f18-nozfs -C tests/conf/site build generic -y

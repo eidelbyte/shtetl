@@ -615,6 +615,7 @@ struct fb {
 	size_t			fb_npa;
 	size_t			fb_psnaps;	/* the last N taken */
 	const char		*fb_msg;	/* -m's, or NULL */
+	char			fb_prec[SH_ZFS_VALMAX];	/* carried over */
 };
 
 static void
@@ -2146,17 +2147,52 @@ fb_world(struct fb *b)
 	return (b->fb_p->fp_update ? fb_backups(b) : 0);
 }
 
+static const char *const fb_env[] = { "PATH=" SH_RUN_PATH,
+	"ASSUME_ALWAYS_YES=yes", "HOME=/root", NULL };
+
+/*
+ * A chroot of F made ready: devfs mounted in it and, for PKG, which
+ * fetches, the host's resolv.conf where F has none, while it does;
+ * each pushed for undoing.
+ */
+static int
+fb_chroot(struct fb *b, int pkg)
+{
+	char dev[SH_BUILD_PATH + 8], resolv[SH_BUILD_PATH + 32];
+	const char *w[6];
+	struct stat st;
+
+	(void) snprintf(dev, sizeof (dev), "%s/dev", b->fb_rootdir);
+	if (fb_mkdirs(b, dev) != 0)
+		return (-1);
+	w[0] = b->fb_t->tl_mount;
+	w[1] = "-t";
+	w[2] = "devfs";
+	w[3] = "devfs";
+	w[4] = dev;
+	w[5] = NULL;
+	if (fb_exec(b, w, NULL, 0, NULL, 0) != 0)
+		return (-1);
+	fb_push(b, FU_UMOUNT, 0, dev);
+	if (!pkg)
+		return (0);
+	(void) snprintf(resolv, sizeof (resolv), "%s/etc/resolv.conf",
+	    b->fb_rootdir);
+	if (stat(resolv, &st) != 0 && stat("/etc/resolv.conf", &st) == 0) {
+		if (fb_copy(b, "/etc/resolv.conf", resolv) != 0)
+			return (-1);
+		fb_push(b, FU_UNLINK, 0, resolv);
+	}
+	return (0);
+}
+
 /* The recipe's packages and commands, in a chroot of F (7.1 step 6). */
 static int
 fb_inside(struct fb *b)
 {
 	struct sh_fplan *p = b->fb_p;
-	static const char *const env[] = { "PATH=" SH_RUN_PATH,
-	    "ASSUME_ALWAYS_YES=yes", "HOME=/root", NULL };
 	const struct sh_node *pkg, *cmds, *block;
-	char dev[SH_BUILD_PATH + 8], resolv[SH_BUILD_PATH + 32];
 	const char **w;
-	struct stat st;
 	size_t i, j, mark;
 	int rc;
 
@@ -2166,34 +2202,15 @@ fb_inside(struct fb *b)
 	    (cmds == NULL || cmds->sn_obj.ob_n == 0))
 		return (0);
 	mark = b->fb_nundo;
-	(void) snprintf(dev, sizeof (dev), "%s/dev", b->fb_rootdir);
 	if ((w = calloc(8 + (pkg != NULL ? pkg->sn_obj.ob_n : 0),
 	    sizeof (*w))) == NULL) {
 		sh_err_nomem(b->fb_err);
 		return (-1);
 	}
 	rc = -1;
-	if (fb_mkdirs(b, dev) != 0)
+	if (fb_chroot(b, pkg != NULL && pkg->sn_obj.ob_n > 0) != 0)
 		goto out;
-	w[0] = b->fb_t->tl_mount;
-	w[1] = "-t";
-	w[2] = "devfs";
-	w[3] = "devfs";
-	w[4] = dev;
-	w[5] = NULL;
-	if (fb_exec(b, w, NULL, 0, NULL, 0) != 0)
-		goto out;
-	fb_push(b, FU_UMOUNT, 0, dev);
 	if (pkg != NULL && pkg->sn_obj.ob_n > 0) {
-		(void) snprintf(resolv, sizeof (resolv), "%s/etc/resolv.conf",
-		    b->fb_rootdir);
-		/* pkg fetches: the host's resolver, while it does */
-		if (stat(resolv, &st) != 0 && stat("/etc/resolv.conf",
-		    &st) == 0) {
-			if (fb_copy(b, "/etc/resolv.conf", resolv) != 0)
-				goto out;
-			fb_push(b, FU_UNLINK, 0, resolv);
-		}
 		w[0] = b->fb_t->tl_pkg;
 		w[1] = "-c";
 		w[2] = b->fb_rootdir;
@@ -2204,7 +2221,7 @@ fb_inside(struct fb *b)
 			w[6 + i] = pkg->sn_obj.ob_v[i].pr_key;
 		w[6 + i] = NULL;
 		(void) fprintf(b->fb_out, "pkg install in %s\n", b->fb_rootdir);
-		if (fb_exec(b, w, env, 0, NULL, 0) != 0)
+		if (fb_exec(b, w, fb_env, 0, NULL, 0) != 0)
 			goto out;
 	}
 	for (i = 0; cmds != NULL && i < cmds->sn_obj.ob_n; i++) {
@@ -2220,7 +2237,7 @@ fb_inside(struct fb *b)
 			(void) fprintf(b->fb_out, "commands %s, from %s\n",
 			    cmds->sn_obj.ob_v[i].pr_key,
 			    block->sn_obj.ob_v[j].pr_key);
-			if (fb_exec(b, w, env, 0, NULL, 0) != 0)
+			if (fb_exec(b, w, fb_env, 0, NULL, 0) != 0)
 				goto out;
 		}
 	}
@@ -2231,9 +2248,12 @@ out:
 	return (rc);
 }
 
-/* F and every dataset of it, snapshotted as the version (7.1 step 7). */
+/*
+ * F and every dataset of it, snapshotted as the version (7.1 step 7),
+ * or KIND pkg, a pkg upgrade of one, which carries its record over.
+ */
 static int
-fb_snapshot(struct fb *b, const char *msg)
+fb_snapshot(struct fb *b, const char *msg, const char *kind)
 {
 	struct sh_fplan *p = b->fb_p;
 	struct sh_zprop zp[5];
@@ -2249,7 +2269,7 @@ fb_snapshot(struct fb *b, const char *msg)
 		msg = deflt;
 	}
 	zp[0].zp_name = "shtetl:kind";
-	zp[0].zp_value = "version";
+	zp[0].zp_value = kind;
 	zp[1].zp_name = "shtetl:commit";
 	zp[1].zp_value = msg;
 	zp[2].zp_name = "shtetl:config";
@@ -2258,8 +2278,9 @@ fb_snapshot(struct fb *b, const char *msg)
 	zp[3].zp_value = b->fb_cfgguid;
 	nzp = 4;
 	rec = NULL;
-	if (b->fb_pz.pz_nsrc > 0) {
-		if ((rec = fb_record(b)) == NULL) {
+	if (b->fb_pz.pz_nsrc > 0 || b->fb_prec[0] != '\0') {
+		if ((rec = b->fb_prec[0] != '\0' ? strdup(b->fb_prec) :
+		    fb_record(b)) == NULL) {
 			sh_err_nomem(b->fb_err);
 			return (-1);
 		}
@@ -2329,7 +2350,7 @@ sh_build_run(struct sh_zfs *z, struct sh_fplan *p,
 		goto fail;
 	/* F unmounted, its mountpoint back, and then the version */
 	fb_undo(b, fmark, 0);
-	if (fb_snapshot(b, b->fb_msg) != 0)
+	if (fb_snapshot(b, b->fb_msg, "version") != 0)
 		goto fail;
 	fb_commit(b);
 	fb_undo(b, 0, 0);
@@ -2345,6 +2366,205 @@ out:
 	for (i = 0; b->fb_pa != NULL && i < b->fb_npa; i++)
 		free(b->fb_pa[i].pa_name);
 	free(b->fb_pa);
+	free(b);
+	return (rc);
+}
+
+/* ---- pkg-upgrade ------------------------------------------------- */
+
+/* A walk of F's filesystems, as P's datasets: placeholders by canmount. */
+static int
+fb_pkgsets(struct sh_zfs *z, struct sh_fplan *p, struct sh_err *e)
+{
+	char **all, cm[SH_ZFS_VALMAX];
+	size_t i, n;
+	int r;
+
+	if ((all = calloc(1, sizeof (*all))) == NULL) {
+		sh_err_nomem(e);
+		return (-1);
+	}
+	n = strlen(p->fp_ds);
+	r = fb_add(p, "", 0, NULL, e) != 0 ? -1 : fb_walk(z, p->fp_ds, &all,
+	    e);
+	for (i = 0; r == 0 && all[i] != NULL; i++) {
+		if ((r = sh_zfs_get(z, all[i], "canmount", cm, sizeof (cm),
+		    NULL, e)) == 0)
+			r = fb_add(p, all[i] + n + 1, strcmp(cm, "off") == 0,
+			    NULL, e);
+	}
+	for (i = 0; all[i] != NULL; i++)
+		free(all[i]);
+	free(all);
+	return (r);
+}
+
+int
+sh_pkg_plan(struct sh_zfs *z, const struct sh_spaces *s,
+    const char *target, const char *runbase, struct sh_fplan *p,
+    struct sh_err *e)
+{
+	char val[SH_ZFS_VALMAX], name[SH_BUILD_NAME * 2];
+	char snap[SH_BUILD_NAME * 3];
+	enum sh_zsrc src;
+	unsigned before;
+	size_t len;
+	int r, n;
+	char *at;
+
+	(void) memset(p, 0, sizeof (*p));
+	before = e->se_count;
+	if (fb_target(target, p->fp_name, sizeof (p->fp_name), e) != 0)
+		return (-1);
+	if (s->ss_root[SH_SP_LAKE] == NULL)
+		sh_errf(e, "no lake root");
+	if (s->ss_root[SH_SP_BUILD] == NULL)
+		sh_errf(e, "no build root");
+	if (e->se_count != before)
+		return (-1);
+	(void) snprintf(p->fp_ds, sizeof (p->fp_ds), "%s/foundations/%s",
+	    s->ss_root[SH_SP_LAKE], p->fp_name);
+	(void) snprintf(p->fp_src, sizeof (p->fp_src), "%s",
+	    s->ss_root[SH_SP_BUILD]);
+	(void) snprintf(p->fp_rundir, sizeof (p->fp_rundir), "%s/%s",
+	    runbase, p->fp_name);
+	p->fp_update = 1;
+	if (sh_zfs_get(z, p->fp_src, SH_BUILD_PROP, val, sizeof (val), &src,
+	    e) != 0)
+		return (-1);
+	if (src == SH_ZSRC_LOCAL)
+		sh_errf(e, "build of %s %s", val, fb_paused(runbase, val) ?
+		    "paused" : "in progress");
+	if ((r = sh_zfs_get(z, p->fp_ds, "type", val, sizeof (val), NULL,
+	    e)) != 0) {
+		if (r == 1)
+			sh_errf(e, "no foundation %s", p->fp_name);
+		return (-1);
+	}
+	if (fb_last(z, p->fp_ds, p->fp_last, e) != 0)
+		return (-1);
+	if (p->fp_last[0] == '\0') {
+		sh_errf(e, "foundation %s exists without a version",
+		    p->fp_name);
+		return (-1);
+	}
+	/* the version's -pkg, after another pkg upgrade of it too */
+	(void) snprintf(p->fp_next, sizeof (p->fp_next), "%s", p->fp_last);
+	if ((at = strstr(p->fp_next, "-pkg")) != NULL &&
+	    (at[4] == '\0' || at[4] == '.'))
+		*at = '\0';
+	len = strlen(p->fp_next);
+	(void) snprintf(p->fp_next + len, sizeof (p->fp_next) - len, "-pkg");
+	(void) snprintf(name, sizeof (name), "%s", p->fp_next);
+	for (n = 2; n < 100; n++) {
+		(void) snprintf(snap, sizeof (snap), "%s@%s", p->fp_ds, name);
+		if (sh_zfs_get(z, snap, "type", val, sizeof (val), NULL,
+		    e) != 0)
+			break;
+		(void) snprintf(name, sizeof (name), "%s.%d", p->fp_next, n);
+	}
+	(void) snprintf(p->fp_next, sizeof (p->fp_next), "%s", name);
+	(void) fb_pkgsets(z, p, e);
+	return (e->se_count == before ? 0 : -1);
+}
+
+void
+sh_pkg_show(FILE *out, const struct sh_fplan *p)
+{
+	(void) fprintf(out, "foundation %s, its packages upgraded, from @%s\n"
+	    "  mounted below %s/root, with its datasets\n"
+	    "  pkg -c <root> upgrade -y\n"
+	    "  snapshot -r %s@%s\n", p->fp_name, p->fp_last, p->fp_rundir,
+	    p->fp_ds, p->fp_next);
+}
+
+int
+sh_pkg_run(struct sh_zfs *z, struct sh_fplan *p,
+    const struct sh_tools *t, const char *msg, FILE *out,
+    struct sh_err *e)
+{
+	struct fb *b;
+	char dir[SH_BUILD_PATH + 8], snap[SH_BUILD_NAME * 2], deflt[512];
+	const char *w[7];
+	size_t i, fmark;
+	int rc, fd;
+
+	if ((b = calloc(1, sizeof (*b))) == NULL) {
+		sh_err_nomem(e);
+		return (-1);
+	}
+	b->fb_z = z;
+	b->fb_p = p;
+	b->fb_t = t;
+	b->fb_out = out;
+	b->fb_err = e;
+	rc = -1;
+	(void) snprintf(b->fb_log, sizeof (b->fb_log), "%s/pkg.log",
+	    p->fp_rundir);
+	(void) snprintf(snap, sizeof (snap), "%s@%s", p->fp_ds, p->fp_last);
+	/* the version's record, carried over */
+	if (fb_mkdirs(b, p->fp_rundir) != 0 ||
+	    sh_zfs_get(z, snap, "shtetl:config", b->fb_cfgsnap,
+	    sizeof (b->fb_cfgsnap), NULL, e) != 0 ||
+	    sh_zfs_get(z, snap, "shtetl:config-guid", b->fb_cfgguid,
+	    sizeof (b->fb_cfgguid), NULL, e) != 0 ||
+	    sh_zfs_get(z, snap, "shtetl:patches", b->fb_prec,
+	    sizeof (b->fb_prec), NULL, e) != 0)
+		goto out;
+	if (strcmp(b->fb_prec, "-") == 0)
+		b->fb_prec[0] = '\0';
+	if ((fd = open(b->fb_log, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC,
+	    0644)) == -1) {
+		sh_errf(e, "%s: %s", b->fb_log, strerror(errno));
+		goto out;
+	}
+	(void) close(fd);
+	if (sh_zfs_set(z, p->fp_src, SH_BUILD_PROP, p->fp_name, e) != 0)
+		goto out;
+	fb_push(b, FU_UNLOCK, 0, p->fp_src);
+	for (i = 0; i < p->fp_nds; i++)
+		fb_push(b, FU_ROLLBACK, 1, p->fp_dss[i].fd_ds);
+	fmark = b->fb_nundo;
+	(void) snprintf(dir, sizeof (dir), "%s/root", p->fp_rundir);
+	if (fb_mountat(b, p->fp_ds, dir, b->fb_rootdir,
+	    sizeof (b->fb_rootdir)) != 0)
+		goto fail;
+	for (i = 1; i < p->fp_nds; i++) {
+		if (p->fp_dss[i].fd_placeholder)
+			continue;
+		if (sh_zfs_mount(z, p->fp_dss[i].fd_ds, e) != 0)
+			goto fail;
+		fb_push(b, FU_UNMOUNT, 0, p->fp_dss[i].fd_ds);
+	}
+	if (fb_chroot(b, 1) != 0)
+		goto fail;
+	w[0] = t->tl_pkg;
+	w[1] = "-c";
+	w[2] = b->fb_rootdir;
+	w[3] = "upgrade";
+	w[4] = "-y";
+	w[5] = NULL;
+	(void) fprintf(out, "pkg upgrade in %s (log %s)\n", b->fb_rootdir,
+	    b->fb_log);
+	(void) fflush(out);
+	if (fb_exec(b, w, fb_env, 0, NULL, 0) != 0)
+		goto fail;
+	fb_undo(b, fmark, 0);
+	(void) snprintf(b->fb_version, sizeof (b->fb_version), "%s",
+	    p->fp_next);
+	(void) snprintf(deflt, sizeof (deflt), "pkg upgrade of %s",
+	    p->fp_last);
+	if (fb_snapshot(b, msg != NULL ? msg : deflt, "pkg") != 0)
+		goto fail;
+	fb_commit(b);
+	fb_undo(b, 0, 0);
+	(void) fprintf(out, "upgraded %s@%s\n", p->fp_ds, p->fp_next);
+	rc = 0;
+	goto out;
+fail:
+	fb_undo(b, 0, 1);
+	sh_errf(e, "pkg upgrade of %s failed; log %s", p->fp_name, b->fb_log);
+out:
 	free(b);
 	return (rc);
 }

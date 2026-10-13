@@ -53,6 +53,7 @@ struct sh_cmd {
 
 static int cmd_bootstrap(struct sh_ctx *, int, char **);
 static int cmd_build(struct sh_ctx *, int, char **);
+static int cmd_pkg_upgrade(struct sh_ctx *, int, char **);
 static int cmd_config_show(struct sh_ctx *, int, char **);
 static int cmd_spaces(struct sh_ctx *, int, char **);
 
@@ -72,6 +73,10 @@ static const struct sh_cmd sh_cmds[] = {
 	    "into zlake; shown\n    first, done once confirmed (-y "
 	    "confirms); a build paused at a\n    patch carried on, the fix "
 	    "made or the patch left out, or\n    given up", cmd_build },
+	{ "pkg-upgrade", NULL, "[-y] [-m msg] foundation", "a foundation's "
+	    "packages upgraded in a chroot of it,\n    snapshotted as its "
+	    "last version's -pkg; shown first, done\n    once confirmed "
+	    "(-y confirms)", cmd_pkg_upgrade },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -375,6 +380,64 @@ cmd_build(struct sh_ctx *ctx, int argc, char **argv)
 	free(plan);
 	sh_site_free(&site);
 	free(dir);
+	return (rc);
+}
+
+/*
+ * pkg-upgrade: a foundation's packages upgraded and snapshotted as
+ * its last version's -pkg (planning.md 7.2), shown and confirmed.
+ */
+static int
+cmd_pkg_upgrade(struct sh_ctx *ctx, int argc, char **argv)
+{
+	struct sh_fplan *plan;
+	struct sh_err e;
+	const char *msg, *target;
+	int i, yes, rc;
+
+	yes = 0;
+	msg = target = NULL;
+	for (i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "-y") == 0) {
+			yes = 1;
+		} else if (strcmp(argv[i], "-m") == 0) {
+			if (i + 1 == argc)
+				return (die_usage("-m needs a message", ""));
+			msg = argv[++i];
+		} else if (argv[i][0] == '-') {
+			return (die_usage("pkg-upgrade: unknown option ",
+			    argv[i]));
+		} else if (target != NULL) {
+			return (die_usage("pkg-upgrade takes one foundation",
+			    ""));
+		} else {
+			target = argv[i];
+		}
+	}
+	if (target == NULL)
+		return (die_usage("pkg-upgrade: no foundation given", ""));
+	sh_err_init(&e, stderr, "shtetl: ");
+	if (ctx_zfs(ctx, &e) != 0)
+		return (SH_EXIT_REFUSED);
+	rc = SH_EXIT_REFUSED;
+	if ((plan = calloc(1, sizeof (*plan))) == NULL) {
+		sh_err_nomem(&e);
+	} else if (sh_pkg_plan(ctx->sc_zfs, &ctx->sc_spaces, target,
+	    SH_BUILD_DIR, plan, &e) == 0) {
+		sh_pkg_show(stdout, plan);
+		(void) fflush(stdout);
+		if (!sh_confirm(stdin, stdout, yes, isatty(STDIN_FILENO),
+		    "Upgrade as above?"))
+			sh_errf(&e, "%s", isatty(STDIN_FILENO) ?
+			    "not confirmed" : "not confirmed: no terminal, use "
+			    "-y");
+		else if (sh_pkg_run(ctx->sc_zfs, plan, &sh_build_tools, msg,
+		    stdout, &e) == 0)
+			rc = out_done();
+	}
+	if (plan != NULL)
+		sh_build_free(plan);
+	free(plan);
 	return (rc);
 }
 

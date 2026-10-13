@@ -426,6 +426,12 @@ immutable}; an update's end {built, failed, paused and aborted}.
 | F25 | an update that fails: F's datasets rolled back to the last version, not destroyed; mounts, mountpoints and the mark undone as for a new build | covered: check_build.c |
 | F26 | an update paused at a patch: --abort rolls F back to its last version; --continue goes on to the update | covered: check_build.c |
 | F27 | for real: a second build of box on the box, an update over the first, on the kept obj cache: the version .2, delete-old run, no backup left | box: tests/box/build.sh |
+| F28 | pkg-upgrade planned (planning.md 7.2, 6.1): from F's last snapshot, a version or a -pkg of one; the snapshot to take its version's -pkg, then -pkg.2 and on; shown | covered: check_build.c |
+| F29 | pkg-upgrade refused: no lake or build root, no such foundation, F with no version, a build under way or paused | covered: check_build.c |
+| F30 | pkg-upgrade's run: the build root's mark; F and its datasets mounted below the run directory, placeholders not; devfs and the host's resolv.conf while pkg runs; pkg -c <root> upgrade -y; all of it undone; snapshot -r with shtetl:kind=pkg, shtetl:commit (-m, or its own), and the version's shtetl:config, shtetl:config-guid and shtetl:patches carried over | covered: check_build.c |
+| F31 | pkg-upgrade that fails: F back to its last snapshot, the mark cleared, the log kept | covered: check_build.c |
+| F32 | pkg-upgrade on the command line: no foundation, two, an unknown option, -m with no message; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
+| F33 | for real: pkg-upgrade of box after F27, its -pkg snapshot on the box | box: tests/box/build.sh |
 
 On the box, tests/box/build.sh builds a foundation for real (sudo sh
 tests/box/build.sh; hours): one pool on a sparse file imported with
