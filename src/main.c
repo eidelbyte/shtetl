@@ -16,6 +16,8 @@
 
 #include "core/boot.h"
 #include "core/beam.h"
+#include "core/edit.h"
+#include "core/save.h"
 #include "core/build.h"
 #include "core/cascade.h"
 #include "core/err.h"
@@ -56,6 +58,7 @@ static int cmd_bootstrap(struct sh_ctx *, int, char **);
 static int cmd_build(struct sh_ctx *, int, char **);
 static int cmd_pkg_upgrade(struct sh_ctx *, int, char **);
 static int cmd_beam(struct sh_ctx *, int, char **);
+static int cmd_save(struct sh_ctx *, int, char **);
 static int cmd_config_show(struct sh_ctx *, int, char **);
 static int cmd_spaces(struct sh_ctx *, int, char **);
 
@@ -82,6 +85,9 @@ static const struct sh_cmd sh_cmds[] = {
 	{ "beam", NULL, "[-y] [--version v] foundation", "a foundation's "
 	    "version, its newest by default,\n    sent to zrun; shown first, "
 	    "done once confirmed (-y confirms)", cmd_beam },
+	{ "save", NULL, "[-m msg] container", "the container saved, its "
+	    "message -m's or written in\n    $VISUAL or $EDITOR; mirrored "
+	    "into zlake", cmd_save },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -442,6 +448,55 @@ cmd_pkg_upgrade(struct sh_ctx *ctx, int argc, char **argv)
 	}
 	if (plan != NULL)
 		sh_build_free(plan);
+	free(plan);
+	return (rc);
+}
+
+/*
+ * save: a container's datasets snapshotted with a message and mirrored
+ * into zlake (planning.md 7.5); the message from an editor without -m.
+ */
+static int
+cmd_save(struct sh_ctx *ctx, int argc, char **argv)
+{
+	struct sh_save *plan;
+	struct sh_err e;
+	const char *msg, *target;
+	char *written, snap[256];
+	int i, rc;
+
+	msg = target = NULL;
+	for (i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "-m") == 0) {
+			if (i + 1 == argc)
+				return (die_usage("-m needs a message", ""));
+			msg = argv[++i];
+		} else if (argv[i][0] == '-') {
+			return (die_usage("save: unknown option ", argv[i]));
+		} else if (target != NULL) {
+			return (die_usage("save takes one container", ""));
+		} else {
+			target = argv[i];
+		}
+	}
+	if (target == NULL)
+		return (die_usage("save: no container given", ""));
+	sh_err_init(&e, stderr, "shtetl: ");
+	if (ctx_zfs(ctx, &e) != 0)
+		return (SH_EXIT_REFUSED);
+	rc = SH_EXIT_REFUSED;
+	written = NULL;
+	if ((plan = calloc(1, sizeof (*plan))) == NULL) {
+		sh_err_nomem(&e);
+	} else if (sh_save_plan(ctx->sc_zfs, &ctx->sc_spaces, target, NULL,
+	    plan, &e) == 0 && (msg != NULL || sh_edit("The save's message: "
+	    "what changed in the container, and why.\nLines beginning # "
+	    "are left out; an empty message saves nothing.", &written,
+	    &e) == 0) && sh_save_run(ctx->sc_zfs, plan, msg != NULL ? msg :
+	    written, time(NULL), snap, sizeof (snap), stdout, &e) == 0) {
+		rc = out_done();
+	}
+	free(written);
 	free(plan);
 	return (rc);
 }

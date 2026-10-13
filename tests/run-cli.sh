@@ -109,6 +109,13 @@ t m7-two beam generic gaming
 t m7-option beam --frob generic
 t m7-version beam generic --version
 t m7-nozfs beam generic
+
+# S8: save
+t s8-none save
+t s8-two save x y
+t s8-option save --frob x
+t s8-msg save x -m
+t s8-nozfs save x -m why
 if [ "$(cat build/.flavor 2>/dev/null)" = portable ]; then
 	t b1-nozfs bootstrap --lake tank/shtetl -y
 	t f18-nozfs -C tests/conf/site build generic -y

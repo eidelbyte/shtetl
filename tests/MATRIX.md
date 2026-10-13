@@ -525,3 +525,30 @@ received, one failing}.
 | M6 | a send failing part way: what this beam received destroyed, the first beam's whole tree, a later one's new snapshots; zrun as it was | covered: check_beam.c |
 | M7 | the command line: beam with no foundation, two, an unknown option, --version with none; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
 | M8 | for real: box beamed after its build, then again after its update, the run root in the build pool | box: tests/box/build.sh |
+
+# Family S: a container's save, and its zlake mirror (M4; planning.md 7.5, 6.2, 7.10; src/core/save.c, src/core/edit.c)
+
+shtetl save X: every dataset of the container snapshotted at once,
+with its message, then mirrored into the lake root's containers/X as
+deltas. Over the fake ZFS: a lake root and a run root in two pools, a
+foundation version on both, a container cloned from it by hand as
+create will clone one.
+
+Dimensions: the roots {lake, run}; X {there, not, a bad name}; the
+message {given, from an editor, empty, the editor failing}; X's
+datasets {a clone of the foundation's, a placeholder, X's own}; the
+save {the first, a later one, two in a second}; the mirror {there,
+partly there after a failure, failing}; shtetl:config {from X's
+newest save, given by create, neither}.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| S1 | refused: no lake or run root; a bad name; no such container; an empty message; nothing to take shtetl:config from (no save, none given) | covered: check_save.c |
+| S2 | the snapshot: every dataset of X at once, save-<date>-<time> UTC (-2 for a second in the same second), shtetl:kind=save, shtetl:commit the message, shtetl:config and its guid from X's newest save, or given | covered: check_save.c |
+| S3 | the first mirror: a dataset cloned from the foundation received as a clone of zlake's counterpart of its origin, holding the delta; a placeholder likewise; X's own whole; parents first | covered: check_save.c |
+| S4 | a later mirror: each dataset from its own newest mirrored save | covered: check_save.c |
+| S5 | 6.2: the save's shtetl:* copied onto each mirrored snapshot, nothing of -p | covered: check_save.c |
+| S6 | a mirror failing part way: the save stays on zrun, said; the next save brings every dataset's mirror up to it, each from its own newest | covered: check_save.c |
+| S7 | the message from an editor, as git commit takes one: $VISUAL, $EDITOR or vi, on a file with a comment saying what it is for; lines beginning # left out, trailing blank lines too; empty refused; the editor failing refused | covered: check_save.c |
+| S8 | the command line: save with no container, two, an unknown option, -m with no message; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
+| S9 | for real: a container cloned from box on zrun saved twice, the mirror a clone of zlake's box and then incremental | box: tests/box/build.sh |

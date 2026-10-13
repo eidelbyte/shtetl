@@ -53,4 +53,12 @@ void sh_beam_show(FILE *out, const struct sh_beam *p);
 int sh_beam_run(struct sh_zfs *z, const struct sh_beam *p, FILE *out,
     struct sh_err *e);
 
+/*
+ * The shtetl:* properties of the snapshot FROM set on TO, a snapshot
+ * received from it, as every send without -p needs (6.2); nothing
+ * else of FROM's. Beam and save use it.
+ */
+int sh_shtetl_copy(struct sh_zfs *z, const char *from, const char *to,
+    struct sh_err *e);
+
 #endif	/* SH_BEAM_H */

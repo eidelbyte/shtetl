@@ -1,0 +1,34 @@
+shtetl: save: unknown option --frob
+usage: shtetl [-C dir] command ...
+       shtetl [-C dir] config show [recipe]
+       shtetl [-C dir] spaces
+       shtetl [-C dir] bootstrap [--lake ds] [--run ds] [--config ds]
+           [--build ds] [--recipes url] [-y]
+       shtetl [-C dir] build [-y] [-m msg] [--continue | --skip | --abort]
+           foundation
+       shtetl [-C dir] pkg-upgrade [-y] [-m msg] foundation
+       shtetl [-C dir] beam [-y] [--version v] foundation
+       shtetl [-C dir] save [-m msg] container
+
+  -C dir  the configuration root (the zshtetl-recipes clone);
+          without it, the config root's mountpoint
+
+  config show: the recipe (foundations/F, containers/X, systems/S)
+    with its layers merged, or the site's settings
+  spaces: each space's root, and where config and build are mounted
+  bootstrap: datasets you have made the roots of the spaces, and laid
+    out; shown first, done once confirmed (-y confirms)
+  build: a foundation built from its recipe into zlake; shown
+    first, done once confirmed (-y confirms); a build paused at a
+    patch carried on, the fix made or the patch left out, or
+    given up
+  pkg-upgrade: a foundation's packages upgraded in a chroot of it,
+    snapshotted as its last version's -pkg; shown first, done
+    once confirmed (-y confirms)
+  beam: a foundation's version, its newest by default,
+    sent to zrun; shown first, done once confirmed (-y confirms)
+  save: the container saved, its message -m's or written in
+    $VISUAL or $EDITOR; mirrored into zlake
+
+exit: 0 done, 1 refused (the reasons are on standard error), 2 usage,
+      3 a build paused at a patch

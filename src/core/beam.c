@@ -298,9 +298,8 @@ bm_copy1(void *arg, const char *prop, const char *value)
 	    -1 : 0);
 }
 
-/* FROM's shtetl:* set on TO, a snapshot received from it (6.2). */
-static int
-bm_copy(struct sh_zfs *z, const char *from, const char *to,
+int
+sh_shtetl_copy(struct sh_zfs *z, const char *from, const char *to,
     struct sh_err *e)
 {
 	struct bm_copy c;
@@ -339,7 +338,7 @@ bm_mend(struct sh_zfs *z, const struct sh_beam *p, size_t i, FILE *out,
 		if (sh_zfs_get(z, from, "type", kind, sizeof (kind), NULL,
 		    e) != 0)
 			continue;
-		if ((r = bm_copy(z, from, to, e)) == 0)
+		if ((r = sh_shtetl_copy(z, from, to, e)) == 0)
 			(void) fprintf(out, "copied shtetl:* onto %s again\n",
 			    to);
 	}
@@ -402,7 +401,7 @@ sh_beam_run(struct sh_zfs *z, const struct sh_beam *p, FILE *out,
 		    e) != 0) || sh_zfs_set(z, rds, "canmount",
 		    p->bm_placeholder[i] ? "off" : "noauto", e) != 0))
 			goto fail;
-		if (bm_copy(z, snap, to, e) != 0)
+		if (sh_shtetl_copy(z, snap, to, e) != 0)
 			goto fail;
 		(void) fprintf(out, "received %s, %s\n", to, first ? "whole" :
 		    "from its last");
