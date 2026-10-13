@@ -412,4 +412,5 @@ not}.
 | F16 | the kernel config: an include of a name in the checkout's conf directory for this machine, or of a path in the configuration root; the ident; the lines in order; src.conf, buildopts' pieces in order | covered: check_build.c |
 | F17 | shtetl:commit: the build's own message, or the one given | covered: check_build.c |
 | F18 | build on the command line: no foundation, two, an unknown option, -m with no message, usage errors; the portable shtetl refuses for want of ZFS; -C not the config root's mountpoint refused | covered: run-cli.sh f18-none, f18-two, f18-option, f18-msg, f18-nozfs; the -C refusal and the run itself on the box |
+| F19 | on a pool imported with an altroot, make and the install are given where the obj cache and F are mounted, below the altroot, not the mountpoint set | box: tests/box/build.sh, its pool imported with one; the fake reports a mountpoint as set |
 

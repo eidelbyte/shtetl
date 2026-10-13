@@ -873,9 +873,13 @@ fb_configs(struct fb *b)
 	return (r);
 }
 
-/* DS's mountpoint set to DIR, made, and DS mounted there. */
+/*
+ * DS's mountpoint set to DIR, made, and DS mounted there; where it is
+ * then into WHERE: below the altroot, on a pool imported with one.
+ */
 static int
-fb_mountat(struct fb *b, const char *ds, const char *dir)
+fb_mountat(struct fb *b, const char *ds, const char *dir, char *where,
+    size_t len)
 {
 	if (fb_mkdirs(b, dir) != 0 ||
 	    sh_zfs_set(b->fb_z, ds, "mountpoint", dir, b->fb_err) != 0)
@@ -884,27 +888,31 @@ fb_mountat(struct fb *b, const char *ds, const char *dir)
 	if (sh_zfs_mount(b->fb_z, ds, b->fb_err) != 0)
 		return (-1);
 	fb_push(b, FU_UNMOUNT, 0, ds);
-	return (0);
+	return (sh_zfs_get(b->fb_z, ds, "mountpoint", where, len, NULL,
+	    b->fb_err));
 }
 
 /*
  * The obj cache mounted at <run dir>/obj, then F at <run dir>/root
- * and each of its datasets below it, placeholders left unmounted.
+ * and each of its datasets below it, placeholders left unmounted;
+ * make and the install are given where they are, which on a pool
+ * imported with an altroot is below it.
  */
 static int
 fb_mounts(struct fb *b, size_t *fmark)
 {
 	struct sh_fplan *p = b->fb_p;
+	char dir[SH_BUILD_PATH + 8];
 	size_t i;
 
-	(void) snprintf(b->fb_objdir, sizeof (b->fb_objdir), "%s/obj",
-	    p->fp_rundir);
-	(void) snprintf(b->fb_rootdir, sizeof (b->fb_rootdir), "%s/root",
-	    p->fp_rundir);
-	if (fb_mountat(b, p->fp_obj, b->fb_objdir) != 0)
+	(void) snprintf(dir, sizeof (dir), "%s/obj", p->fp_rundir);
+	if (fb_mountat(b, p->fp_obj, dir, b->fb_objdir,
+	    sizeof (b->fb_objdir)) != 0)
 		return (-1);
 	*fmark = b->fb_nundo;
-	if (fb_mountat(b, p->fp_ds, b->fb_rootdir) != 0)
+	(void) snprintf(dir, sizeof (dir), "%s/root", p->fp_rundir);
+	if (fb_mountat(b, p->fp_ds, dir, b->fb_rootdir,
+	    sizeof (b->fb_rootdir)) != 0)
 		return (-1);
 	for (i = 1; i < p->fp_nds; i++) {
 		if (p->fp_dss[i].fd_placeholder)
