@@ -13,6 +13,8 @@
 #   IMGDIR   where the pool's file goes (/var/tmp), on ZFS or UFS
 #   SIZE     the pool's file, sparse (80g)
 #   SRC      a git checkout of FreeBSD to clone from, shared (/usr/src)
+#   SEND     no: the log is not committed and pushed back at the end
+#            (tests/box/send.sh), as it is otherwise
 #
 # It touches only what it makes: the pool shbbuild on a file in
 # IMGDIR, imported with an altroot under it, so every mount lands
@@ -21,6 +23,7 @@
 # start while the pool exists, nor while any pool has a shtetl root.
 set -u
 cd "$(dirname "$0")/../.." || exit 2
+. tests/box/send.sh
 BRANCH=${BRANCH:-releng/15.1}
 GITURL=${GITURL:-https://git.freebsd.org/src.git}
 IMGDIR=${IMGDIR:-/var/tmp}
@@ -264,10 +267,9 @@ cases 2>&1 | tee "$OUT"
 clean
 _u=${SUDO_USER:-${DOAS_USER:-}}
 [ -n "$_u" ] && chown -R "$_u" tests/box/results
+box_send "$OUT" build
 if grep -q '^FAIL' "$OUT" || ! grep -q '^== [0-9]* ok, 0 failed' "$OUT"; then
 	echo "boxbuild: see $OUT"
 	exit 1
 fi
-echo "boxbuild: all passed; to send the log back:" \
-    "git add tests/box/results &&" \
-    "git commit -m 'box: $(hostname -s) build' && git push"
+echo "boxbuild: all passed"

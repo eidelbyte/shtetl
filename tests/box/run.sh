@@ -13,8 +13,12 @@
 # disks behind their images; and that directory. It will not start
 # while either pool exists, nor while any other pool has a shtetl
 # root, which discovery would find and the cases would count.
+#
+# The log is committed and pushed back at the end (tests/box/send.sh);
+# SEND=no in the environment keeps it here.
 set -u
 cd "$(dirname "$0")/../.." || exit 2
+. tests/box/send.sh
 T=${TMPDIR:-/tmp}/shtetl-box
 ALT=$T/alt
 P1=shbtank
@@ -297,9 +301,9 @@ cases 2>&1 | tee "$OUT"
 clean
 _u=${SUDO_USER:-${DOAS_USER:-}}
 [ -n "$_u" ] && chown -R "$_u" tests/box/results
+box_send "$OUT" run
 if grep -q '^FAIL' "$OUT" || ! grep -q '^== [0-9]* ok, 0 failed' "$OUT"; then
 	echo "box: see $OUT"
 	exit 1
 fi
-echo "box: all passed; to send the log back: git add tests/box/results &&" \
-    "git commit -m 'box: $(hostname -s) run' && git push"
+echo "box: all passed"
