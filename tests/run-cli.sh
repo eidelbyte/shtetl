@@ -116,6 +116,15 @@ t s8-two save x y
 t s8-option save --frob x
 t s8-msg save x -m
 t s8-nozfs save x -m why
+
+# X8: create
+t x8-none create
+t x8-two create x y --on generic
+t x8-noon create x
+t x8-on create x --on
+t x8-version create x --on generic --version
+t x8-option create --frob x --on generic
+t x8-nozfs create x --on generic -y
 if [ "$(cat build/.flavor 2>/dev/null)" = portable ]; then
 	t b1-nozfs bootstrap --lake tank/shtetl -y
 	t f18-nozfs -C tests/conf/site build generic -y

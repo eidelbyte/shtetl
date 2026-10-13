@@ -102,3 +102,57 @@ testing.
 
 Gotcha: a fake editor written as printf '%s' 'text' keeps \n
 literal; the text must be printf's format.
+
+## m4-create
+
+shtetl create [-y] [-m msg] X --on F [--version v] (planning.md 7.4),
+src/core/create.c, on zwalk.c, beam.c and save.c.
+
+- The plan: X's recipe and F's version, every refusal said (X1). The
+  version is F's newest version or -pkg in zlake, or the one given;
+  X's ver is checked against its shtetl:revision, which the build now
+  records for this. It is beamed first when zrun lacks it, by beam's
+  own plan. X's datasets are F's at the version, read from zlake
+  (canmount=off a placeholder; one F split after the version left
+  out), then X's recipe's: a dataset F has takes the recipe's
+  properties on its clone, one it lacks is X's own, a placeholder
+  before an unnamed parent.
+- The commands: F's recipe as of the version's shtetl:config is
+  resolved from the config root's .zfs/snapshot/<snap>, and a piece
+  of X's (label, file, text) that F's has too is left out, as the
+  ruling of 2026-10-12 asks. shtetl.conf being a layer of both, its
+  pieces are the ones this catches.
+- The run: config snapshot, beam, clones, own datasets, mounts,
+  resolv.conf, the jail's block and start, pkg -j, jexec per piece,
+  the first save with the config snapshot as its shtetl:config.
+  sh_tools gains jail and jexec, so the tests play them by script.
+- The undo: the jail stopped, its block removed, each mount undone
+  children first, X destroyed by zwalk; the config snapshot kept, as
+  a build keeps its own. A failure of the save's mirror is a save's:
+  X stays.
+
+Decided beyond the plan (PROPOSAL, 7.4 as built): the jail's block
+whole in /etc/jail.conf.d/X.conf and what it holds (parasa's:
+rc's start and stop, exec.clean, devfs ruleset 4, the host's network
+inherited), jail -f -c to start, rc.conf untouched; commands by
+jexec X /bin/sh -e -c; pkg -j; resolv.conf copied in and kept;
+requires only checked to be there; a name of digits only refused.
+
+Gotchas:
+- The fake's mounts make no directories: the tests make each
+  container's etc/ under the scratch mount, as a foundation's clone
+  has it, and point cp_resolv at a scratch file.
+- The fake destroyed a mounted filesystem, where ZFS refuses it; that
+  is fixed in the commit before this one (Z20), and a mutation that
+  drops create's unmounts now fails check_create.
+- make's one-second timestamps: a mutation copied in within the
+  second of the last build is not rebuilt; remove the object first.
+
+Verification: check_create 257 checks (X1 - X7), each of thirteen
+mutations of create.c caught; run-cli.sh X8 (52 cases); doccheck with
+the usage; make check, gate, xcheck. The box: build.sh's X9 and S9,
+after M8: the container shbweb on box, its datasets, its block, its
+jail running and named, the command's file, the first save mirrored
+as a clone of zlake's box; the jail stopped and started from its
+block; create again refused; a second save, both mirrored. Owed: the
+box run. tracker: m4-create testing.

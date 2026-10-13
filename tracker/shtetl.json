@@ -286,6 +286,6 @@
     ],
     "provides": "Containers on zrun, cloned from a foundation version, saved.",
     "estimated_size": "large",
-    "completed": "not-started"
+    "completed": "testing"
   }
 }

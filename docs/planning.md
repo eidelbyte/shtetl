@@ -1057,6 +1057,47 @@ As built (M4, `src/core/beam.c`):
    is installed.
 7. Save (7.5).
 
+As built (M4, `src/core/create.c`):
+
+    shtetl create [-y] [-m msg] X --on F [--version v]
+
+- Checked first, every reason said: the lake, run and config roots; X
+  a container name, and not digits only (PROPOSAL: jail(8) takes
+  digits for a jail's id); X not on zrun; X's recipe; F in zlake with
+  a version; the version, F's newest version or -pkg by default, or
+  the one given; X's `ver` met by the version's `shtetl:revision`
+  (REVISION, which the build records); each of `requires` a container
+  on zrun (PROPOSAL: only that; one container mounting another's data
+  is later work).
+- X's datasets: F's at the version (one F split later is not the
+  version's), each a clone, a placeholder `canmount=off`; a property
+  X's recipe gives one of F's set on its clone from its birth; X's own
+  made, a placeholder before a parent nobody names. Nothing collides:
+  a dataset X's recipe names that F has is F's, with X's properties.
+- The run, in order: the config root snapshotted, `create-X-<time>`
+  (`shtetl:kind=config`), the first save's `shtetl:config`; the
+  version beamed if zrun lacks it (7.3); the clones, parents first;
+  X's own; each that mounts mounted (not `canmount=off`, `none` or
+  `legacy`); the host's `/etc/resolv.conf` copied in where X has none,
+  before rc runs (PROPOSAL: kept, the jail resolves names with it);
+  the jail's block written and the jail started; `pkg -j X install
+  -y` with every package; each command piece by `jexec X /bin/sh -e
+  -c`; the first save (7.5), its message `-m`'s or `create X on F@v`.
+- The jail (PROPOSAL, after parasa's): its block is shtetl's, written
+  whole to `/etc/jail.conf.d/X.conf`: `path` the container's mount as
+  ZFS reports it, `host.hostname` X, `exec.start "/bin/sh /etc/rc"`,
+  `exec.stop "/bin/sh /etc/rc.shutdown jail"`, `exec.clean`,
+  `mount.devfs`, `devfs_ruleset = 4`, `ip4` and `ip6` inherited, then
+  the recipe's `jailconf`, a tab in. It is started with `jail -f
+  <block> -c X` and stopped with `-r`. rc.conf is left alone: the jail
+  starts at boot once `jail_list` names it, rc.d/jail reading its
+  block from that directory.
+- A failure before the save undoes all of it but the config snapshot:
+  the jail stopped, its block removed, X unmounted and destroyed. A
+  mirror failing after the save leaves X created and its jail
+  running, as a save's would. The log is
+  `/var/db/shtetl/create/X/create.log`.
+
 ### 7.5 Save X
 
 1. `zfs snapshot -r -o shtetl:kind=save -o shtetl:commit=MSG

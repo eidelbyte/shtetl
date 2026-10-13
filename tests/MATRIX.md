@@ -553,3 +553,32 @@ newest save, given by create, neither}.
 | S7 | the message from an editor, as git commit takes one: $VISUAL, $EDITOR or vi, on a file with a comment saying what it is for; lines beginning # left out, trailing blank lines too; empty refused; the editor failing refused | covered: check_save.c |
 | S8 | the command line: save with no container, two, an unknown option, -m with no message; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
 | S9 | for real: a container cloned from box on zrun saved twice, the mirror a clone of zlake's box and then incremental | box: tests/box/build.sh |
+
+# Family X: a new container (M4; planning.md 7.4; src/core/create.c)
+
+shtetl create X --on F: a container cloned from a version of F on
+zrun, its own datasets made, its jail written and started, its
+packages and commands run, and its first save. Over the fake ZFS, a
+lake, a run and a config root, with jail, jexec and pkg played by
+scripts that log what they were asked.
+
+Dimensions: the target {X, containers/X, a bad name, digits only};
+X {new, there already}; the recipe {accepted, refused, ver met by
+the version or not, requires there or not}; F {there with versions,
+not}; the version {the newest, a -pkg, given, not on zrun}; the
+datasets {F's, a placeholder, F's with the recipe's properties, X's
+own, X's own under a parent nobody names}; the jail {its block,
+jailconf, started}; the commands {X's own pieces, the foundation's
+own run already}; resolv.conf {there, not}; a failure {at each step}.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| X1 | refused: no lake, run or config root; a bad name, digits only; X there already; X's recipe refused; no such foundation; F with no version; the version given not F's; X's ver not met by the version's shtetl:revision; a version without one; a requires not a container on zrun | covered: check_create.c |
+| X2 | the plan: the version, F's newest version or -pkg by default; beamed first when zrun lacks it; F's datasets cloned, X's own made, a placeholder for a parent nobody names; the recipe's properties on F's datasets set on the clones; shown | covered: check_create.c |
+| X3 | the run's ZFS: the config root snapshotted; the version beamed if asked; each of F's datasets cloned parents first, a placeholder canmount=off, the recipe's properties local on the clone; X's own made; X mounted, placeholders not | covered: check_create.c |
+| X4 | the jail: its block written whole to the jail directory (PROPOSAL /etc/jail.conf.d/X.conf), path the container's real mount, host.hostname X, rc's start and stop, exec.clean, mount.devfs, devfs_ruleset 4, ip4 and ip6 inherited, the recipe's jailconf after; started with jail -f ... -c X | covered: check_create.c |
+| X5 | inside: the host's resolv.conf copied in where X has none, kept; pkg -j X install -y; each command piece by jexec X /bin/sh -e -c, a piece the foundation ran as of its version's shtetl:config (same label, file and text) left out | covered: check_create.c |
+| X6 | the first save: shtetl:config the create's config snapshot, the message -m's or "create X on F@v", mirrored into zlake | covered: check_create.c |
+| X7 | a failure at each step undone: the jail stopped, its block removed, X's datasets destroyed, the config snapshot kept; a failure of the save's mirror after the save leaves X created, said | covered: check_create.c |
+| X8 | the command line: create with no container, two, no --on, an unknown option; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
+| X9 | for real: a container on box created on the box, its jail started and stopped, saved again (family S's S9 with it) | box: tests/box/build.sh |

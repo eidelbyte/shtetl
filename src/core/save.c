@@ -37,7 +37,11 @@ sh_save_target(const char *target, char *name, size_t len,
 		n = target + 11;
 	}
 	(void) snprintf(name, len, "%s", n);
-	if ((why = sh_syn_name(name)) != NULL) {
+	/* digits alone jail(8) takes for a jail's id (PROPOSAL) */
+	if ((why = sh_syn_name(name)) == NULL &&
+	    strspn(name, "0123456789") == strlen(name))
+		why = "digits only";
+	if (why != NULL) {
 		sh_errf(e, "%s: invalid container name: %s", target, why);
 		return (-1);
 	}

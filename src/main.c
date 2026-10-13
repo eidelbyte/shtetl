@@ -16,6 +16,7 @@
 
 #include "core/boot.h"
 #include "core/beam.h"
+#include "core/create.h"
 #include "core/edit.h"
 #include "core/save.h"
 #include "core/build.h"
@@ -59,6 +60,7 @@ static int cmd_build(struct sh_ctx *, int, char **);
 static int cmd_pkg_upgrade(struct sh_ctx *, int, char **);
 static int cmd_beam(struct sh_ctx *, int, char **);
 static int cmd_save(struct sh_ctx *, int, char **);
+static int cmd_create(struct sh_ctx *, int, char **);
 static int cmd_config_show(struct sh_ctx *, int, char **);
 static int cmd_spaces(struct sh_ctx *, int, char **);
 
@@ -88,6 +90,11 @@ static const struct sh_cmd sh_cmds[] = {
 	{ "save", NULL, "[-m msg] container", "the container saved, its "
 	    "message -m's or written in\n    $VISUAL or $EDITOR; mirrored "
 	    "into zlake", cmd_save },
+	{ "create", NULL, "[-y] [-m msg] container --on foundation\n"
+	    "           [--version v]", "a container cloned from a "
+	    "foundation's version, its\n    newest by default, its jail "
+	    "started and saved; shown first,\n    done once confirmed (-y "
+	    "confirms)", cmd_create },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -498,6 +505,86 @@ cmd_save(struct sh_ctx *ctx, int argc, char **argv)
 	}
 	free(written);
 	free(plan);
+	return (rc);
+}
+
+/*
+ * create X --on F: planned, shown, confirmed, run (planning.md 7.4).
+ * The recipes are read where the config root is mounted, as a build's
+ * are: the create snapshots it, and -C may name only that directory.
+ */
+static int
+cmd_create(struct sh_ctx *ctx, int argc, char **argv)
+{
+	struct sh_cplan *plan;
+	struct sh_err e, w;
+	char *dir, a[PATH_MAX], b[PATH_MAX];
+	const char *msg, *target, *found, *version;
+	int i, yes, rc;
+
+	yes = 0;
+	msg = target = found = version = NULL;
+	for (i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "-y") == 0) {
+			yes = 1;
+		} else if (strcmp(argv[i], "-m") == 0) {
+			if (i + 1 == argc)
+				return (die_usage("-m needs a message", ""));
+			msg = argv[++i];
+		} else if (strcmp(argv[i], "--on") == 0) {
+			if (i + 1 == argc)
+				return (die_usage("--on needs a foundation",
+				    ""));
+			found = argv[++i];
+		} else if (strcmp(argv[i], "--version") == 0) {
+			if (i + 1 == argc)
+				return (die_usage("--version needs a version",
+				    ""));
+			version = argv[++i];
+		} else if (argv[i][0] == '-') {
+			return (die_usage("create: unknown option ", argv[i]));
+		} else if (target != NULL) {
+			return (die_usage("create takes one container", ""));
+		} else {
+			target = argv[i];
+		}
+	}
+	if (target == NULL)
+		return (die_usage("create: no container given", ""));
+	if (found == NULL)
+		return (die_usage("create: no foundation given (--on)", ""));
+	sh_err_init(&e, stderr, "shtetl: ");
+	sh_err_init(&w, stderr, "shtetl: warning: ");
+	if (ctx_zfs(ctx, &e) != 0 ||
+	    sh_spaces_config_dir(ctx->sc_zfs, &ctx->sc_spaces, &dir, &e) != 0)
+		return (SH_EXIT_REFUSED);
+	if (ctx->sc_root != NULL && (realpath(ctx->sc_root, a) == NULL ||
+	    realpath(dir, b) == NULL || strcmp(a, b) != 0)) {
+		sh_errf(&e, "-C %s: not the config root's mountpoint, %s",
+		    ctx->sc_root, dir);
+		free(dir);
+		return (SH_EXIT_REFUSED);
+	}
+	rc = SH_EXIT_REFUSED;
+	if ((plan = calloc(1, sizeof (*plan))) == NULL) {
+		sh_err_nomem(&e);
+	} else if (sh_create_plan(ctx->sc_zfs, &ctx->sc_spaces, dir, target,
+	    found, version, SH_JAIL_DIR, SH_CREATE_DIR, plan, &e, &w) == 0) {
+		sh_create_show(stdout, plan);
+		(void) fflush(stdout);
+		if (!sh_confirm(stdin, stdout, yes, isatty(STDIN_FILENO),
+		    "Create as above?"))
+			sh_errf(&e, "%s", isatty(STDIN_FILENO) ?
+			    "not confirmed" : "not confirmed: no terminal, use "
+			    "-y");
+		else if (sh_create_run(ctx->sc_zfs, plan, &ctx->sc_spaces,
+		    &sh_build_tools, msg, time(NULL), stdout, &e) == 0)
+			rc = out_done();
+	}
+	if (plan != NULL)
+		sh_create_free(plan);
+	free(plan);
+	free(dir);
 	return (rc);
 }
 

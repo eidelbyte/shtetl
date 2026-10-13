@@ -5,8 +5,9 @@
 # one applied, one that conflicts and pauses the build, fixed here and
 # carried on into the build); then F27, box built again, an update
 # over the first, on the obj cache the first left; F33, its packages
-# upgraded, the update's -pkg; and M8, box beamed to the run root,
-# whole and then incremental.
+# upgraded, the update's -pkg; M8, box beamed to the run root, whole
+# and then incremental; and X9 and S9, the container shbweb created on
+# box, its jail started, stopped and started again, saved again.
 # A buildworld and buildkernel take hours the first time; nothing here
 # asks anything, so start it and leave it.
 #
@@ -35,10 +36,12 @@
 #
 # It touches only what it makes: the pool shbbuild on a file in
 # IMGDIR, imported with an altroot under it, so every mount lands
-# there; and shtetl's run directories of the foundations it builds,
-# /var/db/shtetl/build/box and /var/db/shtetl/build/nope. A run that
-# was stopped is put away first; it will not start while any other
-# pool has a shtetl root.
+# there; shtetl's run directories of the foundations it builds,
+# /var/db/shtetl/build/box and /var/db/shtetl/build/nope; and the
+# container's jail, shbweb, its block /etc/jail.conf.d/shbweb.conf and
+# its log /var/db/shtetl/create/shbweb. A run that was stopped is put
+# away first; it will not start while any other pool has a shtetl
+# root, or a jail shbweb is there.
 set -u
 cd "$(dirname "$0")/../.." || exit 2
 . tests/box/send.sh
@@ -56,6 +59,8 @@ OBJKEEP=$KEEP/obj-$(echo "$BRANCH" | tr / _)
 OBJ=$P/shtetl/foundation-builds/box
 SH=$PWD/shtetl
 RUNS=/var/db/shtetl/build
+X=shbweb
+JAILF=/etc/jail.conf.d/$X.conf
 
 # A run's own files, and the run directories of the two foundations
 # built here, by name.
@@ -63,7 +68,8 @@ runfiles() {
 	rm -f "$T/out" "$T/err"
 	rm -rf "$T/p17"
 	rm -rf /var/db/shtetl/build/box /var/db/shtetl/build/nope
-	rmdir $RUNS /var/db/shtetl 2>/dev/null
+	rm -rf /var/db/shtetl/create/$X
+	rmdir $RUNS /var/db/shtetl/create /var/db/shtetl 2>/dev/null
 	return 0
 }
 
@@ -72,6 +78,15 @@ runfiles() {
 # stopped among its patches, a root no longer; the pool exported.
 teardown() {
 	zpool list -H -o name $P >/dev/null 2>&1 || { runfiles; return 0; }
+	# the container's jail: stopped by its block, which goes too
+	if jls -j $X jid >/dev/null 2>&1; then
+		if [ -f $JAILF ]; then
+			jail -f $JAILF -r $X
+		else
+			jail -r $X
+		fi
+	fi
+	rm -f $JAILF
 	if zfs list -H -o name $OBJ >/dev/null 2>&1; then
 		zfs unmount $OBJ 2>/dev/null
 		zfs inherit mountpoint $OBJ
@@ -87,8 +102,8 @@ teardown() {
 		zfs inherit shtetl:build $P/zbuild
 		zfs rename $P/zbuild $KEEP/zbuild
 	fi
-	zfs destroy -r $P/shtetl 2>/dev/null
 	zfs destroy -R $P/run 2>/dev/null
+	zfs destroy -R $P/shtetl 2>/dev/null
 	zfs destroy -r $P/zconfig 2>/dev/null
 	zpool export $P
 	runfiles
@@ -126,6 +141,10 @@ fi
 if zpool list -H -o name $P >/dev/null 2>&1; then
 	echo "boxbuild: pool $P imported: a run stopped; put away first"
 	teardown
+fi
+if jls -j $X jid >/dev/null 2>&1 || [ -e $JAILF ]; then
+	echo "boxbuild: a jail $X, or its block $JAILF, is there"
+	exit 2
 fi
 _roots=$(zfs get -H -s local -o name,value shtetl:space 2>/dev/null)
 if [ -n "$_roots" ]; then
@@ -534,6 +553,81 @@ EOF
 	    shtetl:kind)" pkg
 	sht beam -y box
 	check M8 "beamed again: refused, on zrun already" "$RC" 1
+
+	echo "== X9: the container $X on box, its jail; S9: saved again"
+	_x=$P/run/containers/$X
+	_lx=$P/shtetl/containers/$X
+	mkdir -p "$ALT/zconfig/containers"
+	cat >"$ALT/zconfig/containers/$X.conf" <<'EOF'
+datasets { var { compression = "lz4"; } "srv/www" {} }
+commands { hello = "echo shtetl-box > /srv/www/index.txt"; }
+jailconf = "allow.raw_sockets;";
+EOF
+	sht create -y -m "the first" $X --on box
+	sed 's/^/    /' "$T/out"
+	check X9 "create's exit" "$RC" 0
+	[ "$RC" = 0 ] || sed 's/^/    /' "$T/err"
+	check X9 "box's datasets cloned at its newest, srv/www its own" \
+	    "$(prop $_x origin) $(prop $_x/usr/local origin)" \
+	    "$_rf@$_v2-pkg $_rf/usr/local@$_v2-pkg"
+	check X9 "srv/www its own, srv a placeholder" \
+	    "$(prop $_x/srv/www origin) $(prop $_x/srv canmount)" "- off"
+	check X9 "seven datasets" \
+	    "$(zfs list -H -o name -r $_x | wc -l | tr -d ' ')" 7
+	check X9 "the recipe's lz4 set on the clone, locally" \
+	    "$(prop $_x/var compression) $(srcof $_x/var compression)" \
+	    "lz4 local"
+	check X9 "mounted, the placeholders not" \
+	    "$(prop $_x mounted) $(prop $_x/usr mounted)" "yes no"
+	check X9 "srv/www mounted, srv not" \
+	    "$(prop $_x/srv/www mounted) $(prop $_x/srv mounted)" "yes no"
+	check X9 "writable: readonly is box's on zrun, not the clone's" \
+	    "$(prop $_x readonly)" off
+	_mp=$(prop $_x mountpoint)
+	has X9 "the jail's block, its path the mount" $JAILF \
+	    "path = \"$_mp\";"
+	has X9 "the recipe's jailconf in it" $JAILF "allow.raw_sockets;"
+	check X9 "the jail running, its hostname its name" \
+	    "$(jls -j $X name 2>/dev/null) $(jexec $X hostname 2>/dev/null)" \
+	    "$X $X"
+	check X9 "the command ran in the jail" \
+	    "$(cat "$_mp/srv/www/index.txt" 2>/dev/null)" shtetl-box
+	if [ -f /etc/resolv.conf ]; then
+		check X9 "the host's resolv.conf copied in" \
+		    "$(cmp -s /etc/resolv.conf "$_mp/etc/resolv.conf" &&
+		    echo same)" same
+	fi
+	_s1=$(zfs list -H -t snapshot -o name -s createtxg $_x | tail -1)
+	check X9 "the first save: its kind, the create's config snapshot" \
+	    "$(prop "$_s1" shtetl:kind) $(prop "$_s1" shtetl:config |
+	    sed 's/@create-.*/@create/')" "save $P/zconfig@create"
+	check X9 "mirrored: a clone of zlake's box" "$(prop $_lx origin)" \
+	    "$P/shtetl/foundations/box@$_v2-pkg"
+	jail -f $JAILF -r $X >/dev/null 2>&1
+	check X9 "stopped by its block, devfs with it" \
+	    "$(jls -j $X jid 2>/dev/null)$(mount -p |
+	    grep -c "^devfs[[:space:]]*$_mp/dev[[:space:]]")" 0
+	jail -f $JAILF -c $X >/dev/null 2>&1
+	check X9 "started again from its block" \
+	    "$(jls -j $X name 2>/dev/null)" $X
+	sht create -y $X --on box
+	check X9 "created again: refused, it exists" "$RC" 1
+	echo second >"$_mp/srv/www/second.txt"
+	sht save -m "the second" $X
+	sed 's/^/    /' "$T/out"
+	check S9 "the second save's exit" "$RC" 0
+	[ "$RC" = 0 ] || sed 's/^/    /' "$T/err"
+	check S9 "two saves on zrun" \
+	    "$(zfs list -H -t snapshot -o name $_x | grep -c @save-)" 2
+	check S9 "both mirrored in zlake" \
+	    "$(zfs list -H -t snapshot -o name $_lx | grep -c @save-)" 2
+	_s2=$(zfs list -H -t snapshot -o name -s createtxg $_lx | tail -1)
+	check S9 "the second's message in zlake, its config carried" \
+	    "$(prop "$_s2" shtetl:commit), $(prop "$_s2" shtetl:config)" \
+	    "the second, $(prop "$_s1" shtetl:config)"
+	check S9 "srv/www's mirror whole, then from its first" \
+	    "$(prop $_lx/srv/www origin) $(zfs list -H -t snapshot \
+	    -o name $_lx/srv/www | grep -c @save-)" "- 2"
 
 	echo "== $pass ok, $fail failed"
 	[ "$fail" = 0 ]

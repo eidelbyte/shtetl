@@ -1260,6 +1260,8 @@ usage: shtetl [-C dir] command ...
        shtetl [-C dir] pkg-upgrade [-y] [-m msg] foundation
        shtetl [-C dir] beam [-y] [--version v] foundation
        shtetl [-C dir] save [-m msg] container
+       shtetl [-C dir] create [-y] [-m msg] container --on foundation
+           [--version v]
 
   -C dir  the configuration root (the zshtetl-recipes clone);
           without it, the config root's mountpoint
@@ -1280,6 +1282,9 @@ usage: shtetl [-C dir] command ...
     sent to zrun; shown first, done once confirmed (-y confirms)
   save: the container saved, its message -m's or written in
     $VISUAL or $EDITOR; mirrored into zlake
+  create: a container cloned from a foundation's version, its
+    newest by default, its jail started and saved; shown first,
+    done once confirmed (-y confirms)
 
 exit: 0 done, 1 refused (the reasons are on standard error), 2 usage,
       3 a build paused at a patch

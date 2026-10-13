@@ -558,8 +558,8 @@ fb_securelevel(void)
 }
 
 const struct sh_tools sh_build_tools = {
-	"git", "make", "pkg", "chroot", "mount", "umount", "sh",
-	fb_securelevel
+	"git", "make", "pkg", "chroot", "mount", "umount", "sh", "jail",
+	"jexec", fb_securelevel
 };
 
 /* What a run has done, to be undone, newest last. */

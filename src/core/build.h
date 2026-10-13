@@ -82,6 +82,8 @@ struct sh_tools {
 	const char	*tl_mount;
 	const char	*tl_umount;
 	const char	*tl_sh;
+	const char	*tl_jail;
+	const char	*tl_jexec;
 	int		(*tl_securelevel)(void);
 };
 
