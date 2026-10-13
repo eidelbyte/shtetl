@@ -3,6 +3,8 @@
  * the fake) against libzfs on real pools. tests/box/run.sh runs it
  * with a dataset of its own to work under; each cell prints a line,
  * "ok   Zn what" or "FAIL Zn what", which run.sh counts with its own.
+ * A refusal is read as check_zfs.c reads one, by its words: the name
+ * refused and why, as the fake says it.
  *
  * usage: box_zcheck POOL/DATASET    (made by run.sh, empty)
  */
@@ -74,6 +76,53 @@ snaps(const char *ds, int *rc)
 	return (walked);
 }
 
+/*
+ * The sink of a call whose refusal a cell reads: in memory, emptied
+ * here first; refused() passes what it heard on to stderr.
+ */
+static struct sh_err q;
+static FILE *qf;
+static char *qbuf;
+static size_t qlen;
+static int refusals, misheard;
+
+static struct sh_err *
+ask(void)
+{
+	if (qf != NULL)
+		(void) fclose(qf);
+	free(qbuf);
+	qbuf = NULL;
+	qlen = 0;
+	if ((qf = open_memstream(&qbuf, &qlen)) == NULL) {
+		(void) fprintf(stderr, "zcheck: open_memstream failed\n");
+		exit(2);
+	}
+	sh_err_init(&q, qf, "");
+	return (&q);
+}
+
+/* RC is -1, and what was reported holds "REL: WHY", REL as at()'s. */
+static void
+refused(const char *id, const char *what, int rc, const char *rel,
+    const char *why)
+{
+	char want[768];
+	int good;
+
+	(void) fflush(qf);
+	(void) snprintf(want, sizeof (want), "%s: %s", at(rel), why);
+	good = rc == -1 && qbuf != NULL && strstr(qbuf, want) != NULL;
+	(void) fprintf(stderr, "zcheck: %s", qbuf != NULL &&
+	    qbuf[0] != '\0' ? qbuf : "(nothing reported)\n");
+	if (!good) {
+		(void) fprintf(stderr, "zcheck: wanted %s\n", want);
+		misheard++;
+	}
+	refusals++;
+	cell(id, what, good);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -83,7 +132,7 @@ main(int argc, char **argv)
 	};
 	static const struct sh_zprop kind = { "shtetl:kind", "foundation" };
 	const char *v1[3], *v2[3], *bad[2];
-	char t1[64], name[512];
+	char t1[64], name[512], g3[512];
 	enum sh_zsrc src;
 	int rc;
 
@@ -137,15 +186,29 @@ main(int argc, char **argv)
 	stop_at = 1;
 	cell("Z5", "the walk stopped, its value returned",
 	    strcmp(snaps(at("f"), &rc), "v1") == 0 && rc == 7);
-	(void) snaps(at("nope"), &rc);
-	cell("Z5", "no such filesystem refused", rc == -1);
+	refused("Z5", "no such filesystem refused",
+	    sh_zfs_snapshots(z, at("nope"), walk, NULL, ask()), "nope",
+	    "no such filesystem");
 
-	/* Z2: all or none */
+	/* Z2: all or none, the one refused named */
 	(void) snprintf(name, sizeof (name), "%s@v3", at("f"));
 	bad[0] = name;
 	bad[1] = v2[1];
-	cell("Z2", "one taken: refused",
-	    sh_zfs_snapshot(z, bad, 2, NULL, 0, &e) == -1);
+	refused("Z2", "one taken: refused",
+	    sh_zfs_snapshot(z, bad, 2, NULL, 0, ask()), "f/usr@v2", "taken");
+	(void) snprintf(g3, sizeof (g3), "%s@v3", at("g"));
+	bad[1] = g3;
+	refused("Z2", "a filesystem missing: refused",
+	    sh_zfs_snapshot(z, bad, 2, NULL, 0, ask()), "g@v3",
+	    "no such filesystem");
+	bad[1] = name;
+	refused("Z2", "a name twice: refused",
+	    sh_zfs_snapshot(z, bad, 2, NULL, 0, ask()), "f@v3",
+	    "named twice");
+	bad[1] = at("f/usr");
+	refused("Z2", "a malformed name: refused",
+	    sh_zfs_snapshot(z, bad, 2, NULL, 0, ask()), "f/usr",
+	    "not a snapshot's name");
 	cell("Z2", "and none taken",
 	    sh_zfs_get(z, name, "type", t1, sizeof (t1), NULL, &e) == 1);
 
@@ -163,15 +226,23 @@ main(int argc, char **argv)
 	    src == SH_ZSRC_LOCAL);
 	cell("Z4", "the filesystem's own unchanged",
 	    strcmp(get(at("f"), "shtetl:kind", NULL), "foundation") == 0);
-	cell("Z4", "a native property on a snapshot refused",
-	    sh_zfs_set(z, v2[0], "compression", "lz4", &e) == -1);
+	refused("Z4", "a native property on a snapshot refused",
+	    sh_zfs_set(z, v2[0], "compression", "lz4", ask()), "f@v2",
+	    "this property can not be modified for snapshots");
 	(void) snprintf(name, sizeof (name), "%s@v9", at("f"));
+	refused("Z4", "a missing snapshot's property refused",
+	    sh_zfs_set(z, name, "shtetl:x", "y", ask()), "f@v9",
+	    "no such snapshot");
 	cell("Z4", "a missing snapshot: 1, as a missing filesystem",
 	    sh_zfs_get(z, name, "type", t1, sizeof (t1), NULL, &e) == 1);
 
 	/* Z6: rollback to the newest only */
-	cell("Z6", "rollback to an older one refused",
-	    sh_zfs_rollback(z, at("f"), "v1", &e) == -1);
+	refused("Z6", "rollback to an older one refused",
+	    sh_zfs_rollback(z, at("f"), "v1", ask()), "f@v1",
+	    "not the newest snapshot");
+	refused("Z6", "rollback of a missing filesystem refused",
+	    sh_zfs_rollback(z, at("nope"), "v1", ask()), "nope",
+	    "no such filesystem");
 	cell("Z6", "rollback to the newest",
 	    sh_zfs_rollback(z, at("f"), "v2", &e) == 0);
 
@@ -179,16 +250,28 @@ main(int argc, char **argv)
 	cell("Z7", "a snapshot destroyed",
 	    sh_zfs_destroy(z, v2[0], &e) == 0 &&
 	    strcmp(snaps(at("f"), &rc), "v1") == 0);
-	cell("Z7", "a filesystem with children refused",
-	    sh_zfs_destroy(z, at("f"), &e) == -1);
-	cell("Z7", "a filesystem with snapshots refused",
-	    sh_zfs_destroy(z, at("f/var"), &e) == -1);
+	/* f has children and v1: ZFS looks at the snapshots first */
+	refused("Z7", "children and a snapshot: refused for the snapshot",
+	    sh_zfs_destroy(z, at("f"), ask()), "f", "has snapshots");
+	refused("Z7", "a filesystem with snapshots refused",
+	    sh_zfs_destroy(z, at("f/var"), ask()), "f/var",
+	    "has snapshots");
 	cell("Z7", "its snapshots, then it",
 	    sh_zfs_destroy(z, v2[2], &e) == 0 &&
 	    sh_zfs_destroy(z, v1[2], &e) == 0 &&
 	    sh_zfs_destroy(z, at("f/var"), &e) == 0 &&
 	    sh_zfs_get(z, at("f/var"), "type", t1, sizeof (t1), NULL,
 	    &e) == 1);
+	refused("Z7", "a missing filesystem refused",
+	    sh_zfs_destroy(z, at("f/var"), ask()), "f/var",
+	    "no such dataset");
+	(void) snprintf(name, sizeof (name), "%s@v9", at("f"));
+	refused("Z7", "a missing snapshot refused",
+	    sh_zfs_destroy(z, name, ask()), "f@v9", "no such dataset");
+	cell("Z7", "f's last snapshot destroyed",
+	    sh_zfs_destroy(z, v1[0], &e) == 0);
+	refused("Z7", "a filesystem with children refused",
+	    sh_zfs_destroy(z, at("f"), ask()), "f", "has children");
 
 	/*
 	 * Z8, Z9: inherit; unmount and mount. f sets the mountpoint f/usr
@@ -218,10 +301,13 @@ main(int argc, char **argv)
 	    sh_zfs_mount(z, at("f/usr"), &e) == 0 &&
 	    strcmp(get(at("f/usr"), "mounted", NULL), "yes") == 0);
 
-	/* Z10: refusals carry ZFS's reason */
-	/* six refusals above: Z5, Z2, Z4, Z6 and Z7 twice */
-	cell("Z10", "every refusal above was reported", e.se_count >= 6);
+	/* Z10: each refusal above in the fake's words */
+	cell("Z10", "every refusal above said why, as the fake does",
+	    refusals > 0 && misheard == 0);
 
 	sh_zfs_close(z);
+	if (qf != NULL)
+		(void) fclose(qf);
+	free(qbuf);
 	return (failed);
 }

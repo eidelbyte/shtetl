@@ -354,6 +354,10 @@ sh_zfs_rollback(struct sh_zfs *z, const char *ds, const char *snap,
 	(void) z;
 	if (zf_fails("rollback", e))
 		return (-1);
+	if (zf_find(ds) == NULL) {
+		sh_errf(e, "zfake: %s: no such filesystem", ds);
+		return (-1);
+	}
 	for (i = zf_nsnaps - 1; i >= 0; i--) {
 		if (strncmp(zf_snaps[i].zs_name, ds, len) == 0 &&
 		    zf_snaps[i].zs_name[len] == '@')
@@ -391,18 +395,19 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 		sh_errf(e, "zfake: %s: no such dataset", name);
 		return (-1);
 	}
+	/* snapshots first, as dsl_destroy_head_check_impl looks */
 	len = strlen(name);
-	for (i = 0; i < zf_n; i++) {
-		if (zf_parent(zf_ds[i].zd_name, parent) &&
-		    strcmp(parent, name) == 0) {
-			sh_errf(e, "zfake: %s: has children", name);
-			return (-1);
-		}
-	}
 	for (i = 0; i < zf_nsnaps; i++) {
 		if (strncmp(zf_snaps[i].zs_name, name, len) == 0 &&
 		    zf_snaps[i].zs_name[len] == '@') {
 			sh_errf(e, "zfake: %s: has snapshots", name);
+			return (-1);
+		}
+	}
+	for (i = 0; i < zf_n; i++) {
+		if (zf_parent(zf_ds[i].zd_name, parent) &&
+		    strcmp(parent, name) == 0) {
+			sh_errf(e, "zfake: %s: has children", name);
 			return (-1);
 		}
 	}
@@ -696,9 +701,13 @@ sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
 	if (zf_fails("set", e))
 		return (-1);
 	if (strchr(ds, '@') != NULL) {
-		if ((s = zf_snap(ds)) == NULL || strchr(prop, ':') == NULL) {
-			sh_errf(e, "zfake: %s: no such snapshot, or %s is no "
-			    "user property", ds, prop);
+		if ((s = zf_snap(ds)) == NULL) {
+			sh_errf(e, "zfake: %s: no such snapshot", ds);
+			return (-1);
+		}
+		if (strchr(prop, ':') == NULL) {
+			sh_errf(e, "zfake: %s: this property can not be "
+			    "modified for snapshots", ds);
 			return (-1);
 		}
 		zf_put(s->zs_props, &s->zs_n, prop, value);

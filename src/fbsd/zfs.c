@@ -6,7 +6,10 @@
  *
  * A failure that libzfs recorded is reported with the handle's own
  * description, which is what zfs(8) would print; libzfs prints
- * nothing itself (libzfs_print_on_error is off).
+ * nothing itself (libzfs_print_on_error is off). The lzc_* calls
+ * return only an errno: where one says why in the terms of
+ * src/core/zfs.h, the refusal is said in tests/zfake.c's words, and
+ * tests/box/zcheck.c holds the two to it.
  *
  * A user property's source, as zfs get reads it (cmd/zfs/zfs_main.c,
  * get_callback): the dataset's own name where it is set locally,
@@ -36,6 +39,14 @@ static void
 zz_err(struct sh_zfs *z, struct sh_err *e, const char *what)
 {
 	sh_errf(e, "%s: %s", what, libzfs_error_description(z->zz_hdl));
+}
+
+/* NAME is not there: a snapshot when it has an @. */
+static void
+zz_none(struct sh_err *e, const char *name)
+{
+	sh_errf(e, "%s: no such %s", name, strchr(name, '@') != NULL ?
+	    "snapshot" : "filesystem");
 }
 
 int
@@ -287,7 +298,7 @@ sh_zfs_children(struct sh_zfs *z, const char *ds,
 
 	if ((r = zz_open(z, ds, &zhp, e)) != 0) {
 		if (r == 1)
-			sh_errf(e, "%s: no such filesystem", ds);
+			zz_none(e, ds);
 		return (-1);
 	}
 	k.zk_fn = fn;
@@ -331,7 +342,7 @@ sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
 
 	if ((r = zz_open(z, ds, &zhp, e)) != 0) {
 		if (r == 1)
-			sh_errf(e, "%s: no such filesystem", ds);
+			zz_none(e, ds);
 		return (-1);
 	}
 	r = zfs_prop_set(zhp, prop, value);
@@ -350,7 +361,7 @@ sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
 
 	if ((r = zz_open(z, ds, &zhp, e)) != 0) {
 		if (r == 1)
-			sh_errf(e, "%s: no such filesystem", ds);
+			zz_none(e, ds);
 		return (-1);
 	}
 	r = zfs_prop_inherit(zhp, prop, B_FALSE);
@@ -378,19 +389,63 @@ zz_names(const char *const *names, size_t n)
 	return (nv);
 }
 
+/* NAME, ds@snap, as a snapshot's: why not, or NULL. */
+static const char *
+zz_snapname(const char *name)
+{
+	const char *at;
+
+	if ((at = strchr(name, '@')) == NULL || at[1] == '\0' ||
+	    strchr(at + 1, '@') != NULL || strchr(at + 1, '/') != NULL)
+		return ("not a snapshot's name");
+	return (NULL);
+}
+
+/* Why ZFS refused to take a snapshot: its errno R in errlist. */
+static const char *
+zz_snapwhy(int r)
+{
+	switch (r) {
+	case EEXIST:
+		return ("taken");
+	case ENOENT:
+		return ("no such filesystem");
+	default:
+		return (strerror(r));
+	}
+}
+
 /*
  * lzc_snapshot (lib/libzfs_core/libzfs_core.c): the snapshots as the
  * keys of one nvlist, the properties in another, all of it one ioctl,
  * so the snapshots exist with their properties, or none of them do.
+ * A name twice would be one key, so it is refused here, with a
+ * malformed one; what ZFS refuses, errlist names, with its errno
+ * (dsl_dataset_snapshot_check).
  */
 int
 sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
     const struct sh_zprop *props, size_t nprops, struct sh_err *e)
 {
 	nvlist_t *snaps, *pv, *errlist;
+	nvpair_t *bad;
+	const char *why;
+	size_t i, j;
+	int32_t r32;
 	int r;
 
 	(void) z;
+	for (i = 0; i < n; i++) {
+		why = zz_snapname(names[i]);
+		for (j = 0; why == NULL && j < i; j++) {
+			if (strcmp(names[j], names[i]) == 0)
+				why = "named twice";
+		}
+		if (why != NULL) {
+			sh_errf(e, "%s: %s", names[i], why);
+			return (-1);
+		}
+	}
 	errlist = NULL;
 	snaps = NULL;
 	if ((pv = zz_props(props, nprops)) == NULL ||
@@ -402,13 +457,18 @@ sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
 	r = lzc_snapshot(snaps, nprops > 0 ? pv : NULL, &errlist);
 	nvlist_free(snaps);
 	nvlist_free(pv);
-	nvlist_free(errlist);
 	if (r != 0) {
-		sh_errf(e, "%s%s: %s", names[0], n > 1 ? " and the rest" : "",
-		    strerror(r));
-		return (-1);
+		if (errlist != NULL &&
+		    (bad = nvlist_next_nvpair(errlist, NULL)) != NULL &&
+		    nvpair_value_int32(bad, &r32) == 0)
+			sh_errf(e, "%s: %s", nvpair_name(bad),
+			    zz_snapwhy(r32));
+		else
+			sh_errf(e, "%s%s: %s", names[0],
+			    n > 1 ? " and the rest" : "", strerror(r));
 	}
-	return (0);
+	nvlist_free(errlist);
+	return (r != 0 ? -1 : 0);
 }
 
 /* One walk for sh_zfs_snapshots. */
@@ -441,7 +501,7 @@ sh_zfs_snapshots(struct sh_zfs *z, const char *ds,
 
 	if ((r = zz_open(z, ds, &zhp, e)) != 0) {
 		if (r == 1)
-			sh_errf(e, "%s: no such filesystem", ds);
+			zz_none(e, ds);
 		return (-1);
 	}
 	w.zs_fn = fn;
@@ -456,41 +516,89 @@ sh_zfs_snapshots(struct sh_zfs *z, const char *ds,
 	return (r != 0 ? -1 : 0);
 }
 
+/* A walk of snapshots: the name of each into ARG, the newest last. */
+static int
+zz_newest(void *arg, const char *snap)
+{
+	(void) snprintf(arg, ZFS_MAX_DATASET_NAME_LEN, "%s", snap);
+	return (0);
+}
+
+/*
+ * dsl_dataset_rollback_check: ENOENT, no DS; ESRCH, no SNAP of DS's;
+ * EEXIST, snapshots after SNAP, or a bookmark after the newest. So
+ * on either of the last two, the newest is looked at.
+ */
 int
 sh_zfs_rollback(struct sh_zfs *z, const char *ds, const char *snap,
     struct sh_err *e)
 {
-	char name[ZFS_MAX_DATASET_NAME_LEN];
+	char name[ZFS_MAX_DATASET_NAME_LEN], last[ZFS_MAX_DATASET_NAME_LEN];
 	int r;
 
-	(void) z;
 	(void) snprintf(name, sizeof (name), "%s@%s", ds, snap);
-	if ((r = lzc_rollback_to(ds, name)) != 0) {
+	if ((r = lzc_rollback_to(ds, name)) == 0)
+		return (0);
+	last[0] = '\0';
+	if (r == ENOENT)
+		zz_none(e, ds);
+	else if ((r == ESRCH || r == EEXIST) &&
+	    sh_zfs_snapshots(z, ds, zz_newest, last, e) == 0 &&
+	    strcmp(last, snap) != 0)
+		sh_errf(e, "%s: not the newest snapshot", name);
+	else
 		sh_errf(e, "%s: %s", name, strerror(r));
-		return (-1);
-	}
-	return (0);
+	return (-1);
 }
 
+/* A walk of snapshots stopped at the first: there is one. */
+static int
+zz_any(void *arg, const char *snap)
+{
+	(void) arg;
+	(void) snap;
+	return (1);
+}
+
+/*
+ * A filesystem: dsl_destroy_head_check_impl refuses EBUSY for
+ * snapshots before EEXIST for children, and EBUSY for a dataset held
+ * busy, so on EBUSY the snapshots are looked for. A snapshot:
+ * lzc_destroy_snaps counts one that is not there as destroyed, so it
+ * is looked for first, and refused as a filesystem would be.
+ */
 int
 sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 {
 	nvlist_t *snaps, *errlist;
 	int r;
 
-	(void) z;
 	if (strchr(name, '@') == NULL) {
-		r = lzc_destroy(name);
-	} else {
-		errlist = NULL;
-		if ((snaps = zz_names(&name, 1)) == NULL) {
-			sh_err_nomem(e);
-			return (-1);
-		}
-		r = lzc_destroy_snaps(snaps, B_FALSE, &errlist);
-		nvlist_free(snaps);
-		nvlist_free(errlist);
+		if ((r = lzc_destroy(name)) == 0)
+			return (0);
+		if (r == ENOENT)
+			sh_errf(e, "%s: no such dataset", name);
+		else if (r == EEXIST)
+			sh_errf(e, "%s: has children", name);
+		else if (r == EBUSY &&
+		    sh_zfs_snapshots(z, name, zz_any, NULL, e) == 1)
+			sh_errf(e, "%s: has snapshots", name);
+		else
+			sh_errf(e, "%s: %s", name, strerror(r));
+		return (-1);
 	}
+	if (!zfs_dataset_exists(z->zz_hdl, name, ZFS_TYPE_SNAPSHOT)) {
+		sh_errf(e, "%s: no such dataset", name);
+		return (-1);
+	}
+	errlist = NULL;
+	if ((snaps = zz_names(&name, 1)) == NULL) {
+		sh_err_nomem(e);
+		return (-1);
+	}
+	r = lzc_destroy_snaps(snaps, B_FALSE, &errlist);
+	nvlist_free(snaps);
+	nvlist_free(errlist);
 	if (r != 0) {
 		sh_errf(e, "%s: %s", name, strerror(r));
 		return (-1);
@@ -506,7 +614,7 @@ sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 
 	if ((r = zz_open(z, ds, &zhp, e)) != 0) {
 		if (r == 1)
-			sh_errf(e, "%s: no such filesystem", ds);
+			zz_none(e, ds);
 		return (-1);
 	}
 	r = zfs_mount(zhp, NULL, 0);
@@ -524,7 +632,7 @@ sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 
 	if ((r = zz_open(z, ds, &zhp, e)) != 0) {
 		if (r == 1)
-			sh_errf(e, "%s: no such filesystem", ds);
+			zz_none(e, ds);
 		return (-1);
 	}
 	r = zfs_unmount(zhp, NULL, 0);

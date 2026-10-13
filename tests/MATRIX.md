@@ -369,12 +369,12 @@ snapshots}; ZFS refusing.
 | Z3 | a snapshot's type, name, createtxg and guid; its own user property, local; its filesystem's, inherited; none, "-" | covered: check_zfs.c |
 | Z4 | a user property set on a snapshot after it is taken; a native one, or a missing snapshot, refused | covered: check_zfs.c |
 | Z5 | a dataset's snapshots: its own only, not its children's, oldest first; FN's stop returned | covered: check_zfs.c |
-| Z6 | rollback to the newest snapshot; to an older one, refused | covered: check_zfs.c |
-| Z7 | destroy: a snapshot; a filesystem with no children and no snapshots; one with either refused | covered: check_zfs.c |
+| Z6 | rollback to the newest snapshot; to an older one, or of a missing filesystem, refused | covered: check_zfs.c |
+| Z7 | destroy: a snapshot; a filesystem with no children and no snapshots; one with either refused, with both for its snapshots (ZFS's order); a missing filesystem or snapshot refused | covered: check_zfs.c |
 | Z8 | inherit: the local value gone, the inherited one back | covered: check_zfs.c |
 | Z9 | unmount after mount | covered: check_zfs.c |
-| Z10 | each call refused when ZFS refuses, with ZFS's reason | covered: check_zfs.c |
-| Z11 | the same cells against libzfs on real pools | box: tests/box/zcheck.c, run by tests/box/run.sh; not yet run. make check links it against the stub |
+| Z10 | each call refused when ZFS refuses, with ZFS's reason, in the same words over libzfs and the fake | covered: check_zfs.c; the words over libzfs, Z11 |
+| Z11 | the same cells against libzfs on real pools, each refusal by its words | box: tests/box/zcheck.c, run by tests/box/run.sh; make check links it against the stub and runs its cells over the fake (tests/box/zcheck-fake.c). Box run 1: Z8's cell wrong (3b50a35), refusals in errno words; run 2 pending |
 
 # Family F: building a foundation (M3; planning.md 7.1; src/core/build.c)
 

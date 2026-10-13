@@ -85,7 +85,8 @@ ZFS_OBJS_freebsd = $(BUILD)/fbsd_zfs.o
 ZFS_OBJS = $(ZFS_OBJS_$(FLAVOR))
 TEST_OBJS = $(BUILD)/zfake.o
 # tests/box/zcheck.c's objects besides the ZFS it checks. make check
-# links it against the stub, so a missing one shows on the mac.
+# links it against the stub, so a missing one shows on the mac, and
+# runs its cells over the fake (tests/box/zcheck-fake.c).
 BOX_OBJS = $(BUILD)/err.o $(BUILD)/tree.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(ZFS_OBJS) $(UCL_OBJS)
 TESTS = check_parse check_schema check_site check_cascade check_show \
@@ -172,6 +173,8 @@ $(BUILD)/box_zcheck: tests/box/zcheck.c $(BOX_OBJS) $(ZFS_OBJS)
 	    $(LDFLAGS)
 $(BUILD)/zfake.o: tests/zfake.c tests/zfake.h src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ tests/zfake.c
+$(BUILD)/zcheck_main.o: tests/box/zcheck.c src/core/zfs.h src/core/err.h
+	$(CC) $(CFLAGS) -Dmain=zcheck_main -c -o $@ tests/box/zcheck.c
 
 $(BUILD)/ucl/ucl_emitter_streamline.o:
 	$(UCL_CHECK)
@@ -205,9 +208,9 @@ $(BUILD)/ucl/ucl_util.o:
 # the core and run), then the command line end to end
 # (tests/run-cli.sh), then the examples of docs/configuration.md
 # (tools/doccheck.py; skipped, and said so, where there is no
-# python3), then the link of tests/box/run.sh's box_zcheck.
-# Everything here runs on the mac.
-check: unit cli doc boxlink
+# python3), then tests/box/run.sh's box_zcheck: linked, and its cells
+# run over the fake. Everything here runs on the mac.
+check: unit cli doc box
 
 unit: build $(CORE_OBJS) $(TEST_OBJS) $(UCL_OBJS)
 	@for t in $(TESTS); do \
@@ -227,8 +230,16 @@ doc: shtetl
 	    echo "doc: no python3: docs/configuration.md not checked"; \
 	fi
 
-boxlink: build $(BUILD)/box_zcheck
+box: build $(BUILD)/box_zcheck $(BUILD)/zcheck_main.o $(BOX_OBJS) \
+	$(TEST_OBJS)
 	@echo "ok   box_zcheck links"
+	@$(CC) $(CFLAGS) -Itests -o $(BUILD)/zcheck_fake \
+	    tests/box/zcheck-fake.c $(BUILD)/zcheck_main.o $(BOX_OBJS) \
+	    $(TEST_OBJS) $(LDFLAGS) || exit 1; \
+	out=$$(./$(BUILD)/zcheck_fake 2>&1) || { echo "$$out"; \
+	    echo "FAIL zcheck over the fake"; exit 1; }; \
+	echo "ok   zcheck over the fake ($$(echo "$$out" | grep -c '^ok ')" \
+	    "cells)"
 
 gate:
 	sh tools/gate.sh
@@ -241,5 +252,5 @@ xcheck:
 clean:
 	rm -rf $(BUILD) shtetl
 
-.PHONY: all build flavor freebsd check check-freebsd unit cli doc boxlink \
+.PHONY: all build flavor freebsd check check-freebsd unit cli doc box \
 	gate xcheck clean

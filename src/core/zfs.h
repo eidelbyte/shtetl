@@ -78,7 +78,8 @@ int sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
 /*
  * Snapshots of N filesystems at once, NAMES ds@snap each, with PROPS
  * set on every one from its birth: one transaction (lzc_snapshot), so
- * all of them are taken, or none.
+ * all of them are taken, or none. A refusal names the one refused: a
+ * name taken, malformed or given twice, or a filesystem missing.
  */
 int sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
     const struct sh_zprop *props, size_t nprops, struct sh_err *e);
@@ -93,14 +94,17 @@ int sh_zfs_snapshots(struct sh_zfs *z, const char *ds,
 
 /*
  * DS rolled back to SNAP, its newest snapshot (lzc_rollback_to): what
- * was written since is gone. Refused when SNAP is not the newest.
+ * was written since is gone. Refused when SNAP is not the newest, or
+ * DS is not there.
  */
 int sh_zfs_rollback(struct sh_zfs *z, const char *ds, const char *snap,
     struct sh_err *e);
 
 /*
  * NAME destroyed: a snapshot (ds@snap), or a filesystem with no
- * children and no snapshots.
+ * children and no snapshots. Refused when NAME is not there, a
+ * snapshot as a filesystem; a filesystem with both is refused for its
+ * snapshots, as ZFS looks at those first.
  */
 int sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e);
 

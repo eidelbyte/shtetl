@@ -161,6 +161,9 @@ test_snapshot_props(void)
 	CHECK(is(get("tank/f", "shtetl:kind", NULL), "foundation"));
 	CHECK(sh_zfs_set(z, "tank/f@v1", "compression", "lz4", &c.c_err) ==
 	    -1);
+	/* libzfs's words, which src/fbsd/zfs.c passes on */
+	CHECK(cap_has(&c, "tank/f@v1: this property can not be modified "
+	    "for snapshots"));
 	CHECK(sh_zfs_set(z, "tank/f@v9", "shtetl:x", "y", &c.c_err) == -1);
 	CHECK(cap_has(&c, "tank/f@v9: no such snapshot"));
 	/* a missing snapshot is 1, as a missing filesystem is */
@@ -188,6 +191,8 @@ test_changes(void)
 	CHECK(sh_zfs_rollback(z, "tank/f", "v1", &c.c_err) == -1);
 	CHECK(cap_has(&c, "tank/f@v1: not the newest snapshot"));
 	CHECK(zfake_last_rollback() == NULL);
+	CHECK(sh_zfs_rollback(z, "tank/nope", "v1", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/nope: no such filesystem"));
 	CHECK(sh_zfs_rollback(z, "tank/f", "v2", &c.c_err) == 0);
 	CHECK(is(zfake_last_rollback(), "tank/f@v2"));
 	/* Z7 */
@@ -195,8 +200,9 @@ test_changes(void)
 	CHECK(sh_zfs_destroy(z, "tank/f@v2", &c.c_err) == 0);
 	CHECK(is(snaps("tank/f", &rc), "v1"));
 	CHECK(sh_zfs_rollback(z, "tank/f", "v1", &c.c_err) == 0);
+	/* children and a snapshot: the snapshot, as ZFS looks first */
 	CHECK(sh_zfs_destroy(z, "tank/f", &c.c_err) == -1);
-	CHECK(cap_has(&c, "tank/f: has children"));
+	CHECK(cap_has(&c, "tank/f: has snapshots"));
 	CHECK(snap(vu, 1, NULL, 0) == 0);
 	CHECK(sh_zfs_destroy(z, "tank/f/var", &c.c_err) == -1);
 	CHECK(cap_has(&c, "tank/f/var: has snapshots"));
@@ -206,6 +212,11 @@ test_changes(void)
 	cap_reset(&c);
 	CHECK(sh_zfs_destroy(z, "tank/f/var", &c.c_err) == -1);
 	CHECK(cap_has(&c, "tank/f/var: no such dataset"));
+	CHECK(sh_zfs_destroy(z, "tank/f@v9", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/f@v9: no such dataset"));
+	CHECK(sh_zfs_destroy(z, "tank/f@v1", &c.c_err) == 0);
+	CHECK(sh_zfs_destroy(z, "tank/f", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/f: has children"));
 	/* Z8 */
 	zfake_set("tank/f", "mountpoint", "/build/f");
 	zfake_set("tank/f/usr", "mountpoint", "/elsewhere");
