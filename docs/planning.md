@@ -942,6 +942,8 @@ a version is an update; there with none, it is refused.
   the installs; installworld's backups after them, each file's flags
   cleared first, then removed: `boot/kernel.old` and boot's other
   `*.old`, `libexec/ld-elf*.so.1.old`, `sbin/init.bak`.
+- pkg and the commands run again (ruled 2026-10-13): the installs put
+  back every file they install, undoing what a command changed.
 - A failed update, and `--abort` of a paused one, roll every dataset
   of F back to the last version (PROPOSAL): F is the foundation's
   history, which an update never destroys. A paused build is an
@@ -1531,6 +1533,23 @@ below that change the plan are folded into the sections named.
 
 ## 14. Rulings
 
+### 2026-10-13 (a foundation's update runs its commands again)
+
+Asked whether "Commands never rerun on update" (2026-10-08) holds for
+a foundation's update, which repeats 7.1's steps 3 - 8: "since a
+foundation update always builds a brand new DESTDIR (eg it doesn't
+act like freebsd-update), then we need to run commands again, since
+it's behaving like a fresh first-run build, even though it's an
+update."
+
+So (7.2): a foundation's update runs its pkg and commands again, as
+its first build did. It installs into F's own datasets, over the last
+version, keeping the one snapshot chain; but installworld and
+distribution put back every file they install, `/etc` among them,
+so what a command changed is undone, as on a fresh build, unlike
+freebsd-update, which merges. The 2026-10-08 ruling is a container's:
+its update rebases what it has, and its commands do not run again.
+
 ### 2026-10-12 (one root to a space)
 
 On `spaces.lake.default` in configuration.md: "why does this matter?
@@ -1823,7 +1842,8 @@ So (5.4, 5.5):
 - Retention: 0 = infinite (default); bare number = trailing count;
   date(1) interval = age, pruned from cron.
 - Foundation names `{recipe}-{ver}-{branch-type}@<ISO-date>-<short-sha>`.
-- Commands never rerun on update. pkg upgrades are decoupled from
+- Commands never rerun on update (a container's; a foundation's runs
+  them again, 2026-10-13). pkg upgrades are decoupled from
   rebases and get their own `-pkg` snapshot.
 - Derivations run only to resolve a rebase conflict on a derived
   binary, answered `keep` before the picker opens.

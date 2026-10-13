@@ -745,6 +745,10 @@ test_update(void)
 	CHECK(strstr(ran, "snapshot tank/zconfig@build-generic-"
 	    "20261008-120000-2\n") != NULL);
 	CHECK(strstr(ran, "made " F) == NULL);
+	/* pkg and the commands again: the installs undid them */
+	CHECK(strstr(ran, "pkg install in ") != NULL);
+	CHECK(strstr(ran, "commands setup, from common/cmd.conf\n"
+	    "commands setup, from foundations/generic.conf\n") != NULL);
 	CHECK(strstr(ran, "removed installworld's backups: boot/kernel.old, "
 	    "boot/loader.old, libexec/ld-elf.so.1.old, "
 	    "libexec/ld-elf32.so.1.old, sbin/init.bak\n") != NULL);

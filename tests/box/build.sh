@@ -455,6 +455,8 @@ EOF
 	    "$([ -e "$_r/sbin/init.bak" ] && echo there)" ""
 	check F27 "the new tree installed: one patch line now" \
 	    "$(grep -c '^shtetl-box ' "$_r/usr/share/misc/bsd-family-tree")" 1
+	check F27 "the command ran again, over distribution's file" \
+	    "$(cat "$_r/etc/motd.template")" shtetl-box
 	for _d in $F/usr/local $F/var $F/tmp $F; do
 		zfs unmount "$_d"
 	done

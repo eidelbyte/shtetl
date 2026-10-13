@@ -350,7 +350,10 @@ Verification: check_build 628 checks (F28 - F31), run-cli.sh F32,
 make check, gate, xcheck. Pending: F33 on the box, after F27.
 tracker: m3-pkg-upgrade testing.
 
-Open for the user: planning.md's rulings say "Commands never rerun on
-update", which reads as the containers' (7.6 rebases them); 7.2 has a
-foundation's update repeat 7.1's steps 3 - 8, its pkg and commands
-among them, and that is how the update is built.
+Asked of the user: planning.md's rulings say "Commands never rerun
+on update", which reads as the containers' (7.6 rebases them); 7.2
+has a foundation's update repeat 7.1's steps 3 - 8, pkg and commands
+among them, and that is how it was built. Ruled 2026-10-13: a
+foundation's update runs its commands again, the install having put
+back what they changed (planning.md 14); check_build and the box's
+F27 hold it.
