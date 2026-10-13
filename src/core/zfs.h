@@ -112,9 +112,10 @@ int sh_zfs_rollback(struct sh_zfs *z, const char *ds, const char *snap,
 
 /*
  * NAME destroyed: a snapshot (ds@snap), or a filesystem with no
- * children and no snapshots. Refused when NAME is not there, a
- * snapshot as a filesystem; a filesystem with both is refused for its
- * snapshots, as ZFS looks at those first.
+ * children and no snapshots, unmounted. Refused when NAME is not
+ * there, a snapshot as a filesystem; a filesystem with both is refused
+ * for its snapshots, as ZFS looks at those first; a mounted one for
+ * being mounted, before either: its mount holds it.
  */
 int sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e);
 

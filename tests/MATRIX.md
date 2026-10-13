@@ -383,6 +383,7 @@ snapshots}; ZFS refusing.
 | Z17 | a clone stream: from the snapshot the source is a clone of, received as a clone of the given origin in the target's pool, holding only the delta; refused: the origin missing | covered: check_zfs.c; box: zcheck.c |
 | Z18 | a snapshot's own user properties walked, not what it inherits; FN's stop returned; set again on a received snapshot (6.2's copy) | covered: check_zfs.c; box: zcheck.c |
 | Z19 | the refusals of Z14 - Z17 in the same words over libzfs and the fake | covered: check_zfs.c; box: zcheck.c |
+| Z20 | a mounted filesystem not destroyed: refused for its mount, before its snapshots, as its mount holds it (dsl_destroy_head_check_impl's long holds); unmounted, destroyed. An undo that skips an unmount fails here over the fake, not first on the box | covered: check_zfs.c; box: zcheck.c |
 
 # Family F: building a foundation (M3; planning.md 7.1; src/core/build.c)
 

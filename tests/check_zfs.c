@@ -240,6 +240,7 @@ test_changes(void)
 static void
 test_mounts(void)
 {
+	const char *ms = "tank/m@s";
 	world();
 	zfake_set("tank/f/usr", "canmount", "off");
 	zfake_set("tank/f/var", "mountpoint", "/v");
@@ -281,6 +282,18 @@ test_mounts(void)
 	zfake_set("tank/f", "mountpoint", "/r");
 	CHECK(sh_zfs_mount(z, "tank/f", &c.c_err) == -1);
 	CHECK(cap_has(&c, "tank/f: mounted at /q, not its mountpoint"));
+	/* Z20: a mounted filesystem not destroyed, before its snapshots */
+	zfake_fs("tank/m");
+	zfake_set("tank/m", "mountpoint", "/m");
+	CHECK(sh_zfs_mount(z, "tank/m", &c.c_err) == 0);
+	CHECK(sh_zfs_snapshot(z, &ms, 1, NULL, 0, &c.c_err) == 0);
+	cap_reset(&c);
+	CHECK(sh_zfs_destroy(z, "tank/m", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/m: mounted") && !cap_has(&c, "snapshots"));
+	CHECK(sh_zfs_unmount(z, "tank/m", &c.c_err) == 0);
+	CHECK(sh_zfs_destroy(z, "tank/m@s", &c.c_err) == 0);
+	CHECK(sh_zfs_destroy(z, "tank/m", &c.c_err) == 0);
+	CHECK(!zfake_exists("tank/m"));
 }
 
 /* Z18: the user properties walked, into these. */

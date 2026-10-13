@@ -172,7 +172,7 @@ main(int argc, char **argv)
 	static const struct sh_zprop zstd = { "compression", "zstd" };
 	const char *v1[3], *v2[3], *bad[2];
 	char t1[64], name[512], g3[512], tn[512], want[640];
-	const char *sv1, *sv2, *sv3, *xs1;
+	const char *sv1, *sv2, *sv3, *xs1, *ms;
 	enum sh_zsrc src;
 	int rc;
 
@@ -369,6 +369,19 @@ main(int argc, char **argv)
 	cell("Z12", "inherited: moved where the default says",
 	    rc == 0 && strcmp(get(at("f"), "mounted", NULL), "yes") == 0 &&
 	    sh_zfs_mount(z, at("f"), &e) == 0);
+	/* Z20: f/m mounted below f, a snapshot of it too */
+	(void) snprintf(name, sizeof (name), "%s@s", at("f/m"));
+	ms = name;
+	cell("Z20", "a filesystem mounted, with a snapshot",
+	    sh_zfs_create(z, at("f/m"), NULL, 0, &e) == 0 &&
+	    sh_zfs_mount(z, at("f/m"), &e) == 0 &&
+	    sh_zfs_snapshot(z, &ms, 1, NULL, 0, &e) == 0);
+	refused("Z20", "destroyed while mounted: refused, before its snapshots",
+	    sh_zfs_destroy(z, at("f/m"), ask()), "f/m", "mounted");
+	cell("Z20", "unmounted, its snapshot destroyed, then it",
+	    sh_zfs_unmount(z, at("f/m"), &e) == 0 &&
+	    sh_zfs_destroy(z, name, &e) == 0 &&
+	    sh_zfs_destroy(z, at("f/m"), &e) == 0);
 
 	/*
 	 * Z14 - Z19: clones and sends, s and its snapshots the source,

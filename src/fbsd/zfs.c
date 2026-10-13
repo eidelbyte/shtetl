@@ -565,10 +565,25 @@ zz_any(void *arg, const char *snap)
 	return (1);
 }
 
+/* Whether the filesystem NAME is mounted. */
+static int
+zz_mounted(struct sh_zfs *z, const char *name)
+{
+	zfs_handle_t *zhp;
+	int r;
+
+	if ((zhp = zfs_open(z->zz_hdl, name, ZFS_TYPE_FILESYSTEM)) == NULL)
+		return (0);
+	r = zfs_is_mounted(zhp, NULL) ? 1 : 0;
+	zfs_close(zhp);
+	return (r);
+}
+
 /*
- * A filesystem: dsl_destroy_head_check_impl refuses EBUSY for
- * snapshots before EEXIST for children, and EBUSY for a dataset held
- * busy, so on EBUSY the snapshots are looked for. A snapshot:
+ * A filesystem: dsl_destroy_head_check_impl refuses EBUSY for a
+ * dataset held long, as a mount holds it, then EBUSY for snapshots,
+ * then EEXIST for children; so on EBUSY the mount and the snapshots
+ * are looked for. A snapshot:
  * lzc_destroy_snaps counts one that is not there as destroyed, so it
  * is looked for first, and refused as a filesystem would be.
  */
@@ -585,6 +600,8 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 			sh_errf(e, "%s: no such dataset", name);
 		else if (r == EEXIST)
 			sh_errf(e, "%s: has children", name);
+		else if (r == EBUSY && zz_mounted(z, name))
+			sh_errf(e, "%s: mounted", name);
 		else if (r == EBUSY &&
 		    sh_zfs_snapshots(z, name, zz_any, NULL, e) == 1)
 			sh_errf(e, "%s: has snapshots", name);

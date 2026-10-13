@@ -36,6 +36,15 @@ pools (box_zcheck POOL/DATASET OTHER/DATASET); run.sh destroys both
 with -R, a clone and its origin being in each. tracker: m4-zfs
 testing.
 
+Later, in a commit of its own just before create's: a mounted
+filesystem is not destroyed. lzc_destroy refuses it EBUSY, the mount
+being a long hold that dsl_destroy_head_check_impl looks at before
+snapshots; the fake destroyed it, so an undo that left a mount would
+have passed on the mac and failed on the box. The fake refuses
+"<fs>: mounted" now, and libzfs's EBUSY is read the same way (Z20;
+check_zfs 190 checks, zcheck over the fake 63 cells). check_build
+passed unchanged: build's undo already unmounts first.
+
 ## m4-beam (568d9a2, 7b4a227)
 
 shtetl beam [-y] [--version v] F (planning.md 7.3), src/core/beam.c.

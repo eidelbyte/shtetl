@@ -517,7 +517,11 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 		sh_errf(e, "zfake: %s: no such dataset", name);
 		return (-1);
 	}
-	/* snapshots first, as dsl_destroy_head_check_impl looks */
+	/* its mount, then snapshots, as dsl_destroy_head_check_impl looks */
+	if (d->zd_at[0] != '\0') {
+		sh_errf(e, "zfake: %s: mounted", name);
+		return (-1);
+	}
 	len = strlen(name);
 	for (i = 0; i < zf_nsnaps; i++) {
 		if (strncmp(zf_snaps[i].zs_name, name, len) == 0 &&
