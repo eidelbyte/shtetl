@@ -414,3 +414,11 @@ not}.
 | F18 | build on the command line: no foundation, two, an unknown option, -m with no message, usage errors; the portable shtetl refuses for want of ZFS; -C not the config root's mountpoint refused | covered: run-cli.sh f18-none, f18-two, f18-option, f18-msg, f18-nozfs; the -C refusal and the run itself on the box |
 | F19 | on a pool imported with an altroot, make and the install are given where the obj cache and F are mounted, below the altroot, not the mountpoint set | box: tests/box/build.sh, its pool imported with one; the fake reports a mountpoint as set |
 
+On the box, tests/box/build.sh builds a foundation for real (sudo sh
+tests/box/build.sh; hours): one pool on a sparse file imported with
+an altroot, bootstrapped by shtetl, the build root a shared clone of
+the box's /usr/src fetching from git.freebsd.org. It runs F13 (a
+fetch that fails, undone on real ZFS), then F11, F12, F16, F17 and
+F19 on a real build of releng/15.1, and logs each by its cell to
+tests/box/results/<host>-build-<time>.log. Not yet run.
+
