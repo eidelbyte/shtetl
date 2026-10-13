@@ -1,7 +1,7 @@
 # shtetl configuration
 
 Every configuration option shtetl takes, how a file is read, and how
-the files of a recipe stack. As built on branch impl/m3, 2026-10-12;
+the files of a recipe stack. As built, 2026-10-12;
 planning.md 5 is the design and section 14 there the rulings this
 follows. For UCL itself, the format, see ucl-primer.md.
 
@@ -14,7 +14,7 @@ where it finds the configuration root itself; the check runs them
 with `-C` naming the example's root.
 
 Reading, checking and stacking, and `config show`, are built (M1,
-reworked on impl/m3). What a key does when a foundation is built or a
+reworked since). What a key does when a foundation is built or a
 container created (the kernel config and src.conf shtetl writes, the
 patches applied, the commands run) is planning.md's, and comes with
 M3 and M4.
