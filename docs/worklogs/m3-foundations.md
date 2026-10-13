@@ -298,3 +298,35 @@ m3-patches tested.
 The kept store (d80d842) was not in this run: the box had not pulled
 it, the log's header says 5802782. Its first run builds whole; the
 one after shows the gain.
+
+## m3-update (09013bc, c621e73)
+
+shtetl build F with F there and a version: its next version into the
+same datasets (planning.md 7.2).
+
+- The plan: an update of @<last>, each dataset kept; the recipe's
+  datasets F's or refused by name; F with no version refused; a
+  securelevel above 0 refused, read through the tools table so the
+  tests can say one (sh_build_plan takes the tools now).
+- The run: no dataset made; delete-old and delete-old-libs between
+  the build and the installs; installworld's backups removed after,
+  their flags cleared (fb_rmtree now clears every file's flags before
+  removing it).
+- Decision beyond the plan (PROPOSAL): a failed update, and --abort
+  of a paused one, roll F back to its last version, never destroy it.
+
+Found by the tests, fixed in the same commit: ld-elf.so.1.old, prefix
+and suffix with nothing between, was not matched as a backup, so
+every update would have kept it; and two builds in one second took
+the same config snapshot name, failing the second (a quick retry after
+a quick failure): now -2, -3.
+
+Verification: check_build 575 checks (F20 - F26; the backups' flags
+the user's immutable one, which an owner may clear on the mac), make
+check, gate, xcheck. Pending: F27 on the box, box built again over
+the first in build.sh, schg cleared for real. tracker: m3-update
+testing.
+
+Gotcha: a test's fixed time makes every build the same second; the
+config snapshot's suffix keeps them apart, and the version's .2 does
+the same for a second version on one day.

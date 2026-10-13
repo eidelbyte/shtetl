@@ -721,7 +721,8 @@ As built (M3, `src/core/build.c`; patches in 7.1.1; updates to come):
   the checkout's newvers.sh) is checked against ver again.
 - The recipe is read where the config root is mounted, the directory
   the build snapshots: `-C` may name only that one. The snapshot is
-  `<config root>@build-F-<YYYYmmdd-HHMMSS>`, `shtetl:kind=config`,
+  `<config root>@build-F-<YYYYmmdd-HHMMSS>` (`-2`, `-3` after it for
+  another build in the same second), `shtetl:kind=config`,
   and the version records it in two properties, `shtetl:config` (its
   name) and `shtetl:config-guid` (PROPOSAL).
 - One build at a time: `shtetl:build=F` on the build root while it
@@ -928,6 +929,23 @@ moving containers to it is out of scope (14, L).
 Then, separately and optionally, `shtetl pkg-upgrade F`: pkg upgrade
 in a chroot, snapshot `-pkg`. Base and base-plus-packages are both
 versions to rebase onto.
+
+As built (M3, `src/core/build.c`): `shtetl build F` with F there and
+a version is an update; there with none, it is refused.
+
+- The plan says so, `foundation F, an update of @<last>`, each dataset
+  kept (`=`). The recipe's datasets must be F's: one the recipe adds,
+  or one F has that it does not name, is refused by name. A
+  securelevel above 0 is refused (`kern.securelevel`).
+- The run makes no dataset; `make delete-old delete-old-libs
+  DESTDIR=<F> BATCH_DELETE_OLD_FILES=yes` after the build and before
+  the installs; installworld's backups after them, each file's flags
+  cleared first, then removed: `boot/kernel.old` and boot's other
+  `*.old`, `libexec/ld-elf*.so.1.old`, `sbin/init.bak`.
+- A failed update, and `--abort` of a paused one, roll every dataset
+  of F back to the last version (PROPOSAL): F is the foundation's
+  history, which an update never destroys. A paused build is an
+  update when F has a version.
 
 **`install -C`** (ruled 2026-10-11, Q-O). Left to itself, installworld
 rewrites every file, so on the onto side every file has a new object,

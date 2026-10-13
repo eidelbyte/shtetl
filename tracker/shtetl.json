@@ -174,7 +174,8 @@
     ],
     "provides": "A foundation's next version on the same snapshot chain.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "Built on the mac (09013bc), box F27 in build.sh (c621e73) pending."
   },
   "m3-pkg-upgrade": {
     "description": "shtetl pkg-upgrade F (planning.md 7.2): pkg upgrade in a chroot of F and a snapshot -pkg of the version (6.1, shtetl:kind=pkg). Verify: MATRIX cells; the box.",
