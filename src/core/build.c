@@ -14,7 +14,11 @@
  * does not name, parents first.
  */
 
+#include <sys/types.h>
 #include <sys/stat.h>
+#if defined(__FreeBSD__) || defined(__APPLE__)
+#include <sys/sysctl.h>
+#endif
 #include <sys/utsname.h>
 
 #include <dirent.h>
@@ -36,6 +40,8 @@
 #include "core/tree.h"
 #include "core/version.h"
 #include "core/zfs.h"
+
+static int fb_kid(void *arg, const char *name);
 
 /* TARGET, F or foundations/F[.conf], as F into NAME. */
 static int
@@ -160,6 +166,111 @@ fb_srcdir(struct sh_zfs *z, struct sh_fplan *p, struct sh_err *e)
 	return (0);
 }
 
+/* A walk of snapshots: each one's name into ARG, the newest last. */
+static int
+fb_lastone(void *arg, const char *snap)
+{
+	(void) snprintf(arg, SH_BUILD_NAME, "%s", snap);
+	return (0);
+}
+
+/* DS's newest snapshot, its name after the @, into LAST; "": none. */
+static int
+fb_last(struct sh_zfs *z, const char *ds, char *last, struct sh_err *e)
+{
+	last[0] = '\0';
+	return (sh_zfs_snapshots(z, ds, fb_lastone, last, e) == 0 ? 0 : -1);
+}
+
+/* Every filesystem below DS, each by its full name, added to *ALL. */
+static int
+fb_walk(struct sh_zfs *z, const char *ds, char ***all, struct sh_err *e)
+{
+	char **kids;
+	size_t i;
+	int r;
+
+	if ((kids = calloc(1, sizeof (*kids))) == NULL) {
+		sh_err_nomem(e);
+		return (-1);
+	}
+	r = sh_zfs_children(z, ds, fb_kid, &kids, e);
+	for (i = 0; r == 0 && kids[i] != NULL; i++) {
+		if (fb_kid(all, kids[i]) != 0) {
+			sh_err_nomem(e);
+			r = -1;
+		} else {
+			r = fb_walk(z, kids[i], all, e);
+		}
+	}
+	for (i = 0; kids[i] != NULL; i++)
+		free(kids[i]);
+	free(kids);
+	return (r);
+}
+
+/*
+ * An update's datasets (7.2): F's, fixed for its life, which the
+ * recipe's must be: each the recipe has that F has not, and each F
+ * has that the recipe has not, refused.
+ */
+static void
+fb_samesets(struct sh_zfs *z, struct sh_fplan *p, struct sh_err *e)
+{
+	char **have;
+	size_t i, j;
+
+	if ((have = calloc(1, sizeof (*have))) == NULL) {
+		sh_err_nomem(e);
+		return;
+	}
+	if (fb_walk(z, p->fp_ds, &have, e) == 0) {
+		for (i = 1; i < p->fp_nds; i++) {
+			for (j = 0; have[j] != NULL &&
+			    strcmp(have[j], p->fp_dss[i].fd_ds) != 0; j++)
+				;
+			if (have[j] == NULL)
+				sh_errf(e, "%s: datasets: %s: not in "
+				    "foundation %s", p->fp_recipe.sr_file,
+				    p->fp_dss[i].fd_rel, p->fp_name);
+		}
+		for (j = 0; have[j] != NULL; j++) {
+			for (i = 1; i < p->fp_nds &&
+			    strcmp(have[j], p->fp_dss[i].fd_ds) != 0; i++)
+				;
+			if (i == p->fp_nds)
+				sh_errf(e, "%s: not in the recipe", have[j]);
+		}
+	}
+	for (j = 0; have[j] != NULL; j++)
+		free(have[j]);
+	free(have);
+}
+
+/*
+ * F there: the build is its next version (7.2), from its last, at a
+ * securelevel where installworld's schg flags can be cleared, into
+ * the datasets it has.
+ */
+static void
+fb_updatable(struct sh_zfs *z, struct sh_fplan *p,
+    const struct sh_tools *t, struct sh_err *e)
+{
+	int lvl;
+
+	p->fp_update = 1;
+	if (fb_last(z, p->fp_ds, p->fp_last, e) != 0)
+		return;
+	if (p->fp_last[0] == '\0') {
+		sh_errf(e, "foundation %s exists without a version",
+		    p->fp_name);
+		return;
+	}
+	if ((lvl = t->tl_securelevel()) > 0)
+		sh_errf(e, "securelevel %d: schg flags cannot be cleared", lvl);
+	fb_samesets(z, p, e);
+}
+
 /* Whether the run directory of the build of NAME holds a pause. */
 static int
 fb_paused(const char *runbase, const char *name)
@@ -217,6 +328,9 @@ fb_resumable(struct sh_zfs *z, struct sh_fplan *p, const char *root,
 	(void) fb_srcdir(z, p, e);
 	if (sh_zfs_get(z, p->fp_ds, "type", val, sizeof (val), NULL, e) != 0)
 		sh_errf(e, "foundation %s missing", p->fp_name);
+	else if (fb_last(z, p->fp_ds, p->fp_last, e) == 0 &&
+	    p->fp_last[0] != '\0')
+		p->fp_update = 1;
 	p->fp_obj_there = 1;
 	if (p->fp_verb == SH_BV_ABORT)
 		return;
@@ -232,8 +346,8 @@ fb_resumable(struct sh_zfs *z, struct sh_fplan *p, const char *root,
 int
 sh_build_plan(struct sh_zfs *z, const struct sh_spaces *s,
     const struct sh_node *site, const char *root, const char *target,
-    const char *runbase, enum sh_bverb verb, struct sh_fplan *p,
-    struct sh_err *e, struct sh_err *w)
+    const char *runbase, const struct sh_tools *t, enum sh_bverb verb,
+    struct sh_fplan *p, struct sh_err *e, struct sh_err *w)
 {
 	char val[SH_ZFS_VALMAX];
 	enum sh_zsrc src;
@@ -285,7 +399,7 @@ sh_build_plan(struct sh_zfs *z, const struct sh_spaces *s,
 		return (-1);
 	r = sh_zfs_get(z, p->fp_ds, "type", val, sizeof (val), NULL, e);
 	if (r == 0)
-		sh_errf(e, "foundation %s exists", p->fp_name);
+		fb_updatable(z, p, t, e);
 	r = sh_zfs_get(z, p->fp_obj, "type", val, sizeof (val), NULL, e);
 	p->fp_obj_there = r == 0;
 	return (e->se_count == before ? 0 : -1);
@@ -361,8 +475,12 @@ sh_build_show(FILE *out, const struct sh_fplan *p)
 	const struct sh_node *kc, *v;
 	size_t i;
 
-	(void) fprintf(out, "foundation %s, new, from %s\n", p->fp_name,
-	    p->fp_src_branch);
+	if (p->fp_update)
+		(void) fprintf(out, "foundation %s, an update of @%s, from "
+		    "%s\n", p->fp_name, p->fp_last, p->fp_src_branch);
+	else
+		(void) fprintf(out, "foundation %s, new, from %s\n",
+		    p->fp_name, p->fp_src_branch);
 	if (p->fp_branch.br_type == SH_BR_RELENG)
 		(void) fprintf(out, "  version %ld.%ld-releng-<day>-<commit>\n",
 		    p->fp_branch.br_major, p->fp_branch.br_minor);
@@ -373,6 +491,11 @@ sh_build_show(FILE *out, const struct sh_fplan *p)
 		(void) fprintf(out, "  version <major>-%s-<day>-<commit>\n",
 		    kind[p->fp_branch.br_type]);
 	for (i = 0; i < p->fp_nds; i++) {
+		/* an update's datasets are F's, as they were made */
+		if (p->fp_update) {
+			(void) fprintf(out, "  = %s\n", p->fp_dss[i].fd_ds);
+			continue;
+		}
 		(void) fprintf(out, "  + %s", p->fp_dss[i].fd_ds);
 		fb_props(out, &p->fp_dss[i]);
 		(void) fputc('\n', out);
@@ -403,8 +526,13 @@ sh_build_show(FILE *out, const struct sh_fplan *p)
 	else
 		(void) fprintf(out, "  make -j<hw.ncpu> buildworld "
 		    "buildkernel\n");
+	if (p->fp_update)
+		(void) fprintf(out, "  make delete-old delete-old-libs, "
+		    "then\n");
 	(void) fprintf(out, "  install world, kernel and distribution "
 	    "(install -C)\n");
+	if (p->fp_update)
+		(void) fprintf(out, "  installworld's backups removed\n");
 	(void) fprintf(out, "  pkg: ");
 	fb_keys(out, p, "pkg");
 	(void) fprintf(out, "\n  commands: ");
@@ -414,8 +542,24 @@ sh_build_show(FILE *out, const struct sh_fplan *p)
 
 /* ---- the run ---------------------------------------------------- */
 
+/* kern.securelevel; 0 where there is none to read. */
+static int
+fb_securelevel(void)
+{
+#if defined(__FreeBSD__) || defined(__APPLE__)
+	size_t len;
+	int lvl;
+
+	len = sizeof (lvl);
+	if (sysctlbyname("kern.securelevel", &lvl, &len, NULL, 0) == 0)
+		return (lvl);
+#endif
+	return (0);
+}
+
 const struct sh_tools sh_build_tools = {
-	"git", "make", "pkg", "chroot", "mount", "umount", "sh"
+	"git", "make", "pkg", "chroot", "mount", "umount", "sh",
+	fb_securelevel
 };
 
 /* What a run has done, to be undone, newest last. */
@@ -426,7 +570,8 @@ enum fu_kind {
 	FU_INHERIT,	/* a dataset's mountpoint set, inherited */
 	FU_UMOUNT,	/* a path mounted (devfs), unmounted */
 	FU_UNLINK,	/* a file put in F, removed */
-	FU_PATCHES	/* the build root back to @shtetl-patch-0 */
+	FU_PATCHES,	/* the build root back to @shtetl-patch-0 */
+	FU_ROLLBACK	/* an update's dataset back to the last version */
 };
 
 struct fu {
@@ -543,6 +688,12 @@ fb_undo(struct fb *b, size_t mark, int failed)
 			break;
 		case FU_PATCHES:
 			fb_unpatch(b);
+			break;
+		case FU_ROLLBACK:
+			if (sh_zfs_rollback(b->fb_z, u->fu_what,
+			    b->fb_p->fp_last, b->fb_err) == 0)
+				(void) fprintf(b->fb_out, "rolled back %s to "
+				    "@%s\n", u->fu_what, b->fb_p->fp_last);
 			break;
 		}
 	}
@@ -715,10 +866,10 @@ fb_begin(struct fb *b, time_t now)
 {
 	struct sh_fplan *p = b->fb_p;
 	struct sh_zprop kind = { "shtetl:kind", "config" };
+	char stamp[32], val[SH_ZFS_VALMAX];
 	const char *one;
-	char stamp[32];
 	struct tm tm;
-	int fd;
+	int fd, n;
 
 	if (fb_mkdirs(b, p->fp_rundir) != 0)
 		return (-1);
@@ -739,6 +890,11 @@ fb_begin(struct fb *b, time_t now)
 	(void) strftime(stamp, sizeof (stamp), "%Y%m%d-%H%M%S", &tm);
 	(void) snprintf(b->fb_cfgsnap, sizeof (b->fb_cfgsnap),
 	    "%s@build-%s-%s", p->fp_config, p->fp_name, stamp);
+	/* a build in the same second as one before it: -2, -3, ... */
+	for (n = 2; n < 100 && sh_zfs_get(b->fb_z, b->fb_cfgsnap, "type",
+	    val, sizeof (val), NULL, b->fb_err) == 0; n++)
+		(void) snprintf(b->fb_cfgsnap, sizeof (b->fb_cfgsnap),
+		    "%s@build-%s-%s-%d", p->fp_config, p->fp_name, stamp, n);
 	one = b->fb_cfgsnap;
 	if (sh_zfs_snapshot(b->fb_z, &one, 1, &kind, 1, b->fb_err) != 0 ||
 	    sh_zfs_get(b->fb_z, b->fb_cfgsnap, "guid", b->fb_cfgguid,
@@ -770,7 +926,11 @@ fb_zprops(const struct sh_fds *d, struct sh_zprop *zp, size_t max)
 	return (n);
 }
 
-/* F's datasets made, before anything is installed; the obj cache. */
+/*
+ * F's datasets made, before anything is installed, or an update's
+ * marked for going back to the last version on a failure; the obj
+ * cache.
+ */
 static int
 fb_create(struct fb *b)
 {
@@ -778,7 +938,9 @@ fb_create(struct fb *b)
 	struct sh_zprop zp[32];
 	size_t i, n;
 
-	for (i = 0; i < p->fp_nds; i++) {
+	for (i = 0; p->fp_update && i < p->fp_nds; i++)
+		fb_push(b, FU_ROLLBACK, 1, p->fp_dss[i].fd_ds);
+	for (i = 0; !p->fp_update && i < p->fp_nds; i++) {
 		n = fb_zprops(&p->fp_dss[i], zp, 32);
 		if (sh_zfs_create(b->fb_z, p->fp_dss[i].fd_ds, zp, n,
 		    b->fb_err) != 0)
@@ -914,7 +1076,10 @@ fb_version(struct fb *b, time_t now)
 	return (0);
 }
 
-/* PATH, and everything below it, removed; gone already is done. */
+/*
+ * PATH, and everything below it, removed, its file flags cleared
+ * first; gone already is done.
+ */
 static int
 fb_rmtree(struct fb *b, const char *path)
 {
@@ -927,6 +1092,11 @@ fb_rmtree(struct fb *b, const char *path)
 	if (lstat(path, &st) != 0) {
 		if (errno == ENOENT)
 			return (0);
+		sh_errf(b->fb_err, "%s: %s", path, strerror(errno));
+		return (-1);
+	}
+	/* immutable or undeletable first, as installworld leaves some */
+	if (st.st_flags != 0 && lchflags(path, 0) != 0) {
 		sh_errf(b->fb_err, "%s: %s", path, strerror(errno));
 		return (-1);
 	}
@@ -1416,7 +1586,8 @@ fb_resume(struct fb *b)
 		return (-1);
 	fb_push(b, FU_UNLOCK, 0, p->fp_src);
 	for (i = 0; i < p->fp_nds; i++)
-		fb_push(b, FU_DESTROY, 1, p->fp_dss[i].fd_ds);
+		fb_push(b, p->fp_update ? FU_ROLLBACK : FU_DESTROY, 1,
+		    p->fp_dss[i].fd_ds);
 	if (fb_fetch(b, 0) != 0)
 		return (-1);
 	if (at >= b->fb_npa || b->fb_pz.pz_nsrc != pz->pz_nsrc) {
@@ -1484,10 +1655,38 @@ fb_destroyf(struct fb *b, const char *ds)
 	return (0);
 }
 
+/* DS and every filesystem below it rolled back to SNAP. */
+static int
+fb_rollbackf(struct fb *b, const char *ds, const char *snap)
+{
+	char **all;
+	size_t i;
+	int r;
+
+	if ((all = calloc(1, sizeof (*all))) == NULL || fb_kid(&all,
+	    ds) != 0) {
+		free(all);
+		sh_err_nomem(b->fb_err);
+		return (-1);
+	}
+	r = fb_walk(b->fb_z, ds, &all, b->fb_err);
+	for (i = 0; r == 0 && all[i] != NULL; i++) {
+		r = sh_zfs_rollback(b->fb_z, all[i], snap, b->fb_err);
+		if (r == 0)
+			(void) fprintf(b->fb_out, "rolled back %s to @%s\n",
+			    all[i], snap);
+	}
+	for (i = 0; all[i] != NULL; i++)
+		free(all[i]);
+	free(all);
+	return (r);
+}
+
 /*
- * --abort: the build root back to @shtetl-patch-0, F's datasets
- * destroyed, the mark cleared, the record and the fetched patches
- * gone; the log and the config snapshot stay.
+ * --abort: the build root back to @shtetl-patch-0, a new F's datasets
+ * destroyed or an update's rolled back to the last version, the mark
+ * cleared, the record and the fetched patches gone; the log and the
+ * config snapshot stay.
  */
 static int
 fb_abort(struct fb *b)
@@ -1500,7 +1699,9 @@ fb_abort(struct fb *b)
 	b->fb_psnaps = p->fp_pause.pz_at + 1;
 	/* every patch snapshot gone, or the rollback failed and said so */
 	fb_unpatch(b);
-	if (b->fb_psnaps != 0 || fb_destroyf(b, p->fp_ds) != 0 ||
+	if (b->fb_psnaps != 0 || (p->fp_update ?
+	    fb_rollbackf(b, p->fp_ds, p->fp_last) :
+	    fb_destroyf(b, p->fp_ds)) != 0 ||
 	    sh_zfs_inherit(b->fb_z, p->fp_src, SH_BUILD_PROP,
 	    b->fb_err) != 0)
 		return (-1);
@@ -1777,15 +1978,19 @@ fb_mounts(struct fb *b, size_t *fmark)
 	return (0);
 }
 
-/* make in the checkout: TARGET, with what every one of them takes. */
+/*
+ * make in the checkout, with what every target takes: buildworld and
+ * buildkernel (HOW 0); TARGET, an install into F (1); or delete-old
+ * delete-old-libs in F (2).
+ */
 static int
-fb_make(struct fb *b, const char *target, const char *jobs, int install)
+fb_make(struct fb *b, const char *target, const char *jobs, int how)
 {
 	struct sh_fplan *p = b->fb_p;
 	char srcconf[SH_BUILD_PATH + 16], kdir[SH_BUILD_PATH + 16];
 	char kconf[SH_BUILD_NAME + 16], dest[SH_BUILD_PATH + 16];
 	char obj[SH_BUILD_PATH + 32];
-	const char *w[12], *env[3];
+	const char *w[13], *env[3];
 	size_t n;
 
 	(void) snprintf(srcconf, sizeof (srcconf), "SRCCONF=%s",
@@ -1801,11 +2006,18 @@ fb_make(struct fb *b, const char *target, const char *jobs, int install)
 	w[n++] = p->fp_srcdir;
 	if (jobs != NULL)
 		w[n++] = jobs;
-	if (install) {
+	if (how == 1) {
 		w[n++] = target;
 		w[n++] = dest;
 		w[n++] = "INSTALL_CMD=install -C";
+	} else if (how == 2) {
+		target = "delete-old delete-old-libs";
+		w[n++] = "delete-old";
+		w[n++] = "delete-old-libs";
+		w[n++] = dest;
+		w[n++] = "BATCH_DELETE_OLD_FILES=yes";
 	} else {
+		target = "buildworld buildkernel";
 		w[n++] = "buildworld";
 		w[n++] = "buildkernel";
 	}
@@ -1817,13 +2029,100 @@ fb_make(struct fb *b, const char *target, const char *jobs, int install)
 	env[0] = "PATH=" SH_RUN_PATH;
 	env[1] = obj;
 	env[2] = NULL;
-	(void) fprintf(b->fb_out, "make %s (log %s)\n", install ? target :
-	    "buildworld buildkernel", b->fb_log);
+	(void) fprintf(b->fb_out, "make %s (log %s)\n", target, b->fb_log);
 	(void) fflush(b->fb_out);
 	return (fb_exec(b, w, env, 0, NULL, 0));
 }
 
-/* The build, and the install into F (7.1 steps 4, 5). */
+static int
+fb_strcmp(const void *a, const void *b)
+{
+	return (strcmp(*(char *const *)a, *(char *const *)b));
+}
+
+/* Whether NAME is PRE...SUF, or with EXACT, PRE alone. */
+static int
+fb_named(const char *name, const char *pre, const char *suf, int exact)
+{
+	size_t n = strlen(name), lp = strlen(pre), ls = strlen(suf);
+
+	if (exact)
+		return (strcmp(name, pre) == 0);
+	/* ld-elf.so.1.old is PRE and SUF alone; .old alone is nothing */
+	return (n >= lp + ls && n > ls && strncmp(name, pre, lp) == 0 &&
+	    strcmp(name + n - ls, suf) == 0);
+}
+
+/*
+ * installworld's own backups (7.2 step 3), their flags cleared first:
+ * boot/kernel.old and boot's other *.old, libexec/ld-elf*.so.1.old,
+ * sbin/init.bak.
+ */
+static int
+fb_backups(struct fb *b)
+{
+	static const struct {
+		const char	*bk_dir;
+		const char	*bk_pre;
+		const char	*bk_suf;
+		int		bk_exact;
+	} bk[] = {
+		{ "boot", "", ".old", 0 },
+		{ "libexec", "ld-elf", ".so.1.old", 0 },
+		{ "sbin", "init.bak", "", 1 }
+	};
+	char dir[SH_BUILD_PATH + 16], path[SH_BUILD_PATH * 2], **gone;
+	struct dirent *de;
+	size_t i, j;
+	DIR *d;
+	int r;
+
+	if ((gone = calloc(1, sizeof (*gone))) == NULL) {
+		sh_err_nomem(b->fb_err);
+		return (-1);
+	}
+	r = 0;
+	for (i = 0; r == 0 && i < sizeof (bk) / sizeof (bk[0]); i++) {
+		(void) snprintf(dir, sizeof (dir), "%s/%s", b->fb_rootdir,
+		    bk[i].bk_dir);
+		if ((d = opendir(dir)) == NULL)
+			continue;
+		while (r == 0 && (de = readdir(d)) != NULL) {
+			if (!fb_named(de->d_name, bk[i].bk_pre, bk[i].bk_suf,
+			    bk[i].bk_exact))
+				continue;
+			(void) snprintf(path, sizeof (path), "%s/%s",
+			    bk[i].bk_dir, de->d_name);
+			if (fb_kid(&gone, path) != 0) {
+				sh_err_nomem(b->fb_err);
+				r = -1;
+			}
+		}
+		(void) closedir(d);
+	}
+	for (j = 0; gone[j] != NULL; j++)
+		;
+	qsort(gone, j, sizeof (*gone), fb_strcmp);
+	for (j = 0; r == 0 && gone[j] != NULL; j++) {
+		(void) snprintf(path, sizeof (path), "%s/%s", b->fb_rootdir,
+		    gone[j]);
+		r = fb_rmtree(b, path);
+		(void) fprintf(b->fb_out, "%s%s", j == 0 ?
+		    "removed installworld's backups: " : ", ", gone[j]);
+	}
+	if (j > 0)
+		(void) fputc('\n', b->fb_out);
+	for (j = 0; gone[j] != NULL; j++)
+		free(gone[j]);
+	free(gone);
+	return (r);
+}
+
+/*
+ * The build, and the install into F (7.1 steps 4, 5); for an update,
+ * delete-old before the install and installworld's backups gone after
+ * (7.2).
+ */
 static int
 fb_world(struct fb *b)
 {
@@ -1838,11 +2137,13 @@ fb_world(struct fb *b)
 	(void) snprintf(jobs, sizeof (jobs), "-j%ld", n > 0 ? n : 1);
 	if (fb_make(b, NULL, jobs, 0) != 0)
 		return (-1);
+	if (b->fb_p->fp_update && fb_make(b, NULL, NULL, 2) != 0)
+		return (-1);
 	for (i = 0; i < sizeof (installs) / sizeof (installs[0]); i++) {
 		if (fb_make(b, installs[i], NULL, 1) != 0)
 			return (-1);
 	}
-	return (0);
+	return (b->fb_p->fp_update ? fb_backups(b) : 0);
 }
 
 /* The recipe's packages and commands, in a chroot of F (7.1 step 6). */

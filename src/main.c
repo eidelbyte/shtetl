@@ -349,7 +349,8 @@ cmd_build(struct sh_ctx *ctx, int argc, char **argv)
 	if ((plan = calloc(1, sizeof (*plan))) == NULL) {
 		sh_err_nomem(&e);
 	} else if (sh_build_plan(ctx->sc_zfs, &ctx->sc_spaces, site.ss_merged,
-	    dir, target, SH_BUILD_DIR, verb, plan, &e, &w) == 0) {
+	    dir, target, SH_BUILD_DIR, &sh_build_tools, verb, plan, &e,
+	    &w) == 0) {
 		/* a paused build was confirmed when it began */
 		if (verb == SH_BV_NEW) {
 			sh_build_show(stdout, plan);

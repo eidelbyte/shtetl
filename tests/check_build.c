@@ -24,6 +24,14 @@ static struct sh_fplan p;
 static char root[1200];
 static const char *runbase = "/var/db/x";
 static enum sh_bverb verb = SH_BV_NEW;
+static struct sh_tools fake;
+static int seclevel;		/* what the fake securelevel says */
+
+static int
+fakelevel(void)
+{
+	return (seclevel);
+}
 
 static int
 is(const char *got, const char *want)
@@ -82,8 +90,8 @@ plan(const char *target)
 	sh_build_free(&p);
 	cap_reset(&c);
 	cap_reset(&wc);
-	return (sh_build_plan(z, &s, NULL, root, target, runbase, verb, &p,
-	    &c.c_err, &wc.c_err));
+	return (sh_build_plan(z, &s, NULL, root, target, runbase, &fake, verb,
+	    &p, &c.c_err, &wc.c_err));
 }
 
 /* Refused with one message holding WANT. */
@@ -158,9 +166,9 @@ test_refused(void)
 	zfake_set("tank/zbuild", "mountpoint", "none");
 	refused("generic", "build root tank/zbuild: no mountpoint");
 	world();
-	/* F7 */
+	/* F7, F21: there with no version: neither new nor an update */
 	zfake_fs("tank/shtetl/foundations/generic");
-	refused("generic", "foundation generic exists");
+	refused("generic", "foundation generic exists without a version");
 }
 
 /* The datasets planned, rel[*] each, space-separated. */
@@ -277,7 +285,6 @@ test_show(void)
 #define	VERSION	"15.1-releng-2026-10-08-0f691888dc56"
 #define	F	"tank/shtetl/foundations/generic"
 
-static struct sh_tools fake;
 static char toolpath[7][1200];
 static char *ran;		/* what the run printed */
 
@@ -352,6 +359,7 @@ fakes(const char *revision)
 	fake.tl_mount = toolpath[4];
 	fake.tl_umount = toolpath[5];
 	fake.tl_sh = "/bin/sh";
+	fake.tl_securelevel = fakelevel;
 	(void) snprintf(nv, sizeof (nv), "[ \"$1\" = -V ] && "
 	    "echo \"$2=\\\"%s\\\"\"\n", revision);
 	(void) scratch_write("src/sys/conf/newvers.sh", nv);
@@ -547,10 +555,6 @@ test_run(void)
 	    "x\n"));
 	CHECK(access(scratch_path("run/generic/root/etc/resolv.conf"), F_OK)
 	    != 0);
-
-	/* built: a second build of it is an update's, and refused here */
-	CHECK(plan("generic") == -1);
-	CHECK(cap_has(&c, "foundation generic exists"));
 }
 
 /* F12 - F15: refusals and failures, each undone. */
@@ -637,6 +641,126 @@ test_failures(void)
 	fakes("15.1");
 	CHECK(build(NULL) == 0);
 	CHECK(strstr(slurp(scratch_path("tools.log")), "devfs") == NULL);
+}
+
+/* Whether REL in F's mount, the run's root, is there. */
+static int
+inroot(const char *rel)
+{
+	char path[1400];
+
+	(void) snprintf(path, sizeof (path), "%s/generic/root/%s", runbase,
+	    rel);
+	return (access(path, F_OK) == 0);
+}
+
+/* F20 - F25: a foundation built again, an update (planning.md 7.2). */
+static void
+test_update(void)
+{
+	static const char *const extra[] = {
+		"foundations/generic.conf", "src_branch = \"releng/15.1\";\n"
+		"datasets { opt {} }\n",
+		NULL
+	};
+	static const char *const backups[] = { "boot/kernel.old/kernel",
+	    "boot/loader.old", "libexec/ld-elf.so.1.old",
+	    "libexec/ld-elf32.so.1.old", "sbin/init.bak", NULL };
+	static const char *const kept[] = { "boot/kernel/kernel",
+	    "boot/loader", "libexec/ld-elf.so.1", "sbin/init",
+	    "sbin/init.bak2", "etc/rc.old", "boot/.old", NULL };
+	static const char *const order[] = {
+		"make -C ", " buildworld buildkernel ",
+		"make -C ", " delete-old delete-old-libs DESTDIR=",
+		"root BATCH_DELETE_OLD_FILES=yes SRCCONF=",
+		"make -C ", " installworld DESTDIR=", NULL
+	};
+	char rel[256], text[1400], *out;
+	size_t i, len;
+	FILE *f;
+
+	runworld();
+	fakes("15.1");
+	config("u", recipe);
+	CHECK(build(NULL) == 0);
+	/* F20 */
+	CHECK(plan("generic") == 0 && p.fp_update == 1);
+	CHECK(is(p.fp_last, VERSION));
+	out = NULL;
+	f = open_memstream(&out, &len);
+	CHECK(f != NULL);
+	sh_build_show(f, &p);
+	CHECK(fclose(f) == 0);
+	CHECK(strstr(out, "foundation generic, an update of @" VERSION
+	    ", from releng/15.1\n  version ") != NULL);
+	CHECK(strstr(out, "  = " F "\n  = " F "/tmp\n") != NULL);
+	CHECK(strstr(out, "  = " F "/usr/local\n") != NULL);
+	CHECK(strstr(out, "  make delete-old delete-old-libs, then\n"
+	    "  install world, kernel and distribution (install -C)\n"
+	    "  installworld's backups removed\n") != NULL);
+	free(out);
+	/* F22 */
+	seclevel = 1;
+	refused("generic", "securelevel 1: schg flags cannot be cleared");
+	seclevel = 0;
+	/* F21 */
+	zfake_fs(F "/extra");
+	refused("generic", F "/extra: not in the recipe");
+	CHECK(sh_zfs_destroy(z, F "/extra", &wc.c_err) == 0);
+	config("u2", extra);
+	refused("generic", "foundations/generic.conf: datasets: opt: not in "
+	    "foundation generic");
+	config("u", recipe);
+
+	/* F23, F24: the run; installworld's backups, some immutable */
+	for (i = 0; backups[i] != NULL; i++) {
+		(void) snprintf(rel, sizeof (rel), "run/generic/root/%s",
+		    backups[i]);
+		(void) scratch_write(rel, "old\n");
+	}
+	for (i = 0; kept[i] != NULL; i++) {
+		(void) snprintf(rel, sizeof (rel), "run/generic/root/%s",
+		    kept[i]);
+		(void) scratch_write(rel, "new\n");
+	}
+	(void) snprintf(text, sizeof (text), "%s",
+	    scratch_path("run/generic/root/sbin/init.bak"));
+	CHECK(chflags(text, UF_IMMUTABLE) == 0);
+	(void) snprintf(text, sizeof (text), "%s",
+	    scratch_path("run/generic/root/boot/kernel.old"));
+	CHECK(chflags(text, UF_IMMUTABLE) == 0);
+	(void) unlink(scratch_path("tools.log"));
+	CHECK(build(NULL) == 0);
+	/* the second build in the second: the config snapshot's -2 */
+	CHECK(strstr(ran, "snapshot tank/zconfig@build-generic-"
+	    "20261008-120000-2\n") != NULL);
+	CHECK(strstr(ran, "made " F) == NULL);
+	CHECK(strstr(ran, "removed installworld's backups: boot/kernel.old, "
+	    "boot/loader.old, libexec/ld-elf.so.1.old, "
+	    "libexec/ld-elf32.so.1.old, sbin/init.bak\n") != NULL);
+	CHECK(strstr(ran, "built " F "@" VERSION ".2\n") != NULL);
+	CHECK(in_order(slurp(scratch_path("tools.log")), order));
+	for (i = 0; backups[i] != NULL; i++)
+		CHECK(!inroot(backups[i]));
+	CHECK(!inroot("boot/kernel.old"));
+	for (i = 0; kept[i] != NULL; i++)
+		CHECK(inroot(kept[i]));
+	CHECK(zfake_snapshot(F "/usr/local@" VERSION) &&
+	    zfake_snapshot(F "/usr/local@" VERSION ".2"));
+	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "-"));
+
+	/* F25: a failure: F back to its last version, nothing destroyed */
+	(void) scratch_write("fail/make-installworld", "");
+	CHECK(build(NULL) == -1);
+	(void) unlink(scratch_path("fail/make-installworld"));
+	CHECK(strstr(ran, "rolled back " F " to @" VERSION ".2\n") != NULL);
+	CHECK(strstr(ran, "rolled back " F "/usr/local to @" VERSION ".2\n")
+	    != NULL);
+	CHECK(strstr(ran, "destroyed") == NULL);
+	CHECK(zfake_exists(F) && zfake_exists(F "/usr/local"));
+	CHECK(is(zfake_last_rollback(), F "@" VERSION ".2"));
+	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "-"));
+	CHECK(!zfake_snapshot(F "@" VERSION ".3"));
 }
 
 /* ---- family P: patches ------------------------------------------ */
@@ -1132,6 +1256,23 @@ test_pause(void)
 	CHECK(resume(SH_BV_ABORT, NULL) == 0);
 	(void) snprintf(path, sizeof (path), "%s/a.c.rej", tree);
 	CHECK(access(path, F_OK) != 0);
+
+	/* F26: an update paused: --abort rolls F back, --skip updates */
+	patchworld();
+	config("qe", generic);
+	CHECK(build(NULL) == 0);
+	patchconf("qf", "\"patches/pause\" {}");
+	pausepatches(0);
+	CHECK(build(NULL) == 1);
+	CHECK(resume(SH_BV_ABORT, NULL) == 0);
+	CHECK(strstr(ran, "rolled back " F " to @" VERSION "\n") != NULL);
+	CHECK(strstr(ran, "destroyed") == NULL && zfake_exists(F));
+	CHECK(zfake_snapshot(F "@" VERSION));
+	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "-"));
+	CHECK(build(NULL) == 1);
+	CHECK(resume(SH_BV_SKIP, NULL) == 0);
+	CHECK(strstr(ran, "make delete-old delete-old-libs") != NULL);
+	CHECK(strstr(ran, "built " F "@" VERSION ".2\n") != NULL);
 	zfake_hook(NULL, NULL);
 }
 
@@ -1146,6 +1287,7 @@ main(void)
 	test_show();
 	test_run();
 	test_failures();
+	test_update();
 	test_patches();
 	test_pause();
 	free(ran);

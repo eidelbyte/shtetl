@@ -392,7 +392,10 @@ there or not}; the recipe {accepted, refused}; src_branch against ver
 not mounted}; F {new, there already}; the recipe's datasets {none,
 nested with the parent named, nested without, a parent named after
 its child, with properties, more than fit}; the obj cache {there,
-not}.
+not}; F {new, there with a version (an update), there without one};
+an update's datasets {as F's, one added, one gone}; the securelevel
+{0, above}; installworld's backups {none, each kind, flagged
+immutable}; an update's end {built, failed, paused and aborted}.
 
 | cell | scenario | disposition |
 |------|----------|-------------|
@@ -402,7 +405,7 @@ not}.
 | F4 | src_branch not meeting ver, refused naming the constraint and its file | covered: check_build.c |
 | F5 | a build under way (shtetl:build set on the build root) refused, naming it | covered: check_build.c |
 | F6 | the build root with no mountpoint, or not mounted, refused | covered: check_build.c |
-| F7 | a foundation of that name already there, refused | covered: check_build.c |
+| F7 | a foundation of that name already there: with a version, an update (F20); without one, refused | covered: check_build.c |
 | F8 | F's datasets: F first, the recipe's in its order, a placeholder for each parent it does not name, a parent named after its child made real, properties carried; more than 32 refused | covered: check_build.c |
 | F9 | the obj cache: made when missing, taken when there | covered: check_build.c |
 | F10 | the plan shown: the branch and the version's pattern, each dataset with what it is set to, the obj cache, the checkout, the kernel and its lines, src.conf, make -j, the install, pkg, commands, the snapshot | covered: check_build.c |
@@ -415,6 +418,14 @@ not}.
 | F17 | shtetl:commit: the build's own message, or the one given | covered: check_build.c |
 | F18 | build on the command line: no foundation, two, an unknown option, -m with no message, usage errors; the portable shtetl refuses for want of ZFS; -C not the config root's mountpoint refused | covered: run-cli.sh f18-none, f18-two, f18-option, f18-msg, f18-nozfs; the -C refusal and the run itself on the box |
 | F19 | on a pool imported with an altroot, make and the install are given where the obj cache and F are mounted, below the altroot, not the mountpoint set | box: tests/box/build.sh, its pool imported with one; the fake reports a mountpoint as set |
+| F20 | an update (planning.md 7.2): F there with a version, the build is its next, into the same datasets; the plan says so, each dataset kept, the last version named | covered: check_build.c |
+| F21 | an update's datasets are F's: one the recipe adds, or one F has that the recipe no longer names, refused, each named; F there with no version refused | covered: check_build.c |
+| F22 | an update at a securelevel above 0, where schg cannot be cleared, refused | covered: check_build.c |
+| F23 | the update's run: no dataset made; make delete-old delete-old-libs with DESTDIR and BATCH_DELETE_OLD_FILES=yes before installworld; the installs with install -C; then installworld's backups removed, flags cleared first: boot/kernel.old, boot/*.old, libexec/ld-elf*.so.1.old, sbin/init.bak, and nothing else | covered: check_build.c (the user's immutable flag; schg needs root: the box) |
+| F24 | an update the same day as the last version: the name with .2 | covered: check_build.c |
+| F25 | an update that fails: F's datasets rolled back to the last version, not destroyed; mounts, mountpoints and the mark undone as for a new build | covered: check_build.c |
+| F26 | an update paused at a patch: --abort rolls F back to its last version; --continue goes on to the update | covered: check_build.c |
+| F27 | for real: a second build of box on the box, an update over the first, on the kept obj cache: the version .2, delete-old run, no backup left | box: tests/box/build.sh |
 
 On the box, tests/box/build.sh builds a foundation for real (sudo sh
 tests/box/build.sh; hours): one pool on a sparse file imported with

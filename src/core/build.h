@@ -54,6 +54,8 @@ struct sh_fplan {
 	struct sh_branch fp_branch;
 	const char	*fp_src_branch;
 	char		fp_ds[SH_BUILD_NAME];	/* lake/foundations/F */
+	int		fp_update;	/* F there: its next version (7.2) */
+	char		fp_last[SH_BUILD_NAME];	/* an update's last, @... */
 	char		fp_obj[SH_BUILD_NAME];	/* lake/foundation-builds/F */
 	int		fp_obj_there;
 	char		fp_src[SH_BUILD_NAME];	/* the build root */
@@ -67,30 +69,9 @@ struct sh_fplan {
 };
 
 /*
- * The plan for building the foundation TARGET (F, or foundations/F)
- * into P, its recipe read from the configuration root ROOT, with the
- * roots S found and the site's settings SITE. RUNBASE is where run
- * directories go (SH_BUILD_DIR; the tests' scratch). Warnings to W.
- * Refused, with every reason: no lake, build or config root; the
- * recipe refused; ver not met by src_branch; a build already under
- * way or paused; a foundation of that name already built.
- *
- * VERB other than SH_BV_NEW carries on a build of F paused at a patch:
- * its record read from its run directory, and the recipe from the
- * config snapshot the build began with, in ROOT's .zfs/snapshot (not
- * for SH_BV_ABORT, which needs none). Refused: no build of F paused.
- */
-int sh_build_plan(struct sh_zfs *z, const struct sh_spaces *s,
-    const struct sh_node *site, const char *root, const char *target,
-    const char *runbase, enum sh_bverb verb, struct sh_fplan *p,
-    struct sh_err *e, struct sh_err *w);
-
-/* The plan, as the person confirming it reads it. */
-void sh_build_show(FILE *out, const struct sh_fplan *p);
-
-/*
  * What a build runs, each by name (looked for in SH_RUN_PATH) or by
- * path: sh_build_tools, or the tests' fakes.
+ * path: sh_build_tools, or the tests' fakes; and where it reads the
+ * securelevel, which an update needs at 0 or below.
  */
 struct sh_tools {
 	const char	*tl_git;
@@ -100,9 +81,37 @@ struct sh_tools {
 	const char	*tl_mount;
 	const char	*tl_umount;
 	const char	*tl_sh;
+	int		(*tl_securelevel)(void);
 };
 
 extern const struct sh_tools sh_build_tools;
+
+/*
+ * The plan for building the foundation TARGET (F, or foundations/F)
+ * into P, its recipe read from the configuration root ROOT, with the
+ * roots S found and the site's settings SITE. RUNBASE is where run
+ * directories go (SH_BUILD_DIR; the tests' scratch). Warnings to W.
+ * Refused, with every reason: no lake, build or config root; the
+ * recipe refused; ver not met by src_branch; a build already under
+ * way or paused.
+ *
+ * F there already is updated (7.2): its next version, into the same
+ * datasets, which must be the recipe's, at a securelevel (T's) of 0
+ * or below. Refused: F there with no version; the datasets differing.
+ *
+ * VERB other than SH_BV_NEW carries on a build of F paused at a patch:
+ * its record read from its run directory, and the recipe from the
+ * config snapshot the build began with, in ROOT's .zfs/snapshot (not
+ * for SH_BV_ABORT, which needs none). Refused: no build of F paused.
+ */
+int sh_build_plan(struct sh_zfs *z, const struct sh_spaces *s,
+    const struct sh_node *site, const char *root, const char *target,
+    const char *runbase, const struct sh_tools *t, enum sh_bverb verb,
+    struct sh_fplan *p, struct sh_err *e, struct sh_err *w);
+
+/* The plan, as the person confirming it reads it. */
+void sh_build_show(FILE *out, const struct sh_fplan *p);
+
 
 /*
  * The plan P carried out (7.1 steps 2 - 8), each step said on OUT:
@@ -125,6 +134,10 @@ extern const struct sh_tools sh_build_tools;
  * the build root as the patch left it. P's verb carries a paused
  * build on, or gives it up (0: undone). A --continue whose fix has
  * left a conflict marker or a .rej is refused and stays paused.
+ *
+ * An update makes no dataset, runs make delete-old delete-old-libs
+ * before the install and removes installworld's backups after it; on
+ * a failure, or --abort, F goes back to its last version.
  */
 int sh_build_run(struct sh_zfs *z, struct sh_fplan *p,
     const struct sh_tools *t, const char *msg, time_t now, FILE *out,
