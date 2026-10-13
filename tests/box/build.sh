@@ -1,6 +1,9 @@
 #!/bin/sh
 # M3 on real pools: shtetl build F, for real, on a throwaway pool: the
-# box column of tests/MATRIX.md family F (F11 - F13, F19 among them).
+# box column of tests/MATRIX.md families F (F11 - F13, F19 among them)
+# and P (P17: patches made from the branch's own tree, one already in,
+# one applied, one that conflicts and pauses the build, fixed here and
+# carried on into the build).
 # A buildworld and buildkernel take hours; nothing here asks anything,
 # so start it and leave it.
 #
@@ -40,6 +43,7 @@ clean() {
 		zpool destroy -f $P
 	fi
 	rm -f "$T/$P.img" "$T/out" "$T/err"
+	rm -rf "$T/p17"
 	[ -d "$ALT" ] && find "$ALT" -depth -type d -empty -delete
 	rmdir "$T" 2>/dev/null
 	# the run directories of the two foundations built here, by name
@@ -133,6 +137,21 @@ srcof() {
 	zfs get -H -o source "$2" "$1" 2>/dev/null
 }
 
+# P17's file, as git's patches say it
+PF=share/misc/bsd-family-tree
+
+mkpatch() {	# FROM TO OUT: PF from FROM to TO, with git's index line
+	_a=$(git -C "$ALT/zbuild" hash-object -w "$1")
+	_b=$(git -C "$ALT/zbuild" hash-object -w "$2")
+	{
+		echo "diff --git a/$PF b/$PF"
+		echo "index $_a..$_b 100644"
+		echo "--- a/$PF"
+		echo "+++ b/$PF"
+		diff -u "$1" "$2" | sed 1,2d
+	} >"$3"
+}
+
 cases() {
 	echo "shtetl box build $(date -u +%Y-%m-%dT%H:%M:%SZ) on" \
 	    "$(hostname -s), $(uname -r), $(zfs version 2>/dev/null |
@@ -163,10 +182,32 @@ ver = ">=15.1";
 kernconf = "GENERIC";
 datasets { tmp {} var {} "usr/local" {} }
 EOF
+	echo "== P17: patches made from $BRANCH's $PF"
+	_d=$T/p17
+	mkdir -p "$_d/repo" "$ALT/zconfig/patches/box" || return 1
+	git -C "$ALT/zbuild" fetch -q origin "$BRANCH" || return 1
+	git -C "$ALT/zbuild" cat-file blob "FETCH_HEAD:$PF" >"$_d/base" ||
+	    return 1
+	# one: a line after the first; two: another there, conflicting
+	awk 'NR == 1 { print; print "shtetl-box one"; next } { print }' \
+	    "$_d/base" >"$_d/one"
+	awk 'NR == 1 { print; print "shtetl-box two"; next } { print }' \
+	    "$_d/base" >"$_d/two"
+	# in: line 40 put back, which the tree has
+	awk 'NR != 40' "$_d/base" >"$_d/less"
+	mkpatch "$_d/base" "$_d/one" "$ALT/zconfig/patches/box/1-one.patch"
+	mkpatch "$_d/base" "$_d/two" "$ALT/zconfig/patches/box/3-two.patch"
+	mkpatch "$_d/less" "$_d/base" "$_d/repo/2-in.patch"
+	git -C "$_d/repo" init -q &&
+	    git -C "$_d/repo" add -A &&
+	    git -C "$_d/repo" -c user.name=box -c user.email=box@localhost \
+	    commit -qm in || return 1
+	_in=$(git -C "$_d/repo" rev-parse HEAD)
 	cat >"$ALT/zconfig/foundations/box.conf" <<EOF
 src_branch = "$BRANCH";
 buildopts = "WITHOUT_TESTS=yes";
 commands { motd = "echo shtetl-box > /etc/motd.template"; }
+patches { "file://$_d/repo" {} "patches/box" {} }
 EOF
 	cat >"$ALT/zconfig/foundations/nope.conf" <<'EOF'
 src_branch = "releng/15.99";
@@ -186,9 +227,35 @@ EOF
 	check F13 "the obj cache kept, unmounted" \
 	    "$(prop $P/shtetl/foundation-builds/nope mounted)" no
 
-	echo "== F11, F19: build box, for real (hours)"
-	_t0=$(date +%s)
+	echo "== P17: build box: a patch already in, one applied, one paused"
 	sht build -y box
+	sed 's/^/    /' "$T/out"
+	check P17 "the pause's exit" "$RC" 3
+	has P17 "already in, from the git source" "$T/out" \
+	    "patch 2-in.patch from file://$_d/repo: already in, skipped"
+	has P17 "applied, from the directory" "$T/out" \
+	    "patch 1-one.patch from patches/box: applied"
+	_w="patch 3-two.patch from patches/box: does not apply;"
+	has P17 "paused, conflict markers left" "$T/out" \
+	    "$_w merged three ways, conflict markers left"
+	check P17 "the record" \
+	    "$([ -f "$RUNS/box/paused.conf" ] && echo yes)" yes
+	check P17 "the build root's mark" "$(prop $P/zbuild shtetl:build)" box
+	check P17 "a snapshot before each patch, and the first" \
+	    "$(zfs list -H -t snapshot -o name -r $P/zbuild |
+	    grep -c '@shtetl-patch-')" 4
+	check P17 "the markers in the tree" \
+	    "$(grep -c '^<<<<<<< ' "$ALT/zbuild/$PF")" 1
+	sht build box --continue
+	check P17 "--continue refused while a marker is left" "$RC" 1
+	has P17 "naming it" "$T/err" "$PF: conflict marker left"
+	# the fix: both lines
+	awk 'NR == 1 { print; print "shtetl-box one"; print "shtetl-box two";
+	    next } { print }' "$_d/base" >"$ALT/zbuild/$PF"
+
+	echo "== F11, F19, P17: --continue, the build for real (hours)"
+	_t0=$(date +%s)
+	sht build box --continue
 	_t1=$(date +%s)
 	echo "# $(( (_t1 - _t0) / 60 )) minutes"
 	sed 's/^/    /' "$T/out"
@@ -230,6 +297,18 @@ EOF
 	    "$(prop $P/shtetl/foundation-builds/box mounted)" no
 	check F11 "the build root's mark cleared" \
 	    "$(srcof $P/zbuild shtetl:build)" "-"
+	_w="file://$_d/repo@$_in: 2-in.patch already;"
+	check P17 "shtetl:patches" "$(prop "$F/var@$_v" shtetl:patches)" \
+	    "$_w patches/box: 3-two.patch fixed"
+	check P17 "the build root rolled back, its checkout clean" \
+	    "$(git -C "$ALT/zbuild" status --porcelain | wc -l | tr -d ' ')" 0
+	check P17 "every patch snapshot gone" \
+	    "$(zfs list -H -t snapshot -o name -r $P/zbuild |
+	    grep -c '@shtetl-patch-')" 0
+	check P17 "the fix written out" \
+	    "$(grep -c '^+shtetl-box two' "$RUNS/box/fixed/2/3-two.patch")" 1
+	check P17 "the record gone" \
+	    "$([ -f "$RUNS/box/paused.conf" ] && echo yes)" ""
 
 	echo "== what was built, mounted for a look"
 	zfs set mountpoint=/look $F
@@ -245,6 +324,8 @@ EOF
 	    "$([ -f "$_r/etc/rc" ] && echo yes)" yes
 	check F11 "the command ran in F" "$(cat "$_r/etc/motd.template")" \
 	    shtetl-box
+	check P17 "the patched tree built: both lines installed" \
+	    "$(grep -c '^shtetl-box ' "$_r/usr/share/misc/bsd-family-tree")" 2
 	check F16 "the kernel's ident, BOX" \
 	    "$(grep -aq 'BOX' "$_r/boot/kernel/kernel" && echo yes)" yes
 	check F11 "usr/local is its own dataset" \
