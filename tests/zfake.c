@@ -30,6 +30,7 @@ struct zf_ds {
 	struct zf_prop	zd_props[ZF_PROPS];
 	int		zd_n;
 	char		zd_at[ZF_VAL];		/* mounted there; "" if not */
+	char		zd_origin[ZF_NAME];	/* a clone's, ds@snap; "" */
 	struct zf_prop	zd_pool[ZF_PROPS];	/* a pool's root: the pool's */
 	int		zd_npool;
 };
@@ -499,6 +500,12 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 	if (zf_fails("destroy", e))
 		return (-1);
 	if ((s = zf_snap(name)) != NULL) {
+		for (i = 0; i < zf_n; i++) {
+			if (strcmp(zf_ds[i].zd_origin, name) == 0) {
+				sh_errf(e, "zfake: %s: has clones", name);
+				return (-1);
+			}
+		}
 		i = (int)(s - zf_snaps);
 		(void) memmove(&zf_snaps[i], &zf_snaps[i + 1],
 		    (size_t)(zf_nsnaps - i - 1) * sizeof (zf_snaps[0]));
@@ -598,6 +605,178 @@ sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 }
 
 int
+sh_zfs_clone(struct sh_zfs *z, const char *origin, const char *ds,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e)
+{
+	char parent[ZF_NAME];
+	size_t i;
+
+	(void) z;
+	if (zf_fails("clone", e))
+		return (-1);
+	if (zf_snap(origin) == NULL) {
+		sh_errf(e, "zfake: %s: no such snapshot", origin);
+		return (-1);
+	}
+	if (zf_find(ds) != NULL) {
+		sh_errf(e, "zfake: %s: exists", ds);
+		return (-1);
+	}
+	if (!zf_parent(ds, parent) || zf_find(parent) == NULL) {
+		sh_errf(e, "zfake: %s: no parent", ds);
+		return (-1);
+	}
+	zf_make(ds);
+	(void) snprintf(zf_find(ds)->zd_origin, ZF_NAME, "%s", origin);
+	for (i = 0; i < nprops; i++)
+		zfake_set(ds, props[i].zp_name, props[i].zp_value);
+	return (0);
+}
+
+/* DS's newest snapshot, or NULL. */
+static struct zf_snap *
+zf_newest(const char *ds)
+{
+	size_t len = strlen(ds);
+	int i;
+
+	for (i = zf_nsnaps - 1; i >= 0; i--) {
+		if (strncmp(zf_snaps[i].zs_name, ds, len) == 0 &&
+		    zf_snaps[i].zs_name[len] == '@')
+			return (&zf_snaps[i]);
+	}
+	return (NULL);
+}
+
+/*
+ * A send as zfs.h has it: the snapshot TO made in the fake, the guid
+ * SNAP's, no property, the filesystem made or taken as asked.
+ */
+int
+sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
+    const char *to, const char *origin, struct sh_err *e)
+{
+	struct zf_snap *sp, *fp, *op, *np;
+	char sfs[ZF_NAME], ffs[ZF_NAME], tofs[ZF_NAME], parent[ZF_NAME];
+	const char *at;
+
+	(void) z;
+	if (zf_fails("send", e))
+		return (-1);
+	if ((sp = zf_snap(snap)) == NULL) {
+		sh_errf(e, "zfake: %s: no such snapshot", snap);
+		return (-1);
+	}
+	fp = NULL;
+	if (from != NULL && (fp = zf_snap(from)) == NULL) {
+		sh_errf(e, "zfake: %s: no such snapshot", from);
+		return (-1);
+	}
+	if ((at = strchr(to, '@')) == NULL) {
+		sh_errf(e, "zfake: %s: not a snapshot's name", to);
+		return (-1);
+	}
+	(void) snprintf(tofs, sizeof (tofs), "%.*s", (int)(at - to), to);
+	(void) snprintf(sfs, sizeof (sfs), "%.*s",
+	    (int)(strchr(snap, '@') - snap), snap);
+	if (fp != NULL) {
+		(void) snprintf(ffs, sizeof (ffs), "%.*s",
+		    (int)(strchr(from, '@') - from), from);
+		/* an earlier one of its own, or what it is a clone of */
+		if (!((strcmp(ffs, sfs) == 0 && fp->zs_txg < sp->zs_txg) ||
+		    strcmp(zf_find(sfs)->zd_origin, from) == 0)) {
+			sh_errf(e, "zfake: %s: not an earlier snapshot of %s",
+			    from, snap);
+			return (-1);
+		}
+	}
+	if (fp == NULL || origin != NULL) {
+		if (origin != NULL && (op = zf_snap(origin)) == NULL) {
+			sh_errf(e, "zfake: %s: no such snapshot", origin);
+			return (-1);
+		}
+		if (zf_find(tofs) != NULL) {
+			sh_errf(e, "zfake: %s: exists", tofs);
+			return (-1);
+		}
+		if (!zf_parent(tofs, parent) || zf_find(parent) == NULL) {
+			sh_errf(e, "zfake: %s: no parent", tofs);
+			return (-1);
+		}
+		if (origin != NULL && (fp == NULL ||
+		    zf_snap(origin)->zs_guid != fp->zs_guid)) {
+			sh_errf(e, "zfake: %s: not %s's counterpart", origin,
+			    from != NULL ? from : snap);
+			return (-1);
+		}
+	} else {
+		if (zf_find(tofs) == NULL) {
+			sh_errf(e, "zfake: %s: no such filesystem", tofs);
+			return (-1);
+		}
+		if ((np = zf_newest(tofs)) == NULL ||
+		    np->zs_guid != fp->zs_guid) {
+			sh_errf(e, "zfake: %s: newest snapshot is not %s's "
+			    "counterpart", tofs, from);
+			return (-1);
+		}
+	}
+	if (zf_nsnaps == ZF_SNAPS) {
+		sh_errf(e, "zfake: too many snapshots");
+		return (-1);
+	}
+	if (zf_find(tofs) == NULL) {
+		zf_make(tofs);
+		if (origin != NULL)
+			(void) snprintf(zf_find(tofs)->zd_origin, ZF_NAME,
+			    "%s", origin);
+	}
+	np = &zf_snaps[zf_nsnaps++];
+	(void) memset(np, 0, sizeof (*np));
+	(void) snprintf(np->zs_name, ZF_NAME, "%s", to);
+	np->zs_txg = ++zf_txg;
+	np->zs_guid = sp->zs_guid;
+	return (0);
+}
+
+int
+sh_zfs_userprops(struct sh_zfs *z, const char *name,
+    int (*fn)(void *, const char *, const char *), void *arg,
+    struct sh_err *e)
+{
+	const struct zf_prop *pp;
+	struct zf_snap *sp;
+	struct zf_ds *d;
+	int i, n, r;
+
+	(void) z;
+	if (zf_fails("userprops", e))
+		return (-1);
+	if (strchr(name, '@') != NULL) {
+		if ((sp = zf_snap(name)) == NULL) {
+			sh_errf(e, "zfake: %s: no such snapshot", name);
+			return (-1);
+		}
+		pp = sp->zs_props;
+		n = sp->zs_n;
+	} else {
+		if ((d = zf_find(name)) == NULL) {
+			sh_errf(e, "zfake: %s: no such filesystem", name);
+			return (-1);
+		}
+		pp = d->zd_props;
+		n = d->zd_n;
+	}
+	for (i = 0; i < n; i++) {
+		if (strchr(pp[i].zp_name, ':') == NULL)
+			continue;
+		if ((r = fn(arg, pp[i].zp_name, pp[i].zp_val)) != 0)
+			return (r);
+	}
+	return (0);
+}
+
+int
 sh_zfs_open(struct sh_zfs **zp, struct sh_err *e)
 {
 	if (zf_fails("open", e)) {
@@ -661,6 +840,13 @@ zf_get(const char *ds, const char *prop, char *val, size_t len,
 	if (strcmp(prop, "mounted") == 0) {
 		(void) snprintf(val, len, "%s", d->zd_at[0] != '\0' ? "yes" :
 		    "no");
+		if (src != NULL)
+			*src = SH_ZSRC_NONE;
+		return (0);
+	}
+	if (strcmp(prop, "origin") == 0) {
+		(void) snprintf(val, len, "%s", d->zd_origin[0] != '\0' ?
+		    d->zd_origin : "-");
 		if (src != NULL)
 			*src = SH_ZSRC_NONE;
 		return (0);

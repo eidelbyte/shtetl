@@ -164,6 +164,45 @@ sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 }
 
 int
+sh_zfs_clone(struct sh_zfs *z, const char *origin, const char *ds,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e)
+{
+	(void) z;
+	(void) origin;
+	(void) ds;
+	(void) props;
+	(void) nprops;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
+sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
+    const char *to, const char *origin, struct sh_err *e)
+{
+	(void) z;
+	(void) snap;
+	(void) from;
+	(void) to;
+	(void) origin;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
+sh_zfs_userprops(struct sh_zfs *z, const char *name,
+    int (*fn)(void *, const char *, const char *), void *arg,
+    struct sh_err *e)
+{
+	(void) z;
+	(void) name;
+	(void) fn;
+	(void) arg;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
 sh_zpool_get(struct sh_zfs *z, const char *pool, const char *prop,
     char *val, size_t len, struct sh_err *e)
 {

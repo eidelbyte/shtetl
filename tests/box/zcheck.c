@@ -6,7 +6,8 @@
  * A refusal is read as check_zfs.c reads one, by its words: the name
  * refused and why, as the fake says it.
  *
- * usage: box_zcheck POOL/DATASET    (made by run.sh, empty)
+ * usage: box_zcheck POOL/DATASET OTHER/DATASET
+ *        (made by run.sh, empty; OTHER another pool, for Z15 - Z17)
  */
 
 #include <stdio.h>
@@ -19,7 +20,7 @@
 static struct sh_zfs *z;
 static struct sh_err e;
 static int failed;
-static char top[256];
+static char top[256], other[256];
 
 static void
 cell(const char *id, const char *what, int good)
@@ -38,6 +39,18 @@ at(const char *rel)
 
 	n = (n + 1) % 4;
 	(void) snprintf(buf[n], sizeof (buf[n]), "%s/%s", top, rel);
+	return (buf[n]);
+}
+
+/* REL below the other pool's dataset, as a full name. */
+static const char *
+oth(const char *rel)
+{
+	static char buf[4][512];
+	static int n;
+
+	n = (n + 1) % 4;
+	(void) snprintf(buf[n], sizeof (buf[n]), "%s/%s", other, rel);
 	return (buf[n]);
 }
 
@@ -102,16 +115,16 @@ ask(void)
 	return (&q);
 }
 
-/* RC is -1, and what was reported holds "REL: WHY", REL as at()'s. */
+/* RC is -1, and what was reported holds "NAME: WHY". */
 static void
-refused(const char *id, const char *what, int rc, const char *rel,
+refusedn(const char *id, const char *what, int rc, const char *name,
     const char *why)
 {
 	char want[768];
 	int good;
 
 	(void) fflush(qf);
-	(void) snprintf(want, sizeof (want), "%s: %s", at(rel), why);
+	(void) snprintf(want, sizeof (want), "%s: %s", name, why);
 	good = rc == -1 && qbuf != NULL && strstr(qbuf, want) != NULL;
 	(void) fprintf(stderr, "zcheck: %s", qbuf != NULL &&
 	    qbuf[0] != '\0' ? qbuf : "(nothing reported)\n");
@@ -121,6 +134,28 @@ refused(const char *id, const char *what, int rc, const char *rel,
 	}
 	refusals++;
 	cell(id, what, good);
+}
+
+/* RC is -1, and what was reported holds "REL: WHY", REL as at()'s. */
+static void
+refused(const char *id, const char *what, int rc, const char *rel,
+    const char *why)
+{
+	refusedn(id, what, rc, at(rel), why);
+}
+
+/* Z18: a snapshot's own user properties, walked into these. */
+static char props[512];
+
+static int
+walkprop(void *arg, const char *prop, const char *value)
+{
+	size_t n = strlen(props);
+
+	(void) arg;
+	(void) snprintf(props + n, sizeof (props) - n, "%s%s=%s",
+	    n > 0 ? " " : "", prop, value);
+	return (0);
 }
 
 int
@@ -133,16 +168,21 @@ main(int argc, char **argv)
 	static const struct sh_zprop kind = { "shtetl:kind", "foundation" };
 	static const struct sh_zprop off = { "canmount", "off" };
 	static const struct sh_zprop none = { "mountpoint", "none" };
+	static const struct sh_zprop kver = { "shtetl:kind", "version" };
+	static const struct sh_zprop zstd = { "compression", "zstd" };
 	const char *v1[3], *v2[3], *bad[2];
-	char t1[64], name[512], g3[512];
+	char t1[64], name[512], g3[512], tn[512], want[640];
+	const char *sv1, *sv2, *sv3, *xs1;
 	enum sh_zsrc src;
 	int rc;
 
-	if (argc != 2) {
-		(void) fprintf(stderr, "usage: box_zcheck POOL/DATASET\n");
+	if (argc != 3) {
+		(void) fprintf(stderr, "usage: box_zcheck POOL/DATASET "
+		    "OTHER/DATASET\n");
 		return (2);
 	}
 	(void) snprintf(top, sizeof (top), "%s", argv[1]);
+	(void) snprintf(other, sizeof (other), "%s", argv[2]);
 	sh_err_init(&e, stderr, "zcheck: ");
 	if (sh_zfs_open(&z, &e) != 0)
 		return (2);
@@ -330,7 +370,93 @@ main(int argc, char **argv)
 	    rc == 0 && strcmp(get(at("f"), "mounted", NULL), "yes") == 0 &&
 	    sh_zfs_mount(z, at("f"), &e) == 0);
 
-	/* Z10: each refusal above in the fake's words */
+	/*
+	 * Z14 - Z19: clones and sends, s and its snapshots the source,
+	 * x a clone of it, the other pool the target
+	 */
+	(void) snprintf(name, sizeof (name), "%s@v1", at("s"));
+	sv1 = strdup(name);
+	cell("Z14", "the source made, with a version",
+	    sh_zfs_create(z, at("s"), NULL, 0, &e) == 0 &&
+	    sh_zfs_snapshot(z, &sv1, 1, &kver, 1, &e) == 0);
+	cell("Z14", "a clone, a property from its birth, its origin",
+	    sh_zfs_clone(z, sv1, at("x"), &zstd, 1, &e) == 0 &&
+	    strcmp(get(at("x"), "origin", NULL), sv1) == 0 &&
+	    strcmp(get(at("x"), "compression", &src), "zstd") == 0 &&
+	    src == SH_ZSRC_LOCAL &&
+	    strcmp(get(at("x"), "mounted", NULL), "no") == 0);
+	(void) snprintf(name, sizeof (name), "%s@v9", at("s"));
+	refusedn("Z14", "no such snapshot",
+	    sh_zfs_clone(z, name, at("y"), NULL, 0, ask()), name,
+	    "no such snapshot");
+	refused("Z14", "the name taken",
+	    sh_zfs_clone(z, sv1, at("x"), NULL, 0, ask()), "x", "exists");
+	refused("Z14", "no parent",
+	    sh_zfs_clone(z, sv1, at("q/r"), NULL, 0, ask()), "q/r",
+	    "no parent");
+	refusedn("Z14", "its origin not destroyed",
+	    sh_zfs_destroy(z, sv1, ask()), sv1, "has clones");
+	(void) snprintf(name, sizeof (name), "%s@v1", oth("s"));
+	cell("Z15", "a whole send into the other pool, nothing but data",
+	    sh_zfs_send(z, sv1, NULL, name, NULL, &e) == 0 &&
+	    strcmp(get(name, "guid", NULL), get(sv1, "guid", NULL)) == 0 &&
+	    strcmp(get(name, "shtetl:kind", NULL), "-") == 0 &&
+	    strcmp(get(oth("s"), "mounted", NULL), "no") == 0);
+	refusedn("Z15", "the target there already",
+	    sh_zfs_send(z, sv1, NULL, name, NULL, ask()), oth("s"),
+	    "exists");
+	(void) snprintf(name, sizeof (name), "%s@v2", at("s"));
+	sv2 = strdup(name);
+	(void) snprintf(name, sizeof (name), "%s@v2", oth("s"));
+	cell("Z16", "an incremental send",
+	    sh_zfs_snapshot(z, &sv2, 1, NULL, 0, &e) == 0 &&
+	    sh_zfs_send(z, sv2, sv1, name, NULL, &e) == 0 &&
+	    strcmp(snaps(oth("s"), &rc), "v1 v2") == 0);
+	(void) snprintf(name, sizeof (name), "%s@v2", oth("nope"));
+	refusedn("Z16", "the target missing",
+	    sh_zfs_send(z, sv2, sv1, name, NULL, ask()), oth("nope"),
+	    "no such filesystem");
+	(void) snprintf(name, sizeof (name), "%s@v3", at("s"));
+	sv3 = strdup(name);
+	(void) snprintf(tn, sizeof (tn), "%s@v3", oth("s"));
+	(void) snprintf(want, sizeof (want), "newest snapshot is not %s's "
+	    "counterpart", sv1);
+	refusedn("Z16", "its newest not the base's counterpart",
+	    sh_zfs_snapshot(z, &sv3, 1, NULL, 0, &e) == 0 ?
+	    sh_zfs_send(z, sv3, sv1, tn, NULL, ask()) : 0, oth("s"),
+	    want);
+	(void) snprintf(name, sizeof (name), "%s@v1", oth("s"));
+	(void) snprintf(want, sizeof (want), "not an earlier snapshot of %s",
+	    sv1);
+	refusedn("Z16", "a base that is no earlier",
+	    sh_zfs_send(z, sv1, sv3, name, NULL, ask()), sv3, want);
+	(void) snprintf(name, sizeof (name), "%s@s1", at("x"));
+	xs1 = strdup(name);
+	(void) snprintf(name, sizeof (name), "%s@s1", oth("x"));
+	(void) snprintf(tn, sizeof (tn), "%s@v1", oth("s"));
+	cell("Z17", "a clone stream, received as a clone of the counterpart",
+	    sh_zfs_snapshot(z, &xs1, 1, NULL, 0, &e) == 0 &&
+	    sh_zfs_send(z, xs1, sv1, name, tn, &e) == 0 &&
+	    strcmp(get(oth("x"), "origin", NULL), tn) == 0);
+	(void) snprintf(name, sizeof (name), "%s@s1", oth("y"));
+	(void) snprintf(tn, sizeof (tn), "%s@v9", oth("s"));
+	refusedn("Z17", "the origin missing",
+	    sh_zfs_send(z, xs1, sv1, name, tn, ask()), tn,
+	    "no such snapshot");
+	(void) snprintf(tn, sizeof (tn), "%s@v2", oth("s"));
+	(void) snprintf(want, sizeof (want), "not %s's counterpart", sv1);
+	refusedn("Z17", "the origin not the base's counterpart",
+	    sh_zfs_send(z, xs1, sv1, name, tn, ask()), tn, want);
+	props[0] = '\0';
+	(void) snprintf(name, sizeof (name), "%s@v1", oth("s"));
+	cell("Z18", "a snapshot's own user properties, copied over",
+	    sh_zfs_userprops(z, sv1, walkprop, NULL, &e) == 0 &&
+	    strcmp(props, "shtetl:kind=version") == 0 &&
+	    sh_zfs_set(z, name, "shtetl:kind", "version", &e) == 0 &&
+	    strcmp(get(name, "shtetl:kind", &src), "version") == 0 &&
+	    src == SH_ZSRC_LOCAL);
+
+	/* Z10, Z19: each refusal above in the fake's words */
 	cell("Z10", "every refusal above said why, as the fake does",
 	    refusals > 0 && misheard == 0);
 

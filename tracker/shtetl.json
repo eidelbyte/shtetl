@@ -232,7 +232,7 @@
     ],
     "provides": "Clones and sends for beam-down, create and save.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing"
   },
   "m4-beam": {
     "description": "A foundation's version brought to zrun (planning.md 7.3): each dataset of F sent from zlake, whole the first time, incremental from the newest version zrun has after; received under the run root's foundations/F, readonly=on, canmount=noauto, a placeholder canmount=off, the mountpoint inherited; no -p, the version's shtetl:* copied onto each received snapshot after (6.2), a received snapshot with no shtetl:kind copied again. The command (PROPOSAL): shtetl beam F [--version V]; create does it when the version is not there. Verify: MATRIX family M; the box.",

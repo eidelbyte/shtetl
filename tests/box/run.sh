@@ -272,10 +272,11 @@ cases() {
 	has D5 "the refusal" "$T/err" "two config roots"
 	zfs inherit shtetl:space $P2/c2
 
-	echo "== Z11: the ZFS calls of M3 against libzfs"
+	echo "== Z11: the ZFS calls of M3 and M4 against libzfs"
 	if [ -x build/box_zcheck ]; then
 		zfs create $P1/zc
-		build/box_zcheck $P1/zc >"$T/out" 2>"$T/err"
+		zfs create $P2/zc2
+		build/box_zcheck $P1/zc $P2/zc2 >"$T/out" 2>"$T/err"
 		_zrc=$?
 		while read -r _l; do
 			case "$_l" in
@@ -285,7 +286,9 @@ cases() {
 		done <"$T/out"
 		check Z11 "box_zcheck's exit" "$_zrc" 0
 		[ -s "$T/err" ] && sed 's/^/    /' "$T/err"
-		zfs destroy -r $P1/zc
+		# -R: a clone and its origin are both in each
+		zfs destroy -R $P2/zc2
+		zfs destroy -R $P1/zc
 	else
 		no "Z11: no build/box_zcheck: make freebsd"
 	fi

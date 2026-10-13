@@ -374,9 +374,15 @@ snapshots}; ZFS refusing.
 | Z8 | inherit: the local value gone, the inherited one back | covered: check_zfs.c |
 | Z9 | unmount after mount | covered: check_zfs.c |
 | Z10 | each call refused when ZFS refuses, with ZFS's reason, in the same words over libzfs and the fake | covered: check_zfs.c; the words over libzfs, Z11 |
-| Z11 | the same cells against libzfs on real pools, each refusal by its words | box: tests/box/zcheck.c, run by tests/box/run.sh; make check links it against the stub and runs its cells over the fake (tests/box/zcheck-fake.c). Box run 1: Z8's cell wrong (3b50a35), refusals in errno words; run 2 (c46e87c): 89 ok, 0 failed; run 3 (dc2be99, Z12 and Z13 too): 95 ok, 0 failed |
+| Z11 | the same cells against libzfs on real pools, each refusal by its words | box: tests/box/zcheck.c, run by tests/box/run.sh; make check links it against the stub and runs its cells over the fake (tests/box/zcheck-fake.c). Box run 1: Z8's cell wrong (3b50a35), refusals in errno words; run 2 (c46e87c): 89 ok, 0 failed; run 3 (dc2be99, Z12 and Z13 too): 95 ok, 0 failed; M4's Z14 - Z19 with them, across the two pools (box_zcheck POOL/DATASET OTHER/DATASET) |
 | Z12 | a mountpoint set or inherited moves mounts as zfs set does: the dataset and those taking their mountpoint from it unmounted, then mounted where it now says if they were mounted or canmount is on; canmount off, none or legacy, unmounted. A set mounts what was not | covered: check_zfs.c; box: zcheck.c, run 3 green (the first real build failed on it, F11) |
 | Z13 | mount: mounted at its mountpoint already, nothing done; mounted elsewhere, no mountpoint, canmount off: refused | covered: check_zfs.c; box: zcheck.c, all but mounted elsewhere (deferred: only zfs set -u makes one, which the interface does not do) |
+| Z14 | a clone (M4): of a snapshot, its properties set from its birth, its origin read back; refused: no such snapshot, no parent, the name taken | covered: check_zfs.c; box: zcheck.c |
+| Z15 | a whole send: a snapshot received as a new filesystem holding it, in another pool; nothing mounted; no property travels, the snapshot's user ones nor the filesystem's local ones (no -p); refused: the target there already | covered: check_zfs.c; box: zcheck.c, across two pools |
+| Z16 | an incremental send: from an earlier snapshot of the same filesystem, onto the target at that snapshot's counterpart, the new one received; refused: the target missing, its newest snapshot not the counterpart | covered: check_zfs.c; box: zcheck.c |
+| Z17 | a clone stream: from the snapshot the source is a clone of, received as a clone of the given origin in the target's pool, holding only the delta; refused: the origin missing | covered: check_zfs.c; box: zcheck.c |
+| Z18 | a snapshot's own user properties walked, not what it inherits; FN's stop returned; set again on a received snapshot (6.2's copy) | covered: check_zfs.c; box: zcheck.c |
+| Z19 | the refusals of Z14 - Z17 in the same words over libzfs and the fake | covered: check_zfs.c; box: zcheck.c |
 
 # Family F: building a foundation (M3; planning.md 7.1; src/core/build.c)
 

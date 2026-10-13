@@ -1,6 +1,6 @@
 /*
  * What the build asks of ZFS, over the fake (src/core/zfs.h,
- * tests/zfake.c): tests/MATRIX.md family Z, Z1 - Z10, Z12, Z13.
+ * tests/zfake.c): tests/MATRIX.md family Z, Z1 - Z10, Z12 - Z19.
  */
 
 #include <stdlib.h>
@@ -283,6 +283,127 @@ test_mounts(void)
 	CHECK(cap_has(&c, "tank/f: mounted at /q, not its mountpoint"));
 }
 
+/* Z18: the user properties walked, into these. */
+static char props[512];
+static int prop_stop;
+
+static int
+walkprop(void *arg, const char *prop, const char *value)
+{
+	size_t n = strlen(props);
+
+	(void) arg;
+	(void) snprintf(props + n, sizeof (props) - n, "%s%s=%s",
+	    n > 0 ? " " : "", prop, value);
+	return (prop_stop > 0 && --prop_stop == 0 ? 9 : 0);
+}
+
+/* Z14 - Z19: clones and sends. */
+static void
+test_sends(void)
+{
+	static const struct sh_zprop kind = { "shtetl:kind", "version" };
+	static const struct sh_zprop zstd = { "compression", "zstd" };
+	static const char *const v1[] = { "tank/f@v1" };
+	static const char *const v2[] = { "tank/f@v2" };
+	static const char *const v3[] = { "tank/f@v3" };
+	static const char *const s1[] = { "tank/x@s1" };
+	enum sh_zsrc src;
+	int rc;
+
+	world();
+	zfake_pool("fast");
+	cap_reset(&c);
+	CHECK(sh_zfs_snapshot(z, v1, 1, &kind, 1, &c.c_err) == 0);
+	/* Z14 */
+	CHECK(sh_zfs_clone(z, "tank/f@v1", "tank/x", &zstd, 1, &c.c_err) == 0);
+	CHECK(is(get("tank/x", "origin", NULL), "tank/f@v1"));
+	CHECK(is(get("tank/x", "compression", &src), "zstd") &&
+	    src == SH_ZSRC_LOCAL);
+	CHECK(is(get("tank/x", "mounted", NULL), "no"));
+	CHECK(is(get("tank/f", "origin", NULL), "-"));
+	cap_reset(&c);
+	CHECK(sh_zfs_clone(z, "tank/f@v9", "tank/y", NULL, 0, &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/f@v9: no such snapshot"));
+	CHECK(sh_zfs_clone(z, "tank/f@v1", "tank/q/r", NULL, 0, &c.c_err) ==
+	    -1);
+	CHECK(cap_has(&c, "tank/q/r: no parent"));
+	CHECK(sh_zfs_clone(z, "tank/f@v1", "tank/x", NULL, 0, &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/x: exists"));
+	CHECK(sh_zfs_destroy(z, "tank/f@v1", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/f@v1: has clones"));
+	/* Z15: whole, into another pool, nothing but the data */
+	cap_reset(&c);
+	CHECK(sh_zfs_send(z, "tank/f@v1", NULL, "fast/f@v1", NULL,
+	    &c.c_err) == 0);
+	CHECK(is(get("fast/f@v1", "guid", NULL), get("tank/f@v1", "guid",
+	    NULL)));
+	CHECK(is(get("fast/f@v1", "shtetl:kind", &src), "-") &&
+	    src == SH_ZSRC_NONE);
+	CHECK(is(get("fast/f", "shtetl:kind", NULL), "-"));
+	CHECK(is(get("fast/f", "mounted", NULL), "no"));
+	CHECK(sh_zfs_send(z, "tank/f@v1", NULL, "fast/f@v1", NULL,
+	    &c.c_err) == -1);
+	CHECK(cap_has(&c, "fast/f: exists"));
+	/* Z16: incremental */
+	cap_reset(&c);
+	CHECK(sh_zfs_snapshot(z, v2, 1, NULL, 0, &c.c_err) == 0);
+	CHECK(sh_zfs_send(z, "tank/f@v2", "tank/f@v1", "fast/f@v2", NULL,
+	    &c.c_err) == 0);
+	CHECK(is(snaps("fast/f", &rc), "v1 v2"));
+	CHECK(sh_zfs_send(z, "tank/f@v2", "tank/f@v1", "fast/nope@v2", NULL,
+	    &c.c_err) == -1);
+	CHECK(cap_has(&c, "fast/nope: no such filesystem"));
+	CHECK(sh_zfs_snapshot(z, v3, 1, NULL, 0, &c.c_err) == 0);
+	CHECK(sh_zfs_send(z, "tank/f@v3", "tank/f@v1", "fast/f@v3", NULL,
+	    &c.c_err) == -1);
+	CHECK(cap_has(&c, "fast/f: newest snapshot is not tank/f@v1's "
+	    "counterpart"));
+	CHECK(sh_zfs_send(z, "tank/f@v1", "tank/f@v3", "fast/f@v1", NULL,
+	    &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/f@v3: not an earlier snapshot of tank/f@v1"));
+	CHECK(sh_zfs_send(z, "tank/f@v9", NULL, "fast/g@v9", NULL,
+	    &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/f@v9: no such snapshot"));
+	/* Z17: the clone stream, received as a clone of the counterpart */
+	cap_reset(&c);
+	CHECK(sh_zfs_snapshot(z, s1, 1, NULL, 0, &c.c_err) == 0);
+	CHECK(sh_zfs_send(z, "tank/x@s1", "tank/f@v1", "fast/x@s1",
+	    "fast/f@v1", &c.c_err) == 0);
+	CHECK(is(get("fast/x", "origin", NULL), "fast/f@v1"));
+	CHECK(is(snaps("fast/x", &rc), "s1"));
+	CHECK(sh_zfs_send(z, "tank/x@s1", "tank/f@v1", "fast/y@s1",
+	    "fast/f@v9", &c.c_err) == -1);
+	CHECK(cap_has(&c, "fast/f@v9: no such snapshot"));
+	CHECK(sh_zfs_send(z, "tank/x@s1", "tank/f@v1", "fast/y@s1",
+	    "fast/f@v2", &c.c_err) == -1);
+	CHECK(cap_has(&c, "fast/f@v2: not tank/f@v1's counterpart"));
+	CHECK(sh_zfs_send(z, "tank/x@s1", "tank/f@v1", "fast/x@s1",
+	    "fast/f@v1", &c.c_err) == -1);
+	CHECK(cap_has(&c, "fast/x: exists"));
+	/* Z18: a snapshot's own, copied onto its counterpart */
+	cap_reset(&c);
+	props[0] = '\0';
+	CHECK(sh_zfs_userprops(z, "tank/f@v1", walkprop, NULL, &c.c_err) == 0);
+	CHECK(is(props, "shtetl:kind=version"));
+	props[0] = '\0';
+	CHECK(sh_zfs_userprops(z, "tank/f@v2", walkprop, NULL, &c.c_err) == 0);
+	CHECK(is(props, ""));
+	props[0] = '\0';
+	CHECK(sh_zfs_userprops(z, "tank/f", walkprop, NULL, &c.c_err) == 0);
+	CHECK(is(props, "shtetl:kind=foundation"));
+	prop_stop = 1;
+	props[0] = '\0';
+	CHECK(sh_zfs_userprops(z, "tank/f@v1", walkprop, NULL, &c.c_err) == 9);
+	CHECK(sh_zfs_set(z, "fast/f@v1", "shtetl:kind", "version",
+	    &c.c_err) == 0);
+	CHECK(is(get("fast/f@v1", "shtetl:kind", &src), "version") &&
+	    src == SH_ZSRC_LOCAL);
+	CHECK(sh_zfs_userprops(z, "fast/f@v9", walkprop, NULL, &c.c_err) ==
+	    -1);
+	CHECK(cap_has(&c, "fast/f@v9: no such snapshot"));
+}
+
 /* Z10: ZFS refusing. */
 static void
 test_refusals(void)
@@ -334,6 +455,7 @@ main(void)
 	test_snapshot_props();
 	test_changes();
 	test_mounts();
+	test_sends();
 	test_refusals();
 	sh_zfs_close(z);
 	cap_close(&c);

@@ -127,6 +127,43 @@ int sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e);
 int sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e);
 
 /*
+ * DS made a clone of the snapshot ORIGIN (lzc_clone), PROPS set
+ * locally from its birth; its parent must be there, and nothing is
+ * mounted. Its origin reads back as the property "origin". Refused:
+ * no such snapshot, no parent, DS there already.
+ */
+int sh_zfs_clone(struct sh_zfs *z, const char *origin, const char *ds,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e);
+
+/*
+ * The snapshot SNAP (ds@snap) sent and received as TO (ds@snap, in any
+ * pool), lzc_send into lzc_receive: whole when FROM is NULL, TO's
+ * filesystem made by the receive; incremental from FROM, an earlier
+ * snapshot of SNAP's filesystem, onto TO's filesystem, whose newest
+ * snapshot must be FROM's counterpart; or, with ORIGIN, a clone
+ * stream, FROM the snapshot SNAP's filesystem is a clone of, and TO's
+ * filesystem made a clone of ORIGIN, FROM's counterpart. A counterpart
+ * is a snapshot received from the other, or the other's source: the
+ * same guid. Nothing travels but the data (no -p: no property, of the
+ * snapshot or of the filesystem), and nothing is mounted. Refused, in
+ * these words: no such snapshot (SNAP, FROM or ORIGIN); TO's filesystem
+ * there already (whole, clone stream) or missing (incremental); its
+ * newest snapshot, or ORIGIN, not FROM's counterpart.
+ */
+int sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
+    const char *to, const char *origin, struct sh_err *e);
+
+/*
+ * The user properties set on NAME itself, a snapshot or a filesystem,
+ * not what it inherits: FN with each one's name and value, in no
+ * order to rely on. FN's non-zero return stops the walk and is
+ * returned.
+ */
+int sh_zfs_userprops(struct sh_zfs *z, const char *name,
+    int (*fn)(void *arg, const char *prop, const char *value), void *arg,
+    struct sh_err *e);
+
+/*
  * A pool's property, and setting one. "ashift" is answered with the
  * ashift of the pool's top-level vdevs (the largest), which is what
  * the disks were laid out with; the pool property of that name is

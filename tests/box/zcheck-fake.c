@@ -15,10 +15,13 @@ int
 main(void)
 {
 	static char prog[] = "box_zcheck", top[] = "tank/zc";
-	char *argv[] = { prog, top, NULL };
+	static char other[] = "fast/zc2";
+	char *argv[] = { prog, top, other, NULL };
 
 	zfake_reset();
 	zfake_pool("tank");
 	zfake_fs("tank/zc");
-	return (zcheck_main(2, argv));
+	zfake_pool("fast");
+	zfake_fs("fast/zc2");
+	return (zcheck_main(3, argv));
 }

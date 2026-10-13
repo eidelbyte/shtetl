@@ -17,10 +17,15 @@
  * inherited from.
  */
 
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <libnvpair.h>
 #include <libzfs.h>
@@ -599,11 +604,197 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 	r = lzc_destroy_snaps(snaps, B_FALSE, &errlist);
 	nvlist_free(snaps);
 	nvlist_free(errlist);
+	/* dsl_destroy_snapshot_check_impl: EBUSY holds, EEXIST clones */
 	if (r != 0) {
-		sh_errf(e, "%s: %s", name, strerror(r));
+		sh_errf(e, "%s: %s", name, r == EEXIST ? "has clones" :
+		    r == EBUSY ? "has holds" : strerror(r));
 		return (-1);
 	}
 	return (0);
+}
+
+/* Whether NAME, of the TYPES, is there. */
+static int
+zz_there(struct sh_zfs *z, const char *name, zfs_type_t types)
+{
+	return (zfs_dataset_exists(z->zz_hdl, name, types) ? 1 : 0);
+}
+
+/* DS's parent there: 0; refused as zfs.h words it otherwise. */
+static int
+zz_parent(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	char parent[ZFS_MAX_DATASET_NAME_LEN];
+	const char *slash;
+
+	if ((slash = strrchr(ds, '/')) != NULL) {
+		(void) snprintf(parent, sizeof (parent), "%.*s",
+		    (int)(slash - ds), ds);
+		if (zz_there(z, parent, ZFS_TYPE_FILESYSTEM))
+			return (0);
+	}
+	sh_errf(e, "%s: no parent", ds);
+	return (-1);
+}
+
+/*
+ * zfs_clone, not lzc_clone: it takes PROPS as words and gives the
+ * kernel native ones in their own types (zfs_valid_proplist).
+ */
+int
+sh_zfs_clone(struct sh_zfs *z, const char *origin, const char *ds,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	nvlist_t *pv;
+	int r;
+
+	if (!zz_there(z, origin, ZFS_TYPE_SNAPSHOT)) {
+		sh_errf(e, "%s: no such snapshot", origin);
+		return (-1);
+	}
+	if (zz_there(z, ds, ZFS_TYPE_DATASET)) {
+		sh_errf(e, "%s: exists", ds);
+		return (-1);
+	}
+	if (zz_parent(z, ds, e) != 0)
+		return (-1);
+	if ((pv = zz_props(props, nprops)) == NULL) {
+		sh_err_nomem(e);
+		return (-1);
+	}
+	if ((r = zz_open(z, origin, &zhp, e)) != 0) {
+		nvlist_free(pv);
+		return (-1);
+	}
+	r = zfs_clone(zhp, ds, nprops > 0 ? pv : NULL);
+	if (r != 0)
+		zz_err(z, e, ds);
+	zfs_close(zhp);
+	nvlist_free(pv);
+	return (r != 0 ? -1 : 0);
+}
+
+/*
+ * lzc_send in a child, into a pipe, lzc_receive from it here: the
+ * stream as zfs send -Lec makes it, nothing of -p. What each refuses
+ * is looked at first, so that it is said in zfs.h's words; after,
+ * the sender's errno (EXDEV: FROM no ancestor) and the receiver's
+ * (dmu_recv.c: ENODEV, the base not FROM's counterpart; EEXIST, the
+ * target there; ETXTBSY, changed since its newest snapshot).
+ */
+int
+sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
+    const char *to, const char *origin, struct sh_err *e)
+{
+	char tofs[ZFS_MAX_DATASET_NAME_LEN];
+	const char *at;
+	int fds[2], st, rr, sr;
+	pid_t pid;
+
+	if (!zz_there(z, snap, ZFS_TYPE_SNAPSHOT) || (from != NULL &&
+	    !zz_there(z, from, ZFS_TYPE_SNAPSHOT)) || (origin != NULL &&
+	    !zz_there(z, origin, ZFS_TYPE_SNAPSHOT))) {
+		sh_errf(e, "%s: no such snapshot",
+		    !zz_there(z, snap, ZFS_TYPE_SNAPSHOT) ? snap :
+		    from != NULL && !zz_there(z, from, ZFS_TYPE_SNAPSHOT) ?
+		    from : origin);
+		return (-1);
+	}
+	if ((at = strchr(to, '@')) == NULL) {
+		sh_errf(e, "%s: not a snapshot's name", to);
+		return (-1);
+	}
+	(void) snprintf(tofs, sizeof (tofs), "%.*s", (int)(at - to), to);
+	if (from == NULL || origin != NULL) {
+		if (zz_there(z, tofs, ZFS_TYPE_DATASET)) {
+			sh_errf(e, "%s: exists", tofs);
+			return (-1);
+		}
+		if (zz_parent(z, tofs, e) != 0)
+			return (-1);
+	} else if (!zz_there(z, tofs, ZFS_TYPE_FILESYSTEM)) {
+		sh_errf(e, "%s: no such filesystem", tofs);
+		return (-1);
+	}
+	if (pipe(fds) != 0) {
+		sh_errf(e, "pipe: %s", strerror(errno));
+		return (-1);
+	}
+	if ((pid = fork()) == -1) {
+		sh_errf(e, "fork: %s", strerror(errno));
+		(void) close(fds[0]);
+		(void) close(fds[1]);
+		return (-1);
+	}
+	if (pid == 0) {
+		/* a receiver that stops reads EPIPE, not a signal */
+		(void) close(fds[0]);
+		(void) signal(SIGPIPE, SIG_IGN);
+		sr = lzc_send(snap, from, fds[1], LZC_SEND_FLAG_LARGE_BLOCK |
+		    LZC_SEND_FLAG_EMBED_DATA | LZC_SEND_FLAG_COMPRESS);
+		_exit(sr & 0xff);
+	}
+	(void) close(fds[1]);
+	rr = lzc_receive(to, NULL, origin, B_FALSE, B_FALSE, fds[0]);
+	(void) close(fds[0]);
+	while (waitpid(pid, &st, 0) == -1 && errno == EINTR)
+		;
+	sr = WIFEXITED(st) ? WEXITSTATUS(st) : EINTR;
+	if (sr != 0 && sr != EPIPE) {
+		if (sr == EXDEV)
+			sh_errf(e, "%s: not an earlier snapshot of %s", from,
+			    snap);
+		else
+			sh_errf(e, "%s: %s", snap, strerror(sr));
+		return (-1);
+	}
+	if (rr == 0)
+		return (0);
+	if (rr == ENODEV && origin != NULL)
+		sh_errf(e, "%s: not %s's counterpart", origin, from);
+	else if (rr == ENODEV)
+		sh_errf(e, "%s: newest snapshot is not %s's counterpart", tofs,
+		    from);
+	else if (rr == EEXIST)
+		sh_errf(e, "%s: exists", tofs);
+	else if (rr == ETXTBSY)
+		sh_errf(e, "%s: changed since its newest snapshot", tofs);
+	else
+		sh_errf(e, "%s: %s", to, strerror(rr));
+	return (-1);
+}
+
+/* A user property set on the dataset itself: its source its name. */
+int
+sh_zfs_userprops(struct sh_zfs *z, const char *name,
+    int (*fn)(void *, const char *, const char *), void *arg,
+    struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	nvlist_t *pv;
+	nvpair_t *pr;
+	const char *val, *src;
+	int r;
+
+	if ((r = zz_open(z, name, &zhp, e)) != 0) {
+		if (r == 1)
+			zz_none(e, name);
+		return (-1);
+	}
+	r = 0;
+	for (pr = nvlist_next_nvpair(zfs_get_user_props(zhp), NULL);
+	    r == 0 && pr != NULL;
+	    pr = nvlist_next_nvpair(zfs_get_user_props(zhp), pr)) {
+		if (nvpair_value_nvlist(pr, &pv) != 0 ||
+		    nvlist_lookup_string(pv, ZPROP_VALUE, &val) != 0 ||
+		    nvlist_lookup_string(pv, ZPROP_SOURCE, &src) != 0 ||
+		    strcmp(src, zfs_get_name(zhp)) != 0)
+			continue;
+		r = fn(arg, nvpair_name(pr), val);
+	}
+	zfs_close(zhp);
+	return (r);
 }
 
 /*
