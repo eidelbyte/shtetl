@@ -213,5 +213,79 @@
     "estimated_size": "small",
     "completed": "tested",
     "note": "Box build 6 (70962a2): 1715 kept by the update, a module's object kept."
+  },
+  "m4-zfs": {
+    "description": "The ZFS calls of M4 (src/core/zfs.h), over libzfs_core, no zfs(8): a clone of a snapshot with properties from its birth (lzc_clone); a snapshot sent and received, whole, incremental, or as a clone stream received as a clone of another (lzc_send into lzc_receive through a pipe, no property travelling); the user properties set on a snapshot itself, walked (to copy shtetl:* after a receive, 6.2); a clone's origin read. Verify: MATRIX family Z (Z14 -) over the fake; the box (tests/box/zcheck.c, across two pools).",
+    "requires": [
+      "m3-zfs"
+    ],
+    "epic": "zrun",
+    "milestone": "M4",
+    "expected_changed_files": [
+      "src/core/zfs.h",
+      "src/fbsd/zfs.c",
+      "tests/zfake.c",
+      "tests/check_zfs.c",
+      "tests/box/zcheck.c",
+      "tests/box/run.sh",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Clones and sends for beam-down, create and save.",
+    "estimated_size": "medium",
+    "completed": "not-started"
+  },
+  "m4-beam": {
+    "description": "A foundation's version brought to zrun (planning.md 7.3): each dataset of F sent from zlake, whole the first time, incremental from the newest version zrun has after; received under the run root's foundations/F, readonly=on, canmount=noauto, a placeholder canmount=off, the mountpoint inherited; no -p, the version's shtetl:* copied onto each received snapshot after (6.2), a received snapshot with no shtetl:kind copied again. The command (PROPOSAL): shtetl beam F [--version V]; create does it when the version is not there. Verify: MATRIX family M; the box.",
+    "requires": [
+      "m4-zfs"
+    ],
+    "epic": "zrun",
+    "milestone": "M4",
+    "expected_changed_files": [
+      "src/core/beam.c",
+      "src/core/beam.h",
+      "src/main.c",
+      "tests/check_beam.c",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Foundation versions on zrun to clone containers from.",
+    "estimated_size": "medium",
+    "completed": "not-started"
+  },
+  "m4-save": {
+    "description": "shtetl save X [-m msg] (planning.md 7.5, 6.2): zfs snapshot -r of the container with shtetl:kind=save, shtetl:commit (-m, or written in an editor) and shtetl:config; the zlake mirror (7.10): each dataset into the lake root's containers/X, a foundation-inherited dataset's first save a clone stream received as a clone of zlake's F/d@vN, a container-only dataset's first a full stream, later saves incremental from the previous; shtetl:* copied after each receive. Retention's prune is M7. Verify: MATRIX family S; the box.",
+    "requires": [
+      "m4-beam"
+    ],
+    "epic": "zrun",
+    "milestone": "M4",
+    "expected_changed_files": [
+      "src/core/save.c",
+      "src/core/save.h",
+      "src/main.c",
+      "tests/check_save.c",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Saves with messages on zrun, mirrored in zlake as deltas.",
+    "estimated_size": "medium",
+    "completed": "not-started"
+  },
+  "m4-create": {
+    "description": "shtetl create X --on F [--version V] (planning.md 7.4): the checks (X's ver allows the version, its datasets do not collide with F's); the version beamed if not on zrun; a clone per dataset of F@v parent first, a placeholder -o canmount=off, the recipe's properties set locally; X's own datasets; the jail block written and the jail started; pkg -j X install and the commands, a piece the foundation ran as of its shtetl:config left out; the first save. The jail's particulars (where its block lives, what it holds, how commands run in it, requires) are PROPOSALs. Verify: MATRIX family X; the box.",
+    "requires": [
+      "m4-save"
+    ],
+    "epic": "zrun",
+    "milestone": "M4",
+    "expected_changed_files": [
+      "src/core/create.c",
+      "src/core/create.h",
+      "src/main.c",
+      "tests/check_create.c",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Containers on zrun, cloned from a foundation version, saved.",
+    "estimated_size": "large",
+    "completed": "not-started"
   }
 }
