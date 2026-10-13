@@ -424,3 +424,46 @@ fetch that fails, undone on real ZFS), then F11, F12, F16, F17 and
 F19 on a real build of releng/15.1, and logs each by its cell to
 tests/box/results/<host>-build-<time>.log. Not yet run.
 
+
+# Family P: patches and the pause (M3; planning.md 7.1.1; src/core/patch.c, src/core/build.c)
+
+A foundation recipe's patches, applied to the src tree after the
+checkout and before the build, and the pause a patch that does not
+apply leaves for a person. The pieces (order, locations, the files a
+patch touches, what a fix leaves) are checked alone in check_patch.c;
+the run in check_build.c, with real git for everything git does to a
+patch and to the tree (skipped, and said so, where there is none),
+patch sources fetched over file:// URLs, and the fake ZFS's snapshots
+and rollbacks of the build root carried out on the scratch tree by a
+hook, so a rollback really puts the files back.
+
+Dimensions: the source {a URL with a scheme, a host and path (https),
+a directory in the configuration root}; its options {ref none, a
+branch, a tag, a commit; dir none, a subdirectory}; the sources {none,
+one, several; an array or an object; from two layers}; a source's
+files {none, several in natural order, not .patch, in a subdirectory};
+the fetch {done, failing}; each patch {applies, already in, conflicts,
+merges without conflict, no base to merge against}; the verb {build,
+--continue, --skip, --abort}; at --continue {fixed, a marker left, a
+.rej left}; the build after the patches {succeeds, fails}.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| P1 | natural order: runs of digits compare as numbers (2 before 10, a2b before a10b), leading zeros, ties byte by byte; only the files ending .patch at the top of the directory, others and subdirectories left | covered: check_patch.c |
+| P2 | a location: a URL as written, a host and path as https, a directory in the configuration root | covered: check_patch.c |
+| P3 | the fetch: a git source at its ref (none: the remote's HEAD; a branch; a tag; a commit) into the run directory, its commit noted; a directory's patches copied; dir taking a subdirectory; a repository, ref or directory missing refused and the run undone | covered: check_build.c |
+| P4 | the list: sources in the recipe's order, each whole, its patches in natural order; the lower layer's sources first; the array and the object alike | covered: check_build.c |
+| P5 | the snapshots: @shtetl-patch-0 after the checkout, @shtetl-patch-N before patch N | covered: check_build.c |
+| P6 | a patch that applies: applied, said, on to the next | covered: check_build.c |
+| P7 | a patch already in, its reverse applying: skipped, said | covered: check_build.c |
+| P8 | a patch that does not apply: merged three ways, conflict markers left; merged without conflict, paused all the same for a person to look; no base to merge against, applied with --reject, .rej files left. The pause: the patch, the files to fix and the three commands said; exit 3; the mark and F's datasets kept, nothing mounted, the record written in the run directory | covered: check_build.c |
+| P9 | --continue: refused while a file the patch touches holds a conflict marker or has a .rej, naming it; otherwise the fix written out (the tree's difference from the patch's snapshot) as fixed/<source>/<name>, the next patch, the build to its end | covered: check_build.c |
+| P10 | --skip: the tree back to the patch's snapshot, the patch left out, the build on | covered: check_build.c |
+| P11 | --abort: the build root back to @shtetl-patch-0, the patch snapshots destroyed, F's datasets destroyed, the mark cleared, the record removed; the log kept | covered: check_build.c |
+| P12 | refused: --continue, --skip or --abort with no build paused, or with one of another foundation paused; a build while one is paused (F5); two verbs at once | covered: check_build.c; run-cli.sh for the usage |
+| P13 | a resumed build reads the recipe in the config snapshot the build began with, not the configuration root as it is now | covered: check_build.c |
+| P14 | the record: shtetl:patches on every dataset of the version, each source with the commit it was fetched at, each patch in already, skipped or fixed by hand; none when there are no patches; a fix kept in the obj cache under patches/<version>/ | covered: check_build.c |
+| P15 | the end: the build root rolled back to @shtetl-patch-0 and every patch snapshot destroyed, after a build that succeeds and after one that fails after the patches | covered: check_build.c |
+| P16 | the plan shows each source, with its ref and dir | covered: check_build.c |
+| P17 | for real: git apply on a FreeBSD tree, ZFS snapshots and rollbacks of the build root; a patch that applies, one already in, one that conflicts, paused, fixed by the script, --continue, built | box: tests/box/build.sh |
+| P18 | the command line: build F --continue, --skip, --abort; usage errors | covered: run-cli.sh |

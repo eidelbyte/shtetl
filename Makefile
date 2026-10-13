@@ -75,7 +75,7 @@ BUILD = build
 CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o \
 	$(BUILD)/root.o $(BUILD)/syntax.o $(BUILD)/schema.o $(BUILD)/site.o \
 	$(BUILD)/cascade.o $(BUILD)/show.o $(BUILD)/run.o $(BUILD)/spaces.o \
-	$(BUILD)/boot.o $(BUILD)/version.o $(BUILD)/build.o
+	$(BUILD)/boot.o $(BUILD)/version.o $(BUILD)/build.o $(BUILD)/patch.o
 # src/core/zfs.h has three implementations, picked at the link: the
 # portable shtetl gets src/core/zstub.c, which refuses every call; the
 # FreeBSD one gets src/fbsd/zfs.c, over libzfs; the unit tests get
@@ -91,7 +91,7 @@ BOX_OBJS = $(BUILD)/err.o $(BUILD)/tree.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(ZFS_OBJS) $(UCL_OBJS)
 TESTS = check_parse check_schema check_site check_cascade check_show \
 	check_run check_spaces check_boot check_version check_zfs \
-	check_build
+	check_build check_patch
 
 all: build shtetl
 
@@ -164,6 +164,9 @@ $(BUILD)/build.o: src/core/build.c src/core/build.h src/core/cascade.h \
 $(BUILD)/version.o: src/core/version.c src/core/version.h \
 	src/core/err.h src/core/syntax.h src/core/tree.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/version.c
+$(BUILD)/patch.o: src/core/patch.c src/core/patch.h src/core/err.h \
+	src/core/parse.h src/core/syntax.h src/core/tree.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/patch.c
 $(BUILD)/zstub.o: src/core/zstub.c src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/zstub.c
 $(BUILD)/fbsd_zfs.o: src/fbsd/zfs.c src/core/zfs.h src/core/err.h
