@@ -425,13 +425,13 @@ immutable}; an update's end {built, failed, paused and aborted}.
 | F24 | an update the same day as the last version: the name with .2 | covered: check_build.c |
 | F25 | an update that fails: F's datasets rolled back to the last version, not destroyed; mounts, mountpoints and the mark undone as for a new build | covered: check_build.c |
 | F26 | an update paused at a patch: --abort rolls F back to its last version; --continue goes on to the update | covered: check_build.c |
-| F27 | for real: a second build of box on the box, an update over the first, on the kept obj cache: the version .2, delete-old run, no backup left, the command's /etc/motd.template written again over distribution's | box: tests/box/build.sh |
+| F27 | for real: a second build of box on the box, an update over the first, on the kept obj cache: the version .2, delete-old run, no backup left, the command's /etc/motd.template written again over distribution's; init and rtld changed by a patch each, so installworld makes backups to remove | box: tests/box/build.sh. Build 4 (63df125, at 97d62c7) green, the update 1 minute on the kept obj cache; but the same commit made no backup, so their removal went unseen: F27 now changes init and rtld |
 | F28 | pkg-upgrade planned (planning.md 7.2, 6.1): from F's last snapshot, a version or a -pkg of one; the snapshot to take its version's -pkg, then -pkg.2 and on; shown | covered: check_build.c |
 | F29 | pkg-upgrade refused: no lake or build root, no such foundation, F with no version, a build under way or paused | covered: check_build.c |
 | F30 | pkg-upgrade's run: the build root's mark; F and its datasets mounted below the run directory, placeholders not; devfs and the host's resolv.conf while pkg runs; pkg -c <root> upgrade -y; all of it undone; snapshot -r with shtetl:kind=pkg, shtetl:commit (-m, or its own), and the version's shtetl:config, shtetl:config-guid and shtetl:patches carried over | covered: check_build.c |
 | F31 | pkg-upgrade that fails: F back to its last snapshot, the mark cleared, the log kept | covered: check_build.c |
 | F32 | pkg-upgrade on the command line: no foundation, two, an unknown option, -m with no message; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
-| F33 | for real: pkg-upgrade of box after F27, its -pkg snapshot on the box | box: tests/box/build.sh |
+| F33 | for real: pkg-upgrade of box after F27, its -pkg snapshot on the box | box: tests/box/build.sh; build 4 (63df125) green |
 
 On the box, tests/box/build.sh builds a foundation for real (sudo sh
 tests/box/build.sh; hours): one pool on a sparse file imported with
@@ -443,8 +443,9 @@ tests/box/results/<host>-build-<time>.log. Build 1 failed on a mount
 after a set (Z12); build 2 green (b12f0c2). Since, the build is P17's,
 paused at a patch and carried on. The pool's file stays between
 runs, exported, keeping the build root and box's obj cache for the
-branch, so a later build is incremental; --clean drops them. Not yet
-run: build 3 ran at 5802782, before it.
+branch, so a later build is incremental; --clean drops them. Build 4
+was its first: the first build whole in 30 minutes, the update over
+its obj cache in 1.
 
 
 # Family P: patches and the pause (M3; planning.md 7.1.1; src/core/patch.c, src/core/build.c)

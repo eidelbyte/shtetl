@@ -192,16 +192,23 @@ srcof() {
 # P17's file, as git's patches say it
 PF=share/misc/bsd-family-tree
 
-mkpatch() {	# FROM TO OUT: PF from FROM to TO, with git's index line
+mkpatch() {	# FROM TO OUT [FILE]: FILE (PF) from FROM to TO, git's way
+	_f=${4:-$PF}
 	_a=$(git -C "$ALT/zbuild" hash-object -w "$1")
 	_b=$(git -C "$ALT/zbuild" hash-object -w "$2")
 	{
-		echo "diff --git a/$PF b/$PF"
+		echo "diff --git a/$_f b/$_f"
 		echo "index $_a..$_b 100644"
-		echo "--- a/$PF"
-		echo "+++ b/$PF"
+		echo "--- a/$_f"
+		echo "+++ b/$_f"
 		diff -u "$1" "$2" | sed 1,2d
 	} >"$3"
+}
+
+lookat() {	# DATASET...: each mounted where its mountpoint now says
+	for _m; do
+		[ "$(prop "$_m" mounted)" = yes ] || zfs mount "$_m"
+	done
 }
 
 cases() {
@@ -385,9 +392,7 @@ EOF
 
 	echo "== what was built, mounted for a look"
 	zfs set mountpoint=/look $F
-	for _d in $F $F/tmp $F/var $F/usr/local; do
-		zfs mount "$_d"
-	done
+	lookat $F $F/tmp $F/var $F/usr/local
 	_r=$ALT/look
 	check F19 "the world went into F (installworld)" \
 	    "$([ -x "$_r/bin/sh" ] && echo yes)" yes
@@ -403,16 +408,25 @@ EOF
 	    "$(grep -aq 'BOX' "$_r/boot/kernel/kernel" && echo yes)" yes
 	check F11 "usr/local is its own dataset" \
 	    "$(df "$_r/usr/local" | awk 'NR == 2 { print $1 }')" "$F/usr/local"
-	for _d in $F/usr/local $F/var $F/tmp $F; do
-		zfs unmount "$_d"
+	for _m in $F/usr/local $F/var $F/tmp $F; do
+		zfs unmount "$_m"
 	done
 	zfs inherit mountpoint $F
 	check F11 "the run's log kept" \
 	    "$([ -s "$RUNS/box/build.log" ] && echo yes)" yes
 
 	echo "== F27: box again, an update over it (the obj cache warm)"
-	# the conflicting patch gone from the recipe's directory
+	# the conflicting patch gone from the recipe's directory; init and
+	# rtld changed, a string each, so installworld backs up the old
 	rm -f "$ALT/zconfig/patches/box/3-two.patch"
+	for _f in sbin/init/init.c libexec/rtld-elf/rtld.c; do
+		git -C "$ALT/zbuild" cat-file blob "FETCH_HEAD:$_f" \
+		    >"$T/p17/b" || return 1
+		{ cat "$T/p17/b"; echo 'static const char shtetl_box[]' \
+		    '__used = "shtetl box";'; } >"$T/p17/a"
+		mkpatch "$T/p17/b" "$T/p17/a" \
+		    "$ALT/zconfig/patches/box/4-${_f##*/}.patch" "$_f"
+	done
 	_t0=$(date +%s)
 	sht build -y box
 	_t1=$(date +%s)
@@ -427,6 +441,9 @@ EOF
 	has F27 "the plan an update" "$T/out" "foundation box, an update of @$_v"
 	has F27 "delete-old before the install" "$T/out" \
 	    "make delete-old delete-old-libs"
+	has F27 "installworld's backups removed: init's" "$T/out" \
+	    "sbin/init.bak"
+	has F27 "and rtld's" "$T/out" "libexec/ld-elf.so.1.old"
 	_v2=$(zfs list -H -t snapshot -o name -s createtxg $F | tail -1)
 	_v2=${_v2#*@}
 	echo "# version $_v2"
@@ -442,9 +459,7 @@ EOF
 	check F27 "the first kept" \
 	    "$(zfs list -H -o name "$F@$_v" 2>/dev/null)" "$F@$_v"
 	zfs set mountpoint=/look $F
-	for _d in $F $F/tmp $F/var $F/usr/local; do
-		zfs mount "$_d"
-	done
+	lookat $F $F/tmp $F/var $F/usr/local
 	check F27 "no kernel.old" \
 	    "$([ -e "$_r/boot/kernel.old" ] && echo there)" ""
 	check F27 "no loader backup" \
@@ -453,12 +468,14 @@ EOF
 	    "$(ls "$_r/libexec" | grep -c '^ld-elf.*\.so\.1\.old$')" 0
 	check F27 "no init.bak" \
 	    "$([ -e "$_r/sbin/init.bak" ] && echo there)" ""
+	check F27 "the changed init installed" \
+	    "$(grep -ac 'shtetl box' "$_r/sbin/init")" 1
 	check F27 "the new tree installed: one patch line now" \
 	    "$(grep -c '^shtetl-box ' "$_r/usr/share/misc/bsd-family-tree")" 1
 	check F27 "the command ran again, over distribution's file" \
 	    "$(cat "$_r/etc/motd.template")" shtetl-box
-	for _d in $F/usr/local $F/var $F/tmp $F; do
-		zfs unmount "$_d"
+	for _m in $F/usr/local $F/var $F/tmp $F; do
+		zfs unmount "$_m"
 	done
 	zfs inherit mountpoint $F
 

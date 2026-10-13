@@ -944,6 +944,14 @@ a version is an update; there with none, it is refused.
   `*.old`, `libexec/ld-elf*.so.1.old`, `sbin/init.bak`.
 - pkg and the commands run again (ruled 2026-10-13): the installs put
   back every file they install, undoing what a command changed.
+- Found on the box: `boot/kernel.old` never comes about in a
+  foundation. installkernel keeps the old kernel only when installing
+  over the running kernel's directory, which a DESTDIR's never is;
+  otherwise it removes the directory first (`sys/conf/kern.post.mk`).
+  So every update writes all of `/boot/kernel` anew, `install -C` or
+  not, and the rebase's onto side has every kernel file changed.
+  `ld-elf*.so.1.old` and `init.bak` come about when the new binary
+  differs, as on any update to a newer commit.
 - A failed update, and `--abort` of a paused one, roll every dataset
   of F back to the last version (PROPOSAL): F is the foundation's
   history, which an update never destroys. A paused build is an

@@ -357,3 +357,28 @@ among them, and that is how it was built. Ruled 2026-10-13: a
 foundation's update runs its commands again, the install having put
 back what they changed (planning.md 14); check_build and the box's
 F27 hold it.
+
+## Box build 4 (63df125)
+
+At 97d62c7: 58 ok, 0 failed. The kept store's first run (a new pool,
+no obj cache: the first build whole, 30 minutes); P17 again; F27, the
+update over the first build's obj cache, in 1 minute; F33, pkg-upgrade,
+its -pkg on every dataset. tracker: m3-pkg-upgrade tested.
+
+F27 passed without proving what it meant to: the update rebuilt the
+same commit, and with install -C nothing differed, so installworld
+made no backup and "no backup left" held of nothing. Read in
+releng/15.1: ld-elf.so.1 is installed -C -b and init -b -B.bak, so
+their backups come with a changed binary; and installkernel removes
+a DESTDIR's /boot/kernel outright, keeping kernel.old only over the
+running kernel's directory (sys/conf/kern.post.mk). So a foundation
+never has a kernel.old, and every update writes all of /boot/kernel
+anew, install -C or not (planning.md 7.2 as built; put to the user).
+
+F27 now patches init and rtld (a __used string appended to each,
+made on the box from the branch's files and rehearsed on the mac), so
+installworld backs them up and the checks see shtetl remove them,
+schg cleared as root; and the changed init is checked in F. Also: the
+look's "cannot mount ... already mounted", zfs set mountpoint having
+mounted them, is gone (lookat), and the loops no longer reuse P17's
+variable. m3-update stays testing until that runs.
