@@ -76,7 +76,7 @@ CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o \
 	$(BUILD)/root.o $(BUILD)/syntax.o $(BUILD)/schema.o $(BUILD)/site.o \
 	$(BUILD)/cascade.o $(BUILD)/show.o $(BUILD)/run.o $(BUILD)/spaces.o \
 	$(BUILD)/boot.o $(BUILD)/version.o $(BUILD)/build.o $(BUILD)/patch.o \
-	$(BUILD)/beam.o $(BUILD)/save.o $(BUILD)/edit.o
+	$(BUILD)/beam.o $(BUILD)/save.o $(BUILD)/edit.o $(BUILD)/zwalk.o
 # src/core/zfs.h has three implementations, picked at the link: the
 # portable shtetl gets src/core/zstub.c, which refuses every call; the
 # FreeBSD one gets src/fbsd/zfs.c, over libzfs; the unit tests get
@@ -168,11 +168,15 @@ $(BUILD)/version.o: src/core/version.c src/core/version.h \
 	src/core/err.h src/core/syntax.h src/core/tree.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/version.c
 $(BUILD)/beam.o: src/core/beam.c src/core/beam.h src/core/build.h \
-	src/core/err.h src/core/spaces.h src/core/zfs.h
+	src/core/err.h src/core/spaces.h src/core/zfs.h src/core/zwalk.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/beam.c
 $(BUILD)/save.o: src/core/save.c src/core/save.h src/core/beam.h \
-	src/core/err.h src/core/spaces.h src/core/syntax.h src/core/zfs.h
+	src/core/err.h src/core/spaces.h src/core/syntax.h src/core/zfs.h \
+	src/core/zwalk.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/save.c
+$(BUILD)/zwalk.o: src/core/zwalk.c src/core/zwalk.h src/core/err.h \
+	src/core/zfs.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/zwalk.c
 $(BUILD)/edit.o: src/core/edit.c src/core/edit.h src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/edit.c
 $(BUILD)/patch.o: src/core/patch.c src/core/patch.h src/core/err.h \

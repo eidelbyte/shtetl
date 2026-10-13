@@ -19,77 +19,7 @@
 #include "core/spaces.h"
 #include "core/syntax.h"
 #include "core/zfs.h"
-
-/* A list of names, NULL-ended, grown by one at a time. */
-static int
-sv_add(void *arg, const char *name)
-{
-	char ***list = arg;
-	char **nl;
-	size_t n;
-
-	for (n = 0; (*list)[n] != NULL; n++)
-		;
-	if ((nl = realloc(*list, (n + 2) * sizeof (*nl))) == NULL)
-		return (-1);
-	*list = nl;
-	if ((nl[n] = strdup(name)) == NULL)
-		return (-1);
-	nl[n + 1] = NULL;
-	return (0);
-}
-
-static void
-sv_free(char **list)
-{
-	size_t i;
-
-	for (i = 0; list != NULL && list[i] != NULL; i++)
-		free(list[i]);
-	free(list);
-}
-
-/* Every filesystem below DS, parents first, by full name. */
-static int
-sv_walk(struct sh_zfs *z, const char *ds, char ***all, struct sh_err *e)
-{
-	char **kids;
-	size_t i;
-	int r;
-
-	if ((kids = calloc(1, sizeof (*kids))) == NULL) {
-		sh_err_nomem(e);
-		return (-1);
-	}
-	r = sh_zfs_children(z, ds, sv_add, &kids, e);
-	for (i = 0; r == 0 && kids[i] != NULL; i++) {
-		if (sv_add(all, kids[i]) != 0) {
-			sh_err_nomem(e);
-			r = -1;
-		} else {
-			r = sv_walk(z, kids[i], all, e);
-		}
-	}
-	sv_free(kids);
-	return (r);
-}
-
-/* DS's snapshots, the names after the @, oldest first; NULL: refused. */
-static char **
-sv_snaps(struct sh_zfs *z, const char *ds, struct sh_err *e)
-{
-	char **list;
-
-	if ((list = calloc(1, sizeof (*list))) == NULL) {
-		sh_err_nomem(e);
-		return (NULL);
-	}
-	if (sh_zfs_snapshots(z, ds, sv_add, &list, e) != 0) {
-		sv_free(list);
-		return (NULL);
-	}
-	return (list);
-}
+#include "core/zwalk.h"
 
 int
 sh_save_target(const char *target, char *name, size_t len,
@@ -122,7 +52,7 @@ sv_lastconfig(struct sh_zfs *z, struct sh_save *p, struct sh_err *e)
 	size_t n;
 	int r;
 
-	if ((snaps = sv_snaps(z, p->sv_run, e)) == NULL)
+	if ((snaps = sh_zw_snaps(z, p->sv_run, e)) == NULL)
 		return (-1);
 	for (n = 0; snaps[n] != NULL; n++)
 		;
@@ -142,7 +72,7 @@ sv_lastconfig(struct sh_zfs *z, struct sh_save *p, struct sh_err *e)
 		    sh_zfs_get(z, name, "shtetl:config-guid", p->sv_guid,
 		    sizeof (p->sv_guid), NULL, e) != 0 ? -1 : 0;
 	}
-	sv_free(snaps);
+	sh_zw_free(snaps);
 	return (r);
 }
 
@@ -180,11 +110,11 @@ sh_save_plan(struct sh_zfs *z, const struct sh_spaces *s,
 			sh_errf(e, "no container %s", p->sv_name);
 		return (-1);
 	}
-	if ((all = calloc(1, sizeof (*all))) == NULL || sv_add(&all,
-	    p->sv_run) != 0 || sv_walk(z, p->sv_run, &all, e) != 0) {
+	if ((all = calloc(1, sizeof (*all))) == NULL || sh_zw_add(&all,
+	    p->sv_run) != 0 || sh_zw_walk(z, p->sv_run, &all, e) != 0) {
 		if (all == NULL)
 			sh_err_nomem(e);
-		sv_free(all);
+		sh_zw_free(all);
 		return (-1);
 	}
 	(void) snprintf(prefix, sizeof (prefix), "%s/", p->sv_runf);
@@ -209,7 +139,7 @@ sh_save_plan(struct sh_zfs *z, const struct sh_spaces *s,
 			    sizeof (p->sv_origin[i]), "%s", val);
 	}
 	p->sv_n = i;
-	sv_free(all);
+	sh_zw_free(all);
 	if (e->se_count != before)
 		return (-1);
 	if (config != NULL) {
@@ -269,17 +199,17 @@ sv_mirror1(struct sh_zfs *z, const struct sh_save *p, size_t i,
 		r = sh_zfs_send(z, from, NULL, to, NULL, e);
 		how = "whole";
 	} else {
-		if ((have = sv_snaps(z, lds, e)) == NULL)
+		if ((have = sh_zw_snaps(z, lds, e)) == NULL)
 			return (-1);
 		for (n = 0; have[n] != NULL; n++)
 			;
 		if (n > 0 && strcmp(have[n - 1], snap) == 0) {
-			sv_free(have);
+			sh_zw_free(have);
 			return (0);
 		}
 		(void) snprintf(val, sizeof (val), "%s@%s", rds, n > 0 ?
 		    have[n - 1] : "");
-		sv_free(have);
+		sh_zw_free(have);
 		r = sh_zfs_send(z, from, val, to, NULL, e);
 		how = "from its last";
 	}

@@ -20,96 +20,7 @@
 #include "core/err.h"
 #include "core/spaces.h"
 #include "core/zfs.h"
-
-/* A list of names, NULL-ended, grown by one at a time. */
-static int
-bm_add(void *arg, const char *name)
-{
-	char ***list = arg;
-	char **nl;
-	size_t n;
-
-	for (n = 0; (*list)[n] != NULL; n++)
-		;
-	if ((nl = realloc(*list, (n + 2) * sizeof (*nl))) == NULL)
-		return (-1);
-	*list = nl;
-	if ((nl[n] = strdup(name)) == NULL)
-		return (-1);
-	nl[n + 1] = NULL;
-	return (0);
-}
-
-static void
-bm_free(char **list)
-{
-	size_t i;
-
-	for (i = 0; list != NULL && list[i] != NULL; i++)
-		free(list[i]);
-	free(list);
-}
-
-static char **
-bm_new(struct sh_err *e)
-{
-	char **list;
-
-	if ((list = calloc(1, sizeof (*list))) == NULL)
-		sh_err_nomem(e);
-	return (list);
-}
-
-/* DS's snapshots, the names after the @, oldest first; NULL: refused. */
-static char **
-bm_snaps(struct sh_zfs *z, const char *ds, struct sh_err *e)
-{
-	char **list;
-
-	if ((list = bm_new(e)) == NULL)
-		return (NULL);
-	if (sh_zfs_snapshots(z, ds, bm_add, &list, e) != 0) {
-		bm_free(list);
-		return (NULL);
-	}
-	return (list);
-}
-
-/* Every filesystem below DS, parents first, by full name. */
-static int
-bm_walk(struct sh_zfs *z, const char *ds, char ***all, struct sh_err *e)
-{
-	char **kids;
-	size_t i;
-	int r;
-
-	if ((kids = bm_new(e)) == NULL)
-		return (-1);
-	r = sh_zfs_children(z, ds, bm_add, &kids, e);
-	for (i = 0; r == 0 && kids[i] != NULL; i++) {
-		if (bm_add(all, kids[i]) != 0) {
-			sh_err_nomem(e);
-			r = -1;
-		} else {
-			r = bm_walk(z, kids[i], all, e);
-		}
-	}
-	bm_free(kids);
-	return (r);
-}
-
-/* The index of NAME in LIST, or -1. */
-static long
-bm_index(char *const *list, const char *name)
-{
-	long i;
-
-	for (i = 0; list[i] != NULL; i++) {
-		if (strcmp(list[i], name) == 0)
-			return (i);
-	}
-	return (-1);
-}
+#include "core/zwalk.h"
 
 /* DS@SNAP's shtetl:kind into KIND; "-" when it has none. */
 static int
@@ -154,15 +65,15 @@ sh_beam_plan(struct sh_zfs *z, const struct sh_spaces *s,
 		return (-1);
 	}
 	lake = vers = zrun = all = rall = NULL;
-	if ((lake = bm_snaps(z, p->bm_lake, e)) == NULL ||
-	    (vers = bm_new(e)) == NULL)
+	if ((lake = sh_zw_snaps(z, p->bm_lake, e)) == NULL ||
+	    (vers = sh_zw_new(e)) == NULL)
 		goto out;
 	/* its versions, and -pkg of them */
 	for (i = 0; lake[i] != NULL; i++) {
 		if (bm_kind(z, p->bm_lake, lake[i], val, sizeof (val), e) != 0)
 			goto out;
 		if ((strcmp(val, "version") == 0 || strcmp(val, "pkg") == 0) &&
-		    bm_add(&vers, lake[i]) != 0) {
+		    sh_zw_add(&vers, lake[i]) != 0) {
 			sh_err_nomem(e);
 			goto out;
 		}
@@ -174,7 +85,7 @@ sh_beam_plan(struct sh_zfs *z, const struct sh_spaces *s,
 		    p->bm_name);
 		goto out;
 	}
-	if (version != NULL && bm_index(vers, version) < 0) {
+	if (version != NULL && sh_zw_index(vers, version) < 0) {
 		sh_errf(e, "foundation %s has no version %s", p->bm_name,
 		    version);
 		goto out;
@@ -183,8 +94,8 @@ sh_beam_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	    version != NULL ? version : vers[n - 1]);
 
 	/* its datasets, parents first; a placeholder by its canmount */
-	if ((all = bm_new(e)) == NULL || bm_add(&all, p->bm_lake) != 0 ||
-	    bm_walk(z, p->bm_lake, &all, e) != 0)
+	if ((all = sh_zw_new(e)) == NULL || sh_zw_add(&all, p->bm_lake) != 0 ||
+	    sh_zw_walk(z, p->bm_lake, &all, e) != 0)
 		goto out;
 	for (i = 0; all[i] != NULL; i++) {
 		if (i == SH_BEAM_DS) {
@@ -207,7 +118,7 @@ sh_beam_plan(struct sh_zfs *z, const struct sh_spaces *s,
 		goto out;
 	if (r == 1)
 		goto out;
-	if ((zrun = bm_snaps(z, p->bm_run, e)) == NULL)
+	if ((zrun = sh_zw_snaps(z, p->bm_run, e)) == NULL)
 		goto out;
 	for (n = 0; zrun[n] != NULL; n++)
 		;
@@ -216,9 +127,9 @@ sh_beam_plan(struct sh_zfs *z, const struct sh_spaces *s,
 		goto out;
 	}
 	(void) snprintf(p->bm_from, sizeof (p->bm_from), "%s", zrun[n - 1]);
-	iv = bm_index(lake, p->bm_version);
-	ifrom = bm_index(lake, p->bm_from);
-	if (bm_index(zrun, p->bm_version) >= 0)
+	iv = sh_zw_index(lake, p->bm_version);
+	ifrom = sh_zw_index(lake, p->bm_from);
+	if (sh_zw_index(zrun, p->bm_version) >= 0)
 		sh_errf(e, "%s@%s is on zrun already", p->bm_name,
 		    p->bm_version);
 	else if (ifrom < 0)
@@ -227,26 +138,26 @@ sh_beam_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	else if (ifrom > iv)
 		sh_errf(e, "zrun has %s@%s, newer than %s", p->bm_name,
 		    p->bm_from, p->bm_version);
-	if ((rall = bm_new(e)) == NULL || bm_add(&rall, p->bm_run) != 0 ||
-	    bm_walk(z, p->bm_run, &rall, e) != 0)
+	if ((rall = sh_zw_new(e)) == NULL || sh_zw_add(&rall, p->bm_run) != 0 ||
+	    sh_zw_walk(z, p->bm_run, &rall, e) != 0)
 		goto out;
 	for (n = 0; rall[n] != NULL; n++)
 		;
 	for (i = 1; i < p->bm_n && n == p->bm_n; i++) {
 		(void) snprintf(val, sizeof (val), "%s/%s", p->bm_run,
 		    p->bm_rel[i]);
-		if (bm_index(rall, val) < 0)
+		if (sh_zw_index(rall, val) < 0)
 			break;
 	}
 	if (n != p->bm_n || i != p->bm_n)
 		sh_errf(e, "foundation %s: its datasets on zrun differ",
 		    p->bm_name);
 out:
-	bm_free(lake);
-	bm_free(vers);
-	bm_free(zrun);
-	bm_free(all);
-	bm_free(rall);
+	sh_zw_free(lake);
+	sh_zw_free(vers);
+	sh_zw_free(zrun);
+	sh_zw_free(all);
+	sh_zw_free(rall);
 	return (e->se_count == before ? 0 : -1);
 }
 
@@ -326,7 +237,7 @@ bm_mend(struct sh_zfs *z, const struct sh_beam *p, size_t i, FILE *out,
 
 	bm_ds(p, p->bm_lake, i, lds, sizeof (lds));
 	bm_ds(p, p->bm_run, i, rds, sizeof (rds));
-	if ((snaps = bm_snaps(z, rds, e)) == NULL)
+	if ((snaps = sh_zw_snaps(z, rds, e)) == NULL)
 		return (-1);
 	r = 0;
 	for (j = 0; r == 0 && snaps[j] != NULL; j++) {
@@ -342,32 +253,8 @@ bm_mend(struct sh_zfs *z, const struct sh_beam *p, size_t i, FILE *out,
 			(void) fprintf(out, "copied shtetl:* onto %s again\n",
 			    to);
 	}
-	bm_free(snaps);
+	sh_zw_free(snaps);
 	return (r);
-}
-
-/* DS, its snapshots and everything below it destroyed, deepest first. */
-static int
-bm_destroyf(struct sh_zfs *z, const char *ds, struct sh_err *e)
-{
-	char **kids, **snaps, name[SH_BEAM_NAME * 3];
-	size_t i;
-	int r;
-
-	if ((kids = bm_new(e)) == NULL)
-		return (-1);
-	r = sh_zfs_children(z, ds, bm_add, &kids, e);
-	for (i = 0; r == 0 && kids[i] != NULL; i++)
-		r = bm_destroyf(z, kids[i], e);
-	bm_free(kids);
-	if (r != 0 || (snaps = bm_snaps(z, ds, e)) == NULL)
-		return (-1);
-	for (i = 0; r == 0 && snaps[i] != NULL; i++) {
-		(void) snprintf(name, sizeof (name), "%s@%s", ds, snaps[i]);
-		r = sh_zfs_destroy(z, name, e);
-	}
-	bm_free(snaps);
-	return (r != 0 ? -1 : sh_zfs_destroy(z, ds, e));
 }
 
 int
@@ -412,7 +299,7 @@ sh_beam_run(struct sh_zfs *z, const struct sh_beam *p, FILE *out,
 fail:
 	/* what this beam received gone: zrun as it was */
 	if (first && done > 0) {
-		if (bm_destroyf(z, p->bm_run, e) == 0)
+		if (sh_zw_destroy(z, p->bm_run, e) == 0)
 			(void) fprintf(out, "destroyed %s\n", p->bm_run);
 	} else {
 		while (done > 0) {
