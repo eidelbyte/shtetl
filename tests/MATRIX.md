@@ -432,6 +432,7 @@ immutable}; an update's end {built, failed, paused and aborted}.
 | F31 | pkg-upgrade that fails: F back to its last snapshot, the mark cleared, the log kept | covered: check_build.c |
 | F32 | pkg-upgrade on the command line: no foundation, two, an unknown option, -m with no message; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
 | F33 | for real: pkg-upgrade of box after F27, its -pkg snapshot on the box | box: tests/box/build.sh; build 4 (63df125) green |
+| F34 | the kernel (planning.md 7.2 as built): installkernel into the obj cache's kernel-install, then synced into F: a file alike kept, its object too; a changed or new one copied in; boot/kernel and usr/lib/debug/boot/kernel mirrored, a module gone and a debug directory the new kernel has not removed; the counts said; installkernel leaving no boot/kernel fails the build; kernel-install removed after | covered: check_build.c; box: tests/box/build.sh, F27's update keeping a module's object |
 
 On the box, tests/box/build.sh builds a foundation for real (sudo sh
 tests/box/build.sh; hours): one pool on a sparse file imported with

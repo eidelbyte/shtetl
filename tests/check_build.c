@@ -317,7 +317,8 @@ tool(const char *name, const char *body)
 static void
 fakes(const char *revision)
 {
-	char body[2048], nv[256], log[1200], fail[1200];
+	char body[4096], nv[256], log[1200], fail[1200];
+	char kf[1200], kd[1200];
 
 	(void) snprintf(body, sizeof (body),
 	    "case \"$3\" in\n"
@@ -329,6 +330,10 @@ fakes(const char *revision)
 	/* scratch_path's buffer is one: each path copied before the next */
 	(void) snprintf(log, sizeof (log), "%s", scratch_path("tools.log"));
 	(void) snprintf(fail, sizeof (fail), "%s", scratch_path("fail"));
+	/* what installkernel installs: kfiles, and kdebug while there */
+	(void) snprintf(kf, sizeof (kf), "%s", scratch_path("kfiles"));
+	(void) snprintf(kd, sizeof (kd), "%s", scratch_path("kdebug"));
+	(void) scratch_write("kfiles/kernel", "kernel one\n");
 	(void) snprintf(body, sizeof (body),
 	    "echo \"make env MAKEOBJDIRPREFIX=$MAKEOBJDIRPREFIX\" >> %s\n"
 	    "d=; t=\n"
@@ -338,8 +343,13 @@ fakes(const char *revision)
 	    "[ -f %s/make-$t ] && { echo \"make $t failed\" >&2; exit 2; }\n"
 	    "[ -n \"$d\" ] && mkdir -p \"$d/etc\" && echo x > \"$d/etc/$t\"\n"
 	    "[ -f \"$2/a.c\" ] && cp \"$2/a.c\" \"$2/../seen-a.c\"\n"
-	    "[ -f \"$2/m.c\" ] && cp \"$2/m.c\" \"$2/../seen-m.c\"\n",
-	    log, fail);
+	    "[ -f \"$2/m.c\" ] && cp \"$2/m.c\" \"$2/../seen-m.c\"\n"
+	    "if [ \"$t\" = installkernel ] && [ ! -f %s/nokernel ]; then\n"
+	    "  mkdir -p \"$d/boot/kernel\" && cp -p %s/* \"$d/boot/kernel/\"\n"
+	    "  [ -d %s ] && mkdir -p \"$d/usr/lib/debug/boot/kernel\" &&\n"
+	    "    cp -p %s/* \"$d/usr/lib/debug/boot/kernel/\"\n"
+	    "fi\n",
+	    log, fail, fail, kf, kd, kd);
 	(void) snprintf(toolpath[1], sizeof (toolpath[1]), "%s",
 	    tool("make", body));
 	(void) snprintf(toolpath[2], sizeof (toolpath[2]), "%s",
@@ -679,6 +689,10 @@ test_update(void)
 	static const char *const kept[] = { "boot/kernel/kernel",
 	    "boot/loader", "libexec/ld-elf.so.1", "sbin/init",
 	    "sbin/init.bak2", "etc/rc.old", "boot/.old", NULL };
+	static const char *const kinstall[] = {
+		"make -C ", " installkernel DESTDIR=",
+		"run/generic/obj/kernel-install INSTALL_CMD=install -C ", NULL
+	};
 	static const char *const order[] = {
 		"make -C ", " buildworld buildkernel ",
 		"make -C ", " delete-old delete-old-libs DESTDIR=",
@@ -686,13 +700,37 @@ test_update(void)
 		"make -C ", " installworld DESTDIR=", NULL
 	};
 	char rel[256], text[1400], *out;
+	struct stat st;
+	ino_t ino;
 	size_t i, len;
 	FILE *f;
 
 	runworld();
 	fakes("15.1");
 	config("u", recipe);
+	/*
+	 * F34: the kernel, a debug file with it, into an empty F; the
+	 * fake's etc/installkernel stands for anything else it installs
+	 */
+	/* scratch_path's one buffer: a call to each command */
+	(void) snprintf(text, sizeof (text), "rm -rf %s",
+	    scratch_path("run/generic/root"));
+	CHECK(system(text) == 0);
+	(void) snprintf(text, sizeof (text), "rm -rf %s",
+	    scratch_path("kdebug"));
+	CHECK(system(text) == 0);
+	(void) scratch_write("kfiles/a.ko", "a\n");
+	(void) scratch_write("kfiles/b.ko", "b\n");
+	(void) scratch_write("kdebug/kernel.debug", "debug one\n");
 	CHECK(build(NULL) == 0);
+	CHECK(strstr(ran, "kernel into " F ": 0 kept, 5 copied, 0 removed\n")
+	    != NULL);
+	CHECK(inroot("usr/lib/debug/boot/kernel/kernel.debug"));
+	(void) snprintf(text, sizeof (text), "%s",
+	    scratch_path("run/generic/root/boot/kernel/a.ko"));
+	CHECK(stat(text, &st) == 0);
+	ino = st.st_ino;
+	CHECK(!inrun("obj/kernel-install"));
 	/* F20 */
 	CHECK(plan("generic") == 0 && p.fp_update == 1);
 	CHECK(is(p.fp_last, VERSION));
@@ -739,8 +777,25 @@ test_update(void)
 	(void) snprintf(text, sizeof (text), "%s",
 	    scratch_path("run/generic/root/boot/kernel.old"));
 	CHECK(chflags(text, UF_IMMUTABLE) == 0);
+	/* F34: one module the same, one changed, one new, one gone, no debug */
+	(void) scratch_write("kfiles/kernel", "kernel two\n");
+	(void) scratch_write("kfiles/c.ko", "c\n");
+	(void) unlink(scratch_path("kfiles/b.ko"));
+	(void) snprintf(text, sizeof (text), "rm -rf %s",
+	    scratch_path("kdebug"));
+	CHECK(system(text) == 0);
 	(void) unlink(scratch_path("tools.log"));
 	CHECK(build(NULL) == 0);
+	CHECK(strstr(ran, "kernel into " F ": 2 kept, 2 copied, 2 removed\n")
+	    != NULL);
+	(void) snprintf(text, sizeof (text), "%s",
+	    scratch_path("run/generic/root/boot/kernel/a.ko"));
+	CHECK(stat(text, &st) == 0 && st.st_ino == ino);
+	CHECK(is(slurp(scratch_path("run/generic/root/boot/kernel/kernel")),
+	    "kernel two\n"));
+	CHECK(inroot("boot/kernel/c.ko") && !inroot("boot/kernel/b.ko"));
+	CHECK(!inroot("usr/lib/debug/boot/kernel"));
+	CHECK(in_order(slurp(scratch_path("tools.log")), kinstall));
 	/* the second build in the second: the config snapshot's -2 */
 	CHECK(strstr(ran, "snapshot tank/zconfig@build-generic-"
 	    "20261008-120000-2\n") != NULL);
@@ -763,6 +818,12 @@ test_update(void)
 	    zfake_snapshot(F "/usr/local@" VERSION ".2"));
 	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "-"));
 
+	/* F34: installkernel that leaves no boot/kernel fails the build */
+	(void) scratch_write("fail/nokernel", "");
+	CHECK(build(NULL) == -1);
+	(void) unlink(scratch_path("fail/nokernel"));
+	CHECK(cap_has(&c, "installkernel: no boot/kernel in "));
+	CHECK(inroot("boot/kernel/kernel"));
 	/* F25: a failure: F back to its last version, nothing destroyed */
 	(void) scratch_write("fail/make-installworld", "");
 	CHECK(build(NULL) == -1);

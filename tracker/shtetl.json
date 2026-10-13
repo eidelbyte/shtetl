@@ -194,5 +194,23 @@
     "estimated_size": "small",
     "completed": "tested",
     "note": "Built on the mac (4359f03), box F33 in build.sh (28a185d) pending. Box build 4 (63df125) green: F33."
+  },
+  "m3-kernel-install": {
+    "description": "The kernel installed through a scratch DESTDIR (planning.md 7.2 as built): installkernel into F removes its /boot/kernel first (sys/conf/kern.post.mk keeps a .old only over the running kernel's directory), so every update wrote every kernel file anew. installkernel into the obj cache's kernel-install, then synced into F as install -C would: a file alike left as it is, a changed or new one copied in, boot/kernel and usr/lib/debug/boot/kernel mirrored. Verify: MATRIX F34 on the mac; the box, an unchanged module keeping its object across F27's update.",
+    "requires": [
+      "m3-update"
+    ],
+    "epic": "build",
+    "milestone": "M3",
+    "expected_changed_files": [
+      "src/core/build.c",
+      "tests/check_build.c",
+      "tests/MATRIX.md",
+      "tests/box/build.sh",
+      "docs/planning.md"
+    ],
+    "provides": "Updates that leave unchanged kernel files' objects alone, for the rebase and the incremental send.",
+    "estimated_size": "small",
+    "completed": "testing"
   }
 }

@@ -615,6 +615,7 @@ struct fb {
 	size_t			fb_npa;
 	size_t			fb_psnaps;	/* the last N taken */
 	const char		*fb_msg;	/* -m's, or NULL */
+	const char		*fb_dest;	/* DESTDIR if not F's */
 	char			fb_prec[SH_ZFS_VALMAX];	/* carried over */
 };
 
@@ -1998,7 +1999,8 @@ fb_make(struct fb *b, const char *target, const char *jobs, int how)
 	    b->fb_srcconf);
 	(void) snprintf(kdir, sizeof (kdir), "KERNCONFDIR=%s", p->fp_rundir);
 	(void) snprintf(kconf, sizeof (kconf), "KERNCONF=%s", b->fb_ident);
-	(void) snprintf(dest, sizeof (dest), "DESTDIR=%s", b->fb_rootdir);
+	(void) snprintf(dest, sizeof (dest), "DESTDIR=%s", b->fb_dest != NULL ?
+	    b->fb_dest : b->fb_rootdir);
 	(void) snprintf(obj, sizeof (obj), "MAKEOBJDIRPREFIX=%s",
 	    b->fb_objdir);
 	n = 0;
@@ -2119,10 +2121,274 @@ fb_backups(struct fb *b)
 	return (r);
 }
 
+/* What a kernel's sync into F did, file by file. */
+struct fb_sync {
+	size_t	sy_kept;
+	size_t	sy_copied;
+	size_t	sy_removed;
+};
+
+/* The directories installkernel makes whole, mirrored into F. */
+static const char *const fb_kdirs[] = { "boot/kernel",
+	"usr/lib/debug/boot/kernel", NULL };
+
+/* Whether REL is one of fb_kdirs, or below one. */
+static int
+fb_mirrored(const char *rel)
+{
+	size_t i, n;
+
+	for (i = 0; fb_kdirs[i] != NULL; i++) {
+		n = strlen(fb_kdirs[i]);
+		if (strncmp(rel, fb_kdirs[i], n) == 0 &&
+		    (rel[n] == '\0' || rel[n] == '/'))
+			return (1);
+	}
+	return (0);
+}
+
+/* Whether the regular files A and B hold the same SIZE bytes. */
+static int
+fb_same(const char *a, const char *b, off_t size)
+{
+	char x[16384], y[16384];
+	ssize_t na, nb;
+	int fa, fb, same;
+
+	if ((fa = open(a, O_RDONLY | O_CLOEXEC)) == -1)
+		return (0);
+	if ((fb = open(b, O_RDONLY | O_CLOEXEC)) == -1) {
+		(void) close(fa);
+		return (0);
+	}
+	same = 1;
+	while (same && size > 0) {
+		na = read(fa, x, sizeof (x));
+		nb = read(fb, y, sizeof (y));
+		if (na <= 0 || na != nb || memcmp(x, y, (size_t)na) != 0)
+			same = 0;
+		else
+			size -= na;
+	}
+	(void) close(fa);
+	(void) close(fb);
+	return (same);
+}
+
 /*
- * The build, and the install into F (7.1 steps 4, 5); for an update,
- * delete-old before the install and installworld's backups gone after
- * (7.2).
+ * SRC (its lstat SS) put at DST as install -C would: a file alike left
+ * as it is, its mode and owner set if they differ; otherwise what DST
+ * was removed and SRC copied, mode, owner and times kept (install -p).
+ */
+static int
+fb_put(struct fb *b, const char *src, const char *dst, const struct stat *ss,
+    struct fb_sync *sy)
+{
+	char buf[16384], to[SH_BUILD_PATH], at[SH_BUILD_PATH];
+	struct timespec tm[2];
+	struct stat ds;
+	ssize_t n, r;
+	int in, out;
+
+	if (S_ISLNK(ss->st_mode)) {
+		if ((n = readlink(src, to, sizeof (to) - 1)) < 0)
+			goto bad;
+		to[n] = '\0';
+		r = readlink(dst, at, sizeof (at) - 1);
+		if (r == n && memcmp(to, at, (size_t)n) == 0) {
+			sy->sy_kept++;
+			return (0);
+		}
+		if (fb_rmtree(b, dst) != 0)
+			return (-1);
+		if (symlink(to, dst) != 0)
+			goto bad;
+		(void) lchown(dst, ss->st_uid, ss->st_gid);
+		sy->sy_copied++;
+		return (0);
+	}
+	if (!S_ISREG(ss->st_mode))
+		return (0);
+	if (lstat(dst, &ds) == 0 && S_ISREG(ds.st_mode) &&
+	    ds.st_size == ss->st_size && fb_same(src, dst, ss->st_size)) {
+		if ((ds.st_mode & 07777) != (ss->st_mode & 07777) &&
+		    chmod(dst, ss->st_mode & 07777) != 0)
+			goto bad;
+		if ((ds.st_uid != ss->st_uid || ds.st_gid != ss->st_gid) &&
+		    chown(dst, ss->st_uid, ss->st_gid) != 0)
+			goto bad;
+		sy->sy_kept++;
+		return (0);
+	}
+	if (fb_rmtree(b, dst) != 0)
+		return (-1);
+	if ((in = open(src, O_RDONLY | O_CLOEXEC)) == -1) {
+		dst = src;
+		goto bad;
+	}
+	if ((out = open(dst, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC,
+	    ss->st_mode & 0777)) == -1) {
+		(void) close(in);
+		goto bad;
+	}
+	r = 0;
+	while (r == 0 && (n = read(in, buf, sizeof (buf))) > 0) {
+		if (write(out, buf, (size_t)n) != n)
+			r = -1;
+	}
+	if (n < 0)
+		r = -1;
+#ifdef __APPLE__
+	tm[0] = ss->st_atimespec;
+	tm[1] = ss->st_mtimespec;
+#else
+	tm[0] = ss->st_atim;
+	tm[1] = ss->st_mtim;
+#endif
+	if (r != 0 || fchown(out, ss->st_uid, ss->st_gid) != 0 ||
+	    fchmod(out, ss->st_mode & 07777) != 0 || futimens(out, tm) != 0) {
+		(void) close(in);
+		(void) close(out);
+		goto bad;
+	}
+	(void) close(in);
+	if (close(out) != 0)
+		goto bad;
+	sy->sy_copied++;
+	return (0);
+bad:
+	sh_errf(b->fb_err, "%s: %s", dst, strerror(errno));
+	return (-1);
+}
+
+/*
+ * SROOT's REL put at DROOT's: each file by fb_put, each directory in
+ * turn; in a directory of fb_kdirs, what the new kernel has not is
+ * removed.
+ */
+static int
+fb_sync(struct fb *b, const char *sroot, const char *droot,
+    const char *rel, struct fb_sync *sy)
+{
+	char s[SH_BUILD_PATH * 2], d[SH_BUILD_PATH * 2];
+	char sub[SH_BUILD_PATH], a[SH_BUILD_PATH * 3], z[SH_BUILD_PATH * 3];
+	struct dirent *de;
+	struct stat ss, ds;
+	DIR *dir;
+	int r;
+
+	(void) snprintf(s, sizeof (s), "%s%s%s", sroot, rel[0] != '\0' ?
+	    "/" : "", rel);
+	(void) snprintf(d, sizeof (d), "%s%s%s", droot, rel[0] != '\0' ?
+	    "/" : "", rel);
+	if (lstat(s, &ss) != 0)
+		goto bad;
+	if (lstat(d, &ds) == 0 && !S_ISDIR(ds.st_mode) &&
+	    fb_rmtree(b, d) != 0)
+		return (-1);
+	if (lstat(d, &ds) != 0 && (mkdir(d, ss.st_mode & 07777) != 0 ||
+	    chown(d, ss.st_uid, ss.st_gid) != 0))
+		goto bad;
+	if ((dir = opendir(s)) == NULL)
+		goto bad;
+	r = 0;
+	while (r == 0 && (de = readdir(dir)) != NULL) {
+		if (strcmp(de->d_name, ".") == 0 ||
+		    strcmp(de->d_name, "..") == 0)
+			continue;
+		(void) snprintf(sub, sizeof (sub), "%s%s%s", rel,
+		    rel[0] != '\0' ? "/" : "", de->d_name);
+		(void) snprintf(a, sizeof (a), "%s/%s", s, de->d_name);
+		(void) snprintf(z, sizeof (z), "%s/%s", d, de->d_name);
+		if (lstat(a, &ss) != 0) {
+			(void) closedir(dir);
+			(void) snprintf(d, sizeof (d), "%s", a);
+			goto bad;
+		}
+		r = S_ISDIR(ss.st_mode) ? fb_sync(b, sroot, droot, sub, sy) :
+		    fb_put(b, a, z, &ss, sy);
+	}
+	(void) closedir(dir);
+	if (r != 0 || !fb_mirrored(rel))
+		return (r);
+	if ((dir = opendir(d)) == NULL)
+		goto bad;
+	while (r == 0 && (de = readdir(dir)) != NULL) {
+		if (strcmp(de->d_name, ".") == 0 ||
+		    strcmp(de->d_name, "..") == 0)
+			continue;
+		(void) snprintf(a, sizeof (a), "%s/%s", s, de->d_name);
+		if (lstat(a, &ss) == 0)
+			continue;
+		(void) snprintf(z, sizeof (z), "%s/%s", d, de->d_name);
+		if ((r = fb_rmtree(b, z)) == 0)
+			sy->sy_removed++;
+	}
+	(void) closedir(dir);
+	return (r);
+bad:
+	sh_errf(b->fb_err, "%s: %s", d, strerror(errno));
+	return (-1);
+}
+
+/*
+ * The kernel (7.1 step 5): installkernel into the obj cache's
+ * kernel-install, then synced into F. installkernel into F itself
+ * would remove its /boot/kernel first (sys/conf/kern.post.mk keeps a
+ * .old only over the running kernel's directory), every file new on
+ * every update. Synced, a file alike is left as it is, as install -C
+ * leaves one; a changed or new one is copied in; in fb_kdirs, what the
+ * new kernel has not is removed.
+ */
+static int
+fb_kernel(struct fb *b)
+{
+	char tmp[SH_BUILD_PATH + 32], path[SH_BUILD_PATH * 2];
+	struct fb_sync sy;
+	struct stat st;
+	size_t i;
+	int r;
+
+	(void) memset(&sy, 0, sizeof (sy));
+	(void) snprintf(tmp, sizeof (tmp), "%s/kernel-install", b->fb_objdir);
+	if (fb_rmtree(b, tmp) != 0 || fb_mkdirs(b, tmp) != 0)
+		return (-1);
+	b->fb_dest = tmp;
+	r = fb_make(b, "installkernel", NULL, 1);
+	b->fb_dest = NULL;
+	if (r != 0)
+		return (-1);
+	(void) snprintf(path, sizeof (path), "%s/boot/kernel", tmp);
+	if (stat(path, &st) != 0 || !S_ISDIR(st.st_mode)) {
+		sh_errf(b->fb_err, "installkernel: no boot/kernel in %s", tmp);
+		return (-1);
+	}
+	if (fb_sync(b, tmp, b->fb_rootdir, "", &sy) != 0)
+		return (-1);
+	/* a kernel directory the new kernel has none of: gone from F */
+	for (i = 0; fb_kdirs[i] != NULL; i++) {
+		(void) snprintf(path, sizeof (path), "%s/%s", tmp,
+		    fb_kdirs[i]);
+		if (lstat(path, &st) == 0)
+			continue;
+		(void) snprintf(path, sizeof (path), "%s/%s", b->fb_rootdir,
+		    fb_kdirs[i]);
+		if (lstat(path, &st) != 0)
+			continue;
+		if (fb_rmtree(b, path) != 0)
+			return (-1);
+		sy.sy_removed++;
+	}
+	(void) fprintf(b->fb_out, "kernel into %s: %zu kept, %zu copied, "
+	    "%zu removed\n", b->fb_p->fp_ds, sy.sy_kept, sy.sy_copied,
+	    sy.sy_removed);
+	return (fb_rmtree(b, tmp));
+}
+
+/*
+ * The build, and the install into F (7.1 steps 4, 5), the kernel by
+ * fb_kernel; for an update, delete-old before the install and
+ * installworld's backups gone after (7.2).
  */
 static int
 fb_world(struct fb *b)
@@ -2141,7 +2407,8 @@ fb_world(struct fb *b)
 	if (b->fb_p->fp_update && fb_make(b, NULL, NULL, 2) != 0)
 		return (-1);
 	for (i = 0; i < sizeof (installs) / sizeof (installs[0]); i++) {
-		if (fb_make(b, installs[i], NULL, 1) != 0)
+		if ((strcmp(installs[i], "installkernel") == 0 ? fb_kernel(b) :
+		    fb_make(b, installs[i], NULL, 1)) != 0)
 			return (-1);
 	}
 	return (b->fb_p->fp_update ? fb_backups(b) : 0);
