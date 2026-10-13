@@ -27,6 +27,7 @@
 #define	SH_EXIT_OK	0
 #define	SH_EXIT_REFUSED	1
 #define	SH_EXIT_USAGE	2
+#define	SH_EXIT_PAUSED	3	/* a build, at a patch (planning.md 7.1.1) */
 
 /*
  * What every command is handed. sc_root is the configuration root
@@ -66,9 +67,11 @@ static const struct sh_cmd sh_cmds[] = {
 	    "           [--build ds] [--recipes url] [-y]", "datasets you "
 	    "have made the roots of the spaces, and laid\n    out; shown "
 	    "first, done once confirmed (-y confirms)", cmd_bootstrap },
-	{ "build", NULL, "[-y] [-m msg] foundation", "a foundation built "
-	    "from its recipe into zlake; shown\n    first, done once "
-	    "confirmed (-y confirms)", cmd_build },
+	{ "build", NULL, "[-y] [-m msg] [--continue | --skip | --abort]\n"
+	    "           foundation", "a foundation built from its recipe "
+	    "into zlake; shown\n    first, done once confirmed (-y "
+	    "confirms); a build paused at a\n    patch carried on, the fix "
+	    "made or the patch left out, or\n    given up", cmd_build },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -94,7 +97,7 @@ usage(FILE *f)
 		    c->cm_verb != NULL ? " " : "",
 		    c->cm_verb != NULL ? c->cm_verb : "", c->cm_what);
 	(void) fprintf(f, "\nexit: 0 done, 1 refused (the reasons are on "
-	    "standard error), 2 usage\n");
+	    "standard error), 2 usage,\n      3 a build paused at a patch\n");
 }
 
 /*
@@ -283,13 +286,32 @@ cmd_build(struct sh_ctx *ctx, int argc, char **argv)
 	struct sh_site site;
 	struct sh_err e, w;
 	char *dir, a[PATH_MAX], b[PATH_MAX];
+	static const struct {
+		const char	*v_name;
+		enum sh_bverb	v_verb;
+	} verbs[] = {
+		{ "--continue", SH_BV_CONTINUE }, { "--skip", SH_BV_SKIP },
+		{ "--abort", SH_BV_ABORT }
+	};
 	const char *msg, *target;
-	int i, yes, rc;
+	enum sh_bverb verb;
+	size_t j;
+	int i, yes, rc, r;
 
 	yes = 0;
+	verb = SH_BV_NEW;
 	msg = target = NULL;
 	for (i = 0; i < argc; i++) {
-		if (strcmp(argv[i], "-y") == 0) {
+		for (j = 0; j < sizeof (verbs) / sizeof (verbs[0]); j++) {
+			if (strcmp(argv[i], verbs[j].v_name) == 0)
+				break;
+		}
+		if (j < sizeof (verbs) / sizeof (verbs[0])) {
+			if (verb != SH_BV_NEW)
+				return (die_usage("build: one of --continue, "
+				    "--skip and --abort", ""));
+			verb = verbs[j].v_verb;
+		} else if (strcmp(argv[i], "-y") == 0) {
 			yes = 1;
 		} else if (strcmp(argv[i], "-m") == 0) {
 			if (i + 1 == argc)
@@ -305,6 +327,8 @@ cmd_build(struct sh_ctx *ctx, int argc, char **argv)
 	}
 	if (target == NULL)
 		return (die_usage("build: no foundation given", ""));
+	if (verb == SH_BV_ABORT && msg != NULL)
+		return (die_usage("build: -m is not for --abort", ""));
 	sh_err_init(&e, stderr, "shtetl: ");
 	sh_err_init(&w, stderr, "shtetl: warning: ");
 	if (ctx_zfs(ctx, &e) != 0 ||
@@ -325,17 +349,25 @@ cmd_build(struct sh_ctx *ctx, int argc, char **argv)
 	if ((plan = calloc(1, sizeof (*plan))) == NULL) {
 		sh_err_nomem(&e);
 	} else if (sh_build_plan(ctx->sc_zfs, &ctx->sc_spaces, site.ss_merged,
-	    dir, target, SH_BUILD_DIR, plan, &e, &w) == 0) {
-		sh_build_show(stdout, plan);
-		(void) fflush(stdout);
-		if (!sh_confirm(stdin, stdout, yes, isatty(STDIN_FILENO),
-		    "Build as above?"))
+	    dir, target, SH_BUILD_DIR, verb, plan, &e, &w) == 0) {
+		/* a paused build was confirmed when it began */
+		if (verb == SH_BV_NEW) {
+			sh_build_show(stdout, plan);
+			(void) fflush(stdout);
+		}
+		if (verb == SH_BV_NEW && !sh_confirm(stdin, stdout, yes,
+		    isatty(STDIN_FILENO), "Build as above?")) {
 			sh_errf(&e, "%s", isatty(STDIN_FILENO) ?
 			    "not confirmed" : "not confirmed: no terminal, use "
 			    "-y");
-		else if (sh_build_run(ctx->sc_zfs, plan, &sh_build_tools, msg,
-		    time(NULL), stdout, &e) == 0)
-			rc = out_done();
+		} else {
+			r = sh_build_run(ctx->sc_zfs, plan, &sh_build_tools,
+			    msg, time(NULL), stdout, &e);
+			if (r >= 0)
+				rc = out_done();
+			if (r == 1 && rc == SH_EXIT_OK)
+				rc = SH_EXIT_PAUSED;
+		}
 	}
 	if (plan != NULL)
 		sh_build_free(plan);

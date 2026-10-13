@@ -23,6 +23,7 @@ static struct sh_spaces s;
 static struct sh_fplan p;
 static char root[1200];
 static const char *runbase = "/var/db/x";
+static enum sh_bverb verb = SH_BV_NEW;
 
 static int
 is(const char *got, const char *want)
@@ -81,7 +82,7 @@ plan(const char *target)
 	sh_build_free(&p);
 	cap_reset(&c);
 	cap_reset(&wc);
-	return (sh_build_plan(z, &s, NULL, root, target, runbase, &p,
+	return (sh_build_plan(z, &s, NULL, root, target, runbase, verb, &p,
 	    &c.c_err, &wc.c_err));
 }
 
@@ -329,7 +330,8 @@ fakes(const char *revision)
 	    "esac; done\n"
 	    "[ -f %s/make-$t ] && { echo \"make $t failed\" >&2; exit 2; }\n"
 	    "[ -n \"$d\" ] && mkdir -p \"$d/etc\" && echo x > \"$d/etc/$t\"\n"
-	    "[ -f \"$2/a.c\" ] && cp \"$2/a.c\" \"$2/../seen-a.c\"\n",
+	    "[ -f \"$2/a.c\" ] && cp \"$2/a.c\" \"$2/../seen-a.c\"\n"
+	    "[ -f \"$2/m.c\" ] && cp \"$2/m.c\" \"$2/../seen-m.c\"\n",
 	    log, fail);
 	(void) snprintf(toolpath[1], sizeof (toolpath[1]), "%s",
 	    tool("make", body));
@@ -684,6 +686,16 @@ treehook(const char *op, const char *name, void *arg)
 	const char *at = strchr(name, '@');
 
 	(void) arg;
+	if (strncmp(name, "tank/zconfig@", 13) == 0 &&
+	    strcmp(op, "snapshot") == 0) {
+		/* the snapshot's files where a resumed build reads them */
+		sh("rm -rf %s.snap && cp -Rp %s %s.snap && "
+		    "rm -rf %s.snap/.zfs && mkdir -p %s/.zfs/snapshot && "
+		    "rm -rf %s/.zfs/snapshot/%s && "
+		    "mv %s.snap %s/.zfs/snapshot/%s", root, root, root, root,
+		    root, root, at + 1, root, root, at + 1);
+		return;
+	}
 	if (strncmp(name, "tank/zbuild@", 12) != 0 || at == NULL)
 		return;
 	if (strcmp(op, "snapshot") == 0)
@@ -699,6 +711,8 @@ treehook(const char *op, const char *name, void *arg)
 	"-c init.defaultBranch=main"
 
 static const char base_a[] = "one\ntwo\nthree\nfour\nfive\nsix\n";
+static const char base_m[] =
+	"l1\nl2\nl3\nl4\nl5\nl6\nl7\nl8\nl9\nl10\nl11\nl12\n";
 
 static const char p_two[] =
 	"--- a/a.c\n+++ b/a.c\n@@ -1,3 +1,3 @@\n one\n-two\n+TWO\n three\n";
@@ -735,6 +749,7 @@ patchworld(void)
 	(void) snprintf(body, sizeof (body), "%s/a.c", tree);
 	(void) scratch_write("ptree/a.c", base_a);
 	(void) scratch_write("ptree/b.c", "fixed\n");
+	(void) scratch_write("ptree/m.c", base_m);
 	sh("cd %s && " GIT " init -q && " GIT " add -A && "
 	    GIT " commit -qm base", tree);
 	(void) scratch_write("pgit/15.1/1-a.patch", p_two);
@@ -907,21 +922,216 @@ test_patches(void)
 	CHECK(is(slurp(text), base_a));
 	CHECK(!zfake_exists(F));
 
-	/* a patch that does not apply: refused, rolled back */
-	patchworld();
-	patchconf("ph", "\"patches/bad\" {}");
-	CHECK(build(NULL) == -1);
-	CHECK(cap_has(&c, "patch 1-x.patch from patches/bad: does not "
-	    "apply"));
-	CHECK(is(zfake_last_rollback(), "tank/zbuild@shtetl-patch-0"));
-	CHECK(!zfake_exists(F));
-
 	/* no patches: no snapshot of the build root, no record */
 	patchworld();
 	config("pi", generic);
 	CHECK(build(NULL) == 0);
 	CHECK(strstr(ran, "shtetl-patch") == NULL);
 	CHECK(is(prop(F "@" VERSION, "shtetl:patches", NULL), "-"));
+	zfake_hook(NULL, NULL);
+}
+
+/* The build paused, carried on by VERB with MSG: its return. */
+static int
+resume(enum sh_bverb v, const char *msg)
+{
+	size_t len;
+	FILE *f;
+	int rc;
+
+	verb = v;
+	if (plan("generic") != 0) {
+		printf("plan refused:\n%s", cap_text(&c));
+		verb = SH_BV_NEW;
+		return (-2);
+	}
+	verb = SH_BV_NEW;
+	free(ran);
+	ran = NULL;
+	f = open_memstream(&ran, &len);
+	CHECK(f != NULL);
+	cap_reset(&c);
+	rc = sh_build_run(z, &p, &fake, msg, NOON, f, &c.c_err);
+	CHECK(fclose(f) == 0);
+	return (rc);
+}
+
+/*
+ * The patches of patches/pause in the configuration root: 1-m4, l4 to
+ * L4, made by hand; 2-x4, l4 to X4, which conflicts with it; with
+ * THIRD, 3-l1, l1 to L1, whose context l4 is no longer there but
+ * which merges three ways. The last two by git, so they carry the
+ * blobs they apply to.
+ */
+static void
+pausepatches(int third)
+{
+	static const char m4[] = "--- a/m.c\n+++ b/m.c\n@@ -1,7 +1,7 @@\n"
+	    " l1\n l2\n l3\n-l4\n+L4\n l5\n l6\n l7\n";
+	char dir[1400];
+
+	char path[1500];
+	FILE *f;
+
+	(void) snprintf(dir, sizeof (dir), "%s/patches/pause", root);
+	sh("mkdir -p %s", dir);
+	(void) snprintf(path, sizeof (path), "%s/1-m4.patch", dir);
+	CHECK((f = fopen(path, "w")) != NULL);
+	CHECK(fputs(m4, f) != EOF && fclose(f) == 0);
+	sh("cd %s && sed 's/^l4$/X4/' m.c > m.t && mv m.t m.c && "
+	    "git -c diff.noprefix=false diff --no-color > %s/2-x4.patch && "
+	    "git checkout -q m.c", tree, dir);
+	if (third)
+		sh("cd %s && sed 's/^l1$/L1/' m.c > m.t && mv m.t m.c && "
+		    "git -c diff.noprefix=false diff --no-color > "
+		    "%s/3-l1.patch && git checkout -q m.c", tree, dir);
+}
+
+/* Whether the file of the run directory REL is there. */
+static int
+inrun(const char *rel)
+{
+	char path[1400];
+
+	(void) snprintf(path, sizeof (path), "%s/generic/%s", runbase, rel);
+	return (access(path, F_OK) == 0);
+}
+
+/* P8 - P13: a patch that does not apply, the pause, and its verbs. */
+static void
+test_pause(void)
+{
+	char text[4096], path[1400];
+
+	if (system("git --version >/dev/null 2>&1") != 0) {
+		printf("check_build: no git: P8 - P13 not checked\n");
+		return;
+	}
+	/* P12: nothing paused */
+	patchworld();
+	patchconf("qz", "\"patches/local\" {}");
+	verb = SH_BV_CONTINUE;
+	CHECK(plan("generic") == -1);
+	CHECK(cap_has(&c, "no build of generic paused"));
+	zfake_set("tank/zbuild", "shtetl:build", "gaming");
+	CHECK(plan("generic") == -1);
+	CHECK(cap_has(&c, "no build of generic paused"));
+	verb = SH_BV_NEW;
+
+	/* P8: conflict markers; refused; fixed; merged; fixed; built */
+	patchworld();
+	patchconf("qa", "\"patches/pause\" {}");
+	pausepatches(1);
+	CHECK(build(NULL) == 1);
+	CHECK(strstr(ran, "patch 1-m4.patch from patches/pause: applied\n")
+	    != NULL);
+	CHECK(strstr(ran, "patch 2-x4.patch from patches/pause: does not "
+	    "apply; merged three ways, conflict markers left\n") != NULL);
+	CHECK(strstr(ran, " m.c\nbuild of generic paused; then one of:\n"
+	    "  shtetl build generic --continue") != NULL);
+	CHECK(strstr(ran, "make ") == NULL && strstr(ran, "mounted") == NULL);
+	CHECK(inrun(SH_BUILD_PAUSED));
+	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "generic"));
+	CHECK(zfake_exists(F));
+	CHECK(zfake_snapshot("tank/zbuild@shtetl-patch-2"));
+	(void) snprintf(path, sizeof (path), "%s/m.c", tree);
+	CHECK(strstr(slurp(path), "<<<<<<<") != NULL);
+	/* P12: a build while one is paused */
+	CHECK(plan("generic") == -1);
+	CHECK(cap_has(&c, "build of generic paused"));
+	/* P9: nothing fixed yet */
+	CHECK(resume(SH_BV_CONTINUE, NULL) == -1);
+	CHECK(cap_has(&c, "m.c: conflict marker left"));
+	CHECK(cap_has(&c, "build of generic still paused"));
+	CHECK(inrun(SH_BUILD_PAUSED) && zfake_exists(F));
+	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "generic"));
+	/* fixed: X4 it is; then 3-l1 merges without conflict */
+	(void) scratch_write("ptree/m.c",
+	    "l1\nl2\nl3\nX4\nl5\nl6\nl7\nl8\nl9\nl10\nl11\nl12\n");
+	CHECK(resume(SH_BV_CONTINUE, NULL) == 1);
+	(void) snprintf(text, sizeof (text), "patch 2-x4.patch from "
+	    "patches/pause: fixed by hand; the fix: %s/generic/fixed/1/"
+	    "2-x4.patch\n", runbase);
+	CHECK(strstr(ran, text) != NULL);
+	CHECK(strstr(ran, "patch 3-l1.patch from patches/pause: does not "
+	    "apply; merged three ways without conflict, to be looked "
+	    "over\n") != NULL);
+	(void) snprintf(path, sizeof (path), "%s/generic/fixed/1/2-x4.patch",
+	    runbase);
+	CHECK(strstr(slurp(path), "-L4\n+X4\n") != NULL);
+	CHECK(strstr(slurp(path), "diff --git a/m.c b/m.c\n") != NULL);
+	CHECK(resume(SH_BV_CONTINUE, NULL) == 0);
+	CHECK(strstr(ran, "built " F "@" VERSION "\n") != NULL);
+	CHECK(is(slurp(scratch_path("seen-m.c")),
+	    "L1\nl2\nl3\nX4\nl5\nl6\nl7\nl8\nl9\nl10\nl11\nl12\n"));
+	/* P14: the record, and the fixes kept in the obj cache */
+	CHECK(is(prop(F "@" VERSION, "shtetl:patches", NULL),
+	    "patches/pause: 2-x4.patch fixed, 3-l1.patch fixed"));
+	(void) snprintf(text, sizeof (text), "obj/patches/%s/1/3-l1.patch",
+	    VERSION);
+	CHECK(inrun(text));
+	/* P15: the end */
+	CHECK(!inrun(SH_BUILD_PAUSED));
+	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "-"));
+	CHECK(!zfake_snapshot("tank/zbuild@shtetl-patch-0"));
+	(void) snprintf(path, sizeof (path), "%s/m.c", tree);
+	CHECK(is(slurp(path), base_m));
+
+	/* P10, P13: --skip; the recipe the build began with */
+	patchworld();
+	patchconf("qb", "\"patches/pause\" {}");
+	pausepatches(0);
+	CHECK(build("the message") == 1);
+	(void) snprintf(path, sizeof (path), "%s/shtetl.conf", root);
+	sh("echo 'commands { late = \"echo late\"; }' >> %s", path);
+	CHECK(resume(SH_BV_SKIP, NULL) == 0);
+	CHECK(strstr(ran, "patch 2-x4.patch from patches/pause: left "
+	    "out\n") != NULL);
+	CHECK(strstr(ran, "commands late") == NULL);
+	CHECK(is(slurp(scratch_path("seen-m.c")),
+	    "l1\nl2\nl3\nL4\nl5\nl6\nl7\nl8\nl9\nl10\nl11\nl12\n"));
+	CHECK(is(prop(F "@" VERSION, "shtetl:patches", NULL),
+	    "patches/pause: 2-x4.patch skipped"));
+	CHECK(is(prop(F "@" VERSION, "shtetl:commit", NULL), "the message"));
+	CHECK(!inrun(SH_BUILD_PAUSED));
+
+	/* P11: --abort */
+	patchworld();
+	patchconf("qc", "\"patches/pause\" {}");
+	pausepatches(0);
+	CHECK(build(NULL) == 1);
+	/* taking it up fails, the config snapshot gone: still paused */
+	CHECK(sh_zfs_destroy(z, "tank/zconfig@build-generic-20261008-120000",
+	    &wc.c_err) == 0);
+	CHECK(resume(SH_BV_CONTINUE, NULL) == -1);
+	CHECK(cap_has(&c, "build of generic still paused"));
+	CHECK(inrun(SH_BUILD_PAUSED) && zfake_exists(F));
+	CHECK(zfake_snapshot("tank/zbuild@shtetl-patch-2"));
+	CHECK(resume(SH_BV_ABORT, NULL) == 0);
+	CHECK(strstr(ran, "build of generic given up, nothing built\n") !=
+	    NULL);
+	CHECK(!zfake_exists(F));
+	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "-"));
+	CHECK(!inrun(SH_BUILD_PAUSED) && !inrun("patches"));
+	CHECK(inrun("build.log"));
+	CHECK(!zfake_snapshot("tank/zbuild@shtetl-patch-0"));
+	(void) snprintf(path, sizeof (path), "%s/m.c", tree);
+	CHECK(is(slurp(path), base_m));
+	verb = SH_BV_ABORT;
+	CHECK(plan("generic") == -1);
+	verb = SH_BV_NEW;
+
+	/* P8, P9: no base to merge against: --reject, a .rej left */
+	patchworld();
+	patchconf("qd", "\"patches/bad\" {}");
+	CHECK(build(NULL) == 1);
+	CHECK(strstr(ran, "patch 1-x.patch from patches/bad: does not "
+	    "apply; applied with --reject, .rej files left\n") != NULL);
+	CHECK(resume(SH_BV_CONTINUE, NULL) == -1);
+	CHECK(cap_has(&c, "a.c.rej left"));
+	CHECK(resume(SH_BV_ABORT, NULL) == 0);
+	(void) snprintf(path, sizeof (path), "%s/a.c.rej", tree);
+	CHECK(access(path, F_OK) != 0);
 	zfake_hook(NULL, NULL);
 }
 
@@ -937,6 +1147,7 @@ main(void)
 	test_run();
 	test_failures();
 	test_patches();
+	test_pause();
 	free(ran);
 	sh_build_free(&p);
 	sh_spaces_free(&s);

@@ -228,7 +228,8 @@ sh_patch_left(const char *dir, char *const *files, struct sh_err *e)
 		(void) snprintf(path, sizeof (path), "%s/%s.rej", dir,
 		    files[i]);
 		if (stat(path, &st) == 0) {
-			sh_errf(e, "%s.rej left", files[i]);
+			if (e != NULL)
+				sh_errf(e, "%s.rej left", files[i]);
 			return (1);
 		}
 		(void) snprintf(path, sizeof (path), "%s/%s", dir, files[i]);
@@ -243,7 +244,9 @@ sh_patch_left(const char *dir, char *const *files, struct sh_err *e)
 		}
 		(void) fclose(f);
 		if (found) {
-			sh_errf(e, "%s: conflict marker left", files[i]);
+			if (e != NULL)
+				sh_errf(e, "%s: conflict marker left",
+				    files[i]);
 			return (1);
 		}
 	}

@@ -91,6 +91,10 @@ t f18-none build
 t f18-two build generic gaming
 t f18-option build --frob generic
 t f18-msg build generic -m
+# P18: a paused build's verbs
+t p18-two build --continue --skip generic
+t p18-abortmsg build --abort -m why generic
+t p18-nozfs build --continue generic
 if [ "$(cat build/.flavor 2>/dev/null)" = portable ]; then
 	t b1-nozfs bootstrap --lake tank/shtetl -y
 	t f18-nozfs -C tests/conf/site build generic -y

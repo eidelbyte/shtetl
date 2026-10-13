@@ -43,8 +43,8 @@ char **sh_patch_files(const char *out, size_t len, struct sh_err *e);
 
 /*
  * What a fix has left in the tree DIR, among FILES: a file holding a
- * conflict marker, or a .rej beside one. The first said in E: 1; 0
- * when nothing is left.
+ * conflict marker, or a .rej beside one. The first said in E (NULL:
+ * not said): 1; 0 when nothing is left.
  */
 int sh_patch_left(const char *dir, char *const *files, struct sh_err *e);
 

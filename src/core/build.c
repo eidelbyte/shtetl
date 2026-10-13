@@ -160,19 +160,88 @@ fb_srcdir(struct sh_zfs *z, struct sh_fplan *p, struct sh_err *e)
 	return (0);
 }
 
+/* Whether the run directory of the build of NAME holds a pause. */
+static int
+fb_paused(const char *runbase, const char *name)
+{
+	char path[SH_BUILD_PATH * 2];
+
+	(void) snprintf(path, sizeof (path), "%s/%s/" SH_BUILD_PAUSED,
+	    runbase, name);
+	return (access(path, F_OK) == 0);
+}
+
+/* The recipe resolved from ROOT, and what the plan takes from it. */
+static int
+fb_recipe(struct sh_fplan *p, const struct sh_node *site, int check,
+    struct sh_err *e, struct sh_err *w)
+{
+	char rpath[SH_BUILD_NAME + 32];
+	const struct sh_node *v;
+
+	(void) snprintf(rpath, sizeof (rpath), "foundations/%s", p->fp_name);
+	if (sh_recipe_resolve(p->fp_root, rpath, &p->fp_recipe, e, w) != 0)
+		return (-1);
+	p->fp_src_branch = sh_obj_get(p->fp_recipe.sr_merged,
+	    "src_branch")->sn_str;
+	(void) sh_syn_branch(p->fp_src_branch, &p->fp_branch);
+	if (check)
+		(void) sh_version_check_branch(&p->fp_branch,
+		    sh_obj_get(p->fp_recipe.sr_merged, "ver"),
+		    p->fp_recipe.sr_file, e);
+	(void) fb_datasets(p, e);
+	v = sh_obj_get(p->fp_recipe.sr_merged, "patches");
+	if (v != NULL && v->sn_obj.ob_n > SH_PATCH_SRCS)
+		sh_errf(e, "%s: patches: more than %d sources",
+		    p->fp_recipe.sr_file, SH_PATCH_SRCS);
+	v = sh_obj_get(sh_obj_get(site, "build"), "make_jobs");
+	p->fp_jobs = v != NULL && v->sn_type == SH_INT ? (long)v->sn_int : 0;
+	return (0);
+}
+
+/*
+ * A paused build carried on: its record read, the recipe from the
+ * config snapshot it began with (ROOT's .zfs/snapshot/<name>).
+ */
+static void
+fb_resumable(struct sh_zfs *z, struct sh_fplan *p, const char *root,
+    const struct sh_node *site, struct sh_err *e, struct sh_err *w)
+{
+	char path[SH_BUILD_PATH * 2], val[SH_ZFS_VALMAX];
+	const char *at;
+
+	(void) snprintf(path, sizeof (path), "%s/" SH_BUILD_PAUSED,
+	    p->fp_rundir);
+	if (sh_pause_read(path, &p->fp_pause, e) != 0)
+		return;
+	(void) fb_srcdir(z, p, e);
+	if (sh_zfs_get(z, p->fp_ds, "type", val, sizeof (val), NULL, e) != 0)
+		sh_errf(e, "foundation %s missing", p->fp_name);
+	p->fp_obj_there = 1;
+	if (p->fp_verb == SH_BV_ABORT)
+		return;
+	if ((at = strchr(p->fp_pause.pz_config, '@')) == NULL) {
+		sh_errf(e, "%s: not a pause record", path);
+		return;
+	}
+	(void) snprintf(p->fp_root, sizeof (p->fp_root),
+	    "%s/.zfs/snapshot/%s", root, at + 1);
+	(void) fb_recipe(p, site, 0, e, w);
+}
+
 int
 sh_build_plan(struct sh_zfs *z, const struct sh_spaces *s,
     const struct sh_node *site, const char *root, const char *target,
-    const char *runbase, struct sh_fplan *p, struct sh_err *e,
-    struct sh_err *w)
+    const char *runbase, enum sh_bverb verb, struct sh_fplan *p,
+    struct sh_err *e, struct sh_err *w)
 {
-	char rpath[SH_BUILD_NAME + 32], val[SH_ZFS_VALMAX];
-	const struct sh_node *v;
+	char val[SH_ZFS_VALMAX];
 	enum sh_zsrc src;
 	unsigned before;
-	int r, sp;
+	int r, sp, mine;
 
 	(void) memset(p, 0, sizeof (*p));
+	p->fp_verb = verb;
 	before = e->se_count;
 	if (fb_target(target, p->fp_name, sizeof (p->fp_name), e) != 0)
 		return (-1);
@@ -182,16 +251,6 @@ sh_build_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	}
 	if (e->se_count != before)
 		return (-1);
-	(void) snprintf(rpath, sizeof (rpath), "foundations/%s", p->fp_name);
-	if (sh_recipe_resolve(root, rpath, &p->fp_recipe, e, w) != 0)
-		return (-1);
-	p->fp_src_branch = sh_obj_get(p->fp_recipe.sr_merged,
-	    "src_branch")->sn_str;
-	(void) sh_syn_branch(p->fp_src_branch, &p->fp_branch);
-	(void) sh_version_check_branch(&p->fp_branch,
-	    sh_obj_get(p->fp_recipe.sr_merged, "ver"), p->fp_recipe.sr_file,
-	    e);
-
 	(void) snprintf(p->fp_ds, sizeof (p->fp_ds), "%s/foundations/%s",
 	    s->ss_root[SH_SP_LAKE], p->fp_name);
 	(void) snprintf(p->fp_obj, sizeof (p->fp_obj),
@@ -207,22 +266,28 @@ sh_build_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	/* one build at a time: the build root says which */
 	r = sh_zfs_get(z, p->fp_src, SH_BUILD_PROP, val, sizeof (val), &src,
 	    e);
-	if (r == 0 && src == SH_ZSRC_LOCAL)
-		sh_errf(e, "build of %s in progress", val);
-	else if (r == 0)
+	if (r != 0)
+		return (-1);
+	mine = src == SH_ZSRC_LOCAL && strcmp(val, p->fp_name) == 0;
+	if (verb != SH_BV_NEW) {
+		if (!mine || !fb_paused(runbase, p->fp_name))
+			sh_errf(e, "no build of %s paused", p->fp_name);
+		else
+			fb_resumable(z, p, root, site, e, w);
+		return (e->se_count == before ? 0 : -1);
+	}
+	if (src == SH_ZSRC_LOCAL)
+		sh_errf(e, "build of %s %s", val, fb_paused(runbase, val) ?
+		    "paused" : "in progress");
+	else
 		(void) fb_srcdir(z, p, e);
+	if (fb_recipe(p, site, 1, e, w) != 0)
+		return (-1);
 	r = sh_zfs_get(z, p->fp_ds, "type", val, sizeof (val), NULL, e);
 	if (r == 0)
 		sh_errf(e, "foundation %s exists", p->fp_name);
 	r = sh_zfs_get(z, p->fp_obj, "type", val, sizeof (val), NULL, e);
 	p->fp_obj_there = r == 0;
-	(void) fb_datasets(p, e);
-	v = sh_obj_get(p->fp_recipe.sr_merged, "patches");
-	if (v != NULL && v->sn_obj.ob_n > SH_PATCH_SRCS)
-		sh_errf(e, "%s: patches: more than %d sources",
-		    p->fp_recipe.sr_file, SH_PATCH_SRCS);
-	v = sh_obj_get(sh_obj_get(site, "build"), "make_jobs");
-	p->fp_jobs = v != NULL && v->sn_type == SH_INT ? (long)v->sn_int : 0;
 	return (e->se_count == before ? 0 : -1);
 }
 
@@ -404,6 +469,7 @@ struct fb {
 	struct fb_pa		*fb_pa;
 	size_t			fb_npa;
 	size_t			fb_psnaps;	/* the last N taken */
+	const char		*fb_msg;	/* -m's, or NULL */
 };
 
 static void
@@ -419,9 +485,18 @@ fb_push(struct fb *b, enum fu_kind k, int fail, const char *what)
 	(void) snprintf(u->fu_what, sizeof (u->fu_what), "%s", what);
 }
 
-static int fb_exec(struct fb *b, const char *const *words,
-    const char *const *env, size_t cap, char **outp, int quiet);
+static int fb_run(struct fb *b, const char *const *words,
+    const char *const *env, size_t cap, char **outp, size_t *lenp,
+    int quiet);
 static void fb_unpatch(struct fb *b);
+static void fb_unrecord(struct fb *b);
+
+static int
+fb_exec(struct fb *b, const char *const *words, const char *const *env,
+    size_t cap, char **outp, int quiet)
+{
+	return (fb_run(b, words, env, cap, outp, NULL, quiet));
+}
 
 /*
  * Undone, newest first, down to MARK: all of it on a FAILED run;
@@ -488,13 +563,13 @@ fb_commit(struct fb *b)
 
 /*
  * WORDS run, its output to the run's log, or with CAP its stdout into
- * *OUTP (the caller frees it). ENV, or the environment shtetl has.
- * QUIET: a failure is not reported (the caller reads the status).
- * The exit status is 0, or -1.
+ * *OUTP (the caller frees it), *LENP bytes. ENV, or the environment
+ * shtetl has. QUIET: a failure is not reported (the caller reads the
+ * status). The exit status is 0, or -1.
  */
 static int
-fb_exec(struct fb *b, const char *const *words, const char *const *env,
-    size_t cap, char **outp, int quiet)
+fb_run(struct fb *b, const char *const *words, const char *const *env,
+    size_t cap, char **outp, size_t *lenp, int quiet)
 {
 	extern char **environ;
 	struct sh_err q, *e;
@@ -541,6 +616,8 @@ fb_exec(struct fb *b, const char *const *words, const char *const *env,
 	r.ru_log = fd;
 	r.ru_capmax = cap;
 	rc = sh_run(&r, e) == 0 ? 0 : -1;
+	if (lenp != NULL)
+		*lenp = r.ru_outlen;
 	if (outp != NULL)
 		*outp = r.ru_out;
 	else
@@ -645,6 +722,7 @@ fb_begin(struct fb *b, time_t now)
 
 	if (fb_mkdirs(b, p->fp_rundir) != 0)
 		return (-1);
+	fb_unrecord(b);
 	(void) snprintf(b->fb_log, sizeof (b->fb_log), "%s/build.log",
 	    p->fp_rundir);
 	if ((fd = open(b->fb_log, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC,
@@ -992,10 +1070,10 @@ fb_dirsrc(struct fb *b, const char *loc, const char *dir, const char *dest)
 /*
  * 7.1.1 step 1: each source into the run directory's patches/<n>, in
  * the recipe's order, and the list of what will be applied fixed from
- * there.
+ * there; or, FETCH 0, a paused build's list read back from there.
  */
 static int
-fb_fetch(struct fb *b)
+fb_fetch(struct fb *b, int fetch)
 {
 	struct sh_fplan *p = b->fb_p;
 	const struct sh_node *srcs, *ref, *dir;
@@ -1008,7 +1086,7 @@ fb_fetch(struct fb *b)
 	if (srcs == NULL || srcs->sn_obj.ob_n == 0)
 		return (0);
 	(void) snprintf(base, sizeof (base), "%s/patches", p->fp_rundir);
-	if (fb_rmtree(b, base) != 0 || fb_mkdirs(b, base) != 0)
+	if (fetch && (fb_rmtree(b, base) != 0 || fb_mkdirs(b, base) != 0))
 		return (-1);
 	if ((b->fb_pa = calloc(SH_PATCH_MAX, sizeof (*b->fb_pa))) == NULL) {
 		sh_err_nomem(b->fb_err);
@@ -1021,24 +1099,25 @@ fb_fetch(struct fb *b)
 		dir = sh_obj_get(srcs->sn_obj.ob_v[k].pr_val, "dir");
 		(void) snprintf(dest, sizeof (dest), "%s/%zu", base, k + 1);
 		if (sh_patch_url(loc, url, sizeof (url)) != NULL) {
-			if (fb_gitsrc(b, k, loc, url, ref != NULL ?
+			if (fetch && fb_gitsrc(b, k, loc, url, ref != NULL ?
 			    ref->sn_str : NULL, dest) != 0)
 				return (-1);
 			(void) snprintf(list, sizeof (list), "%s%s%s", dest,
 			    dir != NULL ? "/" : "", dir != NULL ?
 			    dir->sn_str : "");
 		} else {
-			if (fb_dirsrc(b, loc, dir != NULL ? dir->sn_str : NULL,
-			    dest) != 0)
+			if (fetch && fb_dirsrc(b, loc, dir != NULL ?
+			    dir->sn_str : NULL, dest) != 0)
 				return (-1);
 			(void) snprintf(list, sizeof (list), "%s", dest);
 		}
 		if (fb_listed(b, k, list) != 0)
 			return (-1);
 	}
-	(void) fprintf(b->fb_out, "%zu patch%s from %zu source%s\n",
-	    b->fb_npa, b->fb_npa == 1 ? "" : "es", srcs->sn_obj.ob_n,
-	    srcs->sn_obj.ob_n == 1 ? "" : "s");
+	if (fetch)
+		(void) fprintf(b->fb_out, "%zu patch%s from %zu source%s\n",
+		    b->fb_npa, b->fb_npa == 1 ? "" : "es", srcs->sn_obj.ob_n,
+		    srcs->sn_obj.ob_n == 1 ? "" : "s");
 	return (0);
 }
 
@@ -1083,6 +1162,8 @@ fb_apply(struct fb *b, const char *a1, const char *a2, const char *patch)
  * then each patch after a snapshot of its own, applied, or skipped as
  * already in when its reverse applies.
  */
+static int fb_pause(struct fb *b, size_t i);
+
 static int
 fb_patches(struct fb *b, size_t from)
 {
@@ -1116,12 +1197,372 @@ fb_patches(struct fb *b, size_t from)
 			(void) fprintf(b->fb_out, "patch %s from %s: already "
 			    "in, skipped\n", pa->pa_name, loc);
 		} else {
-			sh_errf(b->fb_err, "patch %s from %s: does not apply",
-			    pa->pa_name, loc);
-			return (-1);
+			return (fb_pause(b, i));
 		}
 	}
 	return (0);
+}
+
+/* git -C <the checkout> W1 W2 W3: what it prints, its first line. */
+static int
+fb_git1(struct fb *b, const char *w1, const char *w2, const char *w3,
+    char *line, size_t len)
+{
+	const char *w[7];
+	char *out;
+	size_t n;
+
+	w[0] = b->fb_t->tl_git;
+	w[1] = "-C";
+	w[2] = b->fb_p->fp_srcdir;
+	w[3] = w1;
+	w[4] = w2;
+	w[5] = w3;
+	w[6] = NULL;
+	if (fb_exec(b, w, NULL, FB_CAP, &out, 0) != 0)
+		return (-1);
+	n = out != NULL ? strcspn(out, "\n") : 0;
+	(void) snprintf(line, len, "%.*s", (int)n, out != NULL ? out : "");
+	free(out);
+	return (0);
+}
+
+/* The tree as it is, as a git tree: everything added, the tree written. */
+static int
+fb_tree(struct fb *b, char *id, size_t len)
+{
+	char line[8];
+
+	if (fb_git1(b, "add", "-A", NULL, line, sizeof (line)) != 0 ||
+	    fb_git1(b, "write-tree", NULL, NULL, id, len) != 0)
+		return (-1);
+	if (id[0] == '\0') {
+		sh_errf(b->fb_err, "git write-tree: no tree");
+		return (-1);
+	}
+	return (0);
+}
+
+/* The files the patch PA touches, as git apply --numstat -z says. */
+static char **
+fb_touched(struct fb *b, const struct fb_pa *pa)
+{
+	const char *w[8];
+	char *out, **files;
+	size_t len;
+
+	w[0] = b->fb_t->tl_git;
+	w[1] = "-C";
+	w[2] = b->fb_p->fp_srcdir;
+	w[3] = "apply";
+	w[4] = "--numstat";
+	w[5] = "-z";
+	w[6] = pa->pa_path;
+	w[7] = NULL;
+	if (fb_run(b, w, NULL, 1 << 20, &out, &len, 0) != 0)
+		return (NULL);
+	files = sh_patch_files(out != NULL ? out : "", out != NULL ? len : 0,
+	    b->fb_err);
+	free(out);
+	return (files);
+}
+
+/*
+ * The patch I does not apply (7.1.1, the pause): the tree as it is
+ * noted as the base of the fix; the patch merged three ways, or,
+ * where that leaves no conflict marker and did not merge, applied
+ * with --reject; the record written; what to do said. 1, paused.
+ */
+static int
+fb_pause(struct fb *b, size_t i)
+{
+	struct sh_fplan *p = b->fb_p;
+	struct fb_pa *pa = &b->fb_pa[i];
+	char path[SH_BUILD_PATH * 2], **files;
+	const char *loc, *how;
+	size_t j;
+
+	loc = sh_obj_get(p->fp_recipe.sr_merged, "patches")->
+	    sn_obj.ob_v[pa->pa_src].pr_key;
+	if (fb_tree(b, b->fb_pz.pz_base, sizeof (b->fb_pz.pz_base)) != 0 ||
+	    (files = fb_touched(b, pa)) == NULL)
+		return (-1);
+	if (fb_apply(b, "--3way", NULL, pa->pa_path) == 0) {
+		how = "merged three ways without conflict, to be looked over";
+	} else if (sh_patch_left(p->fp_srcdir, files, NULL) == 1) {
+		how = "merged three ways, conflict markers left";
+	} else {
+		(void) fb_apply(b, "--reject", NULL, pa->pa_path);
+		how = "applied with --reject, .rej files left";
+	}
+	b->fb_pz.pz_at = i;
+	(void) snprintf(b->fb_pz.pz_config, sizeof (b->fb_pz.pz_config), "%s",
+	    b->fb_cfgsnap);
+	(void) snprintf(b->fb_pz.pz_version, sizeof (b->fb_pz.pz_version),
+	    "%s", b->fb_version);
+	(void) snprintf(b->fb_pz.pz_sha, sizeof (b->fb_pz.pz_sha), "%s",
+	    b->fb_sha);
+	(void) snprintf(b->fb_pz.pz_msg, sizeof (b->fb_pz.pz_msg), "%s",
+	    b->fb_msg != NULL ? b->fb_msg : "");
+	(void) snprintf(path, sizeof (path), "%s/" SH_BUILD_PAUSED,
+	    p->fp_rundir);
+	if (sh_pause_write(path, &b->fb_pz, b->fb_err) != 0) {
+		sh_patch_list_free(files);
+		return (-1);
+	}
+	(void) fprintf(b->fb_out, "patch %s from %s: does not apply; %s\n"
+	    "  the patch: %s\n  in %s:", pa->pa_name, loc, how, pa->pa_path,
+	    p->fp_srcdir);
+	for (j = 0; files[j] != NULL; j++)
+		(void) fprintf(b->fb_out, " %s", files[j]);
+	(void) fprintf(b->fb_out, "\nbuild of %s paused; then one of:\n"
+	    "  shtetl build %s --continue   the fix made, go on\n"
+	    "  shtetl build %s --skip       the patch left out\n"
+	    "  shtetl build %s --abort      nothing built, all undone\n",
+	    p->fp_name, p->fp_name, p->fp_name, p->fp_name);
+	sh_patch_list_free(files);
+	return (1);
+}
+
+/*
+ * --continue: the fix checked, nothing left by the patch's merge; the
+ * fix written out as the tree's difference from the base, a patch to
+ * replace the source's (fixed/<source>/<name>). Not 0 when refused.
+ */
+static int
+fb_fixed(struct fb *b)
+{
+	struct sh_fplan *p = b->fb_p;
+	struct fb_pa *pa = &b->fb_pa[p->fp_pause.pz_at];
+	char fixed[SH_PATCH_STR], dir[SH_BUILD_PATH + 32];
+	char path[SH_BUILD_PATH * 2], **files, *out;
+	const char *w[9], *loc;
+	size_t len;
+	FILE *f;
+	int left, bad;
+
+	if ((files = fb_touched(b, pa)) == NULL)
+		return (-1);
+	left = sh_patch_left(p->fp_srcdir, files, b->fb_err);
+	sh_patch_list_free(files);
+	if (left != 0)
+		return (2);
+	if (fb_tree(b, fixed, sizeof (fixed)) != 0)
+		return (-1);
+	w[0] = b->fb_t->tl_git;
+	w[1] = "-C";
+	w[2] = p->fp_srcdir;
+	w[3] = "diff";
+	w[4] = "--binary";
+	w[5] = p->fp_pause.pz_base;
+	w[6] = fixed;
+	w[7] = NULL;
+	if (fb_run(b, w, NULL, 64 << 20, &out, &len, 0) != 0)
+		return (-1);
+	(void) snprintf(dir, sizeof (dir), "%s/fixed/%zu", p->fp_rundir,
+	    pa->pa_src + 1);
+	(void) snprintf(path, sizeof (path), "%s/%s", dir, pa->pa_name);
+	if (fb_mkdirs(b, dir) != 0) {
+		free(out);
+		return (-1);
+	}
+	if ((f = fopen(path, "w")) == NULL) {
+		sh_errf(b->fb_err, "%s: %s", path, strerror(errno));
+		free(out);
+		return (-1);
+	}
+	bad = len > 0 && fwrite(out, 1, len, f) != len;
+	if (fclose(f) != 0 || bad) {
+		sh_errf(b->fb_err, "%s: %s", path, strerror(errno));
+		free(out);
+		return (-1);
+	}
+	free(out);
+	b->fb_pz.pz_out[p->fp_pause.pz_at] = SH_PO_FIXED;
+	loc = sh_obj_get(p->fp_recipe.sr_merged, "patches")->
+	    sn_obj.ob_v[pa->pa_src].pr_key;
+	(void) fprintf(b->fb_out, "patch %s from %s: fixed by hand; the "
+	    "fix: %s\n", pa->pa_name, loc, path);
+	return (0);
+}
+
+/*
+ * A paused build taken up again (--continue, --skip): what the run
+ * had done read back from its record, and pushed for undoing as it
+ * was; the list read back from the run directory; then the patch
+ * fixed by hand, or left out, the tree back to before it.
+ */
+static int
+fb_resume(struct fb *b)
+{
+	struct sh_fplan *p = b->fb_p;
+	struct sh_pause *pz = &p->fp_pause;
+	char snap[SH_BUILD_NAME + 32];
+	size_t i, at;
+
+	(void) snprintf(b->fb_log, sizeof (b->fb_log), "%s/build.log",
+	    p->fp_rundir);
+	b->fb_pz = *pz;
+	at = pz->pz_at;
+	(void) snprintf(b->fb_cfgsnap, sizeof (b->fb_cfgsnap), "%s",
+	    pz->pz_config);
+	(void) snprintf(b->fb_version, sizeof (b->fb_version), "%s",
+	    pz->pz_version);
+	(void) snprintf(b->fb_sha, sizeof (b->fb_sha), "%s", pz->pz_sha);
+	if (b->fb_msg == NULL && pz->pz_msg[0] != '\0')
+		b->fb_msg = pz->pz_msg;
+	if (sh_zfs_get(b->fb_z, b->fb_cfgsnap, "guid", b->fb_cfgguid,
+	    sizeof (b->fb_cfgguid), NULL, b->fb_err) != 0)
+		return (-1);
+	fb_push(b, FU_UNLOCK, 0, p->fp_src);
+	for (i = 0; i < p->fp_nds; i++)
+		fb_push(b, FU_DESTROY, 1, p->fp_dss[i].fd_ds);
+	if (fb_fetch(b, 0) != 0)
+		return (-1);
+	if (at >= b->fb_npa || b->fb_pz.pz_nsrc != pz->pz_nsrc) {
+		sh_errf(b->fb_err, "%s: the record does not match the run "
+		    "directory", p->fp_rundir);
+		return (-1);
+	}
+	b->fb_pz.pz_nsrc = pz->pz_nsrc;
+	b->fb_psnaps = at + 1;
+	fb_push(b, FU_PATCHES, 0, p->fp_src);
+	(void) fprintf(b->fb_out, "build of %s, paused at patch %s\n",
+	    p->fp_name, b->fb_pa[at].pa_name);
+	if (p->fp_verb == SH_BV_CONTINUE)
+		return (fb_fixed(b));
+	(void) snprintf(snap, sizeof (snap), FB_PSNAP "%zu", at + 1);
+	if (sh_zfs_rollback(b->fb_z, p->fp_src, snap, b->fb_err) != 0)
+		return (-1);
+	b->fb_pz.pz_out[at] = SH_PO_SKIPPED;
+	(void) fprintf(b->fb_out, "patch %s from %s: left out\n",
+	    b->fb_pa[at].pa_name, sh_obj_get(p->fp_recipe.sr_merged,
+	    "patches")->sn_obj.ob_v[b->fb_pa[at].pa_src].pr_key);
+	return (0);
+}
+
+/* A walk of children: each name kept. */
+static int
+fb_kid(void *arg, const char *name)
+{
+	char ***kids = arg;
+	char **nk;
+	size_t n;
+
+	for (n = 0; (*kids)[n] != NULL; n++)
+		;
+	if ((nk = realloc(*kids, (n + 2) * sizeof (*nk))) == NULL)
+		return (-1);
+	*kids = nk;
+	if ((nk[n] = strdup(name)) == NULL)
+		return (-1);
+	nk[n + 1] = NULL;
+	return (0);
+}
+
+/* DS and every filesystem below it destroyed, children first. */
+static int
+fb_destroyf(struct fb *b, const char *ds)
+{
+	char **kids;
+	size_t i;
+	int r;
+
+	if ((kids = calloc(1, sizeof (*kids))) == NULL) {
+		sh_err_nomem(b->fb_err);
+		return (-1);
+	}
+	r = sh_zfs_children(b->fb_z, ds, fb_kid, &kids, b->fb_err);
+	for (i = 0; r == 0 && kids[i] != NULL; i++)
+		r = fb_destroyf(b, kids[i]);
+	for (i = 0; kids[i] != NULL; i++)
+		free(kids[i]);
+	free(kids);
+	if (r != 0 || sh_zfs_destroy(b->fb_z, ds, b->fb_err) != 0)
+		return (-1);
+	(void) fprintf(b->fb_out, "destroyed %s\n", ds);
+	return (0);
+}
+
+/*
+ * --abort: the build root back to @shtetl-patch-0, F's datasets
+ * destroyed, the mark cleared, the record and the fetched patches
+ * gone; the log and the config snapshot stay.
+ */
+static int
+fb_abort(struct fb *b)
+{
+	struct sh_fplan *p = b->fb_p;
+	char path[SH_BUILD_PATH * 2];
+
+	(void) snprintf(b->fb_log, sizeof (b->fb_log), "%s/build.log",
+	    p->fp_rundir);
+	b->fb_psnaps = p->fp_pause.pz_at + 1;
+	/* every patch snapshot gone, or the rollback failed and said so */
+	fb_unpatch(b);
+	if (b->fb_psnaps != 0 || fb_destroyf(b, p->fp_ds) != 0 ||
+	    sh_zfs_inherit(b->fb_z, p->fp_src, SH_BUILD_PROP,
+	    b->fb_err) != 0)
+		return (-1);
+	(void) snprintf(path, sizeof (path), "%s/" SH_BUILD_PAUSED,
+	    p->fp_rundir);
+	if (unlink(path) != 0 && errno != ENOENT) {
+		sh_errf(b->fb_err, "%s: %s", path, strerror(errno));
+		return (-1);
+	}
+	(void) snprintf(path, sizeof (path), "%s/patches", p->fp_rundir);
+	if (fb_rmtree(b, path) != 0)
+		return (-1);
+	(void) snprintf(path, sizeof (path), "%s/fixed", p->fp_rundir);
+	if (fb_rmtree(b, path) != 0)
+		return (-1);
+	(void) fprintf(b->fb_out, "build of %s given up, nothing built\n",
+	    p->fp_name);
+	return (0);
+}
+
+/*
+ * The fixes made by hand kept in the obj cache, mounted, as
+ * patches/<version>/<source>/<name>: the run directory's go with the
+ * next build.
+ */
+static int
+fb_keepfixes(struct fb *b)
+{
+	struct fb_pa *pa;
+	char from[SH_BUILD_PATH * 2], dir[SH_BUILD_PATH * 2];
+	char to[SH_BUILD_PATH * 3];
+	size_t i, n;
+
+	for (i = n = 0; i < b->fb_npa; i++) {
+		if (b->fb_pz.pz_out[i] != SH_PO_FIXED)
+			continue;
+		pa = &b->fb_pa[i];
+		(void) snprintf(from, sizeof (from), "%s/fixed/%zu/%s",
+		    b->fb_p->fp_rundir, pa->pa_src + 1, pa->pa_name);
+		(void) snprintf(dir, sizeof (dir), "%s/patches/%s/%zu",
+		    b->fb_objdir, b->fb_version, pa->pa_src + 1);
+		(void) snprintf(to, sizeof (to), "%s/%s", dir, pa->pa_name);
+		if (fb_mkdirs(b, dir) != 0 || fb_copy(b, from, to) != 0)
+			return (-1);
+		n++;
+	}
+	if (n > 0)
+		(void) fprintf(b->fb_out, "kept %zu fix%s in %s/patches/%s\n",
+		    n, n == 1 ? "" : "es", b->fb_objdir, b->fb_version);
+	return (0);
+}
+
+/* The record of a pause gone: the build has ended. */
+static void
+fb_unrecord(struct fb *b)
+{
+	char path[SH_BUILD_PATH * 2];
+
+	(void) snprintf(path, sizeof (path), "%s/" SH_BUILD_PAUSED,
+	    b->fb_p->fp_rundir);
+	if (unlink(path) != 0 && errno != ENOENT)
+		sh_errf(b->fb_err, "%s: %s", path, strerror(errno));
 }
 
 /*
@@ -1546,7 +1987,7 @@ sh_build_run(struct sh_zfs *z, struct sh_fplan *p,
 {
 	struct fb *b;
 	size_t fmark, i;
-	int rc;
+	int rc, r;
 
 	if ((b = calloc(1, sizeof (*b))) == NULL) {
 		sh_err_nomem(e);
@@ -1557,24 +1998,47 @@ sh_build_run(struct sh_zfs *z, struct sh_fplan *p,
 	b->fb_t = t;
 	b->fb_out = out;
 	b->fb_err = e;
+	b->fb_msg = msg;
 	rc = -1;
-	if (fb_begin(b, now) != 0 || fb_create(b) != 0 ||
-	    fb_checkout(b) != 0 || fb_version(b, now) != 0 ||
-	    fb_fetch(b) != 0 || fb_patches(b, 0) != 0 ||
-	    fb_configs(b) != 0 || fb_mounts(b, &fmark) != 0 ||
-	    fb_world(b) != 0 || fb_inside(b) != 0)
+	if (p->fp_verb == SH_BV_ABORT) {
+		if (fb_abort(b) == 0)
+			rc = 0;
+		goto out;
+	}
+	if (p->fp_verb == SH_BV_NEW) {
+		r = fb_begin(b, now) != 0 || fb_create(b) != 0 ||
+		    fb_checkout(b) != 0 || fb_version(b, now) != 0 ||
+		    fb_fetch(b, 1) != 0 ? -1 : fb_patches(b, 0);
+	} else {
+		/* taking the pause up fails: it stays, for another try */
+		r = fb_resume(b) != 0 ? 2 : fb_patches(b,
+		    p->fp_pause.pz_at + 1);
+	}
+	if (r == 1) {
+		/* paused: everything left as it is, for a person */
+		rc = 1;
+		goto out;
+	}
+	if (r == 2) {
+		sh_errf(e, "build of %s still paused", p->fp_name);
+		goto out;
+	}
+	if (r != 0 || fb_configs(b) != 0 || fb_mounts(b, &fmark) != 0 ||
+	    fb_keepfixes(b) != 0 || fb_world(b) != 0 || fb_inside(b) != 0)
 		goto fail;
 	/* F unmounted, its mountpoint back, and then the version */
 	fb_undo(b, fmark, 0);
-	if (fb_snapshot(b, msg) != 0)
+	if (fb_snapshot(b, b->fb_msg) != 0)
 		goto fail;
 	fb_commit(b);
 	fb_undo(b, 0, 0);
+	fb_unrecord(b);
 	(void) fprintf(out, "built %s@%s\n", p->fp_ds, b->fb_version);
 	rc = 0;
 	goto out;
 fail:
 	fb_undo(b, 0, 1);
+	fb_unrecord(b);
 	sh_errf(e, "build of %s failed; log %s", p->fp_name, b->fb_log);
 out:
 	for (i = 0; b->fb_pa != NULL && i < b->fb_npa; i++)
