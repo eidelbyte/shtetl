@@ -880,6 +880,12 @@ As built (M3, `src/core/patch.c`, `src/core/build.c`):
   tree, everything added (a stray file goes in with it), written to
   `<run dir>/fixed/<n>/<name>` and kept in the obj cache as
   `patches/<version>/<n>/<name>`.
+- After the rollback to `@shtetl-patch-0`, every file the build's
+  patches touched, and a fix by hand did, is given the time of now:
+  the rollback gives back their times from before the patches, older
+  than the objects the obj cache built from them, and the next build's
+  make, going by times, would take those as up to date, a patch since
+  dropped still in them (box build 6).
 - `--abort` needs no recipe: F's datasets are walked and destroyed.
   The log stays, as it does after any build (7.1 as built), where the
   plan above said the run directory goes.

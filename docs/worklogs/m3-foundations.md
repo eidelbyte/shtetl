@@ -427,3 +427,28 @@ module's object. tracker: m3-kernel-install testing.
 
 Gotcha, again: scratch_path's one buffer; two calls in one rm -rf
 removed the same directory twice and the other not at all.
+
+## Box build 6 (70962a2): the kernel kept; a stale object found (8b27e68)
+
+At 8d18312: 62 ok, 2 failed. m3-kernel-install for real: the first
+build copied 1715 kernel files into the new F, the update kept all
+1715 and copied none, and a module (aac.ko) kept its object. tracker:
+m3-kernel-install tested.
+
+The two failures, F27's backups, were a real bug, not the test's.
+The kept obj cache held init built from the init.c F27 had patched
+the run before; that build's end rolled the build root back with ZFS,
+giving init.c its old content and its old time, older than the
+object. This run's first build had no such patch, and make, going by
+times, took the patched object as up to date: F got the patched init,
+and F27's update, the same again, made no backup. Any recipe dropping
+a patch would have met it, the obj cache keeping the dropped patch's
+objects.
+
+Fixed in 8b27e68: after the rollback, every file the build's patches
+touched, and a fix by hand did, gets the time of now (fb_retouch,
+each file once, said); P15 holds it, and dropping the call fails it.
+
+The box's kept build root still has init.c and rtld.c with the times
+the old code left, so its next run needs --clean once (a whole
+build); after that the fix keeps it right.
