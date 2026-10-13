@@ -305,7 +305,7 @@ confirmation {-y, a terminal's answer, no terminal}.
 | B13 | the config root: with --recipes and an empty directory, a snapshot and then git clone; not empty, no clone; no --recipes, no clone; a failed clone leaves the root unmarked | covered: check_boot.c |
 | B14 | an apply interrupted (a create fails): no root marked; the same command again finishes, taking the layout already made | covered: check_boot.c |
 | B15 | a layout child already there but not as shtetl makes it is refused, naming the difference | covered: check_boot.c |
-| B16 | without -y and no terminal: refused, nothing done; -y: done; a terminal answers y or yes, anything else is no | covered: check_boot.c (the decision, sh_boot_confirm); the command itself on the box, tests/box |
+| B16 | without -y and no terminal: refused, nothing done; -y: done; a terminal answers y or yes, anything else is no | covered: check_boot.c (the decision, sh_confirm); the command itself on the box, tests/box |
 | B17 | the pool: autotrim set only when it differs; ashift never set | covered: check_boot.c |
 | B18 | a pool imported with an altroot: the layout's mountpoints are read below it | covered: check_boot.c |
 
@@ -404,3 +404,12 @@ not}.
 | F8 | F's datasets: F first, the recipe's in its order, a placeholder for each parent it does not name, a parent named after its child made real, properties carried; more than 32 refused | covered: check_build.c |
 | F9 | the obj cache: made when missing, taken when there | covered: check_build.c |
 | F10 | the plan shown: the branch and the version's pattern, each dataset with what it is set to, the obj cache, the checkout, the kernel and its lines, src.conf, make -j, the install, pkg, commands, the snapshot | covered: check_build.c |
+| F11 | a whole run, in order: the build root marked, the config root snapshotted (shtetl:kind=config), F's datasets made with their properties, the checkout, newvers.sh asked, the configs written, the obj cache and F mounted below the run directory, make buildworld buildkernel with -j, SRCCONF, KERNCONFDIR, KERNCONF and MAKEOBJDIRPREFIX in its environment, installworld, installkernel and distribution with DESTDIR and install -C, devfs, pkg -c, each command piece, everything unmounted and inherited back, the snapshot of every dataset with the version's properties, the mark cleared | covered: check_build.c |
+| F12 | the version: REVISION's, the day of the run, the commit; REVISION not meeting ver after the checkout refused and undone | covered: check_build.c |
+| F13 | a failure at each step that can fail (git, make at each target, pkg, a command, the snapshot) undone: F's datasets destroyed, every mount and mountpoint back, the mark cleared; the config snapshot and the obj cache kept; the log named | covered: check_build.c |
+| F14 | the build root with changes of its own refused | covered: check_build.c |
+| F15 | no packages: no resolv.conf copied; no packages and no commands: no devfs; a resolv.conf F has is left alone | covered: check_build.c |
+| F16 | the kernel config: an include of a name in the checkout's conf directory for this machine, or of a path in the configuration root; the ident; the lines in order; src.conf, buildopts' pieces in order | covered: check_build.c |
+| F17 | shtetl:commit: the build's own message, or the one given | covered: check_build.c |
+| F18 | build on the command line: no foundation, two, an unknown option, -m with no message, usage errors; the portable shtetl refuses for want of ZFS; -C not the config root's mountpoint refused | covered: run-cli.sh f18-none, f18-two, f18-option, f18-msg, f18-nozfs; the -C refusal and the run itself on the box |
+

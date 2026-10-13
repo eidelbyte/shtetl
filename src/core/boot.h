@@ -104,9 +104,10 @@ int sh_boot_apply(struct sh_zfs *z, const struct sh_bplan *p, FILE *out,
 
 /*
  * Whether to go on with a plan shown: YES (-y) says so; otherwise,
- * where there is a terminal (TTY), the question goes to OUT and y or
- * yes on IN is the answer; anything else, and no terminal, is no.
+ * where there is a terminal (TTY), QUESTION goes to OUT and y or yes
+ * on IN is the answer; anything else, and no terminal, is no.
  */
-int sh_boot_confirm(FILE *in, FILE *out, int yes, int tty);
+int sh_confirm(FILE *in, FILE *out, int yes, int tty,
+    const char *question);
 
 #endif	/* SH_BOOT_H */

@@ -592,7 +592,7 @@ sh_boot_show(FILE *out, const struct sh_bplan *p)
 }
 
 int
-sh_boot_confirm(FILE *in, FILE *out, int yes, int tty)
+sh_confirm(FILE *in, FILE *out, int yes, int tty, const char *question)
 {
 	char line[64];
 	size_t n;
@@ -601,7 +601,7 @@ sh_boot_confirm(FILE *in, FILE *out, int yes, int tty)
 		return (1);
 	if (!tty)
 		return (0);
-	(void) fprintf(out, "Bootstrap as above? [y/N] ");
+	(void) fprintf(out, "%s [y/N] ", question);
 	(void) fflush(out);
 	if (fgets(line, sizeof (line), in) == NULL)
 		return (0);

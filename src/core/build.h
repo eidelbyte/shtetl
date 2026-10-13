@@ -9,6 +9,7 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <time.h>
 
 #include "core/cascade.h"
 #include "core/err.h"
@@ -42,6 +43,7 @@ struct sh_fplan {
 	char		fp_src[SH_BUILD_NAME];	/* the build root */
 	char		fp_srcdir[SH_BUILD_PATH];	/* its mountpoint */
 	char		fp_config[SH_BUILD_NAME];	/* the config root */
+	char		fp_root[SH_BUILD_PATH];	/* its directory, read */
 	char		fp_rundir[SH_BUILD_PATH];
 	struct sh_fds	fp_dss[SH_BUILD_DS];
 	size_t		fp_nds;
@@ -64,6 +66,40 @@ int sh_build_plan(struct sh_zfs *z, const struct sh_spaces *s,
 
 /* The plan, as the person confirming it reads it. */
 void sh_build_show(FILE *out, const struct sh_fplan *p);
+
+/*
+ * What a build runs, each by name (looked for in SH_RUN_PATH) or by
+ * path: sh_build_tools, or the tests' fakes.
+ */
+struct sh_tools {
+	const char	*tl_git;
+	const char	*tl_make;
+	const char	*tl_pkg;
+	const char	*tl_chroot;
+	const char	*tl_mount;
+	const char	*tl_umount;
+	const char	*tl_sh;
+};
+
+extern const struct sh_tools sh_build_tools;
+
+/*
+ * The plan P carried out (7.1 steps 2 - 8), each step said on OUT:
+ * the build root marked; the config root snapshotted; F's datasets
+ * made; the checkout, and its REVISION checked against ver; F and the
+ * obj cache mounted below the run directory; the kernel config and
+ * src.conf written there; make buildworld buildkernel, then
+ * installworld, installkernel and distribution with install -C; pkg
+ * and the commands in a chroot of F; everything unmounted; F and its
+ * datasets snapshotted as the version, NOW's day, carrying
+ * shtetl:kind=version, shtetl:commit (MSG, or a message of the
+ * build's own), shtetl:config and shtetl:config-guid. On a failure,
+ * everything done is undone, a new F's datasets destroyed, and the
+ * logs left in the run directory. 0, or -1 with the reasons in E.
+ */
+int sh_build_run(struct sh_zfs *z, struct sh_fplan *p,
+    const struct sh_tools *t, const char *msg, time_t now, FILE *out,
+    struct sh_err *e);
 
 void sh_build_free(struct sh_fplan *p);
 

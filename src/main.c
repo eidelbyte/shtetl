@@ -7,12 +7,15 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "core/boot.h"
+#include "core/build.h"
 #include "core/cascade.h"
 #include "core/err.h"
 #include "core/root.h"
@@ -48,6 +51,7 @@ struct sh_cmd {
 };
 
 static int cmd_bootstrap(struct sh_ctx *, int, char **);
+static int cmd_build(struct sh_ctx *, int, char **);
 static int cmd_config_show(struct sh_ctx *, int, char **);
 static int cmd_spaces(struct sh_ctx *, int, char **);
 
@@ -62,6 +66,9 @@ static const struct sh_cmd sh_cmds[] = {
 	    "           [--build ds] [--recipes url] [-y]", "datasets you "
 	    "have made the roots of the spaces, and laid\n    out; shown "
 	    "first, done once confirmed (-y confirms)", cmd_bootstrap },
+	{ "build", NULL, "[-y] [-m msg] foundation", "a foundation built "
+	    "from its recipe into zlake; shown\n    first, done once "
+	    "confirmed (-y confirms)", cmd_build },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -265,6 +272,80 @@ boot_site(struct sh_ctx *ctx, const struct sh_bootreq *req,
 }
 
 /*
+ * build F: planned, shown, confirmed, run (planning.md 7.1). The
+ * recipe is read where the config root is mounted, the directory the
+ * build snapshots and records; -C may name only that directory.
+ */
+static int
+cmd_build(struct sh_ctx *ctx, int argc, char **argv)
+{
+	struct sh_fplan *plan;
+	struct sh_site site;
+	struct sh_err e, w;
+	char *dir, a[PATH_MAX], b[PATH_MAX];
+	const char *msg, *target;
+	int i, yes, rc;
+
+	yes = 0;
+	msg = target = NULL;
+	for (i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "-y") == 0) {
+			yes = 1;
+		} else if (strcmp(argv[i], "-m") == 0) {
+			if (i + 1 == argc)
+				return (die_usage("-m needs a message", ""));
+			msg = argv[++i];
+		} else if (argv[i][0] == '-') {
+			return (die_usage("build: unknown option ", argv[i]));
+		} else if (target != NULL) {
+			return (die_usage("build takes one foundation", ""));
+		} else {
+			target = argv[i];
+		}
+	}
+	if (target == NULL)
+		return (die_usage("build: no foundation given", ""));
+	sh_err_init(&e, stderr, "shtetl: ");
+	sh_err_init(&w, stderr, "shtetl: warning: ");
+	if (ctx_zfs(ctx, &e) != 0 ||
+	    sh_spaces_config_dir(ctx->sc_zfs, &ctx->sc_spaces, &dir, &e) != 0)
+		return (SH_EXIT_REFUSED);
+	if (ctx->sc_root != NULL && (realpath(ctx->sc_root, a) == NULL ||
+	    realpath(dir, b) == NULL || strcmp(a, b) != 0)) {
+		sh_errf(&e, "-C %s: not the config root's mountpoint, %s",
+		    ctx->sc_root, dir);
+		free(dir);
+		return (SH_EXIT_REFUSED);
+	}
+	if (sh_site_load(dir, &site, &e) != 0) {
+		free(dir);
+		return (SH_EXIT_REFUSED);
+	}
+	rc = SH_EXIT_REFUSED;
+	if ((plan = calloc(1, sizeof (*plan))) == NULL) {
+		sh_err_nomem(&e);
+	} else if (sh_build_plan(ctx->sc_zfs, &ctx->sc_spaces, site.ss_merged,
+	    dir, target, SH_BUILD_DIR, plan, &e, &w) == 0) {
+		sh_build_show(stdout, plan);
+		(void) fflush(stdout);
+		if (!sh_confirm(stdin, stdout, yes, isatty(STDIN_FILENO),
+		    "Build as above?"))
+			sh_errf(&e, "%s", isatty(STDIN_FILENO) ?
+			    "not confirmed" : "not confirmed: no terminal, use "
+			    "-y");
+		else if (sh_build_run(ctx->sc_zfs, plan, &sh_build_tools, msg,
+		    time(NULL), stdout, &e) == 0)
+			rc = out_done();
+	}
+	if (plan != NULL)
+		sh_build_free(plan);
+	free(plan);
+	sh_site_free(&site);
+	free(dir);
+	return (rc);
+}
+
+/*
  * bootstrap: the roots named, planned, shown, confirmed, applied
  * (planning.md 4.2), one to a space.
  */
@@ -332,7 +413,8 @@ cmd_bootstrap(struct sh_ctx *ctx, int argc, char **argv)
 		sh_boot_show(stdout, plan);
 		(void) fflush(stdout);
 		tty = isatty(STDIN_FILENO);
-		if (!sh_boot_confirm(stdin, stdout, yes, tty)) {
+		if (!sh_confirm(stdin, stdout, yes, tty,
+		    "Bootstrap as above?")) {
 			sh_errf(&e, "%s", tty ? "not confirmed" :
 			    "not confirmed: no terminal, use -y");
 			rc = SH_EXIT_REFUSED;

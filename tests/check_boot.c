@@ -430,7 +430,7 @@ test_clone(void)
 	(void) close(saved);
 }
 
-/* What sh_boot_confirm decides, given TEXT on stdin. */
+/* What sh_confirm decides, given TEXT on stdin. */
 static int
 confirm(const char *text, int yes, int tty)
 {
@@ -446,10 +446,10 @@ confirm(const char *text, int yes, int tty)
 		in = fmemopen((void *)(uintptr_t)text, strlen(text), "r");
 	o = open_memstream(&obuf, &olen);
 	CHECK(in != NULL && o != NULL);
-	r = sh_boot_confirm(in, o, yes, tty);
+	r = sh_confirm(in, o, yes, tty, "Go?");
 	(void) fclose(in);
 	(void) fclose(o);
-	CHECK(tty && !yes ? strstr(obuf, "[y/N]") != NULL : olen == 0);
+	CHECK(tty && !yes ? strstr(obuf, "Go? [y/N] ") != NULL : olen == 0);
 	free(obuf);
 	return (r);
 }

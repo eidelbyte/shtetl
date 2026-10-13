@@ -86,8 +86,14 @@ t b1-option bootstrap --lake tank/shtetl --frob
 t b1-operand bootstrap --lake
 t b1-recipes bootstrap --config tank/zconfig --recipes
 t b4-twice bootstrap --lake tank/a --lake tank/b
+# F18: build's usage errors
+t f18-none build
+t f18-two build generic gaming
+t f18-option build --frob generic
+t f18-msg build generic -m
 if [ "$(cat build/.flavor 2>/dev/null)" = portable ]; then
 	t b1-nozfs bootstrap --lake tank/shtetl -y
+	t f18-nozfs -C tests/conf/site build generic -y
 fi
 # CL7: more than one recipe.
 t cl7-two -C tests/conf/site config show containers/nginx systems/x

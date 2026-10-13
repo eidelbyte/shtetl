@@ -710,6 +710,47 @@ F is named after its recipe (6.1): `foundations/generic.conf` builds
 8. Unmount foundation-builds/F; roll the src root back to before the
    patches (7.1.1) and unmount it.
 
+As built (M3, `src/core/build.c`; patches and updates to come):
+
+    shtetl build [-y] [-m msg] F
+
+- The plan is shown first and confirmed as bootstrap's is; every
+  check is made before anything is done: the roots, the recipe,
+  src_branch against ver, the build root mounted and free, no
+  foundation of that name yet. After the checkout, REVISION (asked of
+  the checkout's newvers.sh) is checked against ver again.
+- The recipe is read where the config root is mounted, the directory
+  the build snapshots: `-C` may name only that one. The snapshot is
+  `<config root>@build-F-<YYYYmmdd-HHMMSS>`, `shtetl:kind=config`,
+  and the version records it in two properties, `shtetl:config` (its
+  name) and `shtetl:config-guid` (PROPOSAL).
+- One build at a time: `shtetl:build=F` on the build root while it
+  runs (PROPOSAL).
+- The obj cache is mounted at `<run dir>/obj` and F at
+  `<run dir>/root`, its datasets below by inheritance, placeholders
+  not, by setting the mountpoints for the build and inheriting them
+  back after (PROPOSAL). The run directory is
+  `/var/db/shtetl/build/F`; it keeps the last build's log
+  (`build.log`), the kernel config and src.conf.
+- The kernel config shtetl writes is `<run dir>/<F in capitals>`:
+  an include of the config named (a name: the checkout's
+  `sys/<machine>/conf/<name>`, the machine uname(3)'s; a path: in the
+  configuration root), `ident <F in capitals>`, the lines. make gets
+  `KERNCONFDIR`, `KERNCONF`, `SRCCONF` and `-j` (`build.make_jobs`,
+  or the CPUs online), and `MAKEOBJDIRPREFIX` in its environment, the
+  only place make reads it.
+- Packages: `pkg -c <root> install -y`, with devfs mounted in F and,
+  where F has no resolv.conf, the host's copied in while pkg runs.
+  Commands: each piece `chroot <root> /bin/sh -e -c`, in order
+  (PROPOSAL).
+- The version is every dataset of F at once, with `shtetl:kind`,
+  `shtetl:commit` (`-m`, or "build <branch> at <commit>"),
+  `shtetl:config` and `shtetl:config-guid`.
+- Every step that changes something is recorded and undone on a
+  failure anywhere: mounts, mountpoints, the mark, and a new F's
+  datasets, which are destroyed. The config snapshot, the obj cache
+  and the log stay.
+
 ### 7.1.1 Patches
 
 Requested 2026-10-11. A foundation recipe may name patches for the src

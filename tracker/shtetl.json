@@ -137,7 +137,7 @@
     ],
     "provides": "A foundation built from its recipe into zlake, one version snapshot.",
     "estimated_size": "large",
-    "completed": "not-started"
+    "completed": "testing"
   },
   "m3-patches": {
     "description": "Patches and the pause (planning.md 7.1.1): the sources fetched into the run directory; *.patch in natural order; a snapshot of the src root before each; git apply, a patch already in skipped; anything else applied with --3way or --reject and the build paused, recorded on the src root and in the run directory; build F --continue (no conflict marker or .rej left; the fix written out as .fixed), --skip, --abort; the src root rolled back when the build ends; shtetl:patches on the version. Verify: MATRIX family P before tests, with a fake git; the box with real patches.",
