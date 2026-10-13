@@ -384,6 +384,13 @@ patches (its top when not given). A list of locations stands for
 `location = true` each. Sources apply in the order the recipe gives
 them, each one's `*.patch` files in natural order.
 
+At the build, after the checkout: a patch that applies is applied; one
+whose reverse applies is already in, and skipped; any other pauses the
+build before anything is built, its merge left in the src tree for a
+person, and `shtetl build F --continue` (once fixed), `--skip` or
+`--abort` takes it up. The version records the sources and what became
+of the patches in `shtetl:patches`. planning.md 7.1.1 has it whole.
+
 ### datasets
 
 The recipe's child datasets, created before anything is installed,

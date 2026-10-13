@@ -422,7 +422,9 @@ an altroot, bootstrapped by shtetl, the build root a shared clone of
 the box's /usr/src fetching from git.freebsd.org. It runs F13 (a
 fetch that fails, undone on real ZFS), then F11, F12, F16, F17 and
 F19 on a real build of releng/15.1, and logs each by its cell to
-tests/box/results/<host>-build-<time>.log. Not yet run.
+tests/box/results/<host>-build-<time>.log. Build 1 failed on a mount
+after a set (Z12); build 2 green (b12f0c2). Since, the build is P17's,
+paused at a patch and carried on.
 
 
 # Family P: patches and the pause (M3; planning.md 7.1.1; src/core/patch.c, src/core/build.c)
@@ -465,5 +467,5 @@ merges without conflict, no base to merge against}; the verb {build,
 | P14 | the record: shtetl:patches on every dataset of the version, each source with the commit it was fetched at, each patch in already, skipped or fixed by hand; none when there are no patches; a fix kept in the obj cache under patches/<version>/ | covered: check_build.c |
 | P15 | the end: the build root rolled back to @shtetl-patch-0 and every patch snapshot destroyed, after a build that succeeds and after one that fails after the patches | covered: check_build.c |
 | P16 | the plan shows each source, with its ref and dir | covered: check_build.c |
-| P17 | for real: git apply on a FreeBSD tree, ZFS snapshots and rollbacks of the build root; a patch that applies, one already in, one that conflicts, paused, fixed by the script, --continue, built | box: tests/box/build.sh |
+| P17 | for real: git apply on a FreeBSD tree, ZFS snapshots and rollbacks of the build root; a patch that applies, one already in, one that conflicts, paused, fixed by the script, --continue, built | box: tests/box/build.sh, the patches made on the box from the branch's own share/misc/bsd-family-tree; rehearsed on the mac against the file; not yet run |
 | P18 | the command line: build F --continue, --skip, --abort; usage errors | covered: run-cli.sh |

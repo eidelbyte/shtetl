@@ -207,3 +207,55 @@ buildworld, buildkernel and install into
 shbbuild/shtetl/foundations/box@15.1-releng-2026-10-13-e38a7085f3a8,
 with the undo, the version's properties and F19's altroot checked.
 tracker: m3-zfs and m3-build tested.
+
+## m3-patches (78d5fbd, 4030885, 46a565d, 8d8645b)
+
+A foundation's patches and the pause (planning.md 7.1.1), in four
+commits: the pieces alone (src/core/patch.c, family P written first),
+the patches applied in the build, the pause with its three verbs, and
+the box's P17.
+
+- **The pieces** (78d5fbd): natural order; a source as git fetches
+  it; a directory's .patch files; the files a patch touches, from git
+  apply --numstat -z; what a fix leaves; the pause record.
+- **Applied** (4030885): the fetch into `<run dir>/patches/<n>`, the
+  list fixed there; @shtetl-patch-0 after the checkout and one before
+  each patch; applied, or already in when its reverse applies; the
+  build root rolled back at the end, success or failure, after the
+  version is taken; shtetl:patches on the version.
+- **The pause** (46a565d): the tree staged and written as the fix's
+  base; --3way, or --reject where that neither merged nor left a
+  marker; paused.conf, exit 3. --continue and --skip read the record
+  and the recipe from the config snapshot's .zfs/snapshot directory;
+  --continue checks for markers and .rej files and writes the fix as
+  a git diff; --skip rolls back to the patch's snapshot; --abort
+  walks F's datasets to destroy them, needing no recipe.
+- **The box** (8d8645b): patches made on the box from the branch's
+  own share/misc/bsd-family-tree, so they always fit what is built.
+
+Decisions beyond the plan, marked PROPOSAL in 7.1.1's "As built": a
+merge without conflict pauses too (nothing merges unseen); a conflict
+marker is seven <, | or > and a space or the line's end, not =======
+alone; the record is UCL; exit 3 for a pause; the shtetl:patches
+format. Divergence: --abort keeps the log, as every build does since
+7.1's as-built, where the plan said the run directory goes.
+
+Also decided in the code: a resume that fails taking the pause up
+(the config snapshot gone, the fix not written) leaves it paused, so
+the person's work in the tree is never undone by an error of ours;
+only a failure after the patches undoes the run.
+
+Verification: check_patch 55 checks; check_build 489, family P over
+real git with file:// sources, a branch, a tag and a commit, and the
+fake ZFS's snapshots of the build root carried out on the scratch
+tree by zfake_hook; mutations seen to fail (the resume reading the
+live root instead of the snapshot); run-cli.sh P18; make check, gate,
+xcheck. P17 rehearsed on the mac against the real file. Pending: the
+box (P17 inside build.sh's real build). tracker: m3-patches testing.
+
+Gotchas: patchworld() makes the patch repository anew each time, so
+its commits change: read a commit after making it, not before. git
+apply --3way implies --index, which refuses a file whose working copy
+differs from the index; earlier patches are applied to the working
+tree only, so the tree is staged before the merge. A test that builds
+twice in one call (a debug line, say) meets "foundation exists".

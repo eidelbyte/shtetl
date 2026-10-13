@@ -710,7 +710,7 @@ F is named after its recipe (6.1): `foundations/generic.conf` builds
 8. Unmount foundation-builds/F; roll the src root back to before the
    patches (7.1.1) and unmount it.
 
-As built (M3, `src/core/build.c`; patches and updates to come):
+As built (M3, `src/core/build.c`; patches in 7.1.1; updates to come):
 
     shtetl build [-y] [-m msg] F
 
@@ -847,6 +847,44 @@ directory goes when the build ends. A patched tree is uncommitted
 changes to the checkout, so the build's version string says
 `<sha>-dirty` (newvers.sh). That is kept (ruled 2026-10-11, Q-R): it
 names the real FreeBSD commit and shows that patches went in.
+
+As built (M3, `src/core/patch.c`, `src/core/build.c`):
+
+    shtetl build F [--continue | --skip | --abort]
+
+- The fetch: source n into `<run dir>/patches/<n>`, a git source by
+  `git init` and `git fetch --depth 1 <url> <ref>` (the remote's HEAD
+  without a ref), checked out, its commit noted; a directory of the
+  configuration root's by its `*.patch` files copied. The list is
+  read from there, so a resumed build applies what it began with.
+- Natural order: runs of digits compare as numbers, the rest byte by
+  byte, names equal so far by their bytes. Only regular files ending
+  `.patch` at the top count; hidden files are left out.
+- The pause: the tree is staged (`git add -A`) and written as a git
+  tree, the base of the fix; then `git apply --3way`, or, where that
+  leaves no conflict marker and did not merge, `git apply --reject`.
+  A merge without conflict pauses all the same, for a person to look
+  over: nothing merges unseen (PROPOSAL). The record is
+  `<run dir>/paused.conf`, UCL read with shtetl's own parse (PROPOSAL);
+  shtetl exits 3 (PROPOSAL). A build while one is paused is refused,
+  saying so.
+- `--continue` and `--skip` read the record and the recipe from the
+  config snapshot the build began with, `<config root>/.zfs/snapshot/
+  <name>`, so a recipe changed meanwhile is not what gets built. A
+  failure taking the pause up leaves it paused.
+- `--continue` is refused while a file the patch touches (`git apply
+  --numstat`) holds a line of seven `<`, `|` or `>` and a space or its
+  end, or has a `.rej` beside it (PROPOSAL; `=======` alone is too
+  common to tell). The fix is `git diff --binary` from the base to the
+  tree, everything added (a stray file goes in with it), written to
+  `<run dir>/fixed/<n>/<name>` and kept in the obj cache as
+  `patches/<version>/<n>/<name>`.
+- `--abort` needs no recipe: F's datasets are walked and destroyed.
+  The log stays, as it does after any build (7.1 as built), where the
+  plan above said the run directory goes.
+- `shtetl:patches` (PROPOSAL): `<location>[@<commit>][: <name>
+  <already|skipped|fixed>, ...]`, the sources joined by `; `; not set
+  when the recipe has no patches.
 
 ### 7.2 Update foundation F
 
