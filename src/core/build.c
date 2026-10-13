@@ -610,6 +610,7 @@ struct fb {
 	char			fb_version[SH_VERSION_MAX];
 	char			fb_cfgsnap[SH_BUILD_NAME + 64];
 	char			fb_cfgguid[64];
+	char			fb_rev[32];	/* REVISION, N.M */
 	struct sh_pause		fb_pz;		/* the patches, so far */
 	struct fb_pa		*fb_pa;
 	size_t			fb_npa;
@@ -1027,21 +1028,18 @@ fb_snapname(void *arg, const char *snap)
 }
 
 /*
- * REVISION, asked of the checkout's newvers.sh and checked against
- * ver, and the version's name.
+ * REVISION, asked of the checkout's newvers.sh, into *MAJOR, *MINOR
+ * and the run's fb_rev, which the version records.
  */
 static int
-fb_version(struct fb *b, time_t now)
+fb_revision(struct fb *b, long *major, long *minor)
 {
-	struct sh_fplan *p = b->fb_p;
-	char path[SH_BUILD_PATH], **have, *out;
+	char path[SH_BUILD_PATH], *out;
 	const char *w[5];
-	long major, minor;
-	size_t n;
 	int r;
 
 	(void) snprintf(path, sizeof (path), "%s/sys/conf/newvers.sh",
-	    p->fp_srcdir);
+	    b->fb_p->fp_srcdir);
 	w[0] = b->fb_t->tl_sh;
 	w[1] = path;
 	w[2] = "-V";
@@ -1049,9 +1047,29 @@ fb_version(struct fb *b, time_t now)
 	w[4] = NULL;
 	if (fb_exec(b, w, NULL, FB_CAP, &out, 0) != 0)
 		return (-1);
-	r = sh_version_revision(out != NULL ? out : "", &major, &minor,
+	r = sh_version_revision(out != NULL ? out : "", major, minor,
 	    b->fb_err);
 	free(out);
+	if (r == 0)
+		(void) snprintf(b->fb_rev, sizeof (b->fb_rev), "%ld.%ld",
+		    *major, *minor);
+	return (r);
+}
+
+/*
+ * REVISION, asked of the checkout's newvers.sh and checked against
+ * ver, and the version's name.
+ */
+static int
+fb_version(struct fb *b, time_t now)
+{
+	struct sh_fplan *p = b->fb_p;
+	char **have;
+	long major, minor;
+	size_t n;
+	int r;
+
+	r = fb_revision(b, &major, &minor);
 	if (r != 0 || sh_version_check(major, minor,
 	    sh_obj_get(p->fp_recipe.sr_merged, "ver"), p->fp_recipe.sr_file,
 	    b->fb_err) != 0)
@@ -1570,6 +1588,7 @@ fb_resume(struct fb *b)
 	struct sh_fplan *p = b->fb_p;
 	struct sh_pause *pz = &p->fp_pause;
 	char snap[SH_BUILD_NAME + 32];
+	long major, minor;
 	size_t i, at;
 
 	(void) snprintf(b->fb_log, sizeof (b->fb_log), "%s/build.log",
@@ -1581,6 +1600,8 @@ fb_resume(struct fb *b)
 	(void) snprintf(b->fb_version, sizeof (b->fb_version), "%s",
 	    pz->pz_version);
 	(void) snprintf(b->fb_sha, sizeof (b->fb_sha), "%s", pz->pz_sha);
+	if (fb_revision(b, &major, &minor) != 0)
+		return (-1);
 	if (b->fb_msg == NULL && pz->pz_msg[0] != '\0')
 		b->fb_msg = pz->pz_msg;
 	if (sh_zfs_get(b->fb_z, b->fb_cfgsnap, "guid", b->fb_cfgguid,
@@ -2593,7 +2614,7 @@ static int
 fb_snapshot(struct fb *b, const char *msg, const char *kind)
 {
 	struct sh_fplan *p = b->fb_p;
-	struct sh_zprop zp[5];
+	struct sh_zprop zp[6];
 	char names[SH_BUILD_DS][SH_BUILD_NAME + SH_VERSION_MAX + 2];
 	const char *np[SH_BUILD_DS];
 	char deflt[256], *rec;
@@ -2614,6 +2635,10 @@ fb_snapshot(struct fb *b, const char *msg, const char *kind)
 	zp[3].zp_name = "shtetl:config-guid";
 	zp[3].zp_value = b->fb_cfgguid;
 	nzp = 4;
+	if (b->fb_rev[0] != '\0') {
+		zp[nzp].zp_name = "shtetl:revision";
+		zp[nzp++].zp_value = b->fb_rev;
+	}
 	rec = NULL;
 	if (b->fb_pz.pz_nsrc > 0 || b->fb_prec[0] != '\0') {
 		if ((rec = b->fb_prec[0] != '\0' ? strdup(b->fb_prec) :
@@ -2621,9 +2646,8 @@ fb_snapshot(struct fb *b, const char *msg, const char *kind)
 			sh_err_nomem(b->fb_err);
 			return (-1);
 		}
-		zp[4].zp_name = "shtetl:patches";
-		zp[4].zp_value = rec;
-		nzp = 5;
+		zp[nzp].zp_name = "shtetl:patches";
+		zp[nzp++].zp_value = rec;
 	}
 	for (i = 0; i < p->fp_nds; i++) {
 		(void) snprintf(names[i], sizeof (names[i]), "%s@%s",
@@ -2846,10 +2870,14 @@ sh_pkg_run(struct sh_zfs *z, struct sh_fplan *p,
 	    sh_zfs_get(z, snap, "shtetl:config-guid", b->fb_cfgguid,
 	    sizeof (b->fb_cfgguid), NULL, e) != 0 ||
 	    sh_zfs_get(z, snap, "shtetl:patches", b->fb_prec,
-	    sizeof (b->fb_prec), NULL, e) != 0)
+	    sizeof (b->fb_prec), NULL, e) != 0 ||
+	    sh_zfs_get(z, snap, "shtetl:revision", b->fb_rev,
+	    sizeof (b->fb_rev), NULL, e) != 0)
 		goto out;
 	if (strcmp(b->fb_prec, "-") == 0)
 		b->fb_prec[0] = '\0';
+	if (strcmp(b->fb_rev, "-") == 0)
+		b->fb_rev[0] = '\0';
 	if ((fd = open(b->fb_log, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC,
 	    0644)) == -1) {
 		sh_errf(e, "%s: %s", b->fb_log, strerror(errno));

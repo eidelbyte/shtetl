@@ -527,6 +527,7 @@ test_run(void)
 	CHECK(is(prop(F "/var@" VERSION, "shtetl:kind", NULL), "version"));
 	CHECK(is(prop(F "@" VERSION, "shtetl:commit", NULL),
 	    "build releng/15.1 at 0f691888dc56"));
+	CHECK(is(prop(F "/var@" VERSION, "shtetl:revision", NULL), "15.1"));
 	CHECK(is(prop(F "@" VERSION, "shtetl:config", NULL),
 	    "tank/zconfig@build-generic-20261008-120000"));
 	(void) snprintf(guid, sizeof (guid), "%s",
@@ -923,6 +924,8 @@ test_pkgup(void)
 	CHECK(is(prop(F "@" VERSION "-pkg", "shtetl:config", NULL),
 	    prop(F "@" VERSION, "shtetl:config", NULL)));
 	CHECK(is(prop(F "@" VERSION "-pkg", "shtetl:patches", NULL), "-"));
+	CHECK(is(prop(F "@" VERSION "-pkg", "shtetl:revision", NULL),
+	    "15.1"));
 	CHECK(is(prop(F, "mounted", NULL), "no"));
 	CHECK(is(prop(F "/usr/local", "mounted", NULL), "no"));
 	CHECK(is(prop(F "/usr", "mounted", NULL), "no"));
@@ -1381,6 +1384,8 @@ test_pause(void)
 	/* P14: the record, and the fixes kept in the obj cache */
 	CHECK(is(prop(F "@" VERSION, "shtetl:patches", NULL),
 	    "patches/pause: 2-x4.patch fixed, 3-l1.patch fixed"));
+	/* a resumed build's REVISION asked again, recorded */
+	CHECK(is(prop(F "@" VERSION, "shtetl:revision", NULL), "15.1"));
 	(void) snprintf(text, sizeof (text), "obj/patches/%s/1/3-l1.patch",
 	    VERSION);
 	CHECK(inrun(text));
