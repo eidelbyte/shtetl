@@ -398,6 +398,9 @@ EOF
 	    "$([ -x "$_r/bin/sh" ] && echo yes)" yes
 	check F19 "the kernel (installkernel)" \
 	    "$([ -f "$_r/boot/kernel/kernel" ] && echo yes)" yes
+	# a module, and its object, for F27 to find kept
+	_ko=$(ls "$_r/boot/kernel" | grep '\.ko$' | head -1)
+	_ino=$(ls -i "$_r/boot/kernel/$_ko" | awk '{ print $1 }')
 	check F19 "/etc (distribution)" \
 	    "$([ -f "$_r/etc/rc" ] && echo yes)" yes
 	check F11 "the command ran in F" "$(cat "$_r/etc/motd.template")" \
@@ -444,6 +447,7 @@ EOF
 	has F27 "installworld's backups removed: init's" "$T/out" \
 	    "sbin/init.bak"
 	has F27 "and rtld's" "$T/out" "libexec/ld-elf.so.1.old"
+	has F27 "the kernel synced into F" "$T/out" "kernel into $F: "
 	_v2=$(zfs list -H -t snapshot -o name -s createtxg $F | tail -1)
 	_v2=${_v2#*@}
 	echo "# version $_v2"
@@ -468,6 +472,8 @@ EOF
 	    "$(ls "$_r/libexec" | grep -c '^ld-elf.*\.so\.1\.old$')" 0
 	check F27 "no init.bak" \
 	    "$([ -e "$_r/sbin/init.bak" ] && echo there)" ""
+	check F27 "an unchanged module keeps its object ($_ko)" \
+	    "$(ls -i "$_r/boot/kernel/$_ko" | awk '{ print $1 }')" "$_ino"
 	check F27 "the changed init installed" \
 	    "$(grep -ac 'shtetl box' "$_r/sbin/init")" 1
 	check F27 "the new tree installed: one patch line now" \
