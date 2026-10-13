@@ -374,7 +374,7 @@ snapshots}; ZFS refusing.
 | Z8 | inherit: the local value gone, the inherited one back | covered: check_zfs.c |
 | Z9 | unmount after mount | covered: check_zfs.c |
 | Z10 | each call refused when ZFS refuses, with ZFS's reason | covered: check_zfs.c |
-| Z11 | the same cells against libzfs on real pools | deferred: the M3 box run (tests/box), which the build's box cases need anyway |
+| Z11 | the same cells against libzfs on real pools | box: tests/box/zcheck.c, run by tests/box/run.sh; not yet run |
 
 # Family F: building a foundation (M3; planning.md 7.1; src/core/build.c)
 

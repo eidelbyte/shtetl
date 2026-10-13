@@ -29,7 +29,7 @@ ZFS="-I$ZT/lib/libspl/include/os/freebsd -I$ZT/lib/libspl/include \
 -DNEED_SOLARIS_BOOLEAN -DHAVE_ISSETUGID -DHAVE_STRLCAT -DHAVE_STRLCPY"
 UCL="-I$F/contrib/libucl/include"
 rc=0
-for f in src/main.c src/core/*.c src/fbsd/*.c; do
+for f in src/main.c src/core/*.c src/fbsd/*.c tests/box/zcheck.c; do
 	extra=""
 	case "$f" in
 	src/fbsd/*) extra="$ZFS" ;;

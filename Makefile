@@ -104,9 +104,11 @@ flavor:
 shtetl: build $(SHTETL_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(SHTETL_OBJS) $(LDFLAGS) $(UCL_LIBS)
 
+# tests/box/run.sh's programs come with it: box_zcheck, the Z cells
+# against libzfs.
 freebsd:
 	$(MAKE) FLAVOR=freebsd UCL=port CFLAGS="$(CFLAGS) -DSH_FREEBSD" \
-	    LDFLAGS="$(LDFLAGS) $(ZFS_LIBS)" all
+	    LDFLAGS="$(LDFLAGS) $(ZFS_LIBS)" all $(BUILD)/box_zcheck
 
 check-freebsd:
 	$(MAKE) FLAVOR=freebsd UCL=port CFLAGS="$(CFLAGS) -DSH_FREEBSD" \
@@ -162,6 +164,9 @@ $(BUILD)/zstub.o: src/core/zstub.c src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/zstub.c
 $(BUILD)/fbsd_zfs.o: src/fbsd/zfs.c src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) $(ZFS_CFLAGS) -c -o $@ src/fbsd/zfs.c
+$(BUILD)/box_zcheck: tests/box/zcheck.c $(BUILD)/err.o $(BUILD)/fbsd_zfs.o
+	$(CC) $(CFLAGS) -o $@ tests/box/zcheck.c $(BUILD)/err.o \
+	    $(BUILD)/fbsd_zfs.o $(LDFLAGS)
 $(BUILD)/zfake.o: tests/zfake.c tests/zfake.h src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ tests/zfake.c
 

@@ -1,7 +1,8 @@
 #!/bin/sh
 # M2 on real pools: shtetl spaces, config show and bootstrap as the
 # freebsd build runs them, against two pools on memory disks: the box
-# column of tests/MATRIX.md families D and B.
+# column of tests/MATRIX.md families D and B; and Z11, the ZFS calls of
+# M3 against libzfs (build/box_zcheck, made by make freebsd).
 #
 # usage: make freebsd && sudo sh tests/box/run.sh
 #        sudo sh tests/box/run.sh --clean     what a crash left, removed
@@ -266,6 +267,24 @@ cases() {
 	check D5 "exit" "$RC" 1
 	has D5 "the refusal" "$T/err" "two config roots"
 	zfs inherit shtetl:space $P2/c2
+
+	echo "== Z11: the ZFS calls of M3 against libzfs"
+	if [ -x build/box_zcheck ]; then
+		zfs create $P1/zc
+		build/box_zcheck $P1/zc >"$T/out" 2>"$T/err"
+		_zrc=$?
+		while read -r _l; do
+			case "$_l" in
+			"ok "*) ok "${_l#ok   }" ;;
+			*) no "${_l#FAIL }" ;;
+			esac
+		done <"$T/out"
+		check Z11 "box_zcheck's exit" "$_zrc" 0
+		[ -s "$T/err" ] && sed 's/^/    /' "$T/err"
+		zfs destroy -r $P1/zc
+	else
+		no "Z11: no build/box_zcheck: make freebsd"
+	fi
 
 	echo "== $pass ok, $fail failed"
 	[ "$fail" = 0 ]
