@@ -84,6 +84,9 @@ ZFS_OBJS_portable = $(BUILD)/zstub.o
 ZFS_OBJS_freebsd = $(BUILD)/fbsd_zfs.o
 ZFS_OBJS = $(ZFS_OBJS_$(FLAVOR))
 TEST_OBJS = $(BUILD)/zfake.o
+# tests/box/zcheck.c's objects besides the ZFS it checks. make check
+# links it against the stub, so a missing one shows on the mac.
+BOX_OBJS = $(BUILD)/err.o $(BUILD)/tree.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(ZFS_OBJS) $(UCL_OBJS)
 TESTS = check_parse check_schema check_site check_cascade check_show \
 	check_run check_spaces check_boot check_version check_zfs \
@@ -97,7 +100,7 @@ build: flavor
 flavor:
 	@mkdir -p $(BUILD)/ucl; \
 	if [ "$$(cat $(BUILD)/.flavor 2>/dev/null)" != "$(FLAVOR)" ]; then \
-	    rm -f $(BUILD)/*.o $(BUILD)/ucl/*.o shtetl; \
+	    rm -f $(BUILD)/*.o $(BUILD)/ucl/*.o shtetl $(BUILD)/box_zcheck; \
 	    echo "$(FLAVOR)" > $(BUILD)/.flavor; \
 	fi
 
@@ -164,9 +167,9 @@ $(BUILD)/zstub.o: src/core/zstub.c src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/zstub.c
 $(BUILD)/fbsd_zfs.o: src/fbsd/zfs.c src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) $(ZFS_CFLAGS) -c -o $@ src/fbsd/zfs.c
-$(BUILD)/box_zcheck: tests/box/zcheck.c $(BUILD)/err.o $(BUILD)/fbsd_zfs.o
-	$(CC) $(CFLAGS) -o $@ tests/box/zcheck.c $(BUILD)/err.o \
-	    $(BUILD)/fbsd_zfs.o $(LDFLAGS)
+$(BUILD)/box_zcheck: tests/box/zcheck.c $(BOX_OBJS) $(ZFS_OBJS)
+	$(CC) $(CFLAGS) -o $@ tests/box/zcheck.c $(BOX_OBJS) $(ZFS_OBJS) \
+	    $(LDFLAGS)
 $(BUILD)/zfake.o: tests/zfake.c tests/zfake.h src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ tests/zfake.c
 
@@ -202,8 +205,9 @@ $(BUILD)/ucl/ucl_util.o:
 # the core and run), then the command line end to end
 # (tests/run-cli.sh), then the examples of docs/configuration.md
 # (tools/doccheck.py; skipped, and said so, where there is no
-# python3). Everything here runs on the mac.
-check: unit cli doc
+# python3), then the link of tests/box/run.sh's box_zcheck.
+# Everything here runs on the mac.
+check: unit cli doc boxlink
 
 unit: build $(CORE_OBJS) $(TEST_OBJS) $(UCL_OBJS)
 	@for t in $(TESTS); do \
@@ -223,6 +227,9 @@ doc: shtetl
 	    echo "doc: no python3: docs/configuration.md not checked"; \
 	fi
 
+boxlink: build $(BUILD)/box_zcheck
+	@echo "ok   box_zcheck links"
+
 gate:
 	sh tools/gate.sh
 
@@ -234,5 +241,5 @@ xcheck:
 clean:
 	rm -rf $(BUILD) shtetl
 
-.PHONY: all build flavor freebsd check check-freebsd unit cli doc gate \
-	xcheck clean
+.PHONY: all build flavor freebsd check check-freebsd unit cli doc boxlink \
+	gate xcheck clean
