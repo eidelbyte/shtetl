@@ -4,7 +4,8 @@
 # and P (P17: patches made from the branch's own tree, one already in,
 # one applied, one that conflicts and pauses the build, fixed here and
 # carried on into the build); then F27, box built again, an update
-# over the first, on the obj cache the first left.
+# over the first, on the obj cache the first left; and F33, its
+# packages upgraded, the update's -pkg.
 # A buildworld and buildkernel take hours the first time; nothing here
 # asks anything, so start it and leave it.
 #
@@ -458,6 +459,23 @@ EOF
 		zfs unmount "$_d"
 	done
 	zfs inherit mountpoint $F
+
+	echo "== F33: pkg-upgrade box"
+	sht pkg-upgrade -y box
+	sed 's/^/    /' "$T/out"
+	check F33 "exit" "$RC" 0
+	[ "$RC" = 0 ] || sed 's/^/    /' "$T/err"
+	check F33 "the -pkg of the update's version" \
+	    "$(zfs list -H -t snapshot -o name -s createtxg $F | tail -1)" \
+	    "$F@$_v2-pkg"
+	check F33 "shtetl:kind pkg, on every dataset" \
+	    "$(zfs get -H -o value -r -t snapshot shtetl:kind $F |
+	    grep -c '^pkg$')" 5
+	check F33 "the version's config carried over" \
+	    "$(prop "$F@$_v2-pkg" shtetl:config)" \
+	    "$(prop "$F@$_v2" shtetl:config)"
+	check F33 "F unmounted, the mark cleared" \
+	    "$(prop $F mounted) $(srcof $P/zbuild shtetl:build)" "no -"
 
 	echo "== $pass ok, $fail failed"
 	[ "$fail" = 0 ]
