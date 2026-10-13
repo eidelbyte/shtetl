@@ -64,3 +64,32 @@ Verification: check_beam 160 checks (M1 - M6), run-cli.sh M7, make
 check, gate, xcheck. The box: build.sh bootstraps a run root and ends
 with M8, box beamed whole and then incrementally. tracker: m4-beam
 testing.
+
+## m4-save
+
+shtetl save [-m msg] X (planning.md 7.5, 6.2, 7.10), src/core/save.c;
+the message from an editor, src/core/edit.c.
+
+- The plan walks X's datasets, each a clone of a zrun foundation's
+  version (its origin under the run root's foundations) or X's own;
+  anything else is refused for now. shtetl:config: create's config
+  snapshot for the first save, X's newest save's after (PROPOSAL).
+- The save is one snapshot of every dataset (sh_zfs_snapshot), named
+  by the UTC second, -2 and on after another in it.
+- The mirror, parents first: a first save of a cloned dataset is a
+  clone stream from its zrun origin, received as a clone of zlake's
+  counterpart (the run root's foundations path swapped for the lake
+  root's); X's own whole; a later one from the dataset's own newest
+  mirrored save, so a mirror cut short heals at the next save.
+  sh_shtetl_copy (beam's 6.2 copy, made public) after each.
+- The editor: sh_run gives every child /dev/null on stdin, which an
+  editor cannot use, so edit.c forks one on the terminal itself, as
+  system(3) does, SIGINT and SIGQUIT ignored while it runs.
+
+Verification: check_save 130 checks (S1 - S7, the foundation beamed
+by beam itself), run-cli.sh S8, make check, gate, xcheck. S9, the box,
+comes with create, which makes the first save. tracker: m4-save
+testing.
+
+Gotcha: a fake editor written as printf '%s' 'text' keeps \n
+literal; the text must be printf's format.

@@ -1073,6 +1073,25 @@ As built (M4, `src/core/beam.c`):
    are copied onto zlake's snapshot (6.2).
 3. Prune by retention (6.3).
 
+As built (M4, `src/core/save.c`, `src/core/edit.c`):
+
+    shtetl save [-m msg] X
+
+- The snapshot is `save-<YYYY-mm-dd>-<HHMMSS>` (UTC; `-2` and on for
+  another in the same second), every dataset of X at once. Its
+  `shtetl:config` is the config snapshot X was made with (PROPOSAL):
+  create's for the first save, carried from X's newest save after.
+- Without `-m`, the message is written in an editor as git commit
+  takes one: `$VISUAL`, `$EDITOR` or `vi`, run by `/bin/sh` on a file
+  whose `#` lines say what it is for; those lines and blank lines at
+  either end are left out, and an empty message saves nothing.
+- A dataset of X is a clone of a foundation's version on zrun, or X's
+  own; a clone of anything else is refused (M5's staging will widen
+  this).
+- A mirror that fails leaves the save taken and says so; the next
+  save brings every dataset's mirror up to it, each from its own
+  newest mirrored save (PROPOSAL). Prune is M7's.
+
 ### 7.6 Update X onto F@v2 (into staging)
 
 `shtetl update X [--to V]`. The target is F's newest version, or V,

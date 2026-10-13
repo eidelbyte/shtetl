@@ -268,7 +268,7 @@
     ],
     "provides": "Saves with messages on zrun, mirrored in zlake as deltas.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing"
   },
   "m4-create": {
     "description": "shtetl create X --on F [--version V] (planning.md 7.4): the checks (X's ver allows the version, its datasets do not collide with F's); the version beamed if not on zrun; a clone per dataset of F@v parent first, a placeholder -o canmount=off, the recipe's properties set locally; X's own datasets; the jail block written and the jail started; pkg -j X install and the commands, a piece the foundation ran as of its shtetl:config left out; the first save. The jail's particulars (where its block lives, what it holds, how commands run in it, requires) are PROPOSALs. Verify: MATRIX family X; the box.",
