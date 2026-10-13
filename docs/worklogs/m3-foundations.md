@@ -71,3 +71,41 @@ Gotcha, mine, twice now: a command chain that runs the gate and then
 commits with `;` commits whatever the gate says. 901975c was amended
 before the push for a long line. Chain the commit behind
 `grep -q 'gate: clean' &&`.
+
+## m3-build (fb5b00f, the plan; 613f066, the run)
+
+shtetl build F for a new foundation (7.1, without patches), in
+src/core/build.c: a plan made and checked in full, shown, confirmed,
+then run with every change recorded for undoing.
+
+- **The plan checks everything first**: the target, the lake, build
+  and config roots, the recipe, src_branch against ver, the build
+  root mounted and free, no F yet. F's datasets come out parents
+  first, a placeholder for each parent the recipe does not name.
+- **The recipe is read where the config root is mounted**, the
+  directory the build snapshots and records, so the record is what
+  was built from; -C may name only that directory.
+- **The undo list.** Each step that changes something pushes how to
+  undo it; on success the steps undo what they must (mounts,
+  mountpoints, the mark) and forget what only a failure undoes (F's
+  datasets). A failure anywhere unwinds all of it, newest first. The
+  config snapshot, the obj cache (a partial build is worth keeping)
+  and the log stay.
+- **Mounting by mountpoint**: the obj cache and F get mountpoints
+  below the run directory for the build and inherit them back after;
+  F's datasets follow by inheritance, placeholders are not mounted.
+- **make's environment**: MAKEOBJDIRPREFIX is read from the
+  environment only, so make gets PATH and it, nothing else.
+- **The choices marked PROPOSAL** are in planning.md 7.1's "As built":
+  the config snapshot's name and the two properties recording it, the
+  build mark, the mount paths, the kernel config's ident, pkg -c with
+  devfs and the host's resolv.conf while pkg runs.
+
+Verification: check_build, 246 checks (F1 - F17); run-cli.sh for F18;
+the run over scripts standing in for git, make, pkg, chroot, mount
+and umount, a real newvers.sh in a fake checkout. make check, gate,
+xcheck. Not yet: a real build on the box (tracker: m3-build testing).
+
+Gotcha: tests/check.h's scratch_path returns one static buffer. Two
+calls in one argument list give the same path twice; copy each before
+the next. It cost the run's test a long look.
