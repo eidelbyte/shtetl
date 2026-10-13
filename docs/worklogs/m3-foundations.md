@@ -461,3 +461,11 @@ update (with init.c and rtld.c); the update's backups made and
 removed; the kernel's 1715 files kept. Started from nothing, this run
 cannot show the stale object gone: that is the next run's, from the
 kept store, where build 6 failed.
+
+## Box build 8 (b6baf3a): the stale object gone
+
+From the kept store, as build 6 was: 64 ok, 0 failed. F27's backups
+were made and removed this time: the first build, without the init
+patch, rebuilt init from the init.c whose time build 7 had set to now,
+so F had the plain init and the update's patched one differed. The
+fix of 8b27e68 holds where the bug showed. M3 stands done.
