@@ -1,0 +1,76 @@
+shtetl box build 2026-10-13T10:17:40Z on KIDON, 15.1-RELEASE-p2, zfs-2.4.2-1-FreeBSD_g6330a45b0, shtetl 2f0e789, releng/15.1
+== the checkout: /usr/src cloned, shared; origin https://git.freebsd.org/src.git
+== bootstrap: lake, config, build
+# shtetl bootstrap -y --lake shbbuild/shtetl --config shbbuild/zconfig --build shbbuild/zbuild -> 0
+ok   B10 bootstrap
+== F13: a build that fails at the fetch, undone
+# shtetl build -y nope -> 1
+ok   F13 exit
+ok   F13 the refusal
+ok   F13 F's datasets gone
+ok   F13 the build root's mark cleared
+ok   F13 the config snapshot kept
+ok   F13 the obj cache kept, unmounted
+== F11, F19: build box, for real (hours)
+# shtetl build -y box -> 0
+# 30 minutes
+    foundation box, new, from releng/15.1
+      version 15.1-releng-<day>-<commit>
+      + shbbuild/shtetl/foundations/box
+      + shbbuild/shtetl/foundations/box/tmp
+      + shbbuild/shtetl/foundations/box/var
+      + shbbuild/shtetl/foundations/box/usr  canmount=off
+      + shbbuild/shtetl/foundations/box/usr/local
+      + shbbuild/shtetl/foundation-builds/box
+      checkout releng/15.1 in shbbuild/zbuild (/var/tmp/shtetl-boxbuild/alt/zbuild)
+      kernel GENERIC
+      src.conf from 1 file
+      make -j<hw.ncpu> buildworld buildkernel
+      install world, kernel and distribution (install -C)
+      pkg: none
+      commands: motd
+      snapshot -r shbbuild/shtetl/foundations/box@<version>
+    snapshot shbbuild/zconfig@build-box-20261013-101746
+    made shbbuild/shtetl/foundations/box
+    made shbbuild/shtetl/foundations/box/tmp
+    made shbbuild/shtetl/foundations/box/var
+    made shbbuild/shtetl/foundations/box/usr
+    made shbbuild/shtetl/foundations/box/usr/local
+    made shbbuild/shtetl/foundation-builds/box
+    checkout releng/15.1 at e38a7085f3a8
+    version 15.1-releng-2026-10-13-e38a7085f3a8 (REVISION 15.1)
+    wrote /var/db/shtetl/build/box/BOX, /var/db/shtetl/build/box/src.conf
+    mounted shbbuild/shtetl/foundation-builds/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/obj, shbbuild/shtetl/foundations/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/root
+    make buildworld buildkernel (log /var/db/shtetl/build/box/build.log)
+    make installworld (log /var/db/shtetl/build/box/build.log)
+    make installkernel (log /var/db/shtetl/build/box/build.log)
+    make distribution (log /var/db/shtetl/build/box/build.log)
+    commands motd, from foundations/box.conf
+    snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-13-e38a7085f3a8
+    built shbbuild/shtetl/foundations/box@15.1-releng-2026-10-13-e38a7085f3a8
+ok   F11 exit
+# version 15.1-releng-2026-10-13-e38a7085f3a8
+ok   F12 the version's name
+ok   F11 every dataset snapshotted
+ok   F11 shtetl:kind
+ok   F11 shtetl:config names the config snapshot
+ok   F11 shtetl:config-guid is its guid
+ok   F17 shtetl:commit, the build's own
+ok   F11 the placeholder
+ok   F11 F unmounted
+ok   F11 its mountpoint back
+ok   F11 the obj cache unmounted
+ok   F11 the build root's mark cleared
+== what was built, mounted for a look
+cannot mount 'shbbuild/shtetl/foundations/box': filesystem already mounted
+cannot mount 'shbbuild/shtetl/foundations/box/tmp': filesystem already mounted
+cannot mount 'shbbuild/shtetl/foundations/box/var': filesystem already mounted
+cannot mount 'shbbuild/shtetl/foundations/box/usr/local': filesystem already mounted
+ok   F19 the world went into F (installworld)
+ok   F19 the kernel (installkernel)
+ok   F19 /etc (distribution)
+ok   F11 the command ran in F
+ok   F16 the kernel's ident, BOX
+ok   F11 usr/local is its own dataset
+ok   F11 the run's log kept
+== 26 ok, 0 failed
