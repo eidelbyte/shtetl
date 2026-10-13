@@ -231,9 +231,9 @@ Upstream ships `shtetl.conf` with the default recipe in it
 (`ver = ">=15.1"`, `kernconf = "GENERIC"`; 5.4), and the site
 writes its settings beside it (5.2). It is tracked, so the site's
 changes to it are local changes git keeps: a pull that brings an
-upstream change to it stops until they are settled. Until the
-zshtetl-recipes repository exists, its seed lives in shtetl's own
-repository, `shtetl-recipes/`: the shipped `shtetl.conf`, the
+upstream change to it stops until they are settled. The recipes are
+a git repository of their own (ruled 2026-10-14), split out of
+shtetl's tree with their history: the shipped `shtetl.conf`, the
 `.gitignore` and a README.
 
 A hazard, tested 2026-10-09 with git on the mac: git treats ignored
@@ -1570,6 +1570,13 @@ below that change the plan are folded into the sections named.
 
 ## 14. Rulings
 
+### 2026-10-14 (the recipes, a repository of their own)
+
+"fyi, shtetl-recipes should be a new git repo, not a sub-dir of this
+repo". So (4.4): the seed that was `shtetl-recipes/` in shtetl's tree
+is a repository of its own, its history kept (git subtree split), and
+shtetl's tree no longer holds it.
+
 ### 2026-10-14 (the kernel through a scratch directory)
 
 Told that installkernel removes a foundation's `/boot/kernel` before
@@ -1712,8 +1719,8 @@ no built-in recipe under it; it holds any kind's keys and each recipe
 takes those of its kind; what would be a redefinition of its values
 (a one-value key, a derivation, a field, a dataset's property) is an
 override; what stacks stacks with it. `buildopts_file` is gone. Its
-seed, with `ver = ">=15.1"` and `kernconf_file = "GENERIC"`, is in
-`shtetl-recipes/` (4.4).
+seed, with `ver = ">=15.1"` and `kernconf_file = "GENERIC"`, was put
+in `shtetl-recipes/` (4.4), a repository of its own since 2026-10-14.
 
 ### 2026-10-12 (Q-AC: keys that hold one value, and redefinitions)
 
@@ -1925,8 +1932,8 @@ M2's:
   root, and accept children, listing them as affected.
 - **Q-AB, the recipes clone.** Built: only with `--recipes URL`, since
   zshtetl-recipes does not exist yet; once it does, the URL can be the
-  default. Its seed is `shtetl-recipes/` in this repository (4.4);
-  making the repository from it is the author's to do.
+  default. Its seed is a repository of its own now (14, 2026-10-14),
+  split out of this one; publishing it is the author's to do.
 
 M1's:
 

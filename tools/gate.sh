@@ -14,7 +14,7 @@ nonascii=$(printf '[^\t -~]')
 # it uses as a comment placeholder. probes/results is the box's
 # output, not ours.
 if LC_ALL=C grep -rn "$nonascii" Makefile README.md LICENSE .gitignore \
-    docs src tests tracker shtetl-recipes probes/*.sh probes/README.md \
+    docs src tests tracker probes/*.sh probes/README.md \
     tools/*.sh tools/*.py; then
 	echo "gate: non-ASCII bytes above"; rc=1
 fi
