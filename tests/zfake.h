@@ -40,4 +40,12 @@ int zfake_snapshot(const char *name);
 const char *zfake_last_snapshot(void);
 const char *zfake_last_rollback(void);
 
+/*
+ * FN told of each snapshot taken, rollback and snapshot destroyed, OP
+ * "snapshot", "rollback" or "destroy" and NAME ds@snap, once done: a
+ * test carries them out on files of its own. zfake_reset forgets it.
+ */
+void zfake_hook(void (*fn)(const char *op, const char *name, void *arg),
+    void *arg);
+
 #endif	/* SH_ZFAKE_H */

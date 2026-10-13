@@ -53,6 +53,8 @@ static struct zf_snap zf_snaps[ZF_SNAPS];	/* oldest first */
 static int zf_nsnaps;
 static unsigned long zf_txg;
 static char zf_rolled[ZF_NAME];		/* the last rollback, ds@snap */
+static void (*zf_hook)(const char *, const char *, void *);
+static void *zf_hookarg;
 static char zf_failing[32];
 static int zf_failin;		/* calls of zf_failing still to pass */
 static struct sh_zfs zf_handle;
@@ -149,6 +151,23 @@ zfake_reset(void)
 	zf_txg = 1;
 	zf_rolled[0] = '\0';
 	zf_failing[0] = '\0';
+	zf_hook = NULL;
+}
+
+void
+zfake_hook(void (*fn)(const char *op, const char *name, void *arg),
+    void *arg)
+{
+	zf_hook = fn;
+	zf_hookarg = arg;
+}
+
+/* What the tests' hook is told: OP done to NAME. */
+static void
+zf_told(const char *op, const char *name)
+{
+	if (zf_hook != NULL)
+		zf_hook(op, name, zf_hookarg);
 }
 
 static void
@@ -410,6 +429,8 @@ sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
 			zf_put(s->zs_props, &s->zs_n, props[k].zp_name,
 			    props[k].zp_value);
 	}
+	for (i = 0; i < n; i++)
+		zf_told("snapshot", names[i]);
 	return (0);
 }
 
@@ -461,6 +482,7 @@ sh_zfs_rollback(struct sh_zfs *z, const char *ds, const char *snap,
 	}
 	(void) snprintf(zf_rolled, sizeof (zf_rolled), "%s",
 	    zf_snaps[i].zs_name);
+	zf_told("rollback", zf_rolled);
 	return (0);
 }
 
@@ -481,6 +503,7 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 		(void) memmove(&zf_snaps[i], &zf_snaps[i + 1],
 		    (size_t)(zf_nsnaps - i - 1) * sizeof (zf_snaps[0]));
 		zf_nsnaps--;
+		zf_told("destroy", name);
 		return (0);
 	}
 	if (strchr(name, '@') != NULL || (d = zf_find(name)) == NULL) {

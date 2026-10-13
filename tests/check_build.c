@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <sys/utsname.h>
 
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -256,6 +257,7 @@ test_show(void)
 	    "compression=zstd-9, exec=off\n"
 	    "  + tank/shtetl/foundation-builds/generic\n"
 	    "  checkout releng/15.1 in tank/zbuild (/usr/src)\n"
+	    "  patches: none\n"
 	    "  kernel GENERIC, lines from 1 file\n"
 	    "  src.conf from 1 file\n"
 	    "  make -j<hw.ncpu> buildworld buildkernel\n"
@@ -326,7 +328,8 @@ fakes(const char *revision)
 	    "buildworld|installworld|installkernel|distribution) t=$a;; "
 	    "esac; done\n"
 	    "[ -f %s/make-$t ] && { echo \"make $t failed\" >&2; exit 2; }\n"
-	    "[ -n \"$d\" ] && mkdir -p \"$d/etc\" && echo x > \"$d/etc/$t\"\n",
+	    "[ -n \"$d\" ] && mkdir -p \"$d/etc\" && echo x > \"$d/etc/$t\"\n"
+	    "[ -f \"$2/a.c\" ] && cp \"$2/a.c\" \"$2/../seen-a.c\"\n",
 	    log, fail);
 	(void) snprintf(toolpath[1], sizeof (toolpath[1]), "%s",
 	    tool("make", body));
@@ -407,7 +410,10 @@ build(const char *msg)
 	FILE *f;
 	int rc;
 
-	CHECK(plan("generic") == 0);
+	if (plan("generic") != 0) {
+		printf("plan refused:\n%s", cap_text(&c));
+		CHECK(0);
+	}
 	free(ran);
 	ran = NULL;
 	f = open_memstream(&ran, &len);
@@ -631,6 +637,294 @@ test_failures(void)
 	CHECK(strstr(slurp(scratch_path("tools.log")), "devfs") == NULL);
 }
 
+/* ---- family P: patches ------------------------------------------ */
+
+/* CMD, made from FMT, run by the shell: it must succeed. */
+static void
+sh(const char *fmt, ...)
+{
+	char cmd[8192];
+	va_list ap;
+
+	va_start(ap, fmt);
+	(void) vsnprintf(cmd, sizeof (cmd), fmt, ap);
+	va_end(ap);
+	if (system(cmd) != 0) {
+		printf("failed: %s\n", cmd);
+		CHECK(0);
+	}
+}
+
+/* What CMD prints, its first line. */
+static const char *
+said(const char *cmd)
+{
+	static char line[512];
+	FILE *f;
+
+	line[0] = '\0';
+	if ((f = popen(cmd, "r")) != NULL) {
+		if (fgets(line, sizeof (line), f) == NULL)
+			line[0] = '\0';
+		(void) pclose(f);
+	}
+	line[strcspn(line, "\n")] = '\0';
+	return (line);
+}
+
+static char tree[1200], snaps[1200], pgit[1200];
+
+/*
+ * The fake's snapshots, rollbacks and destroys of the build root's
+ * snapshots carried out on the tree: copies of it in snaps.
+ */
+static void
+treehook(const char *op, const char *name, void *arg)
+{
+	const char *at = strchr(name, '@');
+
+	(void) arg;
+	if (strncmp(name, "tank/zbuild@", 12) != 0 || at == NULL)
+		return;
+	if (strcmp(op, "snapshot") == 0)
+		sh("rm -rf %s/%s && mkdir -p %s && cp -Rp %s %s/%s", snaps,
+		    at + 1, snaps, tree, snaps, at + 1);
+	else if (strcmp(op, "rollback") == 0)
+		sh("rm -rf %s && cp -Rp %s/%s %s", tree, snaps, at + 1, tree);
+	else
+		sh("rm -rf %s/%s", snaps, at + 1);
+}
+
+#define	GIT	"git -c user.name=t -c user.email=t@t " \
+	"-c init.defaultBranch=main"
+
+static const char base_a[] = "one\ntwo\nthree\nfour\nfive\nsix\n";
+
+static const char p_two[] =
+	"--- a/a.c\n+++ b/a.c\n@@ -1,3 +1,3 @@\n one\n-two\n+TWO\n three\n";
+static const char p_five[] =
+	"--- a/a.c\n+++ b/a.c\n@@ -4,3 +4,3 @@\n four\n-five\n+FIVE\n six\n";
+static const char p_new[] =
+	"diff --git a/c.c b/c.c\nnew file mode 100644\n"
+	"--- /dev/null\n+++ b/c.c\n@@ -0,0 +1 @@\n+int c;\n";
+static const char p_in[] =
+	"--- a/b.c\n+++ b/b.c\n@@ -1 +1 @@\n-broken\n+fixed\n";
+static const char p_bad[] =
+	"--- a/a.c\n+++ b/a.c\n@@ -1,3 +1,3 @@\n uno\n-dos\n+DOS\n tres\n";
+
+/*
+ * The build root a git checkout at tree, the fake git handing it
+ * everything but the checkout's own fetch, checkout and commit; and a
+ * patch repository, pgit: main with 15.1/1-a.patch, tagged t1, and v2
+ * with 2-new.patch and 10-b.patch beside it and a README.
+ */
+static void
+patchworld(void)
+{
+	char body[2048];
+
+	runworld();
+	fakes("15.1");
+	(void) snprintf(tree, sizeof (tree), "%s", scratch_path("ptree"));
+	(void) snprintf(snaps, sizeof (snaps), "%s", scratch_path("psnaps"));
+	(void) snprintf(pgit, sizeof (pgit), "%s", scratch_path("pgit"));
+	sh("rm -rf %s %s %s", tree, snaps, pgit);
+	(void) snprintf(body, sizeof (body), "%s/sys/conf/newvers.sh", tree);
+	sh("mkdir -p %s/sys/conf && cp %s %s", tree,
+	    scratch_path("src/sys/conf/newvers.sh"), body);
+	(void) snprintf(body, sizeof (body), "%s/a.c", tree);
+	(void) scratch_write("ptree/a.c", base_a);
+	(void) scratch_write("ptree/b.c", "fixed\n");
+	sh("cd %s && " GIT " init -q && " GIT " add -A && "
+	    GIT " commit -qm base", tree);
+	(void) scratch_write("pgit/15.1/1-a.patch", p_two);
+	(void) scratch_write("pgit/README", "patches\n");
+	sh("cd %s && " GIT " init -q && " GIT " add -A && "
+	    GIT " commit -qm one && " GIT " tag t1 && "
+	    GIT " checkout -q -b v2", pgit);
+	(void) scratch_write("pgit/15.1/2-new.patch", p_new);
+	(void) scratch_write("pgit/15.1/10-b.patch", p_in);
+	sh("cd %s && " GIT " add -A && " GIT " commit -qm two && "
+	    GIT " checkout -q main", pgit);
+	zfake_set("tank/zbuild", "mountpoint", tree);
+	(void) snprintf(body, sizeof (body),
+	    "case \"$3\" in\n"
+	    "diff) [ \"$4\" = --quiet ] && exit 0;;\n"
+	    "fetch|checkout) [ \"$2\" = %s ] && exit 0;;\n"
+	    "rev-parse) [ \"$2\" = %s ] && { echo " SHA "; exit 0; };;\n"
+	    "esac\n"
+	    "exec git \"$@\"\n", tree, tree);
+	(void) snprintf(toolpath[0], sizeof (toolpath[0]), "%s",
+	    tool("git", body));
+	fake.tl_git = toolpath[0];
+	zfake_hook(treehook, NULL);
+}
+
+/* The recipe generic with PATCHES, the patches block's inside. */
+static void
+patchconf(const char *name, const char *patches)
+{
+	char text[4096];
+	const char *files[] = { "foundations/generic.conf", text,
+	    "patches/local/1-d.patch", p_five,
+	    "patches/local/notes.txt", "not a patch\n",
+	    "patches/bad/1-x.patch", p_bad, NULL };
+
+	(void) snprintf(text, sizeof (text), "src_branch = \"releng/15.1\";\n"
+	    "patches { %s }\n", patches);
+	config(name, files);
+}
+
+/* P3 - P7, P14 - P16: a build with patches, and its fetch. */
+static void
+test_patches(void)
+{
+	char text[4096], url[1300], commit[64], snap[256];
+	char *out;
+	size_t len;
+	FILE *f;
+
+	if (system("git --version >/dev/null 2>&1") != 0) {
+		printf("check_build: no git: P3 - P16 not checked\n");
+		return;
+	}
+	patchworld();
+	(void) snprintf(url, sizeof (url), "file://%s", pgit);
+	(void) snprintf(text, sizeof (text), "git -C %s rev-parse v2", pgit);
+	(void) snprintf(commit, sizeof (commit), "%s", said(text));
+	CHECK(strlen(commit) == 40);
+	(void) snprintf(text, sizeof (text),
+	    "\"%s\" { ref = \"v2\"; dir = \"15.1\"; } \"patches/local\" {}",
+	    url);
+	patchconf("pa", text);
+	/* P16 */
+	CHECK(plan("generic") == 0);
+	out = NULL;
+	f = open_memstream(&out, &len);
+	CHECK(f != NULL);
+	sh_build_show(f, &p);
+	CHECK(fclose(f) == 0);
+	(void) snprintf(text, sizeof (text), "  patches: %s (ref v2, "
+	    "dir 15.1), patches/local\n", url);
+	CHECK(strstr(out, text) != NULL);
+	free(out);
+	/* P3 - P7: two sources, each whole, each in natural order */
+	CHECK(build(NULL) == 0);
+	{
+		char l1[1400], l2[1400], l3[1400], l4[1400];
+		const char *const steps[] = { l1, "copied patches/local\n",
+		    "4 patches from 2 sources\n",
+		    "snapshot tank/zbuild@shtetl-patch-0\n", l2, l3, l4,
+		    "patch 1-d.patch from patches/local: applied\n",
+		    "make buildworld", "snapshot -r " F "@" VERSION "\n",
+		    "rolled back tank/zbuild to @shtetl-patch-0\n",
+		    "built " F "@" VERSION "\n", NULL };
+
+		(void) snprintf(l1, sizeof (l1), "fetched %s at %.12s\n", url,
+		    commit);
+		(void) snprintf(l2, sizeof (l2), "patch 1-a.patch from %s: "
+		    "applied\n", url);
+		(void) snprintf(l3, sizeof (l3), "patch 2-new.patch from %s: "
+		    "applied\n", url);
+		(void) snprintf(l4, sizeof (l4), "patch 10-b.patch from %s: "
+		    "already in, skipped\n", url);
+		CHECK(in_order(ran, steps));
+	}
+	/* what make saw, patched; the tree after, as it was */
+	CHECK(is(slurp(scratch_path("seen-a.c")),
+	    "one\nTWO\nthree\nfour\nFIVE\nsix\n"));
+	(void) snprintf(text, sizeof (text), "%s/a.c", tree);
+	CHECK(is(slurp(text), base_a));
+	(void) snprintf(text, sizeof (text), "%s/c.c", tree);
+	CHECK(access(text, F_OK) != 0);
+	/* P5, P15: every patch snapshot gone, the rollback to the first */
+	CHECK(is(zfake_last_rollback(), "tank/zbuild@shtetl-patch-0"));
+	for (len = 0; len <= 4; len++) {
+		(void) snprintf(snap, sizeof (snap),
+		    "tank/zbuild@shtetl-patch-%zu", len);
+		CHECK(!zfake_snapshot(snap));
+	}
+	/* P3: the list fixed in the run directory */
+	(void) snprintf(text, sizeof (text), "%s/generic/patches/1/15.1/"
+	    "10-b.patch", runbase);
+	CHECK(access(text, F_OK) == 0);
+	/* P14 */
+	(void) snprintf(text, sizeof (text), "%s@%s: 10-b.patch already; "
+	    "patches/local", url, commit);
+	CHECK(is(prop(F "@" VERSION, "shtetl:patches", NULL), text));
+	CHECK(is(prop(F "/usr/local@" VERSION, "shtetl:patches", NULL), text));
+	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "-"));
+
+	/* P3: the remote's HEAD, a tag, a commit */
+	patchworld();
+	(void) snprintf(text, sizeof (text), "\"%s\" { dir = \"15.1\"; }", url);
+	patchconf("pb", text);
+	CHECK(build(NULL) == 0);
+	CHECK(strstr(ran, "1 patch from 1 source\n") != NULL);
+	patchworld();
+	(void) snprintf(text, sizeof (text), "\"%s\" { ref = \"t1\"; "
+	    "dir = \"15.1\"; }", url);
+	patchconf("pc", text);
+	CHECK(build(NULL) == 0);
+	CHECK(strstr(ran, "1 patch from 1 source\n") != NULL);
+	patchworld();
+	/* the repository is made anew: its commit too */
+	(void) snprintf(text, sizeof (text), "git -C %s rev-parse v2", pgit);
+	(void) snprintf(commit, sizeof (commit), "%s", said(text));
+	(void) snprintf(text, sizeof (text), "\"%s\" { ref = \"%s\"; "
+	    "dir = \"15.1\"; }", url, commit);
+	patchconf("pd", text);
+	CHECK(build(NULL) == 0);
+	CHECK(strstr(ran, "3 patches from 1 source\n") != NULL);
+
+	/* P3: no repository, no ref: refused, undone, no snapshot taken */
+	patchworld();
+	patchconf("pe", "\"file:///nonexistent/shtetl-p\" {}");
+	CHECK(build(NULL) == -1);
+	CHECK(cap_has(&c, "patches file:///nonexistent/shtetl-p: fetch of "
+	    "HEAD failed"));
+	CHECK(!zfake_exists(F));
+	CHECK(!zfake_snapshot("tank/zbuild@shtetl-patch-0"));
+	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "-"));
+	patchworld();
+	(void) snprintf(text, sizeof (text), "\"%s\" { ref = \"nope\"; }",
+	    url);
+	patchconf("pf", text);
+	CHECK(build(NULL) == -1);
+	(void) snprintf(text, sizeof (text), "patches %s: fetch of nope "
+	    "failed", url);
+	CHECK(cap_has(&c, text));
+
+	/* P15: a failure after the patches, rolled back all the same */
+	patchworld();
+	patchconf("pg", "\"patches/local\" {}");
+	(void) scratch_write("fail/make-buildworld", "");
+	CHECK(build(NULL) == -1);
+	(void) unlink(scratch_path("fail/make-buildworld"));
+	CHECK(is(zfake_last_rollback(), "tank/zbuild@shtetl-patch-0"));
+	CHECK(!zfake_snapshot("tank/zbuild@shtetl-patch-1"));
+	(void) snprintf(text, sizeof (text), "%s/a.c", tree);
+	CHECK(is(slurp(text), base_a));
+	CHECK(!zfake_exists(F));
+
+	/* a patch that does not apply: refused, rolled back */
+	patchworld();
+	patchconf("ph", "\"patches/bad\" {}");
+	CHECK(build(NULL) == -1);
+	CHECK(cap_has(&c, "patch 1-x.patch from patches/bad: does not "
+	    "apply"));
+	CHECK(is(zfake_last_rollback(), "tank/zbuild@shtetl-patch-0"));
+	CHECK(!zfake_exists(F));
+
+	/* no patches: no snapshot of the build root, no record */
+	patchworld();
+	config("pi", generic);
+	CHECK(build(NULL) == 0);
+	CHECK(strstr(ran, "shtetl-patch") == NULL);
+	CHECK(is(prop(F "@" VERSION, "shtetl:patches", NULL), "-"));
+	zfake_hook(NULL, NULL);
+}
+
 int
 main(void)
 {
@@ -642,6 +936,7 @@ main(void)
 	test_show();
 	test_run();
 	test_failures();
+	test_patches();
 	free(ran);
 	sh_build_free(&p);
 	sh_spaces_free(&s);
