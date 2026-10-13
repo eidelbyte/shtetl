@@ -15,6 +15,7 @@
 #include <unistd.h>
 
 #include "core/boot.h"
+#include "core/beam.h"
 #include "core/build.h"
 #include "core/cascade.h"
 #include "core/err.h"
@@ -54,6 +55,7 @@ struct sh_cmd {
 static int cmd_bootstrap(struct sh_ctx *, int, char **);
 static int cmd_build(struct sh_ctx *, int, char **);
 static int cmd_pkg_upgrade(struct sh_ctx *, int, char **);
+static int cmd_beam(struct sh_ctx *, int, char **);
 static int cmd_config_show(struct sh_ctx *, int, char **);
 static int cmd_spaces(struct sh_ctx *, int, char **);
 
@@ -77,6 +79,9 @@ static const struct sh_cmd sh_cmds[] = {
 	    "packages upgraded in a chroot of it,\n    snapshotted as its "
 	    "last version's -pkg; shown first, done\n    once confirmed "
 	    "(-y confirms)", cmd_pkg_upgrade },
+	{ "beam", NULL, "[-y] [--version v] foundation", "a foundation's "
+	    "version, its newest by default,\n    sent to zrun; shown first, "
+	    "done once confirmed (-y confirms)", cmd_beam },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -438,6 +443,57 @@ cmd_pkg_upgrade(struct sh_ctx *ctx, int argc, char **argv)
 	if (plan != NULL)
 		sh_build_free(plan);
 	free(plan);
+	return (rc);
+}
+
+/*
+ * beam: a foundation's version brought to zrun (planning.md 7.3),
+ * shown and confirmed.
+ */
+static int
+cmd_beam(struct sh_ctx *ctx, int argc, char **argv)
+{
+	struct sh_beam plan;
+	struct sh_err e;
+	const char *version, *target;
+	int i, yes, rc;
+
+	yes = 0;
+	version = target = NULL;
+	for (i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "-y") == 0) {
+			yes = 1;
+		} else if (strcmp(argv[i], "--version") == 0) {
+			if (i + 1 == argc)
+				return (die_usage("--version needs a version",
+				    ""));
+			version = argv[++i];
+		} else if (argv[i][0] == '-') {
+			return (die_usage("beam: unknown option ", argv[i]));
+		} else if (target != NULL) {
+			return (die_usage("beam takes one foundation", ""));
+		} else {
+			target = argv[i];
+		}
+	}
+	if (target == NULL)
+		return (die_usage("beam: no foundation given", ""));
+	sh_err_init(&e, stderr, "shtetl: ");
+	if (ctx_zfs(ctx, &e) != 0)
+		return (SH_EXIT_REFUSED);
+	rc = SH_EXIT_REFUSED;
+	if (sh_beam_plan(ctx->sc_zfs, &ctx->sc_spaces, target, version, &plan,
+	    &e) == 0) {
+		sh_beam_show(stdout, &plan);
+		(void) fflush(stdout);
+		if (!sh_confirm(stdin, stdout, yes, isatty(STDIN_FILENO),
+		    "Beam as above?"))
+			sh_errf(&e, "%s", isatty(STDIN_FILENO) ?
+			    "not confirmed" : "not confirmed: no terminal, use "
+			    "-y");
+		else if (sh_beam_run(ctx->sc_zfs, &plan, stdout, &e) == 0)
+			rc = out_done();
+	}
 	return (rc);
 }
 

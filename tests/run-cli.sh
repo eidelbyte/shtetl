@@ -102,6 +102,13 @@ t f32-two pkg-upgrade generic gaming
 t f32-option pkg-upgrade --frob generic
 t f32-msg pkg-upgrade generic -m
 t f32-nozfs pkg-upgrade generic
+
+# M7: beam
+t m7-none beam
+t m7-two beam generic gaming
+t m7-option beam --frob generic
+t m7-version beam generic --version
+t m7-nozfs beam generic
 if [ "$(cat build/.flavor 2>/dev/null)" = portable ]; then
 	t b1-nozfs bootstrap --lake tank/shtetl -y
 	t f18-nozfs -C tests/conf/site build generic -y

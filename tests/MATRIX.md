@@ -498,3 +498,30 @@ merges without conflict, no base to merge against}; the verb {build,
 | P16 | the plan shows each source, with its ref and dir | covered: check_build.c |
 | P17 | for real: git apply on a FreeBSD tree, ZFS snapshots and rollbacks of the build root; a patch that applies, one already in, one that conflicts, paused, fixed by the script, --continue, built | box: tests/box/build.sh, the patches made on the box from the branch's own share/misc/bsd-family-tree; rehearsed on the mac against the file; box build 3 (461df60, at 5802782) green: paused, refused, fixed, built in 30 minutes, both lines installed |
 | P18 | the command line: build F --continue, --skip, --abort; usage errors | covered: run-cli.sh |
+
+# Family M: a foundation's version brought to zrun (M4; planning.md 7.3; src/core/beam.c)
+
+shtetl beam F: a version of F, in zlake, sent to the run root's
+foundations/F, whole the first time and incremental after, the
+version's shtetl:* copied onto what was received. Over the fake ZFS,
+with a lake root and a run root in two pools.
+
+Dimensions: the roots {lake, run, there or not}; the target {F,
+foundations/F, a bad name}; F {there with versions, there without,
+not there}; the version {the newest by default, a -pkg the newest,
+given and there, given and not one of F's}; zrun {without F, with an
+older version, with V already, with a newer one}; F's datasets {as
+zrun's, differing}; a placeholder {there}; zrun's snapshots {all
+with shtetl:kind, one without, an interrupted copy}; the sends {all
+received, one failing}.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| M1 | the plan: F's newest version or -pkg by default, the one given otherwise; a first beam whole, a later one incremental from zrun's newest; shown | covered: check_beam.c |
+| M2 | refused: no lake or run root; a bad name; no such foundation; F with no version; the version given not one of F's; it on zrun already; zrun's newest newer than it; F's datasets not zrun's | covered: check_beam.c |
+| M3 | a first beam: each dataset of F whole, parents first, into the run root's foundations/F; readonly=on on F, its datasets inheriting it; canmount=noauto on each, off on a placeholder; the mountpoint inherited; nothing mounted | covered: check_beam.c |
+| M4 | a later beam: each dataset incremental from zrun's newest, the version received on each; zrun's earlier versions kept | covered: check_beam.c |
+| M5 | 6.2: the version's shtetl:* copied onto each received snapshot, nothing else of it; a zrun snapshot without shtetl:kind, an interrupted copy, copied again from zlake first | covered: check_beam.c |
+| M6 | a send failing part way: what this beam received destroyed, the first beam's whole tree, a later one's new snapshots; zrun as it was | covered: check_beam.c |
+| M7 | the command line: beam with no foundation, two, an unknown option, --version with none; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
+| M8 | for real: box beamed after its build, then again after its update, the run root in the build pool | box: tests/box/build.sh |

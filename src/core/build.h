@@ -88,6 +88,13 @@ struct sh_tools {
 extern const struct sh_tools sh_build_tools;
 
 /*
+ * TARGET, F or foundations/F[.conf], as the foundation's name F into
+ * NAME. Refused: another kind's path, a bad name.
+ */
+int sh_build_target(const char *target, char *name, size_t len,
+    struct sh_err *e);
+
+/*
  * The plan for building the foundation TARGET (F, or foundations/F)
  * into P, its recipe read from the configuration root ROOT, with the
  * roots S found and the site's settings SITE. RUNBASE is where run

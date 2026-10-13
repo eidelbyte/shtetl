@@ -7,6 +7,7 @@ usage: shtetl [-C dir] command ...
        shtetl [-C dir] build [-y] [-m msg] [--continue | --skip | --abort]
            foundation
        shtetl [-C dir] pkg-upgrade [-y] [-m msg] foundation
+       shtetl [-C dir] beam [-y] [--version v] foundation
 
   -C dir  the configuration root (the zshtetl-recipes clone);
           without it, the config root's mountpoint
@@ -23,6 +24,8 @@ usage: shtetl [-C dir] command ...
   pkg-upgrade: a foundation's packages upgraded in a chroot of it,
     snapshotted as its last version's -pkg; shown first, done
     once confirmed (-y confirms)
+  beam: a foundation's version, its newest by default,
+    sent to zrun; shown first, done once confirmed (-y confirms)
 
 exit: 0 done, 1 refused (the reasons are on standard error), 2 usage,
       3 a build paused at a patch

@@ -544,11 +544,30 @@ int
 sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
     struct sh_err *e)
 {
+	struct zf_snap *sp;
 	struct zf_ds *d;
+	int i;
 
 	(void) z;
 	if (zf_fails("inherit", e))
 		return (-1);
+	/* a snapshot's user property, its own no longer */
+	if (strchr(ds, '@') != NULL) {
+		if ((sp = zf_snap(ds)) == NULL) {
+			sh_errf(e, "zfake: %s: no such snapshot", ds);
+			return (-1);
+		}
+		for (i = 0; i < sp->zs_n; i++) {
+			if (strcmp(sp->zs_props[i].zp_name, prop) != 0)
+				continue;
+			(void) memmove(&sp->zs_props[i], &sp->zs_props[i + 1],
+			    (size_t)(sp->zs_n - i - 1) *
+			    sizeof (sp->zs_props[0]));
+			sp->zs_n--;
+			break;
+		}
+		return (0);
+	}
 	if ((d = zf_find(ds)) == NULL) {
 		sh_errf(e, "zfake: %s: no such filesystem", ds);
 		return (-1);

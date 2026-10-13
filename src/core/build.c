@@ -43,9 +43,9 @@
 
 static int fb_kid(void *arg, const char *name);
 
-/* TARGET, F or foundations/F[.conf], as F into NAME. */
-static int
-fb_target(const char *target, char *name, size_t len, struct sh_err *e)
+int
+sh_build_target(const char *target, char *name, size_t len,
+    struct sh_err *e)
 {
 	const char *n, *why;
 	size_t l;
@@ -357,7 +357,7 @@ sh_build_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	(void) memset(p, 0, sizeof (*p));
 	p->fp_verb = verb;
 	before = e->se_count;
-	if (fb_target(target, p->fp_name, sizeof (p->fp_name), e) != 0)
+	if (sh_build_target(target, p->fp_name, sizeof (p->fp_name), e) != 0)
 		return (-1);
 	for (sp = 0; sp < SH_SP_N; sp++) {
 		if (sp != SH_SP_RUN && s->ss_root[sp] == NULL)
@@ -2751,7 +2751,7 @@ sh_pkg_plan(struct sh_zfs *z, const struct sh_spaces *s,
 
 	(void) memset(p, 0, sizeof (*p));
 	before = e->se_count;
-	if (fb_target(target, p->fp_name, sizeof (p->fp_name), e) != 0)
+	if (sh_build_target(target, p->fp_name, sizeof (p->fp_name), e) != 0)
 		return (-1);
 	if (s->ss_root[SH_SP_LAKE] == NULL)
 		sh_errf(e, "no lake root");
