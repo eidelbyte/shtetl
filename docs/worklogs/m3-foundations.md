@@ -452,3 +452,12 @@ each file once, said); P15 holds it, and dropping the call fails it.
 The box's kept build root still has init.c and rtld.c with the times
 the old code left, so its next run needs --clean once (a whole
 build); after that the fix keeps it right.
+
+## Box build 7 (63f6a8f)
+
+At 920c214, after --clean: 64 ok, 0 failed. The time of now went on 1
+patched file after the first build (bsd-family-tree) and 3 after the
+update (with init.c and rtld.c); the update's backups made and
+removed; the kernel's 1715 files kept. Started from nothing, this run
+cannot show the stale object gone: that is the next run's, from the
+kept store, where build 6 failed.
