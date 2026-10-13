@@ -1007,6 +1007,23 @@ version's `shtetl:*` properties are copied after the receive (6.2). It is never 
 except while an update reads it: zfs_rebase reads every side at its
 mountpoint and refuses one that is not mounted (9).
 
+As built (M4, `src/core/beam.c`):
+
+    shtetl beam [-y] [--version v] F
+
+- Shown and confirmed as a build is (PROPOSAL). The version is the
+  one given, or F's newest snapshot that is a version or a `-pkg` of
+  one (PROPOSAL): base and base-plus-packages are both versions to
+  rebase onto (7.2).
+- Forward only (PROPOSAL): a version on zrun already, or older than
+  zrun's newest, is refused; so are F's datasets not being zrun's.
+- A first beam sets `readonly=on` on F, its datasets inheriting it,
+  and `canmount=noauto` on each, `off` on a placeholder. Before a
+  later beam, a zrun snapshot without `shtetl:kind` is given its zlake
+  counterpart's `shtetl:*` again (6.2).
+- A send failing part way destroys what the beam received (PROPOSAL):
+  a first beam's whole tree, a later one's new snapshots.
+
 ### 7.4 New container X
 
 `shtetl create X --on F [--version V]`.

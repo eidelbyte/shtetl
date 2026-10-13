@@ -35,3 +35,32 @@ Verification: check_zfs 182 checks (Z14 - Z19), zcheck over the fake
 pools (box_zcheck POOL/DATASET OTHER/DATASET); run.sh destroys both
 with -R, a clone and its origin being in each. tracker: m4-zfs
 testing.
+
+## m4-beam (568d9a2, 7b4a227)
+
+shtetl beam [-y] [--version v] F (planning.md 7.3), src/core/beam.c.
+
+- The plan reads F's snapshots in zlake for its versions (shtetl:kind
+  version or pkg, by createtxg), its datasets parents first, a
+  placeholder by canmount=off; and zrun's F, if there, for its newest.
+  Refused with every reason: no lake or run root, no such foundation,
+  none of a version, the version not F's, on zrun already, older than
+  zrun's newest, datasets differing.
+- The run sends each dataset (sh_zfs_send), whole or from zrun's
+  newest; a first beam's properties on zrun (readonly on F, inherited;
+  canmount noauto, a placeholder off); the version's shtetl:* copied
+  onto each received snapshot; an interrupted copy mended first.
+- A failure destroys what this beam received.
+
+Decided beyond the plan (PROPOSAL, planning.md 7.3 as built): the
+command, its confirmation, the default version (newest version or
+-pkg), forward only, the undo.
+
+Also: build.c's target parsing is sh_build_target now, shared; the
+fake's sh_zfs_inherit takes a snapshot's user property, as ZFS does,
+so a test can make an interrupted copy.
+
+Verification: check_beam 160 checks (M1 - M6), run-cli.sh M7, make
+check, gate, xcheck. The box: build.sh bootstraps a run root and ends
+with M8, box beamed whole and then incrementally. tracker: m4-beam
+testing.
