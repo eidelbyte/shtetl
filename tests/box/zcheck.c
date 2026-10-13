@@ -131,6 +131,8 @@ main(int argc, char **argv)
 		{ "shtetl:commit", "the first" }
 	};
 	static const struct sh_zprop kind = { "shtetl:kind", "foundation" };
+	static const struct sh_zprop off = { "canmount", "off" };
+	static const struct sh_zprop none = { "mountpoint", "none" };
 	const char *v1[3], *v2[3], *bad[2];
 	char t1[64], name[512], g3[512];
 	enum sh_zsrc src;
@@ -300,6 +302,33 @@ main(int argc, char **argv)
 	cell("Z9", "mounted again",
 	    sh_zfs_mount(z, at("f/usr"), &e) == 0 &&
 	    strcmp(get(at("f/usr"), "mounted", NULL), "yes") == 0);
+
+	/*
+	 * Z12, Z13: a mountpoint mounts as zfs set does, which the first
+	 * real build met (a mount after it failed busy); mount. f and
+	 * f/usr unmounted first, f/off and f/none made beside them.
+	 */
+	rc = sh_zfs_unmount(z, at("f/usr"), &e) | sh_zfs_unmount(z, at("f"),
+	    &e) | sh_zfs_create(z, at("f/off"), &off, 1, &e) |
+	    sh_zfs_create(z, at("f/none"), &none, 1, &e);
+	rc |= sh_zfs_set(z, at("f"), "mountpoint", "/zcheck-m", &e);
+	cell("Z12", "a mountpoint set: f mounted, and f/usr below it",
+	    rc == 0 && strcmp(get(at("f"), "mounted", NULL), "yes") == 0 &&
+	    strcmp(get(at("f/usr"), "mounted", NULL), "yes") == 0);
+	cell("Z12", "canmount off, or a mountpoint of its own: not",
+	    strcmp(get(at("f/off"), "mounted", NULL), "no") == 0 &&
+	    strcmp(get(at("f/none"), "mounted", NULL), "no") == 0);
+	cell("Z13", "mounted there already: nothing to do",
+	    sh_zfs_mount(z, at("f"), &e) == 0 &&
+	    sh_zfs_mount(z, at("f/usr"), &e) == 0);
+	refused("Z13", "canmount off refused",
+	    sh_zfs_mount(z, at("f/off"), ask()), "f/off", "canmount is off");
+	refused("Z13", "no mountpoint refused",
+	    sh_zfs_mount(z, at("f/none"), ask()), "f/none", "no mountpoint");
+	rc = sh_zfs_inherit(z, at("f"), "mountpoint", &e);
+	cell("Z12", "inherited: moved where the default says",
+	    rc == 0 && strcmp(get(at("f"), "mounted", NULL), "yes") == 0 &&
+	    sh_zfs_mount(z, at("f"), &e) == 0);
 
 	/* Z10: each refusal above in the fake's words */
 	cell("Z10", "every refusal above said why, as the fake does",

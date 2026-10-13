@@ -1,6 +1,6 @@
 /*
  * What the build asks of ZFS, over the fake (src/core/zfs.h,
- * tests/zfake.c): tests/MATRIX.md family Z, Z1 - Z10.
+ * tests/zfake.c): tests/MATRIX.md family Z, Z1 - Z10, Z12, Z13.
  */
 
 #include <stdlib.h>
@@ -236,6 +236,53 @@ test_changes(void)
 	CHECK(is(get("tank/f", "mounted", NULL), "no"));
 }
 
+/* Z12, Z13: what a mountpoint does to mounts; mount. */
+static void
+test_mounts(void)
+{
+	world();
+	zfake_set("tank/f/usr", "canmount", "off");
+	zfake_set("tank/f/var", "mountpoint", "/v");
+	/* Z12: set, f mounted; f/usr off; f/var takes its own */
+	cap_reset(&c);
+	CHECK(sh_zfs_set(z, "tank/f", "mountpoint", "/m", &c.c_err) == 0);
+	CHECK(is(get("tank/f", "mounted", NULL), "yes"));
+	CHECK(is(get("tank/f/usr", "mounted", NULL), "no"));
+	CHECK(is(get("tank/f/var", "mounted", NULL), "no"));
+	CHECK(sh_zfs_mount(z, "tank/f/var", &c.c_err) == 0);
+	/* moved: f, not f/var */
+	CHECK(sh_zfs_set(z, "tank/f", "mountpoint", "/n", &c.c_err) == 0);
+	CHECK(sh_zfs_mount(z, "tank/f", &c.c_err) == 0);
+	CHECK(is(get("tank/f/var", "mounted", NULL), "yes"));
+	CHECK(sh_zfs_mount(z, "tank/f/var", &c.c_err) == 0);
+	/* noauto: not mounted by a set, moved once mounted */
+	zfake_set("tank/f/usr", "canmount", "noauto");
+	CHECK(sh_zfs_set(z, "tank/f", "mountpoint", "/o", &c.c_err) == 0);
+	CHECK(is(get("tank/f/usr", "mounted", NULL), "no"));
+	CHECK(sh_zfs_mount(z, "tank/f/usr", &c.c_err) == 0);
+	CHECK(sh_zfs_set(z, "tank/f", "mountpoint", "/p", &c.c_err) == 0);
+	CHECK(is(get("tank/f/usr", "mounted", NULL), "yes"));
+	CHECK(sh_zfs_mount(z, "tank/f/usr", &c.c_err) == 0);
+	/* inherited none: unmounted, f/var's own left */
+	zfake_set("tank", "mountpoint", "none");
+	CHECK(sh_zfs_inherit(z, "tank/f", "mountpoint", &c.c_err) == 0);
+	CHECK(is(get("tank/f", "mounted", NULL), "no"));
+	CHECK(is(get("tank/f/usr", "mounted", NULL), "no"));
+	CHECK(is(get("tank/f/var", "mounted", NULL), "yes"));
+	CHECK(!cap_has(&c, "zfake"));
+	/* Z13: mount refused */
+	CHECK(sh_zfs_mount(z, "tank/f", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/f: no mountpoint"));
+	zfake_set("tank/f/usr", "canmount", "off");
+	CHECK(sh_zfs_set(z, "tank/f", "mountpoint", "/q", &c.c_err) == 0);
+	CHECK(sh_zfs_mount(z, "tank/f/usr", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/f/usr: canmount is off"));
+	/* the property moved without the mount, as zfs set -u leaves it */
+	zfake_set("tank/f", "mountpoint", "/r");
+	CHECK(sh_zfs_mount(z, "tank/f", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/f: mounted at /q, not its mountpoint"));
+}
+
 /* Z10: ZFS refusing. */
 static void
 test_refusals(void)
@@ -286,6 +333,7 @@ main(void)
 	test_snapshots();
 	test_snapshot_props();
 	test_changes();
+	test_mounts();
 	test_refusals();
 	sh_zfs_close(z);
 	cap_close(&c);

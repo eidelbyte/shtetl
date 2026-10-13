@@ -67,11 +67,21 @@ int sh_zfs_children(struct sh_zfs *z, const char *ds,
 int sh_zfs_create(struct sh_zfs *z, const char *ds,
     const struct sh_zprop *props, size_t nprops, struct sh_err *e);
 
-/* PROP of DS, a filesystem or a snapshot, set locally to VALUE. */
+/*
+ * PROP of DS, a filesystem or a snapshot, set locally to VALUE. A
+ * mountpoint moves mounts as zfs set does: DS and the datasets taking
+ * their mountpoint from it are unmounted, and then mounted where it
+ * now says if they were mounted or their canmount is on, unless
+ * canmount is off or the mountpoint none or legacy. So setting one
+ * mounts a dataset that was not.
+ */
 int sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
     const char *value, struct sh_err *e);
 
-/* PROP of DS no longer set locally: inherited, or its default. */
+/*
+ * PROP of DS no longer set locally: inherited, or its default. A
+ * mountpoint moves mounts as sh_zfs_set's does.
+ */
 int sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
     struct sh_err *e);
 
@@ -108,7 +118,11 @@ int sh_zfs_rollback(struct sh_zfs *z, const char *ds, const char *snap,
  */
 int sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e);
 
-/* DS mounted where its mountpoint says, and unmounted. */
+/*
+ * DS mounted where its mountpoint says, and unmounted. Mounted there
+ * already, nothing is done; mounted elsewhere, or with no mountpoint,
+ * or canmount off, it is refused.
+ */
 int sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e);
 int sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e);
 

@@ -606,10 +606,20 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 	return (0);
 }
 
+/*
+ * zfs_mount (lib/libzfs/libzfs_mount.c) mounts nothing and says
+ * nothing where the mountpoint is none or legacy or canmount is off
+ * (zfs_is_mountable), and fails EBUSY on a dataset mounted already,
+ * as setting a mountpoint mounts one (libzfs_changelist.c). So those
+ * are looked at first: mounted where its mountpoint says is done;
+ * mounted elsewhere, as zfs set -u leaves one, is refused.
+ */
 int
 sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 {
 	zfs_handle_t *zhp;
+	char mp[ZFS_MAXPROPLEN];
+	char *at;
 	int r;
 
 	if ((r = zz_open(z, ds, &zhp, e)) != 0) {
@@ -617,11 +627,28 @@ sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 			zz_none(e, ds);
 		return (-1);
 	}
-	r = zfs_mount(zhp, NULL, 0);
-	if (r != 0)
+	at = NULL;
+	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, mp, sizeof (mp), NULL,
+	    NULL, 0, B_FALSE) != 0 || mp[0] != '/') {
+		sh_errf(e, "%s: no mountpoint", ds);
+		r = -1;
+	} else if (zfs_prop_get_int(zhp, ZFS_PROP_CANMOUNT) ==
+	    ZFS_CANMOUNT_OFF) {
+		sh_errf(e, "%s: canmount is off", ds);
+		r = -1;
+	} else if (zfs_is_mounted(zhp, &at)) {
+		if (strcmp(at, mp) != 0) {
+			sh_errf(e, "%s: mounted at %s, not its mountpoint",
+			    ds, at);
+			r = -1;
+		}
+	} else if (zfs_mount(zhp, NULL, 0) != 0) {
 		zz_err(z, e, ds);
+		r = -1;
+	}
+	free(at);
 	zfs_close(zhp);
-	return (r != 0 ? -1 : 0);
+	return (r);
 }
 
 int

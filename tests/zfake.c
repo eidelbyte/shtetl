@@ -29,6 +29,7 @@ struct zf_ds {
 	char		zd_name[ZF_NAME];
 	struct zf_prop	zd_props[ZF_PROPS];
 	int		zd_n;
+	char		zd_at[ZF_VAL];		/* mounted there; "" if not */
 	struct zf_prop	zd_pool[ZF_PROPS];	/* a pool's root: the pool's */
 	int		zd_npool;
 };
@@ -174,6 +175,89 @@ zf_parent(const char *ds, char *buf)
 	return (1);
 }
 
+static int zf_get(const char *ds, const char *prop, char *val, size_t len,
+    enum sh_zsrc *src, struct sh_err *e);
+
+/* PROP of D no longer set locally. */
+static void
+zf_drop(struct zf_ds *d, const char *prop)
+{
+	int i;
+
+	for (i = 0; i < d->zd_n; i++) {
+		if (strcmp(d->zd_props[i].zp_name, prop) == 0) {
+			(void) memmove(&d->zd_props[i], &d->zd_props[i + 1],
+			    (size_t)(d->zd_n - i - 1) *
+			    sizeof (d->zd_props[0]));
+			d->zd_n--;
+			return;
+		}
+	}
+}
+
+/* Whether D takes its mountpoint from DS: DS, or below with none set. */
+static int
+zf_takes(const char *d, const char *ds)
+{
+	char cur[ZF_NAME], up[ZF_NAME];
+	const struct zf_ds *x;
+	size_t len = strlen(ds);
+
+	if (strncmp(d, ds, len) != 0 || (d[len] != '\0' && d[len] != '/'))
+		return (0);
+	(void) snprintf(cur, sizeof (cur), "%s", d);
+	while (strcmp(cur, ds) != 0) {
+		x = zf_find(cur);
+		if (zf_prop(x->zd_props, x->zd_n, "mountpoint") != NULL ||
+		    !zf_parent(cur, up))
+			return (0);
+		(void) snprintf(cur, sizeof (cur), "%s", up);
+	}
+	return (1);
+}
+
+/*
+ * DS's mountpoint set to VALUE, or inherited (NULL), with what zfs set
+ * and zfs inherit do to mounts (lib/libzfs/libzfs_changelist.c): DS
+ * and each dataset taking its mountpoint from DS are unmounted, the
+ * property changed, and each then mounted, parents first, where its
+ * mountpoint now says, if it was mounted or its canmount is on, so
+ * long as canmount is not off and the mountpoint is not none or
+ * legacy. Setting a mountpoint mounts a dataset that was not.
+ */
+static void
+zf_remount(const char *ds, const char *value)
+{
+	static char was[ZF_DS];
+	char mp[ZF_VAL], cm[ZF_VAL];
+	struct zf_ds *d;
+	int i;
+
+	for (i = 0; i < zf_n; i++) {
+		was[i] = 0;
+		if (!zf_takes(zf_ds[i].zd_name, ds))
+			continue;
+		was[i] = zf_ds[i].zd_at[0] != '\0' ? 2 : 1;
+		zf_ds[i].zd_at[0] = '\0';
+	}
+	d = zf_find(ds);
+	if (value != NULL)
+		zf_put(d->zd_props, &d->zd_n, "mountpoint", value);
+	else
+		zf_drop(d, "mountpoint");
+	for (i = 0; i < zf_n; i++) {
+		if (was[i] == 0)
+			continue;
+		(void) zf_get(zf_ds[i].zd_name, "mountpoint", mp, sizeof (mp),
+		    NULL, NULL);
+		(void) zf_get(zf_ds[i].zd_name, "canmount", cm, sizeof (cm),
+		    NULL, NULL);
+		if (mp[0] == '/' && strcmp(cm, "off") != 0 &&
+		    (was[i] == 2 || strcmp(cm, "on") == 0))
+			(void) snprintf(zf_ds[i].zd_at, ZF_VAL, "%s", mp);
+	}
+}
+
 void
 zfake_pool(const char *pool)
 {
@@ -204,6 +288,14 @@ zfake_set(const char *ds, const char *prop, const char *value)
 
 	if ((d = zf_find(ds)) == NULL)
 		zf_die("no such filesystem", ds);
+	/* mounted yes: where its mountpoint says */
+	if (strcmp(prop, "mounted") == 0) {
+		d->zd_at[0] = '\0';
+		if (strcmp(value, "yes") == 0)
+			(void) zf_get(ds, "mountpoint", d->zd_at, ZF_VAL, NULL,
+			    NULL);
+		return;
+	}
 	zf_put(d->zd_props, &d->zd_n, prop, value);
 }
 
@@ -423,7 +515,6 @@ sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
     struct sh_err *e)
 {
 	struct zf_ds *d;
-	int i;
 
 	(void) z;
 	if (zf_fails("inherit", e))
@@ -432,15 +523,10 @@ sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
 		sh_errf(e, "zfake: %s: no such filesystem", ds);
 		return (-1);
 	}
-	for (i = 0; i < d->zd_n; i++) {
-		if (strcmp(d->zd_props[i].zp_name, prop) == 0) {
-			(void) memmove(&d->zd_props[i], &d->zd_props[i + 1],
-			    (size_t)(d->zd_n - i - 1) *
-			    sizeof (d->zd_props[0]));
-			d->zd_n--;
-			break;
-		}
-	}
+	if (strcmp(prop, "mountpoint") == 0)
+		zf_remount(ds, NULL);
+	else
+		zf_drop(d, prop);
 	return (0);
 }
 
@@ -454,24 +540,37 @@ sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 		sh_errf(e, "zfake: %s: no such filesystem", ds);
 		return (-1);
 	}
-	zfake_set(ds, "mounted", "no");
+	zf_find(ds)->zd_at[0] = '\0';
 	return (0);
 }
 
+/* Mounted where its mountpoint says already: nothing to do. */
 int
 sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 {
-	char mp[ZF_VAL];
+	char mp[ZF_VAL], cm[ZF_VAL];
+	struct zf_ds *d;
 
 	if (zf_fails("mount", e))
 		return (-1);
-	if (sh_zfs_get(z, ds, "mountpoint", mp, sizeof (mp), NULL, e) != 0)
+	if (sh_zfs_get(z, ds, "mountpoint", mp, sizeof (mp), NULL, e) != 0 ||
+	    sh_zfs_get(z, ds, "canmount", cm, sizeof (cm), NULL, e) != 0)
 		return (-1);
+	d = zf_find(ds);
 	if (mp[0] != '/') {
 		sh_errf(e, "zfake: %s: no mountpoint", ds);
 		return (-1);
 	}
-	zfake_set(ds, "mounted", "yes");
+	if (strcmp(cm, "off") == 0) {
+		sh_errf(e, "zfake: %s: canmount is off", ds);
+		return (-1);
+	}
+	if (d->zd_at[0] != '\0' && strcmp(d->zd_at, mp) != 0) {
+		sh_errf(e, "zfake: %s: mounted at %s, not its mountpoint", ds,
+		    d->zd_at);
+		return (-1);
+	}
+	(void) snprintf(d->zd_at, ZF_VAL, "%s", mp);
 	return (0);
 }
 
@@ -532,6 +631,13 @@ zf_get(const char *ds, const char *prop, char *val, size_t len,
 	if (strcmp(prop, "type") == 0 || strcmp(prop, "name") == 0) {
 		(void) snprintf(val, len, "%s", prop[0] == 't' ?
 		    "filesystem" : ds);
+		if (src != NULL)
+			*src = SH_ZSRC_NONE;
+		return (0);
+	}
+	if (strcmp(prop, "mounted") == 0) {
+		(void) snprintf(val, len, "%s", d->zd_at[0] != '\0' ? "yes" :
+		    "no");
 		if (src != NULL)
 			*src = SH_ZSRC_NONE;
 		return (0);
@@ -717,7 +823,10 @@ sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
 		sh_errf(e, "zfake: %s: no such filesystem", ds);
 		return (-1);
 	}
-	zfake_set(ds, prop, value);
+	if (strcmp(prop, "mountpoint") == 0)
+		zf_remount(ds, value);
+	else
+		zfake_set(ds, prop, value);
 	return (0);
 }
 
