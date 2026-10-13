@@ -259,3 +259,27 @@ apply --3way implies --index, which refuses a file whose working copy
 differs from the index; earlier patches are applied to the working
 tree only, so the tree is staged before the merge. A test that builds
 twice in one call (a debug line, say) meets "foundation exists".
+
+## Box build: a kept build root and obj cache (d80d842)
+
+Not a tracker issue: test-harness work, at the user's ask, so the box
+build goes faster after the first.
+
+tests/box/build.sh destroyed its pool at the end, the build root and
+box's obj cache with it, so each run was hours. Keeping the obj cache
+alone would not have helped: make goes by the files' times, and the
+build root was a fresh clone of SRC each run. Now the pool's file
+stays, exported between runs, with a store, shbbuild/keep: zbuild and
+box's obj cache per branch. A run renames them into the layout it
+bootstraps and back; the rest is made anew. CLEAN is off by default
+since FreeBSD 14 (checked on releng/15.1 and stable/15), so the next
+build of the branch is incremental. shtetl needs no change: an obj
+cache that stays is 4.6's design.
+
+Gotcha: bootstrap refuses a dataset that is already a root, so the
+put-away takes shtetl:space off the build root before it goes back
+to the store. A build stopped among its patches leaves the tree
+patched: the put-away rolls it back to @shtetl-patch-0 first.
+
+Verification: sh -n, gate; the box's next run is the first with the
+store, and builds whole; the one after shows the gain.
