@@ -3,7 +3,8 @@
 # box column of tests/MATRIX.md families F (F11 - F13, F19 among them)
 # and P (P17: patches made from the branch's own tree, one already in,
 # one applied, one that conflicts and pauses the build, fixed here and
-# carried on into the build).
+# carried on into the build); then F27, box built again, an update
+# over the first, on the obj cache the first left.
 # A buildworld and buildkernel take hours the first time; nothing here
 # asks anything, so start it and leave it.
 #
@@ -407,6 +408,56 @@ EOF
 	zfs inherit mountpoint $F
 	check F11 "the run's log kept" \
 	    "$([ -s "$RUNS/box/build.log" ] && echo yes)" yes
+
+	echo "== F27: box again, an update over it (the obj cache warm)"
+	# the conflicting patch gone from the recipe's directory
+	rm -f "$ALT/zconfig/patches/box/3-two.patch"
+	_t0=$(date +%s)
+	sht build -y box
+	_t1=$(date +%s)
+	echo "# $(( (_t1 - _t0) / 60 )) minutes"
+	sed 's/^/    /' "$T/out"
+	check F27 "exit" "$RC" 0
+	if [ "$RC" != 0 ]; then
+		sed 's/^/    /' "$T/err"
+		tail -40 "$RUNS/box/build.log" | sed 's/^/    /'
+		return 1
+	fi
+	has F27 "the plan an update" "$T/out" "foundation box, an update of @$_v"
+	has F27 "delete-old before the install" "$T/out" \
+	    "make delete-old delete-old-libs"
+	_v2=$(zfs list -H -t snapshot -o name -s createtxg $F | tail -1)
+	_v2=${_v2#*@}
+	echo "# version $_v2"
+	case "$_v2" in
+	"$_v") no "F27 a new version: still $_v" ;;
+	[0-9]*-releng-*|[0-9]*-stable-*|[0-9]*-current-*)
+		ok "F27 a new version, on the same datasets" ;;
+	*)	no "F27 a new version: $_v2" ;;
+	esac
+	check F27 "two versions on each dataset" \
+	    "$(zfs list -H -t snapshot -o name -r $F/usr/local | wc -l |
+	    tr -d ' ')" 2
+	check F27 "the first kept" \
+	    "$(zfs list -H -o name "$F@$_v" 2>/dev/null)" "$F@$_v"
+	zfs set mountpoint=/look $F
+	for _d in $F $F/tmp $F/var $F/usr/local; do
+		zfs mount "$_d"
+	done
+	check F27 "no kernel.old" \
+	    "$([ -e "$_r/boot/kernel.old" ] && echo there)" ""
+	check F27 "no loader backup" \
+	    "$(ls "$_r/boot" | grep -c '\.old$')" 0
+	check F27 "no ld-elf backup" \
+	    "$(ls "$_r/libexec" | grep -c '^ld-elf.*\.so\.1\.old$')" 0
+	check F27 "no init.bak" \
+	    "$([ -e "$_r/sbin/init.bak" ] && echo there)" ""
+	check F27 "the new tree installed: one patch line now" \
+	    "$(grep -c '^shtetl-box ' "$_r/usr/share/misc/bsd-family-tree")" 1
+	for _d in $F/usr/local $F/var $F/tmp $F; do
+		zfs unmount "$_d"
+	done
+	zfs inherit mountpoint $F
 
 	echo "== $pass ok, $fail failed"
 	[ "$fail" = 0 ]
