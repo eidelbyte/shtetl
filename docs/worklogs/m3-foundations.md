@@ -159,3 +159,41 @@ and the first run of build.sh. tracker: m3-zfs and m3-build testing.
 
 Gotcha: a box cell that only counts refusals passes on any words.
 Read refusals by their words, the name included.
+
+## Box run 2, box build 1 (f0a6f76, 90f58e7)
+
+Box run 2 (run.sh at c46e87c): 89 ok, 0 failed, the refusals by their
+words included.
+
+Box build 1 (build.sh): F13 passed; F11, the real build, failed after
+the fetch: "foundation-builds/box: mountpoint or dataset is busy".
+
+- **A mountpoint mounts (f0a6f76).** fb_mountat sets the obj cache's
+  mountpoint and mounts it. libzfs's zfs_prop_set runs a changelist
+  whose postfix mounts every dataset taking that mountpoint whose
+  canmount is on, mounted before or not (libzfs_changelist.c), and
+  zfs_mount then fails EBUSY on a mounted one. The fake never mounted
+  on a set, so check_build passed. Now the fake moves mounts on a set
+  or inherit of mountpoint as the changelist does, and sh_zfs_mount,
+  both sides, does nothing for a dataset mounted at its mountpoint
+  and refuses one mounted elsewhere, with no mountpoint, or canmount
+  off (zfs_mount passed over those two saying nothing). With the old
+  mount, check_build's run fails on the mac as the box's did.
+- **Decision: keep libzfs's moves on set and inherit** rather than
+  zfs set -u's: bootstrap's mountpoint=none on the lake and run roots
+  relies on it to unmount them, and inherit has no -u. The build's
+  undo inherits after it unmounts, and the lake's mountpoint is none
+  (4.1), so nothing is mounted again; a lake with a real mountpoint
+  would see F mounted there after a build.
+- **The logs come back by themselves (90f58e7)**, at the user's ask:
+  tests/box/send.sh commits and pushes each run's log as the person
+  who ran sudo, through su; a push that cannot go is said.
+
+New cells Z12, Z13 (check_zfs 128 checks; zcheck 44 cells over the
+fake). Verification: make check from clean, gate, xcheck, box_send
+against a scratch remote. Pending: box run 3 (Z12, Z13 on libzfs)
+and box build 2.
+
+Gotcha: a fake that is simpler than libzfs hides exactly the bugs a
+box finds late. Where libzfs does something on the side (mounts on a
+set), the fake has to as well.
