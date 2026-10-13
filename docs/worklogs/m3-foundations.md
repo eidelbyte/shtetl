@@ -283,3 +283,18 @@ patched: the put-away rolls it back to @shtetl-patch-0 first.
 
 Verification: sh -n, gate; the box's next run is the first with the
 store, and builds whole; the one after shows the gain.
+
+## Box build 3 (461df60)
+
+At 5802782: 42 ok, 0 failed. P17 for real: the build paused at
+3-two.patch with a conflict marker (exit 3), 2-in already in from the
+file:// git source, 1-one applied; --continue refused while the
+marker was left; resolved by the script, --continue built world and
+kernel in 30 minutes, and F's /usr/share/misc/bsd-family-tree has
+both lines, so the patched tree is what was built. shtetl:patches,
+the fix, the rollback and the record's end all as planned. tracker:
+m3-patches tested.
+
+The kept store (d80d842) was not in this run: the box had not pulled
+it, the log's header says 5802782. Its first run builds whole; the
+one after shows the gain.

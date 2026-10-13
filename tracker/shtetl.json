@@ -157,8 +157,8 @@
     ],
     "provides": "Patched foundations, a failing patch pausing the build for a person.",
     "estimated_size": "large",
-    "completed": "testing",
-    "note": "Built on the mac (78d5fbd, 4030885, 46a565d, 8d8645b): patches, the pause, --continue/--skip/--abort. Box P17 inside build.sh's real build pending."
+    "completed": "tested",
+    "note": "Built on the mac (78d5fbd, 4030885, 46a565d, 8d8645b): patches, the pause, --continue/--skip/--abort. Box P17 inside build.sh's real build pending. Box build 3 (461df60) green: P17 paused, refused, fixed, built."
   },
   "m3-update": {
     "description": "Update foundation F (planning.md 7.2): 7.1 steps 3 - 8 on the same datasets; delete-old and delete-old-libs before the install; the install with install -C; installworld's backups removed after their schg flags are cleared; the datasets checked to match the previous version's; refused at a securelevel above 0, where schg cannot be cleared. Verify: MATRIX cells in family F; the box.",
