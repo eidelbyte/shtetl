@@ -382,3 +382,18 @@ schg cleared as root; and the changed init is checked in F. Also: the
 look's "cannot mount ... already mounted", zfs set mountpoint having
 mounted them, is gone (lookat), and the loops no longer reuse P17's
 variable. m3-update stays testing until that runs.
+
+## Box build 5 (e820db9): M3 done
+
+At 993bd7a: 62 ok, 0 failed, from the kept store (the first build 1
+minute, the update 1 minute). F27 for what it meant: installworld
+left libexec/ld-elf.so.1.old, libexec/ld-elf32.so.1.old and
+sbin/init.bak, schg on them, and shtetl removed them; the changed init
+is in F; the command wrote /etc/motd.template again over
+distribution's. tracker: m3-update tested, and with it every M3
+issue. planning.md 12 marks M3 built.
+
+Open with the user: installkernel rewrites all of a foundation's
+/boot/kernel on every update (7.2 as built); shtetl could install the
+kernel itself, into a scratch directory, and copy it in with install
+-C so unchanged modules keep their objects.

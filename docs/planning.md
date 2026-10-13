@@ -1434,7 +1434,7 @@ by the command line run over two configuration roots
 | M0 | probes (section 13) | box |
 | M1 | skeleton, UCL loader, schema, cascade, `shtetl config show`; built 2026-10-11 (tests/MATRIX.md family C, all covered; make check and make check-freebsd pass on the box); the cascade reworked 2026-10-12 for the stacking rulings and the default layer (docs/worklogs/m3-stacking.md) | mac |
 | M2 | discovery, bootstrap, property table; built 2026-10-11 (tests/MATRIX.md families R, D, B on the mac; tests/box/run.sh passes on the box, 2026-10-12) | box |
-| M3 | foundation build and update into zlake, patches and the pause included; pkg-upgrade; under way: versions, ZFS calls and the build of a new foundation built and tested on the mac (tracker/shtetl.json, docs/worklogs/m3-foundations.md) | box |
+| M3 | foundation build and update into zlake, patches and the pause included; pkg-upgrade; built 2026-10-13 (tests/MATRIX.md families V, Z, F, P on the mac; tests/box/run.sh and tests/box/build.sh pass on the box, a real releng/15.1 build, pause, update and pkg-upgrade among them, 2026-10-14; tracker/shtetl.json, docs/worklogs/m3-foundations.md) | box |
 | M4 | beam-down, new container, save with messages, the zlake mirror | box |
 | M5 | update into staging, history replay, gate handling and derivations, cutover, abandon | box |
 | M6 | systems: outer space, one-shot boot, update | box/VM |

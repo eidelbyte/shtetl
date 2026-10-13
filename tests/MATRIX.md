@@ -425,7 +425,7 @@ immutable}; an update's end {built, failed, paused and aborted}.
 | F24 | an update the same day as the last version: the name with .2 | covered: check_build.c |
 | F25 | an update that fails: F's datasets rolled back to the last version, not destroyed; mounts, mountpoints and the mark undone as for a new build | covered: check_build.c |
 | F26 | an update paused at a patch: --abort rolls F back to its last version; --continue goes on to the update | covered: check_build.c |
-| F27 | for real: a second build of box on the box, an update over the first, on the kept obj cache: the version .2, delete-old run, no backup left, the command's /etc/motd.template written again over distribution's; init and rtld changed by a patch each, so installworld makes backups to remove | box: tests/box/build.sh. Build 4 (63df125, at 97d62c7) green, the update 1 minute on the kept obj cache; but the same commit made no backup, so their removal went unseen: F27 now changes init and rtld |
+| F27 | for real: a second build of box on the box, an update over the first, on the kept obj cache: the version .2, delete-old run, no backup left, the command's /etc/motd.template written again over distribution's; init and rtld changed by a patch each, so installworld makes backups to remove | box: tests/box/build.sh. Build 4 (63df125, at 97d62c7) green, the update 1 minute on the kept obj cache; but the same commit made no backup, so their removal went unseen: F27 now changes init and rtld. Build 5 (e820db9, at 993bd7a) green: ld-elf.so.1.old, ld-elf32.so.1.old and init.bak made and removed, schg cleared as root; the command run again |
 | F28 | pkg-upgrade planned (planning.md 7.2, 6.1): from F's last snapshot, a version or a -pkg of one; the snapshot to take its version's -pkg, then -pkg.2 and on; shown | covered: check_build.c |
 | F29 | pkg-upgrade refused: no lake or build root, no such foundation, F with no version, a build under way or paused | covered: check_build.c |
 | F30 | pkg-upgrade's run: the build root's mark; F and its datasets mounted below the run directory, placeholders not; devfs and the host's resolv.conf while pkg runs; pkg -c <root> upgrade -y; all of it undone; snapshot -r with shtetl:kind=pkg, shtetl:commit (-m, or its own), and the version's shtetl:config, shtetl:config-guid and shtetl:patches carried over | covered: check_build.c |
@@ -445,7 +445,8 @@ paused at a patch and carried on. The pool's file stays between
 runs, exported, keeping the build root and box's obj cache for the
 branch, so a later build is incremental; --clean drops them. Build 4
 was its first: the first build whole in 30 minutes, the update over
-its obj cache in 1.
+its obj cache in 1. Build 5 started from the store: the first build 1
+minute too.
 
 
 # Family P: patches and the pause (M3; planning.md 7.1.1; src/core/patch.c, src/core/build.c)
