@@ -4,8 +4,9 @@
 # and P (P17: patches made from the branch's own tree, one already in,
 # one applied, one that conflicts and pauses the build, fixed here and
 # carried on into the build); then F27, box built again, an update
-# over the first, on the obj cache the first left; and F33, its
-# packages upgraded, the update's -pkg.
+# over the first, on the obj cache the first left; F33, its packages
+# upgraded, the update's -pkg; and M8, box beamed to the run root,
+# whole and then incremental.
 # A buildworld and buildkernel take hours the first time; nothing here
 # asks anything, so start it and leave it.
 #
@@ -87,6 +88,7 @@ teardown() {
 		zfs rename $P/zbuild $KEEP/zbuild
 	fi
 	zfs destroy -r $P/shtetl 2>/dev/null
+	zfs destroy -R $P/run 2>/dev/null
 	zfs destroy -r $P/zconfig 2>/dev/null
 	zpool export $P
 	runfiles
@@ -242,10 +244,11 @@ cases() {
 		    return 1
 	fi
 	zfs create $P/shtetl
+	zfs create $P/run
 	zfs create -o mountpoint=/zconfig $P/zconfig
 
-	echo "== bootstrap: lake, config, build"
-	sht bootstrap -y --lake $P/shtetl --config $P/zconfig \
+	echo "== bootstrap: lake, run, config, build"
+	sht bootstrap -y --lake $P/shtetl --run $P/run --config $P/zconfig \
 	    --build $P/zbuild
 	check B10 "bootstrap" "$RC" 0
 	[ "$RC" = 0 ] || { sed 's/^/    /' "$T/err"; return 1; }
@@ -501,6 +504,36 @@ EOF
 	    "$(prop "$F@$_v2" shtetl:config)"
 	check F33 "F unmounted, the mark cleared" \
 	    "$(prop $F mounted) $(srcof $P/zbuild shtetl:build)" "no -"
+
+	echo "== M8: box to zrun, its first version whole, its newest after"
+	_rf=$P/run/foundations/box
+	sht beam -y --version "$_v" box
+	sed 's/^/    /' "$T/out"
+	check M8 "the first beam's exit" "$RC" 0
+	[ "$RC" = 0 ] || sed 's/^/    /' "$T/err"
+	check M8 "each dataset received" \
+	    "$(zfs list -H -t snapshot -o name -r $_rf | grep -c "@$_v\$")" 5
+	check M8 "readonly, inherited below" \
+	    "$(prop $_rf readonly) $(srcof $_rf/usr/local readonly)" \
+	    "on inherited from $_rf"
+	check M8 "canmount noauto, the placeholder's off" \
+	    "$(prop $_rf canmount) $(prop $_rf/usr canmount)" "noauto off"
+	check M8 "nothing mounted" \
+	    "$(zfs get -H -o value -r mounted $_rf | grep -c yes)" 0
+	check M8 "shtetl:* copied, the config too" \
+	    "$(prop "$_rf/var@$_v" shtetl:kind) $(prop "$_rf@$_v" shtetl:config)" \
+	    "version $(prop "$F@$_v" shtetl:config)"
+	sht beam -y box
+	sed 's/^/    /' "$T/out"
+	check M8 "the later beam's exit" "$RC" 0
+	[ "$RC" = 0 ] || sed 's/^/    /' "$T/err"
+	check M8 "the newest, the update's -pkg, from the first" \
+	    "$(zfs list -H -t snapshot -o name -s createtxg $_rf | tail -1)" \
+	    "$_rf@$_v2-pkg"
+	check M8 "its kind pkg" "$(prop "$_rf/usr/local@$_v2-pkg" \
+	    shtetl:kind)" pkg
+	sht beam -y box
+	check M8 "beamed again: refused, on zrun already" "$RC" 1
 
 	echo "== $pass ok, $fail failed"
 	[ "$fail" = 0 ]
