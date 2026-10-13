@@ -947,6 +947,16 @@ a version is an update; there with none, it is refused.
   history, which an update never destroys. A paused build is an
   update when F has a version.
 
+`shtetl pkg-upgrade [-y] [-m msg] F` as built: from F's last snapshot
+(a version, or a `-pkg` of one), shown and confirmed as a build is;
+the build root's mark taken, so it and a build never overlap; F and
+its datasets mounted below the run directory, placeholders not;
+devfs and the host's resolv.conf while pkg runs; `pkg -c <root>
+upgrade -y`; the snapshot `<version>-pkg` (`-pkg.2` and on after the
+first), `shtetl:kind=pkg`, carrying the version's `shtetl:config`,
+`shtetl:config-guid` and `shtetl:patches` (PROPOSAL); on a failure, F
+back to its last snapshot.
+
 **`install -C`** (ruled 2026-10-11, Q-O). Left to itself, installworld
 rewrites every file, so on the onto side every file has a new object,
 generation and ctime, and the rebase decides each one on content

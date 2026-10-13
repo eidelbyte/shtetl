@@ -192,6 +192,7 @@
     ],
     "provides": "Base-plus-packages versions to rebase onto.",
     "estimated_size": "small",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "Built on the mac (4359f03), box F33 in build.sh (28a185d) pending."
   }
 }

@@ -330,3 +330,27 @@ testing.
 Gotcha: a test's fixed time makes every build the same second; the
 config snapshot's suffix keeps them apart, and the version's .2 does
 the same for a second version on one day.
+
+## m3-pkg-upgrade (4359f03, 28a185d)
+
+shtetl pkg-upgrade F (planning.md 7.2, 6.1): from F's last snapshot,
+pkg -c <root> upgrade -y in a chroot of F, and the version's -pkg
+(-pkg.2 and on) with shtetl:kind=pkg.
+
+- It takes the build root's mark, so a pkg upgrade and a build never
+  overlap, and refuses while one is under way or paused.
+- The -pkg carries its version's shtetl:config, config-guid and
+  patches over (PROPOSAL), so it says what it was made from; its
+  commit message is -m's or "pkg upgrade of <version>".
+- A failure rolls F back to its last snapshot, as an update's does.
+- fb_chroot (devfs, resolv.conf) is shared with the build's pkg and
+  commands now; fb_snapshot takes the kind.
+
+Verification: check_build 628 checks (F28 - F31), run-cli.sh F32,
+make check, gate, xcheck. Pending: F33 on the box, after F27.
+tracker: m3-pkg-upgrade testing.
+
+Open for the user: planning.md's rulings say "Commands never rerun on
+update", which reads as the containers' (7.6 rebases them); 7.2 has a
+foundation's update repeat 7.1's steps 3 - 8, its pkg and commands
+among them, and that is how the update is built.
