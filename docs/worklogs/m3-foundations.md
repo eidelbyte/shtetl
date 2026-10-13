@@ -109,3 +109,53 @@ xcheck. Not yet: a real build on the box (tracker: m3-build testing).
 Gotcha: tests/check.h's scratch_path returns one static buffer. Two
 calls in one argument list give the same path twice; copy each before
 the next. It cost the run's test a long look.
+
+## Box prep, box run 1 (1102eb9 - 3865eef; 3b50a35, e600e2f)
+
+Not a tracker issue of its own: the box side of m3-zfs and m3-build.
+
+- **Z11 (1102eb9).** tests/box/zcheck.c runs family Z's cells
+  against libzfs, under a dataset run.sh makes for it ($P1/zc) and
+  destroys after. Built by make freebsd as build/box_zcheck.
+- **The altroot (80c587d).** Writing build.sh, which imports its pool
+  with -R, showed DESTDIR and MAKEOBJDIRPREFIX taking the mountpoint
+  as set, not where it is mounted below the altroot. The build now
+  reads each mount's path back after mounting (fb_mountat).
+- **tests/box/build.sh (375ff96).** A real build on a throwaway pool
+  on a sparse file, imported with an altroot: F13, undo on a failed
+  fetch, then F11, F12, F16, F17 and F19 after a real build, F left
+  mounted at /look for a look. --clean takes it all away.
+- **The link (3865eef).** The first make freebsd on the box failed to
+  link box_zcheck: err.o needs tree.o, and nothing on the mac had
+  linked zcheck.c. make check now links it against the stub.
+
+Box run 1 (run.sh): 77 ok, 2 failed.
+
+- **Z8, the cell wrong (3b50a35).** It inherited f/usr's mountpoint
+  with nothing above set, so ZFS rightly said default; check_zfs.c
+  sets f's first. zcheck now does too. Z11's failure was the exit.
+- **The refusals, in errno words (e600e2f).** Every refusal cell
+  passed, but zcheck only counted messages, and src/fbsd/zfs.c said
+  strerror: "File exists", "Device busy", and Z2's named f@v3 when
+  f/usr@v2 was the one taken. Read against the fake, the fake was
+  wrong twice: it refused a destroy for children before snapshots,
+  and ZFS looks at snapshots first; and it refused destroying a
+  missing snapshot, which lzc_destroy_snaps counts as destroyed. The
+  libzfs layer now says the fake's words, from the errno where it is
+  unambiguous and from the pool where not (rollback's EEXIST is a
+  bookmark too, destroy's EBUSY a held dataset too); a missing
+  snapshot is refused before the call. zcheck reads each refusal by
+  its words and gained the fake's refusals it lacked.
+
+Decision, beyond the plan: **make check runs zcheck's cells over the
+fake** (tests/box/zcheck-fake.c, zcheck.c's main built as
+zcheck_main), 38 cells. Run 1's zcheck fails exactly its Z8 cell
+there; a box cell that disagrees with the fake shows on the mac, and
+the box then only says whether libzfs agrees with both.
+
+Verification: make check from clean (check_zfs 101 checks, zcheck
+over the fake 38 cells), gate, xcheck. Pending: box run 2 of run.sh,
+and the first run of build.sh. tracker: m3-zfs and m3-build testing.
+
+Gotcha: a box cell that only counts refusals passes on any words.
+Read refusals by their words, the name included.
