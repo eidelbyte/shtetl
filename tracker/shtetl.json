@@ -117,7 +117,8 @@
     ],
     "provides": "Everything the build asks of ZFS, faked faithfully enough to test the build on the mac.",
     "estimated_size": "medium",
-    "completed": "testing"
+    "completed": "tested",
+    "note": "Box run 3 (dc2be99) green: 95 ok, Z11 - Z13 on libzfs."
   },
   "m3-build": {
     "description": "shtetl build F for a new foundation (planning.md 7.1, without patches): the recipe resolved and checked; the plan shown and confirmed as bootstrap's is (-y); one build at a time (shtetl:build on the src root); the config root snapshotted and the snapshot recorded (4.4, shtetl:config); zlake/foundations/F pre-split before anything is installed; the checkout of src_branch in zbuild; the kernel config and src.conf shtetl writes (kernconf, buildopts); make buildworld buildkernel with MAKEOBJDIRPREFIX on foundation-builds/F; installworld, installkernel and distribution with INSTALL_CMD=\"install -C\"; pkg and commands in a chroot of F; snapshot -r with the version name and shtetl:kind, shtetl:commit, shtetl:config, shtetl:patches; every mount undone on every way out. Programs from a table the tests point at fakes. Verify: MATRIX family F (the build) before its tests, over the fake ZFS and fake make, git and pkg; the box for a real build.",
@@ -137,7 +138,8 @@
     ],
     "provides": "A foundation built from its recipe into zlake, one version snapshot.",
     "estimated_size": "large",
-    "completed": "testing"
+    "completed": "tested",
+    "note": "Box build 2 (dc2be99) green: 26 ok; a real releng/15.1 build into box@15.1-releng-2026-10-13-e38a7085f3a8."
   },
   "m3-patches": {
     "description": "Patches and the pause (planning.md 7.1.1): the sources fetched into the run directory; *.patch in natural order; a snapshot of the src root before each; git apply, a patch already in skipped; anything else applied with --3way or --reject and the build paused, recorded on the src root and in the run directory; build F --continue (no conflict marker or .rej left; the fix written out as .fixed), --skip, --abort; the src root rolled back when the build ends; shtetl:patches on the version. Verify: MATRIX family P before tests, with a fake git; the box with real patches.",

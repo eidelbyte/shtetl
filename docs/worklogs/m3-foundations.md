@@ -197,3 +197,13 @@ and box build 2.
 Gotcha: a fake that is simpler than libzfs hides exactly the bugs a
 box finds late. Where libzfs does something on the side (mounts on a
 set), the fake has to as well.
+
+## Box run 3, box build 2 (b12f0c2)
+
+Both green at dc2be99, the logs sent back by the scripts themselves
+(2f0e789, b12f0c2, committed on the box as its user). run.sh: 95 ok,
+Z12 and Z13 on libzfs among them. build.sh: 26 ok, a real releng/15.1
+buildworld, buildkernel and install into
+shbbuild/shtetl/foundations/box@15.1-releng-2026-10-13-e38a7085f3a8,
+with the undo, the version's properties and F19's altroot checked.
+tracker: m3-zfs and m3-build tested.
