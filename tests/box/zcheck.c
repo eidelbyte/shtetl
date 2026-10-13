@@ -190,15 +190,27 @@ main(int argc, char **argv)
 	    sh_zfs_get(z, at("f/var"), "type", t1, sizeof (t1), NULL,
 	    &e) == 1);
 
-	/* Z8, Z9: inherit; unmount and mount */
-	rc = sh_zfs_set(z, at("f/usr"), "mountpoint", "/zcheck-usr", &e);
+	/*
+	 * Z8, Z9: inherit; unmount and mount. f sets the mountpoint f/usr
+	 * inherits, as in check_zfs.c: nothing above f does, so what f
+	 * inherits is the default. The values carry run.sh's altroot, so
+	 * f/usr's is read against f's.
+	 */
+	rc = sh_zfs_set(z, at("f"), "mountpoint", "/zcheck-f", &e);
+	rc |= sh_zfs_set(z, at("f/usr"), "mountpoint", "/zcheck-usr", &e);
 	(void) get(at("f/usr"), "mountpoint", &src);
 	cell("Z8", "a mountpoint set locally", rc == 0 &&
 	    src == SH_ZSRC_LOCAL);
 	rc = sh_zfs_inherit(z, at("f/usr"), "mountpoint", &e);
-	(void) get(at("f/usr"), "mountpoint", &src);
-	cell("Z8", "and inherited again", rc == 0 &&
+	(void) snprintf(name, sizeof (name), "%s/usr",
+	    get(at("f"), "mountpoint", NULL));
+	cell("Z8", "and inherited again, f's below it", rc == 0 &&
+	    strcmp(get(at("f/usr"), "mountpoint", &src), name) == 0 &&
 	    src == SH_ZSRC_INHERITED);
+	rc = sh_zfs_inherit(z, at("f"), "mountpoint", &e);
+	(void) get(at("f"), "mountpoint", &src);
+	cell("Z8", "f's inherited where none is set: the default",
+	    rc == 0 && src == SH_ZSRC_DEFAULT);
 	cell("Z9", "unmounted",
 	    sh_zfs_unmount(z, at("f/usr"), &e) == 0 &&
 	    strcmp(get(at("f/usr"), "mounted", NULL), "no") == 0);
