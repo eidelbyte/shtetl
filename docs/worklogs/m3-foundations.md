@@ -397,3 +397,33 @@ Open with the user: installkernel rewrites all of a foundation's
 /boot/kernel on every update (7.2 as built); shtetl could install the
 kernel itself, into a scratch directory, and copy it in with install
 -C so unchanged modules keep their objects.
+
+## m3-kernel-install
+
+At the user's ruling (planning.md 14, 2026-10-14): the kernel goes
+in through a scratch directory, so an update stops writing every
+kernel file anew (installkernel into F removes its /boot/kernel
+first, sys/conf/kern.post.mk).
+
+- installkernel with DESTDIR the obj cache's kernel-install (on the
+  lake, sized for builds); fb_make takes a DESTDIR other than F's.
+- fb_sync walks it into F: fb_put leaves a file alike as it is (its
+  mode and owner set if they differ), and copies a changed or new
+  one with mode, owner and times kept (install -p, as kern.post.mk
+  installs them); symlinks alike. boot/kernel and
+  usr/lib/debug/boot/kernel are mirrored, what the new kernel has not
+  removed, a debug directory included when the new kernel has none.
+  Anything else installkernel wrote is synced without removals.
+- installkernel leaving no boot/kernel fails the build, rather than
+  the mirror emptying F's. kernel-install is removed after.
+- Said: "kernel into F: n kept, m copied, k removed".
+
+Verification: check_build 648 checks (F34: into an empty F, then an
+update with a module the same, one changed, one new, one gone and no
+debug directory; the unchanged module's inode the same; the counts;
+no boot/kernel refused); a mutation copying every file fails it.
+make check, gate, xcheck. Pending: the box, F27's update keeping a
+module's object. tracker: m3-kernel-install testing.
+
+Gotcha, again: scratch_path's one buffer; two calls in one rm -rf
+removed the same directory twice and the other not at all.

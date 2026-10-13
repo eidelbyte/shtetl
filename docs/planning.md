@@ -948,8 +948,14 @@ a version is an update; there with none, it is refused.
   foundation. installkernel keeps the old kernel only when installing
   over the running kernel's directory, which a DESTDIR's never is;
   otherwise it removes the directory first (`sys/conf/kern.post.mk`).
-  So every update writes all of `/boot/kernel` anew, `install -C` or
-  not, and the rebase's onto side has every kernel file changed.
+  So every update would write all of `/boot/kernel` anew, `install -C`
+  or not, and the rebase's onto side would have every kernel file
+  changed. shtetl installs the kernel itself, every build alike (ruled
+  2026-10-14): installkernel into the obj cache's `kernel-install`,
+  then synced into F as `install -C` would, a file alike left as it is
+  with its object, a changed or new one copied in (mode, owner and
+  times kept), and `boot/kernel` and `usr/lib/debug/boot/kernel`
+  mirrored, a file the new kernel has not removed.
   `ld-elf*.so.1.old` and `init.bak` come about when the new binary
   differs, as on any update to a newer commit.
 - A failed update, and `--abort` of a paused one, roll every dataset
@@ -1540,6 +1546,17 @@ below that change the plan are folded into the sections named.
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-14 (the kernel through a scratch directory)
+
+Told that installkernel removes a foundation's `/boot/kernel` before
+it installs, every update writing every kernel file anew, and asked
+whether shtetl should install into a scratch directory and copy in
+with `install -C`: "we should do that additional dir and kernel
+install dance. that's a good and small addition."
+
+So (7.2 as built): every build installs the kernel into the obj
+cache's `kernel-install` and syncs it into F, unchanged files kept.
 
 ### 2026-10-13 (a foundation's update runs its commands again)
 
