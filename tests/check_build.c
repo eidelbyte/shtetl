@@ -1104,6 +1104,7 @@ static void
 test_patches(void)
 {
 	char text[4096], url[1300], commit[64], snap[256];
+	struct stat st;
 	char *out;
 	size_t len;
 	FILE *f;
@@ -1133,6 +1134,9 @@ test_patches(void)
 	CHECK(strstr(out, text) != NULL);
 	free(out);
 	/* P3 - P7: two sources, each whole, each in natural order */
+	(void) snprintf(text, sizeof (text), "touch -t 200001010000 %s/a.c "
+	    "%s/b.c", tree, tree);
+	sh("%s", text);
 	CHECK(build(NULL) == 0);
 	{
 		char l1[1400], l2[1400], l3[1400], l4[1400];
@@ -1161,6 +1165,17 @@ test_patches(void)
 	CHECK(is(slurp(text), base_a));
 	(void) snprintf(text, sizeof (text), "%s/c.c", tree);
 	CHECK(access(text, F_OK) != 0);
+	/*
+	 * P15: the patched files given the time of now, not the old ones
+	 * the rollback gave back; c.c, made by a patch, gone with it
+	 */
+	CHECK(strstr(ran, "rolled back tank/zbuild to @shtetl-patch-0\n"
+	    "the time of now on 2 patched files, for the next build's "
+	    "make\n") != NULL);
+	(void) snprintf(text, sizeof (text), "%s/a.c", tree);
+	CHECK(stat(text, &st) == 0 && st.st_mtime > time(NULL) - 3600);
+	(void) snprintf(text, sizeof (text), "%s/b.c", tree);
+	CHECK(stat(text, &st) == 0 && st.st_mtime > time(NULL) - 3600);
 	/* P5, P15: every patch snapshot gone, the rollback to the first */
 	CHECK(is(zfake_last_rollback(), "tank/zbuild@shtetl-patch-0"));
 	for (len = 0; len <= 4; len++) {

@@ -1415,9 +1415,9 @@ fb_tree(struct fb *b, char *id, size_t len)
 	return (0);
 }
 
-/* The files the patch PA touches, as git apply --numstat -z says. */
+/* The files the patch PATCH touches, as git apply --numstat -z says. */
 static char **
-fb_touched(struct fb *b, const struct fb_pa *pa)
+fb_touched(struct fb *b, const char *patch)
 {
 	const char *w[8];
 	char *out, **files;
@@ -1429,7 +1429,7 @@ fb_touched(struct fb *b, const struct fb_pa *pa)
 	w[3] = "apply";
 	w[4] = "--numstat";
 	w[5] = "-z";
-	w[6] = pa->pa_path;
+	w[6] = patch;
 	w[7] = NULL;
 	if (fb_run(b, w, NULL, 1 << 20, &out, &len, 0) != 0)
 		return (NULL);
@@ -1457,7 +1457,7 @@ fb_pause(struct fb *b, size_t i)
 	loc = sh_obj_get(p->fp_recipe.sr_merged, "patches")->
 	    sn_obj.ob_v[pa->pa_src].pr_key;
 	if (fb_tree(b, b->fb_pz.pz_base, sizeof (b->fb_pz.pz_base)) != 0 ||
-	    (files = fb_touched(b, pa)) == NULL)
+	    (files = fb_touched(b, pa->pa_path)) == NULL)
 		return (-1);
 	if (fb_apply(b, "--3way", NULL, pa->pa_path) == 0) {
 		how = "merged three ways without conflict, to be looked over";
@@ -1513,7 +1513,7 @@ fb_fixed(struct fb *b)
 	FILE *f;
 	int left, bad;
 
-	if ((files = fb_touched(b, pa)) == NULL)
+	if ((files = fb_touched(b, pa->pa_path)) == NULL)
 		return (-1);
 	left = sh_patch_left(p->fp_srcdir, files, b->fb_err);
 	sh_patch_list_free(files);
@@ -1768,9 +1768,78 @@ fb_unrecord(struct fb *b)
 		sh_errf(b->fb_err, "%s: %s", path, strerror(errno));
 }
 
+/* The files the patch PATCH touches, each added to *ALL once. */
+static int
+fb_retouch1(struct fb *b, const char *patch, char ***all)
+{
+	char **files;
+	size_t i, j;
+	int r;
+
+	if ((files = fb_touched(b, patch)) == NULL)
+		return (-1);
+	r = 0;
+	for (i = 0; r == 0 && files[i] != NULL; i++) {
+		for (j = 0; (*all)[j] != NULL &&
+		    strcmp((*all)[j], files[i]) != 0; j++)
+			;
+		if ((*all)[j] == NULL && fb_kid(all, files[i]) != 0) {
+			sh_err_nomem(b->fb_err);
+			r = -1;
+		}
+	}
+	sh_patch_list_free(files);
+	return (r);
+}
+
+/*
+ * The files the first TAKEN patches touched, and a fix by hand did,
+ * given the time of now once the build root is rolled back: the
+ * rollback gives them back their times from before the patches,
+ * older than the objects the obj cache built from them, so the next
+ * build's make, which goes by times, would take those as up to date,
+ * a patch since dropped still in them.
+ */
+static void
+fb_retouch(struct fb *b, size_t taken)
+{
+	char fix[SH_BUILD_PATH * 2], path[SH_BUILD_PATH * 2], **all;
+	struct fb_pa *pa;
+	size_t i, n;
+
+	if (b->fb_pa == NULL || (all = calloc(1, sizeof (*all))) == NULL)
+		return;
+	for (i = 0; i < taken && i < b->fb_npa; i++) {
+		pa = &b->fb_pa[i];
+		if (fb_retouch1(b, pa->pa_path, &all) != 0)
+			break;
+		if (b->fb_pz.pz_out[i] != SH_PO_FIXED)
+			continue;
+		(void) snprintf(fix, sizeof (fix), "%s/fixed/%zu/%s",
+		    b->fb_p->fp_rundir, pa->pa_src + 1, pa->pa_name);
+		if (fb_retouch1(b, fix, &all) != 0)
+			break;
+	}
+	for (i = n = 0; all[i] != NULL; i++) {
+		(void) snprintf(path, sizeof (path), "%s/%s",
+		    b->fb_p->fp_srcdir, all[i]);
+		if (utimensat(AT_FDCWD, path, NULL, AT_SYMLINK_NOFOLLOW) == 0)
+			n++;
+		else if (errno != ENOENT)
+			sh_errf(b->fb_err, "%s: %s", path, strerror(errno));
+		free(all[i]);
+	}
+	free(all);
+	if (n > 0)
+		(void) fprintf(b->fb_out, "the time of now on %zu patched "
+		    "file%s, for the next build's make\n", n, n == 1 ? "" :
+		    "s");
+}
+
 /*
  * 7.1.1 step 5: the patch snapshots destroyed newest first, the build
- * root rolled back to @shtetl-patch-0, and that destroyed too.
+ * root rolled back to @shtetl-patch-0, and that destroyed too; the
+ * files the patches touched given the time of now.
  */
 static void
 fb_unpatch(struct fb *b)
@@ -1790,9 +1859,10 @@ fb_unpatch(struct fb *b)
 		return;
 	(void) snprintf(name, sizeof (name), "%s@" FB_PSNAP "0", p->fp_src);
 	(void) sh_zfs_destroy(b->fb_z, name, b->fb_err);
-	b->fb_psnaps = 0;
 	(void) fprintf(b->fb_out, "rolled back %s to @" FB_PSNAP "0\n",
 	    p->fp_src);
+	fb_retouch(b, b->fb_psnaps);
+	b->fb_psnaps = 0;
 }
 
 /*
