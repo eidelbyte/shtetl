@@ -4,11 +4,22 @@
 # and P (P17: patches made from the branch's own tree, one already in,
 # one applied, one that conflicts and pauses the build, fixed here and
 # carried on into the build).
-# A buildworld and buildkernel take hours; nothing here asks anything,
-# so start it and leave it.
+# A buildworld and buildkernel take hours the first time; nothing here
+# asks anything, so start it and leave it.
+#
+# What a run takes from the last one: the pool's file stays, exported
+# between runs, holding the build root (a clone of SRC) and box's obj
+# cache for BRANCH. Each run renames them into the layout it
+# bootstraps, a moment within a pool, and back at the end. A build
+# root whose files keep their times and an obj tree of the same branch
+# make the next buildworld incremental (CLEAN is off by default since
+# FreeBSD 14; WITH_META_MODE in /etc/src-env.conf, with filemon
+# loaded, makes it surer). Everything else is made anew each run.
 #
 # usage: make freebsd && sudo sh tests/box/build.sh
-#        sudo sh tests/box/build.sh --clean      what a crash left, removed
+#        sudo sh tests/box/build.sh --clean      all of it gone, the
+#                                                kept build root and
+#                                                obj cache too
 #
 # Settings, from the environment:
 #   BRANCH   the branch to build (releng/15.1)
@@ -22,8 +33,9 @@
 # It touches only what it makes: the pool shbbuild on a file in
 # IMGDIR, imported with an altroot under it, so every mount lands
 # there; and shtetl's run directories of the foundations it builds,
-# /var/db/shtetl/build/box and /var/db/shtetl/build/nope. It will not
-# start while the pool exists, nor while any pool has a shtetl root.
+# /var/db/shtetl/build/box and /var/db/shtetl/build/nope. A run that
+# was stopped is put away first; it will not start while any other
+# pool has a shtetl root.
 set -u
 cd "$(dirname "$0")/../.." || exit 2
 . tests/box/send.sh
@@ -35,20 +47,58 @@ SRC=${SRC:-/usr/src}
 P=shbbuild
 T=$IMGDIR/shtetl-boxbuild
 ALT=$T/alt
+# kept from run to run: the build root, and box's obj cache per branch
+KEEP=$P/keep
+OBJKEEP=$KEEP/obj-$(echo "$BRANCH" | tr / _)
+OBJ=$P/shtetl/foundation-builds/box
 SH=$PWD/shtetl
 RUNS=/var/db/shtetl/build
 
+# A run's own files, and the run directories of the two foundations
+# built here, by name.
+runfiles() {
+	rm -f "$T/out" "$T/err"
+	rm -rf "$T/p17"
+	rm -rf /var/db/shtetl/build/box /var/db/shtetl/build/nope
+	rmdir $RUNS /var/db/shtetl 2>/dev/null
+	return 0
+}
+
+# The run's layout gone and what is kept put back: box's obj cache,
+# and the build root, its tree back to its checkout if a build
+# stopped among its patches, a root no longer; the pool exported.
+teardown() {
+	zpool list -H -o name $P >/dev/null 2>&1 || { runfiles; return 0; }
+	if zfs list -H -o name $OBJ >/dev/null 2>&1; then
+		zfs unmount $OBJ 2>/dev/null
+		zfs inherit mountpoint $OBJ
+		zfs rename $OBJ $OBJKEEP || zfs destroy -r $OBJ
+	fi
+	if zfs list -H -o name $P/zbuild >/dev/null 2>&1; then
+		if zfs list -H -o name $P/zbuild@shtetl-patch-0 \
+		    >/dev/null 2>&1; then
+			zfs rollback -r $P/zbuild@shtetl-patch-0
+			zfs destroy $P/zbuild@shtetl-patch-0
+		fi
+		zfs inherit shtetl:space $P/zbuild
+		zfs inherit shtetl:build $P/zbuild
+		zfs rename $P/zbuild $KEEP/zbuild
+	fi
+	zfs destroy -r $P/shtetl 2>/dev/null
+	zfs destroy -r $P/zconfig 2>/dev/null
+	zpool export $P
+	runfiles
+}
+
+# Everything, the kept build root and obj caches with it.
 clean() {
 	if zpool list -H -o name $P >/dev/null 2>&1; then
 		zpool destroy -f $P
 	fi
-	rm -f "$T/$P.img" "$T/out" "$T/err"
-	rm -rf "$T/p17"
+	rm -f "$T/$P.img"
+	runfiles
 	[ -d "$ALT" ] && find "$ALT" -depth -type d -empty -delete
 	rmdir "$T" 2>/dev/null
-	# the run directories of the two foundations built here, by name
-	rm -rf /var/db/shtetl/build/box /var/db/shtetl/build/nope
-	rmdir $RUNS /var/db/shtetl 2>/dev/null
 	return 0
 }
 
@@ -70,8 +120,8 @@ if [ "$(cat build/.flavor 2>/dev/null)" != freebsd ] || [ ! -x "$SH" ]; then
 	exit 2
 fi
 if zpool list -H -o name $P >/dev/null 2>&1; then
-	echo "boxbuild: pool $P exists: sudo sh tests/box/build.sh --clean"
-	exit 2
+	echo "boxbuild: pool $P imported: a run stopped; put away first"
+	teardown
 fi
 _roots=$(zfs get -H -s local -o name,value shtetl:space 2>/dev/null)
 if [ -n "$_roots" ]; then
@@ -158,23 +208,44 @@ cases() {
 	    head -1), shtetl $(git rev-parse --short HEAD 2>/dev/null)," \
 	    "$BRANCH"
 	mkdir -p "$T" "$ALT" || return 1
-	truncate -s "$SIZE" "$T/$P.img" || return 1
-	zpool create -R "$ALT" -O compression=zstd $P "$T/$P.img" || return 1
+	if [ -f "$T/$P.img" ]; then
+		echo "== the pool kept from the last run: $T/$P.img"
+		zpool import -d "$T" -R "$ALT" $P || return 1
+	else
+		echo "== a new pool: $T/$P.img"
+		truncate -s "$SIZE" "$T/$P.img" || return 1
+		zpool create -R "$ALT" -O compression=zstd $P "$T/$P.img" ||
+		    return 1
+		zfs create -o mountpoint=none -o canmount=off $KEEP || return 1
+	fi
+	if zfs list -H -o name $KEEP/zbuild >/dev/null 2>&1; then
+		echo "== the build root kept: its checkout, its files' times"
+		zfs rename $KEEP/zbuild $P/zbuild || return 1
+		[ "$(prop $P/zbuild mounted)" = yes ] || zfs mount $P/zbuild ||
+		    return 1
+	else
+		echo "== the checkout: $SRC cloned, shared; origin $GITURL"
+		zfs create -o mountpoint=/zbuild $P/zbuild || return 1
+		# a checkout another user owns is one git refuses root
+		git -c safe.directory='*' clone -q --shared "$SRC" \
+		    "$ALT/zbuild" || return 1
+		git -C "$ALT/zbuild" remote set-url origin "$GITURL" ||
+		    return 1
+	fi
 	zfs create $P/shtetl
 	zfs create -o mountpoint=/zconfig $P/zconfig
-	zfs create -o mountpoint=/zbuild $P/zbuild
-
-	echo "== the checkout: $SRC cloned, shared; origin $GITURL"
-	# a checkout another user owns is one git refuses root by default
-	git -c safe.directory='*' clone -q --shared "$SRC" "$ALT/zbuild" ||
-	    return 1
-	git -C "$ALT/zbuild" remote set-url origin "$GITURL" || return 1
 
 	echo "== bootstrap: lake, config, build"
 	sht bootstrap -y --lake $P/shtetl --config $P/zconfig \
 	    --build $P/zbuild
 	check B10 "bootstrap" "$RC" 0
 	[ "$RC" = 0 ] || { sed 's/^/    /' "$T/err"; return 1; }
+	if zfs list -H -o name $OBJKEEP >/dev/null 2>&1; then
+		echo "== box's obj cache for $BRANCH kept: an incremental build"
+		zfs rename $OBJKEEP $OBJ || return 1
+	else
+		echo "== no obj cache kept for $BRANCH: a whole build"
+	fi
 
 	mkdir -p "$ALT/zconfig/foundations"
 	cat >"$ALT/zconfig/shtetl.conf" <<'EOF'
@@ -341,11 +412,11 @@ EOF
 	[ "$fail" = 0 ]
 }
 
-trap 'clean; exit 2' INT TERM
+trap 'teardown; exit 2' INT TERM
 OUT=tests/box/results/$(hostname -s)-build-$(date -u +%Y%m%dT%H%M%SZ).log
 mkdir -p tests/box/results
 cases 2>&1 | tee "$OUT"
-clean
+teardown
 _u=${SUDO_USER:-${DOAS_USER:-}}
 [ -n "$_u" ] && chown -R "$_u" tests/box/results
 box_send "$OUT" build

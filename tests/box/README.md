@@ -20,6 +20,14 @@ ssh agent sudo dropped, the commit stays and the script says to `git
 push`. `SEND=no` keeps the log here. `tests/box/build.sh`, a real
 build of a foundation, ends the same way.
 
+`tests/box/build.sh` keeps its pool's file between runs (in
+`IMGDIR`, `/var/tmp` by default), exported, with the build root and
+the obj cache of the branch it builds in it: the first run builds
+everything, in hours, and a later one of the same branch only what
+changed. `sudo sh tests/box/build.sh --clean` drops all of it, for a
+build from nothing. A run that was stopped is put away when the next
+one starts.
+
 It needs root, the freebsd build of shtetl (`make freebsd`, which
 links the textproc/libucl package), and for the recipes clone
 (B13) git; without git that case is skipped. It refuses to start

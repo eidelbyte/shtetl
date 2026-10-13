@@ -424,7 +424,9 @@ fetch that fails, undone on real ZFS), then F11, F12, F16, F17 and
 F19 on a real build of releng/15.1, and logs each by its cell to
 tests/box/results/<host>-build-<time>.log. Build 1 failed on a mount
 after a set (Z12); build 2 green (b12f0c2). Since, the build is P17's,
-paused at a patch and carried on.
+paused at a patch and carried on. The pool's file stays between
+runs, exported, keeping the build root and box's obj cache for the
+branch, so a later build is incremental; --clean drops them.
 
 
 # Family P: patches and the pause (M3; planning.md 7.1.1; src/core/patch.c, src/core/build.c)
