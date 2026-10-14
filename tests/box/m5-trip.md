@@ -12,7 +12,7 @@ before M5. Since then:
 - config snapshots taken only when the config root changed, named
   three words.
 
-Run it at deb6abe or later. The scripts take minutes: run.sh took
+Run it at 0bcc801 or later. The scripts take minutes: run.sh took
 seconds last time, and build.sh about three, building from the store
 its last run kept; the update cells add a few more.
 
@@ -60,7 +60,7 @@ it" and skips U9 and K7; everything else still runs.
 ## 2. Bring shtetl up to date
 
     cd ~/shtetl
-    git pull                    # deb6abe or later
+    git pull                    # 0bcc801 or later
     make freebsd                # shtetl and build/box_zcheck
 
 ## 3. run.sh: the ZFS calls (seconds)
@@ -119,7 +119,7 @@ The bar: the last line `== N ok, 0 failed`.
 
 Tell me once both logs are pushed (commits "box: KIDON ...: n ok, m
 failed"). I read each log's header first: its "shtetl <sha>" must be
-deb6abe or later, since an older one means the box ran stale code.
+0bcc801 or later, since an older one means the box ran stale code.
 Then its ok/failed line, then any failures. On a green run I mark the
 five M5 issues tested and planning.md 12 marks M5 built.
 
