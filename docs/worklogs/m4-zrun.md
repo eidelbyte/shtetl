@@ -57,6 +57,19 @@ so the real layer now looks at it first (zz_newest_is), by guid, as
 it looks at every other refusal. Z1 - Z15, Z17 - Z20 green on the
 box, Z20 among them.
 
+Box run 5 (run.sh at 18b78bf, results 0904925): 111 ok, 3 failed, the
+next Z16 cell. A base that is no earlier (s@v1 from s@v3) was refused
+for the target's newest, the new check, where the fake says "not an
+earlier snapshot": over libzfs that was only lzc_send's EXDEV, after
+the target. The real send now looks in the fake's order: SNAP, FROM,
+TO's name, FROM earlier (by createtxg, or the clone's origin), then
+the target (ORIGIN there, the target absent, its parent, ORIGIN
+FROM's counterpart; or the target there, its newest FROM's
+counterpart), guids and txgs read as numbers (zfs_prop_get_int). The
+errnos after the stream stay, for a change between. Lesson: a check
+added to the real layer goes where the fake has it, every Z cell
+walked against both before the box.
+
 ## m4-beam (568d9a2, 7b4a227)
 
 shtetl beam [-y] [--version v] F (planning.md 7.3), src/core/beam.c.
