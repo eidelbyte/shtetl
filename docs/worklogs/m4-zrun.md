@@ -184,6 +184,12 @@ Gotchas:
   drops create's unmounts now fails check_create.
 - make's one-second timestamps: a mutation copied in within the
   second of the last build is not rebuilt; remove the object first.
+- Build 9 showed build.sh's X9 going on after create failed: the
+  container's mount read back empty, so the S9 cell's write aimed at
+  the host's /srv/www (refused only because KIDON has none), and
+  "created again" passed on its exit alone. X9 and S9 are a function
+  now (container) that stops after a failed create, writes only below
+  the altroot, and reads the second create's refusal for "exists".
 
 Verification: check_create 257 checks (X1 - X7), each of thirteen
 mutations of create.c caught; run-cli.sh X8 (52 cases); doccheck with
