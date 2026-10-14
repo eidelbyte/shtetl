@@ -56,8 +56,10 @@ int sh_zfs_local(struct sh_zfs *z, const char *prop,
  * its value into VAL and, when SRC is not NULL, where it comes from.
  * A property DS has no value of, a user property unset or a native
  * one that is not DS's (the origin of a filesystem that is no clone),
- * is "-", from nowhere, as zfs get shows it. 1, and nothing reported,
- * when there is no DS.
+ * is "-", from nowhere, as zfs get shows it. "written@SNAP" is the
+ * bytes DS has written since its snapshot SNAP, a number, from nowhere;
+ * refused when DS has no such snapshot. 1, and nothing reported, when
+ * there is no DS.
  */
 int sh_zfs_get(struct sh_zfs *z, const char *ds, const char *prop,
     char *val, size_t len, enum sh_zsrc *src, struct sh_err *e);
@@ -156,6 +158,23 @@ int sh_zfs_clone(struct sh_zfs *z, const char *origin, const char *ds,
  */
 int sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
     const char *to, const char *origin, struct sh_err *e);
+
+/*
+ * DS, a clone, promoted (lzc_promote): its origin's snapshots up to the
+ * one DS was cloned from become DS's, clones of them following, and the
+ * origin's filesystem a clone of DS's. Refused: no such filesystem, not
+ * a clone, a snapshot name the two share ("<snap> is the origin's too").
+ */
+int sh_zfs_promote(struct sh_zfs *z, const char *ds, struct sh_err *e);
+
+/*
+ * The filesystem FROM, everything below it and their snapshots, renamed
+ * TO in the same pool; a mounted one moves where its mountpoint, if
+ * inherited, now says, as zfs rename does. Refused: no such filesystem,
+ * TO there already ("exists"), TO's parent missing ("no parent").
+ */
+int sh_zfs_rename(struct sh_zfs *z, const char *from, const char *to,
+    struct sh_err *e);
 
 /*
  * The user properties set on NAME itself, a snapshot or a filesystem,

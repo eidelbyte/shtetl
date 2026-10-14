@@ -307,7 +307,7 @@
     ],
     "provides": "Promote, rename and written@ for cutover and abandon.",
     "estimated_size": "small",
-    "completed": "not-started"
+    "completed": "testing"
   },
   "m5-rebase": {
     "description": "zfs_rebase as shtetl runs it (planning.md 9, 7.6.1): src/core/rebase.c, an injected rebaser (start in the clone or dataset form, with --allow-unrelated --base for a replay step, -o the manifest in shtetl's run directory; --continue with --no-merge or -i on the terminal; --abort; exits 0 - 3), the real one running the tool, tests/rbfake.c acting on the fake ZFS; and the resolution document read and answered (v4-manifest.md 8: tree scoping, escapes, #unanswered recounted, written whole). Verify: MATRIX family W.",

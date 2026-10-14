@@ -21,6 +21,7 @@
 #include <sys/wait.h>
 
 #include <errno.h>
+#include <stdint.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -225,10 +226,24 @@ sh_zfs_get(struct sh_zfs *z, const char *ds, const char *prop, char *val,
 	zfs_prop_t p;
 	const char *uv;
 	char where[ZFS_MAX_DATASET_NAME_LEN];
+	uint64_t written;
 	int r;
 
 	if ((r = zz_open(z, ds, &zhp, e)) != 0)
 		return (r);
+	/* written@SNAP: a number, the binary source of it */
+	if (strncmp(prop, "written@", 8) == 0) {
+		r = zfs_prop_get_written_int(zhp, prop, &written);
+		zfs_close(zhp);
+		if (r != 0) {
+			sh_errf(e, "%s@%s: no such snapshot", ds, prop + 8);
+			return (-1);
+		}
+		(void) snprintf(val, len, "%ju", (uintmax_t)written);
+		if (src != NULL)
+			*src = SH_ZSRC_NONE;
+		return (0);
+	}
 	p = zfs_name_to_prop(prop);
 	if (p == ZPROP_USERPROP) {
 		if (!zfs_prop_user(prop)) {
@@ -652,6 +667,66 @@ zz_parent(struct sh_zfs *z, const char *ds, struct sh_err *e)
 	}
 	sh_errf(e, "%s: no parent", ds);
 	return (-1);
+}
+
+int
+sh_zfs_promote(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	char origin[ZFS_MAX_DATASET_NAME_LEN];
+	char conflict[ZFS_MAX_DATASET_NAME_LEN];
+	int r;
+
+	if (!zz_there(z, ds, ZFS_TYPE_FILESYSTEM)) {
+		sh_errf(e, "%s: no such filesystem", ds);
+		return (-1);
+	}
+	if (sh_zfs_get(z, ds, "origin", origin, sizeof (origin), NULL,
+	    e) != 0)
+		return (-1);
+	if (strcmp(origin, "-") == 0) {
+		sh_errf(e, "%s: not a clone", ds);
+		return (-1);
+	}
+	conflict[0] = '\0';
+	if ((r = lzc_promote(ds, conflict, sizeof (conflict))) == 0)
+		return (0);
+	if (r == EEXIST)
+		sh_errf(e, "%s: %s is the origin's too", ds, conflict);
+	else
+		sh_errf(e, "%s: %s", ds, strerror(r));
+	return (-1);
+}
+
+/* zfs_rename: its changelist moves the mounts, as zfs rename's does. */
+int
+sh_zfs_rename(struct sh_zfs *z, const char *from, const char *to,
+    struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	renameflags_t flags;
+	int r;
+
+	if (!zz_there(z, from, ZFS_TYPE_FILESYSTEM)) {
+		sh_errf(e, "%s: no such filesystem", from);
+		return (-1);
+	}
+	if (zz_there(z, to, ZFS_TYPE_DATASET)) {
+		sh_errf(e, "%s: exists", to);
+		return (-1);
+	}
+	if (zz_parent(z, to, e) != 0)
+		return (-1);
+	if ((r = zz_open(z, from, &zhp, e)) != 0) {
+		if (r == 1)
+			zz_none(e, from);
+		return (-1);
+	}
+	(void) memset(&flags, 0, sizeof (flags));
+	r = zfs_rename(zhp, to, flags);
+	if (r != 0)
+		zz_err(z, e, from);
+	zfs_close(zhp);
+	return (r != 0 ? -1 : 0);
 }
 
 /*

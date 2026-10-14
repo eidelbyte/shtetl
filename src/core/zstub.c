@@ -164,6 +164,26 @@ sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 }
 
 int
+sh_zfs_promote(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	(void) z;
+	(void) ds;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
+sh_zfs_rename(struct sh_zfs *z, const char *from, const char *to,
+    struct sh_err *e)
+{
+	(void) z;
+	(void) from;
+	(void) to;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
 sh_zfs_clone(struct sh_zfs *z, const char *origin, const char *ds,
     const struct sh_zprop *props, size_t nprops, struct sh_err *e)
 {

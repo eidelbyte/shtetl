@@ -459,6 +459,73 @@ test_refusals(void)
 	}
 }
 
+/* Z21 - Z23: promote, rename, written@. */
+static void
+test_m5(void)
+{
+	static const char *const fv[] = { "tank/f@v1", "tank/f@v2" };
+	const char *x1 = "tank/x@s1", *f3 = "tank/f@v3";
+	int rc;
+
+	world();
+	zfake_set("tank/f", "mountpoint", "/f");
+	CHECK(snap(fv, 1, NULL, 0) == 0 && snap(fv + 1, 1, NULL, 0) == 0);
+	CHECK(sh_zfs_clone(z, "tank/f@v1", "tank/x", NULL, 0, &c.c_err) == 0);
+	CHECK(snap(&x1, 1, NULL, 0) == 0);
+	CHECK(sh_zfs_clone(z, "tank/f@v1", "tank/y", NULL, 0, &c.c_err) == 0);
+	CHECK(snap(&f3, 1, NULL, 0) == 0);
+	/* Z21: x takes v1, y follows it; f a clone of x@v1 after */
+	cap_reset(&c);
+	CHECK(sh_zfs_promote(z, "tank/x", &c.c_err) == 0);
+	CHECK(is(snaps("tank/x", &rc), "v1 s1") && rc == 0);
+	CHECK(is(snaps("tank/f", &rc), "v2 v3"));
+	CHECK(is(get("tank/x", "origin", NULL), "-"));
+	CHECK(is(get("tank/f", "origin", NULL), "tank/x@v1"));
+	CHECK(is(get("tank/y", "origin", NULL), "tank/x@v1"));
+	cap_reset(&c);
+	CHECK(sh_zfs_promote(z, "tank/x", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/x: not a clone"));
+	cap_reset(&c);
+	CHECK(sh_zfs_promote(z, "tank/nope", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/nope: no such filesystem"));
+	/* a snapshot name both have */
+	{
+		const char *ys = "tank/y@v1";
+
+		CHECK(snap(&ys, 1, NULL, 0) == 0);
+		cap_reset(&c);
+		CHECK(sh_zfs_promote(z, "tank/y", &c.c_err) == -1);
+		CHECK(cap_has(&c, "tank/y: v1 is the origin's too"));
+	}
+	/* Z22: x and below renamed, snapshots and origins following */
+	zfake_fs("tank/x/www");
+	CHECK(sh_zfs_mount(z, "tank/x", &c.c_err) == 0);
+	cap_reset(&c);
+	CHECK(sh_zfs_rename(z, "tank/x", "tank/w", &c.c_err) == 0);
+	CHECK(!zfake_exists("tank/x") && zfake_exists("tank/w/www"));
+	CHECK(zfake_snapshot("tank/w@v1") && zfake_snapshot("tank/w@s1"));
+	CHECK(is(get("tank/f", "origin", NULL), "tank/w@v1"));
+	CHECK(is(get("tank/w", "mounted", NULL), "yes"));
+	CHECK(is(get("tank/w", "mountpoint", NULL), "/tank/w"));
+	CHECK(is(get("tank/w/www", "mounted", NULL), "no"));
+	cap_reset(&c);
+	CHECK(sh_zfs_rename(z, "tank/x", "tank/v", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/x: no such filesystem"));
+	cap_reset(&c);
+	CHECK(sh_zfs_rename(z, "tank/w", "tank/f", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/f: exists"));
+	cap_reset(&c);
+	CHECK(sh_zfs_rename(z, "tank/w", "tank/q/w", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/q/w: no parent"));
+	/* Z23: what was written since a snapshot, a number */
+	CHECK(is(get("tank/w", "written@s1", NULL), "0"));
+	zfake_write("tank/w", 2048);
+	CHECK(is(get("tank/w", "written@s1", NULL), "2048"));
+	CHECK(is(get("tank/w", "written@v1", NULL), "2048"));
+	CHECK(is(get("tank/w", "written@nope", NULL), "(refused)"));
+	CHECK(cap_has(&c, "tank/w@nope: no such snapshot"));
+}
+
 int
 main(void)
 {
@@ -470,6 +537,7 @@ main(void)
 	test_mounts();
 	test_sends();
 	test_refusals();
+	test_m5();
 	sh_zfs_close(z);
 	cap_close(&c);
 	printf("check_zfs: %d checks\n", checks);

@@ -17,6 +17,7 @@
 #define	ZF_DS		128
 #define	ZF_SNAPS	256
 #define	ZF_PROPS	32
+#define	ZF_WRITES	16	/* zfake_write calls a filesystem */
 #define	ZF_NAME		256
 #define	ZF_VAL		256
 
@@ -31,6 +32,9 @@ struct zf_ds {
 	int		zd_n;
 	char		zd_at[ZF_VAL];		/* mounted there; "" if not */
 	char		zd_origin[ZF_NAME];	/* a clone's, ds@snap; "" */
+	unsigned long	zd_wtxg[ZF_WRITES];	/* zfake_write's, when */
+	unsigned long	zd_wbytes[ZF_WRITES];	/* and how much */
+	int		zd_nw;
 	struct zf_prop	zd_pool[ZF_PROPS];	/* a pool's root: the pool's */
 	int		zd_npool;
 };
@@ -762,6 +766,163 @@ sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
 	return (0);
 }
 
+void
+zfake_write(const char *ds, unsigned long bytes)
+{
+	struct zf_ds *d;
+
+	if ((d = zf_find(ds)) == NULL)
+		zf_die("no such filesystem", ds);
+	if (d->zd_nw == ZF_WRITES)
+		zf_die("too many writes", ds);
+	d->zd_wtxg[d->zd_nw] = ++zf_txg;
+	d->zd_wbytes[d->zd_nw++] = bytes;
+}
+
+/* Whether NAME is FS, a snapshot of it, or below it. */
+static int
+zf_under(const char *name, const char *fs)
+{
+	size_t n = strlen(fs);
+
+	return (strncmp(name, fs, n) == 0 && (name[n] == '\0' ||
+	    name[n] == '/' || name[n] == '@'));
+}
+
+/*
+ * DS, a clone of O@S, promoted: O's snapshots up to S by transaction
+ * become DS's, clones of them following them; DS takes O's origin and
+ * O becomes a clone of DS@S (dsl_dataset_promote).
+ */
+int
+sh_zfs_promote(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	struct zf_ds *d, *o;
+	const struct zf_snap *at;
+	char oname[ZF_NAME], oorigin[ZF_NAME], moved[ZF_NAME];
+	char renamed[ZF_NAME], self[ZF_NAME];
+	size_t olen;
+	int i, j;
+
+	(void) z;
+	if (zf_fails("promote", e))
+		return (-1);
+	if ((d = zf_find(ds)) == NULL) {
+		sh_errf(e, "zfake: %s: no such filesystem", ds);
+		return (-1);
+	}
+	if (d->zd_origin[0] == '\0') {
+		sh_errf(e, "zfake: %s: not a clone", ds);
+		return (-1);
+	}
+	olen = (size_t)(strchr(d->zd_origin, '@') - d->zd_origin);
+	(void) snprintf(oname, sizeof (oname), "%.*s", (int)olen,
+	    d->zd_origin);
+	o = zf_find(oname);
+	at = zf_snap(d->zd_origin);
+	for (i = 0; i < zf_nsnaps; i++) {
+		if (strncmp(zf_snaps[i].zs_name, oname, olen) != 0 ||
+		    zf_snaps[i].zs_name[olen] != '@' ||
+		    zf_snaps[i].zs_txg > at->zs_txg)
+			continue;
+		(void) snprintf(renamed, sizeof (renamed), "%s%s", ds,
+		    zf_snaps[i].zs_name + olen);
+		if (zf_snap(renamed) != NULL) {
+			sh_errf(e, "zfake: %s: %s is the origin's too", ds,
+			    zf_snaps[i].zs_name + olen + 1);
+			return (-1);
+		}
+	}
+	(void) snprintf(oorigin, sizeof (oorigin), "%s", o->zd_origin);
+	(void) snprintf(self, sizeof (self), "%s%s", ds,
+	    d->zd_origin + olen);
+	for (i = 0; i < zf_nsnaps; i++) {
+		if (strncmp(zf_snaps[i].zs_name, oname, olen) != 0 ||
+		    zf_snaps[i].zs_name[olen] != '@' ||
+		    zf_snaps[i].zs_txg > at->zs_txg)
+			continue;
+		(void) snprintf(moved, sizeof (moved), "%s",
+		    zf_snaps[i].zs_name);
+		(void) snprintf(zf_snaps[i].zs_name, ZF_NAME, "%s%s", ds,
+		    moved + olen);
+		for (j = 0; j < zf_n; j++) {
+			if (strcmp(zf_ds[j].zd_origin, moved) == 0)
+				(void) snprintf(zf_ds[j].zd_origin, ZF_NAME,
+				    "%s%s", ds, moved + olen);
+		}
+	}
+	(void) snprintf(d->zd_origin, ZF_NAME, "%s", oorigin);
+	(void) snprintf(o->zd_origin, ZF_NAME, "%s", self);
+	return (0);
+}
+
+/*
+ * FROM, everything below it and their snapshots renamed TO, origins
+ * naming them following; what was mounted unmounted first and mounted
+ * after where its mountpoint now says, as zfs rename's changelist does.
+ */
+int
+sh_zfs_rename(struct sh_zfs *z, const char *from, const char *to,
+    struct sh_err *e)
+{
+	static char was[ZF_DS];
+	char parent[ZF_NAME], mp[ZF_VAL], cm[ZF_VAL], buf[ZF_NAME];
+	size_t flen = strlen(from);
+	int i;
+
+	(void) z;
+	if (zf_fails("rename", e))
+		return (-1);
+	if (zf_find(from) == NULL) {
+		sh_errf(e, "zfake: %s: no such filesystem", from);
+		return (-1);
+	}
+	if (zf_find(to) != NULL) {
+		sh_errf(e, "zfake: %s: exists", to);
+		return (-1);
+	}
+	if (!zf_parent(to, parent) || zf_find(parent) == NULL) {
+		sh_errf(e, "zfake: %s: no parent", to);
+		return (-1);
+	}
+	for (i = 0; i < zf_n; i++) {
+		was[i] = 0;
+		if (!zf_under(zf_ds[i].zd_name, from))
+			continue;
+		was[i] = zf_ds[i].zd_at[0] != '\0';
+		zf_ds[i].zd_at[0] = '\0';
+		(void) snprintf(buf, sizeof (buf), "%s%s", to,
+		    zf_ds[i].zd_name + flen);
+		(void) snprintf(zf_ds[i].zd_name, ZF_NAME, "%s", buf);
+	}
+	for (i = 0; i < zf_nsnaps; i++) {
+		if (!zf_under(zf_snaps[i].zs_name, from))
+			continue;
+		(void) snprintf(buf, sizeof (buf), "%s%s", to,
+		    zf_snaps[i].zs_name + flen);
+		(void) snprintf(zf_snaps[i].zs_name, ZF_NAME, "%s", buf);
+	}
+	for (i = 0; i < zf_n; i++) {
+		if (zf_ds[i].zd_origin[0] == '\0' ||
+		    !zf_under(zf_ds[i].zd_origin, from))
+			continue;
+		(void) snprintf(buf, sizeof (buf), "%s%s", to,
+		    zf_ds[i].zd_origin + flen);
+		(void) snprintf(zf_ds[i].zd_origin, ZF_NAME, "%s", buf);
+	}
+	for (i = 0; i < zf_n; i++) {
+		if (!was[i])
+			continue;
+		(void) zf_get(zf_ds[i].zd_name, "mountpoint", mp, sizeof (mp),
+		    NULL, NULL);
+		(void) zf_get(zf_ds[i].zd_name, "canmount", cm, sizeof (cm),
+		    NULL, NULL);
+		if (mp[0] == '/' && strcmp(cm, "off") != 0)
+			(void) snprintf(zf_ds[i].zd_at, ZF_VAL, "%s", mp);
+	}
+	return (0);
+}
+
 int
 sh_zfs_userprops(struct sh_zfs *z, const char *name,
     int (*fn)(void *, const char *, const char *), void *arg,
@@ -846,9 +1007,11 @@ zf_get(const char *ds, const char *prop, char *val, size_t len,
     enum sh_zsrc *src, struct sh_err *e)
 {
 	const struct zf_ds *d, *a;
+	const struct zf_snap *sn;
 	char up[ZF_NAME], cur[ZF_NAME];
 	const char *v;
 	enum sh_zsrc s;
+	unsigned long w;
 	int i, user, inherit;
 
 	if ((d = zf_find(ds)) == NULL)
@@ -870,6 +1033,22 @@ zf_get(const char *ds, const char *prop, char *val, size_t len,
 	if (strcmp(prop, "origin") == 0) {
 		(void) snprintf(val, len, "%s", d->zd_origin[0] != '\0' ?
 		    d->zd_origin : "-");
+		if (src != NULL)
+			*src = SH_ZSRC_NONE;
+		return (0);
+	}
+	/* written@SNAP: zfake_write's bytes since SNAP's transaction */
+	if (strncmp(prop, "written@", 8) == 0) {
+		(void) snprintf(cur, sizeof (cur), "%s@%s", ds, prop + 8);
+		if ((sn = zf_snap(cur)) == NULL) {
+			sh_errf(e, "zfake: %s: no such snapshot", cur);
+			return (-1);
+		}
+		for (i = 0, w = 0; i < d->zd_nw; i++) {
+			if (d->zd_wtxg[i] > sn->zs_txg)
+				w += d->zd_wbytes[i];
+		}
+		(void) snprintf(val, len, "%lu", w);
 		if (src != NULL)
 			*src = SH_ZSRC_NONE;
 		return (0);

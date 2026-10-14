@@ -37,6 +37,9 @@ int zfake_exists(const char *ds);
  * the snapshot the last rollback went back to (NULL: none yet).
  */
 int zfake_snapshot(const char *name);
+
+/* BYTES written to DS now, which written@ counts after its snapshots. */
+void zfake_write(const char *ds, unsigned long bytes);
 const char *zfake_last_snapshot(void);
 const char *zfake_last_rollback(void);
 

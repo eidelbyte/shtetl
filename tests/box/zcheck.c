@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "core/err.h"
 #include "core/zfs.h"
@@ -144,6 +145,40 @@ refused(const char *id, const char *what, int rc, const char *rel,
 	refusedn(id, what, rc, at(rel), why);
 }
 
+/*
+ * Z23's write: 64 KiB into a file at DS's mountpoint, waited for until
+ * written@SNAP counts it (a transaction group commits it), up to 30 s;
+ * zcheck-fake.c sets ZCHECK_WRITE to the fake's own.
+ */
+int (*zcheck_write)(const char *ds);
+
+static int
+zc_write(const char *ds, const char *snap)
+{
+	char path[1024], prop[300], buf[4096];
+	FILE *f;
+	int i;
+
+	if (zcheck_write != NULL)
+		return (zcheck_write(ds));
+	(void) snprintf(path, sizeof (path), "%s/zcheck-written",
+	    get(ds, "mountpoint", NULL));
+	(void) memset(buf, 'z', sizeof (buf));
+	if ((f = fopen(path, "w")) == NULL)
+		return (-1);
+	for (i = 0; i < 16; i++)
+		(void) fwrite(buf, 1, sizeof (buf), f);
+	if (fclose(f) != 0)
+		return (-1);
+	(void) snprintf(prop, sizeof (prop), "written@%s", snap);
+	for (i = 0; i < 30; i++) {
+		if (strcmp(get(ds, prop, NULL), "0") != 0)
+			return (0);
+		(void) sleep(1);
+	}
+	return (-1);
+}
+
 /* Z18: a snapshot's own user properties, walked into these. */
 static char props[512];
 
@@ -172,7 +207,7 @@ main(int argc, char **argv)
 	static const struct sh_zprop zstd = { "compression", "zstd" };
 	const char *v1[3], *v2[3], *bad[2];
 	char t1[64], name[512], g3[512], tn[512], want[640];
-	const char *sv1, *sv2, *sv3, *xs1, *ms;
+	const char *sv1, *sv2, *sv3, *xs1, *ms, *pa;
 	enum sh_zsrc src;
 	int rc;
 
@@ -471,6 +506,43 @@ main(int argc, char **argv)
 	    sh_zfs_set(z, name, "shtetl:kind", "version", &e) == 0 &&
 	    strcmp(get(name, "shtetl:kind", &src), "version") == 0 &&
 	    src == SH_ZSRC_LOCAL);
+
+	/* Z21 - Z23: promote, rename, written@; p, its clone q */
+	(void) snprintf(name, sizeof (name), "%s@a", at("p"));
+	pa = strdup(name);
+	cell("Z21", "a clone of p@a",
+	    sh_zfs_create(z, at("p"), NULL, 0, &e) == 0 &&
+	    sh_zfs_snapshot(z, &pa, 1, NULL, 0, &e) == 0 &&
+	    sh_zfs_clone(z, pa, at("q"), NULL, 0, &e) == 0);
+	(void) snprintf(name, sizeof (name), "%s@a", at("q"));
+	cell("Z21", "promoted: q holds a, p a clone of q@a",
+	    sh_zfs_promote(z, at("q"), &e) == 0 &&
+	    strcmp(snaps(at("q"), &rc), "a") == 0 &&
+	    strcmp(get(at("p"), "origin", NULL), name) == 0 &&
+	    strcmp(get(at("q"), "origin", NULL), "-") == 0);
+	refused("Z21", "not a clone", sh_zfs_promote(z, at("q"), ask()), "q",
+	    "not a clone");
+	refused("Z21", "no such filesystem", sh_zfs_promote(z, at("nope"),
+	    ask()), "nope", "no such filesystem");
+	(void) snprintf(name, sizeof (name), "%s@a", at("r"));
+	cell("Z22", "renamed, its snapshot and p's origin following",
+	    sh_zfs_rename(z, at("q"), at("r"), &e) == 0 &&
+	    strcmp(snaps(at("r"), &rc), "a") == 0 &&
+	    strcmp(get(at("p"), "origin", NULL), name) == 0);
+	refused("Z22", "no such filesystem", sh_zfs_rename(z, at("q"),
+	    at("q2"), ask()), "q", "no such filesystem");
+	refused("Z22", "the new name taken", sh_zfs_rename(z, at("r"),
+	    at("p"), ask()), "p", "exists");
+	refused("Z22", "no parent", sh_zfs_rename(z, at("r"), at("q/r"),
+	    ask()), "q/r", "no parent");
+	cell("Z23", "nothing written since a snapshot: 0",
+	    sh_zfs_mount(z, at("r"), &e) == 0 &&
+	    strcmp(get(at("r"), "written@a", NULL), "0") == 0);
+	cell("Z23", "a write counted, a number", zc_write(at("r"), "a") == 0 &&
+	    strtoul(get(at("r"), "written@a", NULL), NULL, 10) > 0);
+	refused("Z23", "no such snapshot", sh_zfs_get(z, at("r"),
+	    "written@nope", t1, sizeof (t1), NULL, ask()), "r@nope",
+	    "no such snapshot");
 
 	/* Z10, Z19: each refusal above in the fake's words */
 	cell("Z10", "every refusal above said why, as the fake does",
