@@ -13,6 +13,7 @@
 
 #include "check.h"
 #include "core/build.h"
+#include "core/cfgsnap.h"
 #include "core/spaces.h"
 #include "core/zfs.h"
 #include "zfake.h"
@@ -60,6 +61,9 @@ config(const char *dir, const char *const *files)
 		(void) scratch_write(path, files[i + 1]);
 	}
 	(void) snprintf(root, sizeof (root), "%s", scratch_path(dir));
+	/* the config root changed, as ZFS would count it (N8) */
+	if (zfake_exists("tank/zconfig"))
+		zfake_write("tank/zconfig", 512);
 }
 
 /* A bootstrapped box: a lake, a build root mounted, a config root. */
@@ -289,6 +293,8 @@ test_show(void)
 
 static char toolpath[7][1200];
 static char *ran;		/* what the run printed */
+/* the config snapshots NOON's draws 0 and 1 name, and the first's line */
+static char cfg0[512], cfg1[512], said0[600];
 
 /*
  * A script NAME in the scratch tools directory, logging its calls and
@@ -497,7 +503,7 @@ test_run(void)
 		NULL
 	};
 	static const char *const said[] = {
-		"snapshot tank/zconfig@build-generic-20261008-120000\n",
+		said0,
 		"made " F "\n", "made " F "/usr/local\n",
 		"made tank/shtetl/foundation-builds/generic\n",
 		"checkout releng/15.1 at 0f691888dc56\n",
@@ -537,11 +543,10 @@ test_run(void)
 	CHECK(is(prop(F "@" VERSION, "shtetl:commit", NULL),
 	    "build releng/15.1 at 0f691888dc56"));
 	CHECK(is(prop(F "/var@" VERSION, "shtetl:revision", NULL), "15.1"));
-	CHECK(is(prop(F "@" VERSION, "shtetl:config", NULL),
-	    "tank/zconfig@build-generic-20261008-120000"));
+	CHECK(is(prop(F "@" VERSION, "shtetl:config", NULL), cfg0));
 	CHECK(is(prop(F "@" VERSION, "shtetl:config-guid", NULL), "-"));
-	CHECK(is(prop("tank/zconfig@build-generic-20261008-120000",
-	    "shtetl:kind", NULL), "config"));
+	CHECK(is(prop(cfg0, "shtetl:kind", NULL), "config"));
+	CHECK(is(prop(cfg0, "shtetl:commit", NULL), "build generic"));
 	/* the datasets as made */
 	CHECK(is(prop(F "/usr", "canmount", &src), "off") &&
 	    src == SH_ZSRC_LOCAL);
@@ -607,8 +612,7 @@ test_failures(void)
 		CHECK(cap_has(&c, "run/generic/build.log"));
 		/* F13: undone */
 		CHECK(!zfake_exists(F) && !zfake_exists(F "/usr"));
-		CHECK(zfake_snapshot("tank/zconfig@build-generic-"
-		    "20261008-120000"));
+		CHECK(zfake_snapshot(cfg0));
 		(void) prop("tank/zbuild", "shtetl:build", &src);
 		CHECK(src == SH_ZSRC_NONE);
 		if (zfake_exists("tank/shtetl/foundation-builds/generic")) {
@@ -804,9 +808,11 @@ test_update(void)
 	CHECK(inroot("boot/kernel/c.ko") && !inroot("boot/kernel/b.ko"));
 	CHECK(!inroot("usr/lib/debug/boot/kernel"));
 	CHECK(in_order(slurp(scratch_path("tools.log")), kinstall));
-	/* the second build in the second: the config snapshot's -2 */
-	CHECK(strstr(ran, "snapshot tank/zconfig@build-generic-"
-	    "20261008-120000-2\n") != NULL);
+	/* N8: the recipe changed (u2): a new config snapshot */
+	(void) snprintf(text, sizeof (text), "snapshot %s\n", cfg1);
+	CHECK(strstr(ran, text) != NULL);
+	CHECK(is(prop(F "@" VERSION ".2", "shtetl:config", NULL), cfg1));
+	CHECK(is(prop(cfg1, "shtetl:commit", NULL), "update generic"));
 	CHECK(strstr(ran, "made " F) == NULL);
 	/* pkg and the commands again: the installs undid them */
 	CHECK(strstr(ran, "pkg install in ") != NULL);
@@ -835,6 +841,9 @@ test_update(void)
 	/* F25: a failure: F back to its last version, nothing destroyed */
 	(void) scratch_write("fail/make-installworld", "");
 	CHECK(build(NULL) == -1);
+	/* N8: nothing changed since: the last config snapshot, kept */
+	CHECK(strstr(ran, "snapshot tank/zconfig@") == NULL);
+	CHECK(zfake_snapshot(cfg1));
 	(void) unlink(scratch_path("fail/make-installworld"));
 	CHECK(strstr(ran, "rolled back " F " to @" VERSION ".2\n") != NULL);
 	CHECK(strstr(ran, "rolled back " F "/usr/local to @" VERSION ".2\n")
@@ -1427,8 +1436,7 @@ test_pause(void)
 	pausepatches(0);
 	CHECK(build(NULL) == 1);
 	/* taking it up fails, the config snapshot gone: still paused */
-	CHECK(sh_zfs_destroy(z, "tank/zconfig@build-generic-20261008-120000",
-	    &wc.c_err) == 0);
+	CHECK(sh_zfs_destroy(z, cfg0, &wc.c_err) == 0);
 	CHECK(resume(SH_BV_CONTINUE, NULL) == -1);
 	CHECK(cap_has(&c, "build of generic still paused"));
 	CHECK(inrun(SH_BUILD_PAUSED) && zfake_exists(F));
@@ -1484,6 +1492,11 @@ main(void)
 	cap_open(&c);
 	cap_open(&wc);
 	CHECK(sh_zfs_open(&z, &c.c_err) == 0);
+	(void) strcpy(cfg0, "tank/zconfig@");
+	sh_cfgsnap_name(NOON, 0, cfg0 + 13, sizeof (cfg0) - 13);
+	(void) strcpy(cfg1, "tank/zconfig@");
+	sh_cfgsnap_name(NOON, 1, cfg1 + 13, sizeof (cfg1) - 13);
+	(void) snprintf(said0, sizeof (said0), "snapshot %s\n", cfg0);
 	test_refused();
 	test_datasets();
 	test_show();

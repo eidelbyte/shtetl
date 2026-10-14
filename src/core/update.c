@@ -38,6 +38,7 @@
 #include "core/beam.h"
 #include "core/build.h"
 #include "core/cascade.h"
+#include "core/cfgsnap.h"
 #include "core/err.h"
 #include "core/jail.h"
 #include "core/rebase.h"
@@ -674,29 +675,17 @@ uq_tidy(struct uq *c)
 	(void) rmdir(path);
 }
 
-/* The config root snapshotted, as a build does: update-X-<time>. */
+/* The config snapshot X-staging records (cfgsnap.c). */
 static int
 uq_config(struct uq *c)
 {
 	struct sh_uplan *p = c->c_p;
-	struct sh_zprop kind = { "shtetl:kind", "config" };
-	char stamp[32];
-	const char *one;
-	struct tm tm;
-	int n;
+	char msg[SH_UPDATE_NAME * 3];
 
-	(void) gmtime_r(&c->c_now, &tm);
-	(void) strftime(stamp, sizeof (stamp), "%Y%m%d-%H%M%S", &tm);
-	(void) snprintf(p->up_cfgsnap, sizeof (p->up_cfgsnap),
-	    "%s@update-%s-%s", p->up_config, p->up_name, stamp);
-	for (n = 2; n < 100 && uq_there(c, p->up_cfgsnap); n++)
-		(void) snprintf(p->up_cfgsnap, sizeof (p->up_cfgsnap),
-		    "%s@update-%s-%s-%d", p->up_config, p->up_name, stamp, n);
-	one = p->up_cfgsnap;
-	if (sh_zfs_snapshot(c->c_z, &one, 1, &kind, 1, c->c_err) != 0)
-		return (-1);
-	(void) fprintf(c->c_out, "snapshot %s\n", p->up_cfgsnap);
-	return (0);
+	(void) snprintf(msg, sizeof (msg), "update %s to %s@%s", p->up_name,
+	    p->up_found, p->up_version);
+	return (sh_cfgsnap(c->c_z, p->up_config, msg, c->c_now,
+	    p->up_cfgsnap, sizeof (p->up_cfgsnap), c->c_out, c->c_err));
 }
 
 /* A save of NAME (X or X-staging), its config CONFIG; its name to SNAP. */

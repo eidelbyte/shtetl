@@ -220,7 +220,10 @@ nothing of the site's reaches a remote unless the user says so, file by
 file. The history of the site's files is zconfig's snapshots:
 
 - shtetl snapshots the config root before any change it makes there
-  and before any git operation;
+  and before any git operation; a build, create or update takes one
+  only when the root was written to since the newest (`written@`),
+  named three words, `shtetl:commit` saying what took it (ruled
+  2026-10-14, 14; src/core/cfgsnap.c);
 - every snapshot shtetl takes anywhere (a foundation version, a save,
   an update's result) records the config snapshot it was made with in
   `shtetl:config`, by name, so any build or save leads back to the
@@ -740,10 +743,11 @@ As built (M3, `src/core/build.c`; patches in 7.1.1; updates to come):
   the checkout's newvers.sh) is checked against ver again.
 - The recipe is read where the config root is mounted, the directory
   the build snapshots: `-C` may name only that one. The snapshot is
-  `<config root>@build-F-<YYYYmmdd-HHMMSS>` (`-2`, `-3` after it for
-  another build in the same second), `shtetl:kind=config`,
-  and the version records its name in `shtetl:config` (PROPOSAL; its
-  guid dropped, ruled 2026-10-14, 14).
+  the config root's newest `shtetl:kind=config` snapshot when nothing
+  was written to the root since it, else a new one named three words
+  (`<config root>@maple-otter-quill`), `shtetl:commit` "build F" or
+  "update F"; the version records its name in `shtetl:config`
+  (ruled 2026-10-14, 14; its guid dropped).
 - One build at a time: `shtetl:build=F` on the build root while it
   runs (PROPOSAL).
 - The obj cache is mounted at `<run dir>/obj` and F at
@@ -1099,11 +1103,12 @@ As built (M4, `src/core/create.c`):
   X's recipe gives one of F's set on its clone from its birth; X's own
   made, a placeholder before a parent nobody names. Nothing collides:
   a dataset X's recipe names that F has is F's, with X's properties.
-- The run, in order: the config root snapshotted, `create-X-<time>`
-  (`shtetl:kind=config`), the first save's `shtetl:config`; the
-  version beamed if zrun lacks it (7.3); the clones, parents first;
-  X's own; each that mounts mounted (not `canmount=off`, `none` or
-  `legacy`); each external command piece by `sh -e -c` on the host,
+- The run, in order: the config snapshot, the newest or a new one as
+  a build's (`shtetl:commit` "create X on F@V"), the first save's
+  `shtetl:config`; the version beamed if zrun lacks it (7.3); the
+  clones, parents first; X's own; each that mounts mounted (not
+  `canmount=off`, `none` or `legacy`); each external command piece by
+  `sh -e -c` on the host,
   `SHTETL_ROOT` X's mount, `SHTETL_KIND` container, before anything
   runs inside X; the jail's block written and the jail started;
   `pkg -j X install -y` with every package; each command piece by
@@ -1226,8 +1231,9 @@ As built (M5, `src/core/update.c`, `src/core/rebase.c`):
   with the target; F's datasets mounted; each dataset of X,
   parents first, replayed, cloned from the target (F's placeholder,
   `canmount=off`) or cloned from the from-save (X's own), the recipe's
-  properties set locally; F unmounted; the config root snapshotted
-  (`update-X-<time>`); X-staging snapshotted as the target
+  properties set locally; F unmounted; the config snapshot, the
+  newest or a new one as a build's (`shtetl:commit` "update X to
+  F@V"); X-staging snapshotted as the target
   (`shtetl:kind=version`); its jail's block written (the name
   X-staging, X's hostname, X's jailconf) and started; X-staging saved.
 - A replay: step 1 `--from X/d@s1 --onto F/d@V --result X-staging/d`,

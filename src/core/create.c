@@ -30,6 +30,7 @@
 #include "core/beam.h"
 #include "core/build.h"
 #include "core/cascade.h"
+#include "core/cfgsnap.h"
 #include "core/create.h"
 #include "core/err.h"
 #include "core/jail.h"
@@ -505,30 +506,17 @@ cr_mkdirs(struct cr *c, const char *dir)
 	}
 }
 
-/* The config root snapshotted, as a build does: create-X-<time>. */
+/* The config snapshot X records: the newest, or one taken (cfgsnap.c). */
 static int
 cr_config(struct cr *c, time_t now)
 {
 	struct sh_cplan *p = c->c_p;
-	struct sh_zprop kind = { "shtetl:kind", "config" };
-	char stamp[32], val[SH_ZFS_VALMAX];
-	const char *one;
-	struct tm tm;
-	int n;
+	char msg[SH_CREATE_NAME * 3];
 
-	(void) gmtime_r(&now, &tm);
-	(void) strftime(stamp, sizeof (stamp), "%Y%m%d-%H%M%S", &tm);
-	(void) snprintf(c->c_cfgsnap, sizeof (c->c_cfgsnap),
-	    "%s@create-%s-%s", p->cp_config, p->cp_name, stamp);
-	for (n = 2; n < 100 && sh_zfs_get(c->c_z, c->c_cfgsnap, "type", val,
-	    sizeof (val), NULL, c->c_err) == 0; n++)
-		(void) snprintf(c->c_cfgsnap, sizeof (c->c_cfgsnap),
-		    "%s@create-%s-%s-%d", p->cp_config, p->cp_name, stamp, n);
-	one = c->c_cfgsnap;
-	if (sh_zfs_snapshot(c->c_z, &one, 1, &kind, 1, c->c_err) != 0)
-		return (-1);
-	(void) fprintf(c->c_out, "snapshot %s\n", c->c_cfgsnap);
-	return (0);
+	(void) snprintf(msg, sizeof (msg), "create %s on %s@%s", p->cp_name,
+	    p->cp_found, p->cp_version);
+	return (sh_cfgsnap(c->c_z, p->cp_config, msg, now, c->c_cfgsnap,
+	    sizeof (c->c_cfgsnap), c->c_out, c->c_err));
 }
 
 /* A dataset of the recipe's properties as ZFS takes them; N set. */

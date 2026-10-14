@@ -12,7 +12,9 @@
 # with an edit the update conflicts with, updated with the real
 # zfs_rebase (which must be installed on shtetl's PATH), paused at the
 # gate, answered by hand, taken up and cut over; shbab updated and
-# abandoned.
+# abandoned. Along the way N9: the config snapshot a failed build kept
+# recorded again by the next build, nothing having been written to the
+# config root, and a new one once a patch is.
 # A buildworld and buildkernel take hours the first time; nothing here
 # asks anything, so start it and leave it.
 #
@@ -228,6 +230,12 @@ prop() {
 	zfs get -H -o value "$2" "$1" 2>/dev/null
 }
 
+# The config root's snapshots whose shtetl:commit is $1.
+cfgsnaps() {
+	zfs list -H -t snapshot -o name,shtetl:commit -r $P/zconfig |
+	    awk -F '\t' -v m="$1" '$2 == m { print $1 }'
+}
+
 srcof() {
 	zfs get -H -o source "$2" "$1" 2>/dev/null
 }
@@ -317,8 +325,8 @@ EOF
 	fi
 	_s1=$(zfs list -H -t snapshot -o name -s createtxg $_x | tail -1)
 	check X9 "the first save: its kind, the create's config snapshot" \
-	    "$(prop "$_s1" shtetl:kind) $(prop "$_s1" shtetl:config |
-	    sed 's/@create-.*/@create/')" "save $P/zconfig@create"
+	    "$(prop "$_s1" shtetl:kind) $(prop "$(prop "$_s1" \
+	    shtetl:config)" shtetl:commit | cut -d' ' -f1-2)" "save create $X"
 	check X9 "mirrored: a clone of zlake's box" "$(prop $_lx origin)" \
 	    "$P/shtetl/foundations/box@$_v2-pkg"
 	jail -f $JAILF -r $X >/dev/null 2>&1
@@ -591,8 +599,10 @@ EOF
 	check F13 "the build root's mark cleared" \
 	    "$(srcof $P/zbuild shtetl:build)" "-"
 	check F13 "the config snapshot kept" \
-	    "$(zfs list -H -t snapshot -o name -r $P/zconfig |
-	    grep -c '@build-nope-')" 1
+	    "$(cfgsnaps "build nope" | wc -l | tr -d ' ')" 1
+	_cn=$(cfgsnaps "build nope")
+	check N9 "the config root atime=off, from bootstrap" \
+	    "$(prop $P/zconfig atime)" off
 	check F13 "the obj cache kept, unmounted" \
 	    "$(prop $P/shtetl/foundation-builds/nope mounted)" no
 
@@ -654,6 +664,8 @@ EOF
 	    "$(zfs list -H -o name "$_c" 2>/dev/null)" "$_c"
 	check F11 "no shtetl:config-guid" \
 	    "$(prop "$F@$_v" shtetl:config-guid)" -
+	check N9 "nothing written to zconfig since F13: its snapshot" \
+	    "$_c" "$_cn"
 	case "$(prop "$F@$_v" shtetl:commit)" in
 	"build $BRANCH at "*) ok "F17 shtetl:commit, the build's own" ;;
 	*) no "F17 shtetl:commit: $(prop "$F@$_v" shtetl:commit)" ;;
@@ -746,6 +758,9 @@ EOF
 		ok "F27 a new version, on the same datasets" ;;
 	*)	no "F27 a new version: $_v2" ;;
 	esac
+	_c2=$(prop "$F@$_v2" shtetl:config)
+	check N9 "a patch written: a config snapshot of the update's" \
+	    "$([ "$_c2" != "$_c" ] && prop "$_c2" shtetl:commit)" "update box"
 	check F27 "two versions on each dataset" \
 	    "$(zfs list -H -t snapshot -o name -r $F/usr/local | wc -l |
 	    tr -d ' ')" 2

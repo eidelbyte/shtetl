@@ -14,6 +14,7 @@
 #include "check.h"
 #include "core/beam.h"
 #include "core/build.h"
+#include "core/cfgsnap.h"
 #include "core/create.h"
 #include "core/spaces.h"
 #include "core/zfs.h"
@@ -26,7 +27,6 @@
 #define	V1	"15.1-releng-2026-10-01-0f691888dc56"
 #define	BSNAP	"build-generic-20261001-120000"
 #define	BCFG	"tank/zconfig@" BSNAP
-#define	XCFG	"tank/zconfig@create-x-20261008-120000"
 #define	S1	"save-2026-10-08-120000"
 /* 2026-10-08 12:00:00 UTC */
 #define	NOON	((time_t)1791460800)
@@ -39,6 +39,10 @@ static struct sh_tools fake;
 static char root[1200], jaildir[1200], logbase[1200], mnt[1200];
 static char hostresolv[1200], toollog[1200], failed[1200];
 static char *ran;
+/* the config snapshot a create takes at NOON, and its line */
+static char xcfg[512], xsaid[600];
+/* the world's config root not written to since the build's snapshot */
+static int unwritten;
 
 static int
 is(const char *got, const char *want)
@@ -273,6 +277,9 @@ world(int run, int beamed)
 	zfake_fs(LF "/var");
 	cap_reset(&wc);
 	CHECK(sh_zfs_snapshot(z, bcfg, 1, &cfg, 1, &wc.c_err) == 0);
+	/* the containers' recipes, written after the build (N8) */
+	if (!unwritten)
+		zfake_write("tank/zconfig", 512);
 	version(V1, "version", "15.1");
 	zfake_pool("fast");
 	if (run) {
@@ -494,7 +501,8 @@ test_run(void)
 	world(1, 0);
 	CHECK(create("x", "hello") == 0);
 	/* X3 */
-	CHECK(is(prop(XCFG, "shtetl:kind"), "config"));
+	CHECK(is(prop(xcfg, "shtetl:kind"), "config"));
+	CHECK(is(prop(xcfg, "shtetl:commit"), "create x on generic@" V1));
 	CHECK(is(prop(RF "@" V1, "shtetl:kind"), "version"));
 	CHECK(is(prop(RX, "origin"), RF "@" V1));
 	CHECK(is(prop(RX "/usr", "origin"), RF "/usr@" V1));
@@ -511,7 +519,7 @@ test_run(void)
 	CHECK(is(prop(RX "/www/data", "mounted"), "yes"));
 	/* a clone keeps none of its origin's local properties */
 	CHECK(is(prop(RX, "readonly"), "off"));
-	CHECK(strstr(ran, "snapshot " XCFG "\n") != NULL);
+	CHECK(strstr(ran, xsaid) != NULL);
 	CHECK(strstr(ran, "cloned " RX "/usr/local\n") != NULL);
 	CHECK(strstr(ran, "made " RX "/www/data\n") != NULL);
 	/* X4 */
@@ -541,7 +549,7 @@ test_run(void)
 	/* X6 */
 	CHECK(is(prop(RX "@" S1, "shtetl:kind"), "save"));
 	CHECK(is(prop(RX "@" S1, "shtetl:commit"), "hello"));
-	CHECK(is(prop(RX "@" S1, "shtetl:config"), XCFG));
+	CHECK(is(prop(RX "@" S1, "shtetl:config"), xcfg));
 	CHECK(is(prop(RX "/www/data@" S1, "shtetl:kind"), "save"));
 	CHECK(is(prop(LX "@" S1, "shtetl:kind"), "save"));
 	CHECK(is(prop(LX, "origin"), LF "@" V1));
@@ -564,6 +572,19 @@ test_run(void)
 	CHECK(asked("jexec db /bin/sh -e -c echo motd\n"));
 	CHECK(asked("external db container "));
 	CHECK(!asked("echo x") && !asked("echo base"));
+	/* N8: one create after another, nothing changed: its snapshot */
+	world(1, 1);
+	CHECK(create("x", NULL) == 0 && strstr(ran, xsaid) != NULL);
+	CHECK(create("db", "db") == 0);
+	CHECK(strstr(ran, "snapshot tank/zconfig@") == NULL);
+	CHECK(is(prop("fast/run/containers/db@" S1, "shtetl:config"), xcfg));
+	/* and right after the build: the build's */
+	unwritten = 1;
+	world(1, 1);
+	unwritten = 0;
+	CHECK(create("x", NULL) == 0);
+	CHECK(strstr(ran, "snapshot tank/zconfig@") == NULL);
+	CHECK(is(prop(RX "@" S1, "shtetl:config"), BCFG));
 }
 
 /* Whether nothing of x is left but the config snapshot. */
@@ -574,7 +595,7 @@ undone(void)
 
 	(void) snprintf(path, sizeof (path), "%s/x.conf", jaildir);
 	if (zfake_exists(RX) || access(path, F_OK) == 0 ||
-	    !there(XCFG) || !cap_has(&c, "create of x failed; log ")) {
+	    !there(xcfg) || !cap_has(&c, "create of x failed; log ")) {
 		printf("not undone:\n%s", cap_text(&c));
 		return (0);
 	}
@@ -659,6 +680,9 @@ main(void)
 	cap_open(&c);
 	cap_open(&wc);
 	CHECK(sh_zfs_open(&z, &c.c_err) == 0);
+	(void) strcpy(xcfg, "tank/zconfig@");
+	sh_cfgsnap_name(NOON, 0, xcfg + 13, sizeof (xcfg) - 13);
+	(void) snprintf(xsaid, sizeof (xsaid), "snapshot %s\n", xcfg);
 	config();
 	test_refused();
 	test_plan();

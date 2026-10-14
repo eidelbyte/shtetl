@@ -667,3 +667,22 @@ after its own.
 | K7 | for real: the updated container cut over on the box, its archive in zlake; and an abandon | box: tests/box/build.sh |
 | K8 | abandon once a cutover has promoted, or destroyed X: refused, the cutover to carry on; an abandon stopped at X's jail start, or with the staging mirror left in zlake, taken up; done, nothing to take up | covered: check_update.c test_cutover_again |
 | K9 | refused in the plan, nothing done: a hold on a snapshot of the old X, a clone of one outside it, a staging snapshot name a promote would meet (zrun, zlake), the archive's name taken; a hold or clone the promote takes along not refused; an abandon on a hold on the staging tree | covered: check_update.c test_cutover_again |
+
+# Family N: the config root's snapshots (M5; planning.md 7.1, 7.4, 7.6; src/core/cfgsnap.c)
+
+What a build, create or update records in shtetl:config. Dimensions:
+whether the root has a config snapshot; whether anything was written
+to the root since its newest; other snapshots on the root; whether
+the first drawn name is taken; ZFS refusing a step.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| N1 | no config snapshot yet: one taken, named by draw 0 of the time, shtetl:kind config, shtetl:commit what took it, said | covered: check_cfgsnap.c |
+| N2 | one there, nothing written since: it is recorded, nothing taken, nothing said | covered: check_cfgsnap.c |
+| N3 | written since: a new one taken; with several, only the newest counts (written since an older one, not the newest: the newest recorded) | covered: check_cfgsnap.c |
+| N4 | a snapshot of another kind on the root newer than the newest config snapshot (a person's, bootstrap's): passed over, written@ measured from the config one | covered: check_cfgsnap.c |
+| N5 | draw 0's name taken (the same second): draw 1; every draw taken: refused, nothing taken | covered: check_cfgsnap.c |
+| N6 | the names: three different words of the list, lowercase letters joined by dashes; the same time and draw the same name; different draws different names | covered: check_cfgsnap.c |
+| N7 | ZFS refusing the listing, the written@ read, the snapshot: refused, nothing recorded | covered: check_cfgsnap.c |
+| N8 | the commands: a build records one (a second build with nothing changed records the same, after a change a new one); a create right after the build records the build's; an update with nothing changed records the one there, after a change a new one | covered: check_build.c, check_create.c, check_update.c |
+| N9 | for real: bootstrap leaves the config root atime=off, so shtetl reading the recipes writes nothing and a second build with no change records the first one's; a recipe written in between, a new one | box: tests/box/build.sh |

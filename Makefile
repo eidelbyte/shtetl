@@ -78,7 +78,7 @@ CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o \
 	$(BUILD)/boot.o $(BUILD)/version.o $(BUILD)/build.o $(BUILD)/patch.o \
 	$(BUILD)/beam.o $(BUILD)/save.o $(BUILD)/edit.o $(BUILD)/zwalk.o \
 	$(BUILD)/create.o $(BUILD)/rebase.o $(BUILD)/jail.o \
-	$(BUILD)/update.o $(BUILD)/cutover.o
+	$(BUILD)/update.o $(BUILD)/cutover.o $(BUILD)/cfgsnap.o
 # src/core/zfs.h has three implementations, picked at the link: the
 # portable shtetl gets src/core/zstub.c, which refuses every call; the
 # FreeBSD one gets src/fbsd/zfs.c, over libzfs; the unit tests get
@@ -95,7 +95,7 @@ SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(ZFS_OBJS) $(UCL_OBJS)
 TESTS = check_parse check_schema check_site check_cascade check_show \
 	check_run check_spaces check_boot check_version check_zfs \
 	check_build check_patch check_beam check_save check_create \
-	check_rebase check_update
+	check_rebase check_update check_cfgsnap
 
 all: build shtetl
 
@@ -164,8 +164,8 @@ $(BUILD)/boot.o: src/core/boot.c src/core/boot.h src/core/err.h \
 	src/core/tree.h src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/boot.c
 $(BUILD)/build.o: src/core/build.c src/core/build.h src/core/cascade.h \
-	src/core/err.h src/core/spaces.h src/core/syntax.h src/core/tree.h \
-	src/core/version.h src/core/zfs.h
+	src/core/cfgsnap.h src/core/err.h src/core/spaces.h \
+	src/core/syntax.h src/core/tree.h src/core/version.h src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/build.c
 $(BUILD)/version.o: src/core/version.c src/core/version.h \
 	src/core/err.h src/core/syntax.h src/core/tree.h
@@ -178,13 +178,14 @@ $(BUILD)/save.o: src/core/save.c src/core/save.h src/core/beam.h \
 	src/core/zwalk.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/save.c
 $(BUILD)/create.o: src/core/create.c src/core/create.h src/core/beam.h \
-	src/core/jail.h \
+	src/core/cfgsnap.h src/core/jail.h \
 	src/core/build.h src/core/cascade.h src/core/err.h src/core/run.h \
 	src/core/save.h src/core/spaces.h src/core/tree.h src/core/version.h \
 	src/core/zfs.h src/core/zwalk.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/create.c
 $(BUILD)/update.o: src/core/update.c src/core/update.h src/core/beam.h \
-	src/core/build.h src/core/cascade.h src/core/err.h src/core/jail.h \
+	src/core/cfgsnap.h src/core/build.h src/core/cascade.h \
+	src/core/err.h src/core/jail.h \
 	src/core/parse.h src/core/rebase.h src/core/run.h src/core/save.h \
 	src/core/spaces.h src/core/tree.h src/core/version.h src/core/zfs.h \
 	src/core/zwalk.h
@@ -200,6 +201,9 @@ $(BUILD)/jail.o: src/core/jail.c src/core/jail.h src/core/build.h \
 $(BUILD)/rebase.o: src/core/rebase.c src/core/rebase.h src/core/err.h \
 	src/core/run.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/rebase.c
+$(BUILD)/cfgsnap.o: src/core/cfgsnap.c src/core/cfgsnap.h \
+	src/core/err.h src/core/zfs.h src/core/zwalk.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/cfgsnap.c
 $(BUILD)/zwalk.o: src/core/zwalk.c src/core/zwalk.h src/core/err.h \
 	src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/zwalk.c

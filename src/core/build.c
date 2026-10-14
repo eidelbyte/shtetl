@@ -32,6 +32,7 @@
 
 #include "core/build.h"
 #include "core/cascade.h"
+#include "core/cfgsnap.h"
 #include "core/err.h"
 #include "core/patch.h"
 #include "core/run.h"
@@ -864,16 +865,16 @@ fb_write(struct fb *b, const char *path, const char *text)
 	return (0);
 }
 
-/* The build root marked as building F; the config root snapshotted. */
+/*
+ * The build root marked as building F; the config snapshot the version
+ * records, the newest or one taken (cfgsnap.c).
+ */
 static int
 fb_begin(struct fb *b, time_t now)
 {
 	struct sh_fplan *p = b->fb_p;
-	struct sh_zprop kind = { "shtetl:kind", "config" };
-	char stamp[32], val[SH_ZFS_VALMAX];
-	const char *one;
-	struct tm tm;
-	int fd, n;
+	char msg[SH_BUILD_NAME * 2];
+	int fd;
 
 	if (fb_mkdirs(b, p->fp_rundir) != 0)
 		return (-1);
@@ -890,20 +891,10 @@ fb_begin(struct fb *b, time_t now)
 	    b->fb_err) != 0)
 		return (-1);
 	fb_push(b, FU_UNLOCK, 0, p->fp_src);
-	(void) gmtime_r(&now, &tm);
-	(void) strftime(stamp, sizeof (stamp), "%Y%m%d-%H%M%S", &tm);
-	(void) snprintf(b->fb_cfgsnap, sizeof (b->fb_cfgsnap),
-	    "%s@build-%s-%s", p->fp_config, p->fp_name, stamp);
-	/* a build in the same second as one before it: -2, -3, ... */
-	for (n = 2; n < 100 && sh_zfs_get(b->fb_z, b->fb_cfgsnap, "type",
-	    val, sizeof (val), NULL, b->fb_err) == 0; n++)
-		(void) snprintf(b->fb_cfgsnap, sizeof (b->fb_cfgsnap),
-		    "%s@build-%s-%s-%d", p->fp_config, p->fp_name, stamp, n);
-	one = b->fb_cfgsnap;
-	if (sh_zfs_snapshot(b->fb_z, &one, 1, &kind, 1, b->fb_err) != 0)
-		return (-1);
-	(void) fprintf(b->fb_out, "snapshot %s\n", b->fb_cfgsnap);
-	return (0);
+	(void) snprintf(msg, sizeof (msg), "%s %s", p->fp_update ? "update" :
+	    "build", p->fp_name);
+	return (sh_cfgsnap(b->fb_z, p->fp_config, msg, now, b->fb_cfgsnap,
+	    sizeof (b->fb_cfgsnap), b->fb_out, b->fb_err));
 }
 
 /* A dataset of the recipe's properties as ZFS takes them; N set. */

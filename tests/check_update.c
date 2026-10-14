@@ -14,6 +14,7 @@
 #include "check.h"
 #include "core/beam.h"
 #include "core/build.h"
+#include "core/cfgsnap.h"
 #include "core/cutover.h"
 #include "core/parse.h"
 #include "core/rebase.h"
@@ -34,7 +35,6 @@
 #define	V1	"15.1-releng-2026-10-01-0f691888dc56"
 #define	V2	"15.1-releng-2026-10-08-0f691888dc56"
 #define	BCFG	"tank/zconfig@build-generic-20261001-120000"
-#define	UCFG	"tank/zconfig@update-x-20261008-120000"
 #define	S1	"save-2026-10-02-100000"
 #define	S2	"save-2026-10-03-100000"
 #define	S3	"save-2026-10-08-120000"
@@ -485,7 +485,6 @@ test_run(void)
 	CHECK(asked("jail -f ") && !runs("x"));
 	CHECK(is(prop(RX "@" S3, "shtetl:kind"), "save"));
 	CHECK(is(prop(RX "@" S3, "shtetl:commit"), "update to generic@" V2));
-	CHECK(is(prop(UCFG, "shtetl:kind"), "config"));
 	/* the replays, three saves each */
 	log = rbfake_log();
 	CHECK(strstr(log, "start --from " RX "@" S1 " --onto " RF "@" V2
@@ -520,7 +519,9 @@ test_run(void)
 	/* F away again; X-staging the version, started, saved */
 	CHECK(is(prop(RF, "mounted"), "no"));
 	CHECK(is(prop(RXS "@" V2, "shtetl:kind"), "version"));
-	CHECK(is(prop(RXS "/www@" V2, "shtetl:config"), UCFG));
+	/* N8: the config root unchanged since the build: the build's */
+	CHECK(is(prop(RXS "/www@" V2, "shtetl:config"), BCFG));
+	CHECK(strstr(ran, "snapshot tank/zconfig@") == NULL);
 	(void) snprintf(path, sizeof (path), "%s/x-staging.conf", jaildir);
 	CHECK(strstr(slurp(path), "x-staging {\n\tpath = \"") != NULL);
 	CHECK(strstr(slurp(path), "\thost.hostname = \"x\";\n") != NULL);
@@ -555,6 +556,17 @@ test_run(void)
 	CHECK(is(prop(RXS "@" S3, "shtetl:commit"), "update to generic@" V2));
 	CHECK(!there(RXS "@" S1));
 	settings(NULL);
+	/* N8: a recipe written since: a config snapshot of its own */
+	world(1);
+	zfake_write("tank/zconfig", 512);
+	CHECK(update(SH_UV_NEW, 0) == 0);
+	(void) strcpy(path, "snapshot tank/zconfig@");
+	sh_cfgsnap_name(NOON, 0, path + strlen(path),
+	    sizeof (path) - strlen(path));
+	CHECK(strstr(ran, path) != NULL);
+	CHECK(is(prop(RXS "@" V2, "shtetl:config"), path + 9));
+	CHECK(is(prop(path + 9, "shtetl:kind"), "config"));
+	CHECK(is(prop(path + 9, "shtetl:commit"), "update x to generic@" V2));
 }
 
 /* Every line still "-" of the resolution at PATH answered keep. */

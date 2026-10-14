@@ -35,3 +35,48 @@ stale since draft 4 and are regenerated separately.
 Verification: check_update asserts the replayed save carries its
 original's shtetl:commit and no shtetl:replayed-from; make check,
 gate, xcheck.
+
+## Config snapshots only on a change, named three words
+
+src/core/cfgsnap.c, sh_cfgsnap, in place of the three copies in
+fb_begin, cr_config and uq_config. It finds the config root's newest
+shtetl:kind config snapshot (by creation, not name; other snapshots on
+the root, bootstrap's or a person's, passed over) and asks ZFS for
+written@ it on the root: 0, and that one is recorded, nothing taken,
+nothing said. Otherwise, or with none yet, one is taken.
+
+- The name: three different words of a 256-word list (short ASCII
+  nouns), drawn from splitmix64 of the time and a try count. Not
+  random: the same second and try give the same name, so the tests
+  know it (sh_cfgsnap_name), and a taken name moves to the next try,
+  up to 100, then a refusal.
+- Beyond what was asked: the new snapshot carries shtetl:commit, "build
+  F", "update F", "create X on F@V", "update X to F@V", since its name
+  no longer says what took it (and planning's 2026-10-08 ruling puts a
+  message on every snapshot). A snapshot recorded again keeps the
+  first one's message.
+- Bootstrap's own snapshot of the empty root before it clones the
+  recipes is left as it was (@bootstrap-<time>, no kind): it is a
+  place to go back to, not a record of recipes.
+- written@ is any write: a recipe edited and edited back, or git
+  touching .git, takes a new one. Reads write nothing with atime=off,
+  which bootstrap sets on the config root by default; a shtetl.conf
+  setting atime=on there would make every run take one.
+- Tests: the command suites write to tank/zconfig where a recipe
+  changes (check_build's config() switching roots counts as a write,
+  check_create's world writes the containers' recipes after the
+  build's snapshot), so reuse and change are both exercised; F26's
+  paused update had been relying on a fresh snapshot per build and
+  failed until config() counted its switch.
+
+Verification: check_cfgsnap 162 checks (family N1 - N7, written
+first); check_build, check_create, check_update carry N8 (a second
+build after a recipe change takes the second name, a failed build
+after that reuses it; a create after another reuses its snapshot, a
+create right after the build the build's; an update with nothing
+changed the build's, after a write its own); 11 mutations of cfgsnap.c
+all caught. make check, gate, xcheck. Box: build.sh gains N9 (atime
+off on the config root; P17's build records F13's failed build's
+snapshot, nothing having been written; F27's after the patch edit a
+new one, "update box") and X9 checks the create's snapshot by its
+message; owed with the next run.
