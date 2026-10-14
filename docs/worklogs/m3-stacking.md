@@ -222,3 +222,30 @@ check_spaces 89, check_boot 278; 21 command-line cases; 36 doc
 commands in 14 examples. MATRIX 159 cells, none planned. make gate
 clean; xcheck: every source passes. Not on the box: tests/box/run.sh
 needs a run for B3, B6 and B16's new text.
+
+## Later: a block of each kind (2026-10-14)
+
+Ruled after M4 (planning.md 14): shtetl.conf's keys reached every kind,
+so a command for systems only, or containers only, had no place. A
+file of the default may now hold `foundation { }`, `container { }` and
+`system { }`.
+
+- schema.c checks a block's keys as that kind's (sc_key, split out of
+  sc_layer, and sc_block); an import in a block, a block not an
+  object, a block in a block or in a recipe's own file are refused.
+- cascade.c takes the block of the recipe's kind as a layer of its own
+  just after the file holding it (ld_block), a copy whose values say
+  they came from "container in shtetl.conf" (ld_restamp). Everything
+  else follows from the layer rules already there: stacking, the
+  default's overrides with a warning, a commands label's piece keyed
+  by its layer, config show's comments, and create's skip of what the
+  foundation ran (a container block's pieces are no foundation's, so
+  they always run).
+- The layer's name being its own string, not "shtetl.conf", keeps a
+  block's command and text pieces from replacing the file's own,
+  which are keyed by file.
+
+Verified: check_schema (CK24), check_cascade (CC38), check_create (a
+container block's piece runs in every container); a mutation dropping
+the block's layer, and one letting import into a block, each caught;
+configuration.md's new example (doccheck); make check, gate, xcheck.

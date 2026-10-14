@@ -16,7 +16,8 @@
 #define	SH_IMPORT_DEPTH	16
 
 struct sh_layer {
-	char		*sl_file;	/* common/web.conf */
+	/* common/web.conf, or a kind's block: container in shtetl.conf */
+	char		*sl_file;
 	struct sh_node	*sl_tree;	/* as parsed */
 	int		sl_default;	/* shtetl.conf, or what it imports */
 };

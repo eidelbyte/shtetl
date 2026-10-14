@@ -145,7 +145,8 @@ block(void)
 static const char shtetl_conf[] =
 	"ver = \">=15.1\";\n"
 	"datasets { var {} \"usr/local\" {} }\n"
-	"commands { base = \"echo base\"; }\n";
+	"commands { base = \"echo base\"; }\n"
+	"container { commands { resolv = \"echo resolv\"; } }\n";
 
 /*
  * The configuration root: shtetl.conf, the foundation generic, the
@@ -408,12 +409,17 @@ test_plan(void)
 	    p.cp_dss[4].cd_placeholder);
 	CHECK(is(p.cp_dss[5].cd_rel, "www/data") && !p.cp_dss[5].cd_clone &&
 	    !p.cp_dss[5].cd_placeholder);
-	/* shtetl.conf's base the foundation ran; x's base and web not */
-	CHECK(p.cp_ncmds == 2 && p.cp_skipped == 1);
+	/*
+	 * shtetl.conf's base the foundation ran; x's base and web not,
+	 * nor shtetl.conf's container block, no foundation's
+	 */
+	CHECK(p.cp_ncmds == 3 && p.cp_skipped == 1);
 	CHECK(is(p.cp_cmds[0].cp_label, "base"));
 	CHECK(is(p.cp_cmds[0].cp_file, "containers/x.conf"));
 	CHECK(is(p.cp_cmds[0].cp_text, "echo x"));
-	CHECK(is(p.cp_cmds[1].cp_label, "web"));
+	CHECK(is(p.cp_cmds[1].cp_label, "resolv"));
+	CHECK(is(p.cp_cmds[1].cp_file, "container in shtetl.conf"));
+	CHECK(is(p.cp_cmds[2].cp_label, "web"));
 	CHECK(strncmp(p.cp_jailfile, jaildir, strlen(jaildir)) == 0 &&
 	    is(p.cp_jailfile + strlen(jaildir), "/x.conf"));
 	ran = NULL;
@@ -430,8 +436,9 @@ test_plan(void)
 	CHECK(strstr(ran, "  + " RX "/www  its own, canmount=off\n") != NULL);
 	CHECK(strstr(ran, "  + " RX "/www/data  its own\n") != NULL);
 	CHECK(strstr(ran, "  pkg: nginx, curl\n") != NULL);
-	CHECK(strstr(ran, "  commands: base (containers/x.conf), web "
-	    "(containers/x.conf); 1 the foundation ran\n") != NULL);
+	CHECK(strstr(ran, "  commands: base (containers/x.conf), resolv "
+	    "(container in shtetl.conf), web (containers/x.conf); 1 the "
+	    "foundation ran\n") != NULL);
 	free(ran);
 	ran = NULL;
 
@@ -496,6 +503,7 @@ test_run(void)
 	CHECK(asked("pkg -j x install -y -- nginx curl\n"));
 	CHECK(asked("jexec x /bin/sh -e -c echo x\n"));
 	CHECK(asked("jexec x /bin/sh -e -c echo web\n"));
+	CHECK(asked("jexec x /bin/sh -e -c echo resolv\n"));
 	CHECK(!asked("echo base"));
 	CHECK(strstr(slurp(toollog), "pkg -j") < strstr(slurp(toollog),
 	    "jexec"));
@@ -520,11 +528,12 @@ test_run(void)
 	    V1));
 	CHECK(is(slurp(path), "nameserver ::1\n"));
 	CHECK(strstr(ran, "beamed") == NULL);
-	/* no packages, no commands: neither tool asked */
+	/* db's packages; of commands only the container block's */
 	world(1, 1);
 	CHECK(create("db", "db") == 0);
 	CHECK(asked("pkg -j db install -y -- postgresql17-server\n"));
-	CHECK(!asked("jexec"));
+	CHECK(asked("jexec db /bin/sh -e -c echo resolv\n"));
+	CHECK(!asked("echo x") && !asked("echo base"));
 }
 
 /* Whether nothing of x is left but the config snapshot. */

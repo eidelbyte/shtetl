@@ -458,6 +458,12 @@ override:
 - It may hold any kind's keys; each recipe takes those of its kind
   and leaves the rest (a container takes no `kernconf`, a
   foundation no `jailconf`). shtetl.conf's settings are no recipe's.
+- A file of it may hold a block of one kind's keys, `foundation`,
+  `container` or `system` (ruled 2026-10-14), which only that kind's
+  recipes take: a layer of its own after the file's, "container in
+  shtetl.conf", stacking on the file as a nearer file would. No
+  `import` in a block. A container's block reaches no foundation, so
+  its commands run in every container (7.4).
 - What would be a redefinition of the default's value is an override
   instead, with a warning naming the value replaced and its file: a
   recipe's `src_branch` or `kernconf` config over the default's, its
@@ -1417,6 +1423,14 @@ Outer space is a root-on-RAM system reached with `reboot -r` (ruled
 2026-10-09; the user's doc on it is pending). A shutdown hook was
 considered and declined.
 
+A system's commands (PROPOSAL, for M6): run once, when S is created,
+after its pkg, by `chroot` into S's datasets mounted below a run
+directory, before S ever boots: a system has no jail to `jexec` into.
+A piece its foundation ran is left out, as a container's is (7.4), and
+none runs again on an update, which rebases what S has. They run from
+wherever S is made: the host that runs shtetl for a new S, outer space
+for its updates.
+
 ### 7.12 Restore
 
 Any entity can be rebuilt on zrun from zlake: its foundation version,
@@ -1643,6 +1657,14 @@ below that change the plan are folded into the sections named.
 
 ## 14. Rulings
 
+### 2026-10-14 (shtetl.conf: a block of each kind)
+
+Told that shtetl.conf's keys reach every kind, so a command meant for
+systems or containers only had no place: "shtetl gets per kind blocks
+for all three kinds". So (5.4): a file of the default may hold a
+`foundation`, a `container` and a `system` block, each taken by that
+kind's recipes only.
+
 ### 2026-10-14 (scheduling: cron)
 
 Told that periodic(8) runs from cron, FreeBSD's housekeeping (ZFS
@@ -1669,7 +1691,10 @@ commands for containers; and shtetl.conf is to carry a command for
 systems adding `.include "/etc/jail.conf.d/*.conf";` to
 `/etc/jail.conf` (FreeBSD ships the directory and no jail.conf), so
 that rc.d/jail starts every container with `jail_enable` alone. Both
-wait on how shtetl.conf gives a command to one kind of recipe only.
+waited on how shtetl.conf gives a command to one kind of recipe only:
+ruled the same day, a block of each kind (5.4). The system's command
+is in shtetl-recipes' system block; the resolv.conf, not yet: a
+container's commands run in its jail, which cannot read the host's.
 
 ### 2026-10-14 (Q-AB: shtetl-recipes by default)
 

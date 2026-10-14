@@ -383,20 +383,107 @@ sc_coll(struct sc *x, const struct sh_rkey *rk, const struct sh_node *v)
 	}
 }
 
+/* One key PR of a layer against the keys of the kinds in KINDS. */
+static void
+sc_key(struct sc *x, const struct sh_pair *pr, unsigned kinds)
+{
+	const struct sh_rkey *rk;
+	struct sh_branch br;
+
+	rk = sh_rkey(pr->pr_key);
+	if (rk == NULL) {
+		sh_err_at(x->sc_err, x->sc_file, &x->sc_path, "invalid key");
+		return;
+	}
+	if ((rk->rk_kinds & kinds) == 0) {
+		sh_err_at(x->sc_err, x->sc_file, &x->sc_path,
+		    "valid only in %s recipe",
+		    sh_kind_name((enum sh_kind)rk->rk_kinds));
+		return;
+	}
+	switch (rk->rk_vt) {
+	case SH_V_IMPORT:
+		sc_import(x, pr->pr_val);
+		break;
+	case SH_V_VER:
+		sc_ver(x, pr->pr_val);
+		break;
+	case SH_V_STRING:
+		(void) sc_string(x, pr->pr_val);
+		break;
+	case SH_V_BRANCH:
+		if (sc_string(x, pr->pr_val))
+			(void) sc_syn(x, "branch",
+			    sh_syn_branch(pr->pr_val->sn_str, &br));
+		break;
+	case SH_V_KERNCONF:
+		/* lines, or the config they are added to */
+		if (pr->pr_val->sn_type != SH_STR || !pr->pr_val->sn_block)
+			sc_relpath(x, pr->pr_val, "path");
+		else
+			(void) sc_string(x, pr->pr_val);
+		break;
+	case SH_V_COLL:
+		sc_coll(x, rk, pr->pr_val);
+		break;
+	}
+}
+
+/*
+ * A kind's block of the default, V: the keys of that kind, KIND, which
+ * only its recipes take; an import is the file's, not a block's.
+ */
+static void
+sc_block(struct sc *x, unsigned kind, const struct sh_node *v)
+{
+	const struct sh_pair *pr;
+	size_t i, was;
+
+	if (v->sn_type != SH_OBJECT) {
+		sc_type(x, "an object", v, 0);
+		return;
+	}
+	x->sc_kind = kind;
+	for (i = 0; i < v->sn_obj.ob_n; i++) {
+		pr = &v->sn_obj.ob_v[i];
+		was = sh_path_push(&x->sc_path, pr->pr_key);
+		if (strcmp(pr->pr_key, "import") == 0)
+			sh_err_at(x->sc_err, x->sc_file, &x->sc_path,
+			    "not valid in a kind's block");
+		else
+			sc_key(x, pr, kind);
+		sh_path_pop(&x->sc_path, was);
+	}
+	x->sc_kind = SH_ALLKINDS;
+}
+
+unsigned
+sh_schema_block(const char *key)
+{
+	static const enum sh_kind kinds[] = { SH_FOUNDATION, SH_CONTAINER,
+	    SH_SYSTEM };
+	size_t i;
+
+	for (i = 0; i < sizeof (kinds) / sizeof (kinds[0]); i++) {
+		if (strcmp(key, sh_kind_name(kinds[i])) == 0)
+			return ((unsigned)kinds[i]);
+	}
+	return (0);
+}
+
 /*
  * One layer against the keys of the kinds in KINDS: one kind for a
- * recipe's own files, all of them for the default's. SETTINGS: the
- * file is shtetl.conf, whose site settings are not recipe keys.
+ * recipe's own files, all of them for the default's, which may hold
+ * a block of each kind's keys besides. SETTINGS: the file is
+ * shtetl.conf, whose site settings are not recipe keys.
  */
 static unsigned
 sc_layer(const struct sh_node *layer, unsigned kinds, const char *file,
     int settings, struct sh_err *e)
 {
-	const struct sh_rkey *rk;
 	const struct sh_pair *pr;
-	struct sh_branch br;
 	struct sc x;
-	unsigned before;
+	unsigned before, kb;
 	size_t i, was;
 
 	before = e->se_count;
@@ -413,43 +500,11 @@ sc_layer(const struct sh_node *layer, unsigned kinds, const char *file,
 		if (settings && sh_site_section(pr->pr_key))
 			continue;
 		was = sh_path_push(&x.sc_path, pr->pr_key);
-		rk = sh_rkey(pr->pr_key);
-		if (rk == NULL) {
-			sh_err_at(e, file, &x.sc_path, "invalid key");
-		} else if ((rk->rk_kinds & kinds) == 0) {
-			sh_err_at(e, file, &x.sc_path,
-			    "valid only in %s recipe",
-			    sh_kind_name((enum sh_kind)rk->rk_kinds));
-		} else {
-			switch (rk->rk_vt) {
-			case SH_V_IMPORT:
-				sc_import(&x, pr->pr_val);
-				break;
-			case SH_V_VER:
-				sc_ver(&x, pr->pr_val);
-				break;
-			case SH_V_STRING:
-				(void) sc_string(&x, pr->pr_val);
-				break;
-			case SH_V_BRANCH:
-				if (sc_string(&x, pr->pr_val))
-					(void) sc_syn(&x, "branch",
-					    sh_syn_branch(pr->pr_val->sn_str,
-					    &br));
-				break;
-			case SH_V_KERNCONF:
-				/* lines, or the config they are added to */
-				if (pr->pr_val->sn_type != SH_STR ||
-				    !pr->pr_val->sn_block)
-					sc_relpath(&x, pr->pr_val, "path");
-				else
-					(void) sc_string(&x, pr->pr_val);
-				break;
-			case SH_V_COLL:
-				sc_coll(&x, rk, pr->pr_val);
-				break;
-			}
-		}
+		if (kinds == SH_ALLKINDS &&
+		    (kb = sh_schema_block(pr->pr_key)) != 0)
+			sc_block(&x, kb, pr->pr_val);
+		else
+			sc_key(&x, pr, kinds);
 		sh_path_pop(&x.sc_path, was);
 	}
 	return (e->se_count - before);

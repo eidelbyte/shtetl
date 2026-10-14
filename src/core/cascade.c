@@ -22,9 +22,13 @@
  * file, lower layers first; src_branch, one value, may be given again
  * only alike, and kernconf's config is given by one file. A recipe
  * takes from the default only its kind's keys, and what would redefine
- * the default's value overrides it instead. A key keeps the place where
- * it was first added, so a commands block runs where it was first
- * defined.
+ * the default's value overrides it instead. A file of the default may
+ * hold a block of one kind's keys (foundation, container, system);
+ * a recipe of that kind takes the block as a layer of its own, after
+ * the file's, named "container in shtetl.conf", so that what it gives
+ * stacks on what the file gives as a nearer file's would. A key keeps
+ * the place where it was first added, so a commands block runs where
+ * it was first defined.
  */
 
 #include <stdio.h>
@@ -160,6 +164,60 @@ ld_imports(struct ld *x, const char *file, const struct sh_node *tree)
 	return (0);
 }
 
+/* The froms of N and below that are OLD made NEW. */
+static void
+ld_restamp(struct sh_node *n, const char *old, const char *new)
+{
+	size_t i;
+
+	if (n->sn_from == old)
+		n->sn_from = new;
+	if (n->sn_type == SH_ARRAY) {
+		for (i = 0; i < n->sn_arr.ar_n; i++)
+			ld_restamp(n->sn_arr.ar_v[i], old, new);
+	} else if (n->sn_type == SH_OBJECT) {
+		for (i = 0; i < n->sn_obj.ob_n; i++) {
+			if (n->sn_obj.ob_v[i].pr_from == old)
+				n->sn_obj.ob_v[i].pr_from = new;
+			ld_restamp(n->sn_obj.ob_v[i].pr_val, old, new);
+		}
+	}
+}
+
+/*
+ * The block of the recipe's kind in FILE, a file of the default whose
+ * tree is TREE, as a layer of its own after FILE's: "container in
+ * shtetl.conf", which its values say they came from. -1: no memory.
+ */
+static int
+ld_block(struct ld *x, const char *file, const struct sh_node *tree)
+{
+	const struct sh_node *b;
+	struct sh_node *copy;
+	const char *kind;
+	char *name;
+	size_t len;
+
+	kind = sh_kind_name(x->ld_r->sr_kind);
+	if ((b = sh_obj_get(tree, kind)) == NULL || b->sn_type != SH_OBJECT)
+		return (0);
+	len = strlen(kind) + strlen(" in ") + strlen(file) + 1;
+	if ((name = malloc(len)) == NULL)
+		return (-1);
+	(void) snprintf(name, len, "%s in %s", kind, file);
+	if ((copy = sh_node_copy(b)) == NULL) {
+		free(name);
+		return (-1);
+	}
+	ld_restamp(copy, file, name);
+	if (ld_append(x, name, copy) != 0) {
+		sh_node_free(copy);
+		free(name);
+		return (-1);
+	}
+	return (0);
+}
+
 /*
  * Loads NAME, after what it imports. FROM and FPATH say where NAME
  * was named, for messages (FROM NULL: by shtetl itself). OPTIONAL: a
@@ -231,7 +289,7 @@ ld_load(struct ld *x, const char *name, const char *from,
 		free(file);
 		return (-1);
 	}
-	return (0);
+	return (x->ld_default ? ld_block(x, file, tree) : 0);
 }
 
 /* TARGET's kind, name and file, into R. */

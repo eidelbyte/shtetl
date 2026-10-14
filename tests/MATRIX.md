@@ -107,6 +107,7 @@ object, string}; entry key syntax per collection; error reporting
 | CK20 | the key path quotes a component that is not a bare word (`datasets."usr/local".readonly`) | covered: check_schema.c |
 | CK22 | a file of the default layer takes every kind's keys; shtetl.conf's sections of settings are no recipe keys, and a file it imports may have none; an unknown key is refused | covered: check_schema.c test_default |
 | CK23 | src_branch: main, stable/N or releng/N.M; anything else refused: invalid branch | covered: check_schema.c |
+| CK24 | a block of one kind's keys (foundation, container, system) in a file of the default: its keys checked as that kind's, another kind's refused; no import in it; not an object refused; a block in a block, or in a recipe's own file, an invalid key | covered: check_schema.c test_blocks |
 
 ## CS: shtetl.conf (planning.md 5.2, 6.3; src/core/site.c)
 
@@ -177,6 +178,7 @@ spelling.
 | CC35 | shtetl.conf is checked whole wherever it is read: a refused setting refuses a recipe's resolve, naming the setting; a file shtetl.conf imports holds no settings | covered: check_cascade.c test_site_checked; configuration.md, example settings-refused |
 | CC36 | in ver a bare major is every minor of it: =15 any 15.x, <=15 takes 15.x, >15 begins at 16.0; N.N is that version; each form's range, and the meets they make (=15 with >=15.3; =15 with <15 and >15 with <16 refused) | covered: check_cascade.c test_ver; configuration.md, example ver |
 | CC37 | kernconf: the config from one file of the stack, a second file giving it refused, alike or not; the default's overridden with a warning; lines stack with the default's and the imports'; merged as { file; lines } | covered: check_cascade.c test_stacked, test_default |
+| CC38 | a kind's block of a default file: a recipe of that kind takes it as a layer of its own after the file's ("container in shtetl.conf"), its values saying so; what it gives stacks with the file's, a commands label a piece of its own; a one-value key given again overrides the file's, with a warning; another kind's block not taken; a file shtetl.conf imports may hold blocks; create runs a container block's pieces, which no foundation had (check_create.c X5) | covered: check_cascade.c test_blocks, check_create.c |
 
 ## CW: what config show prints (src/core/show.c)
 

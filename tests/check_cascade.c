@@ -751,6 +751,71 @@ test_patches(void)
 	CHECK(is(sh_obj_get(one, "ref")->sn_str, "r1"));
 }
 
+/*
+ * CC38: a block of one kind's keys in a file of the default: a recipe of
+ * that kind takes it as a layer of its own after the file's, "container
+ * in shtetl.conf"; what it gives stacks with the file's, a commands
+ * label a piece of its own; what it gives again of the file's one-value
+ * keys overrides it, with a warning; another kind's block is not taken;
+ * a file shtetl.conf imports may hold blocks too.
+ */
+static void
+test_blocks(void)
+{
+	static const char *const kb[] = {
+		"shtetl.conf",
+		"import = \"common/k.conf\";\n"
+		"pkg = [ \"sudo\" ];\n"
+		"kernconf = \"GENERIC\";\n"
+		"commands { base = \"echo all\"; }\n"
+		"container { pkg = [ \"nginx\" ]; "
+		"commands { base = \"echo c\"; resolv = \"echo r\"; } "
+		"jailconf = \"allow.raw_sockets;\"; }\n"
+		"foundation { kernconf = \"MINE\"; }\n"
+		"system { commands { jails = \"echo j\"; } }\n",
+		"common/k.conf", "container { pkg = [ \"vim\" ]; }\n",
+		"containers/x.conf", "pkg = [ \"curl\" ];\n",
+		"foundations/f.conf", "src_branch = \"main\";\n",
+		"systems/s.conf", "pkg = [ \"tmux\" ];\n",
+		NULL
+	};
+	const struct sh_node *v;
+
+	resolves(mkroot("kb", kb), "containers/x");
+	CHECK(is(layers(), "common/k.conf container in common/k.conf "
+	    "shtetl.conf container in shtetl.conf containers/x.conf"));
+	CHECK(r.sr_layers[1].sl_default && r.sr_layers[3].sl_default);
+	CHECK(!r.sr_layers[4].sl_default);
+	CHECK(is(keys(M("pkg")), "vim sudo nginx curl"));
+	v = sh_obj_get(M("pkg"), "nginx");
+	CHECK(is(v->sn_from, "container in shtetl.conf"));
+	CHECK(is(keys(sh_obj_get(M("commands"), "base")),
+	    "shtetl.conf container in shtetl.conf"));
+	v = sh_obj_get(sh_obj_get(M("commands"), "resolv"),
+	    "container in shtetl.conf");
+	CHECK(v != NULL && is(v->sn_str, "echo r"));
+	CHECK(is(keys(M("jailconf")), "container in shtetl.conf"));
+	CHECK(sh_obj_get(M("commands"), "jails") == NULL);
+	CHECK(M("kernconf") == NULL);
+	CHECK(wc.c_err.se_count == 0);
+
+	resolves(root, "foundations/f");
+	CHECK(is(layers(), "common/k.conf shtetl.conf foundation in "
+	    "shtetl.conf foundations/f.conf"));
+	v = sh_obj_get(M("kernconf"), "file");
+	CHECK(is(v->sn_str, "MINE") && is(v->sn_from,
+	    "foundation in shtetl.conf"));
+	CHECK(wc.c_err.se_count == 1);
+	CHECK(cap_has(&wc, "foundation in shtetl.conf: kernconf: MINE "
+	    "overrides GENERIC from shtetl.conf"));
+	CHECK(is(keys(M("pkg")), "sudo"));
+	CHECK(is(keys(M("commands")), "base"));
+
+	resolves(root, "systems/s");
+	CHECK(is(keys(M("commands")), "base jails"));
+	CHECK(is(keys(M("pkg")), "sudo tmux"));
+}
+
 int
 main(void)
 {
@@ -769,6 +834,7 @@ main(void)
 	test_patches();
 	test_default();
 	test_site_checked();
+	test_blocks();
 	sh_recipe_free(&r);
 	cap_close(&wc);
 	cap_close(&c);

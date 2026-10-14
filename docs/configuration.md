@@ -1202,6 +1202,96 @@ takes no `jailconf`; the container takes `jailconf` and no
 each, and keeps `sudo` and `tmux`. `ver` stacks, so
 `containers/old` cannot be read with this shtetl.conf.
 
+### Blocks of one kind
+
+A file of the default may hold a block of each kind's keys:
+`foundation`, `container` and `system`. A recipe of that kind takes
+the block, and only it; the keys outside every block reach every kind
+that takes them, as above. A block is a layer of its own, just after
+the file that holds it, and says so: what it gives comes from
+`container in shtetl.conf`. So what it gives stacks with the file's
+like a nearer file's would: a package more, a commands label a piece
+of its own, and a one-value key given again overrides the file's with
+a warning. A block holds its kind's keys only, and no `import`.
+
+A container's commands run in its jail when it is created, but not a
+piece its foundation ran (planning.md 7.4): shtetl.conf's own commands
+reach the foundation, which runs them, so the container leaves them
+out; its block's reach no foundation, and run in every container.
+
+<!-- example: blocks -->
+
+```ucl
+# shtetl.conf
+pkg = [ "sudo" ];
+commands { motd = "echo shtetl > /etc/motd.template"; }
+foundation { kernconf = "GENERIC"; }
+container {
+    pkg = [ "ca_root_nss" ];
+    commands { hosts = "echo 127.0.0.1 localhost > /etc/hosts"; }
+}
+system {
+    commands {
+        jails = <<EOD
+grep -qxF '.include "/etc/jail.conf.d/*.conf";' /etc/jail.conf 2>/dev/null ||
+    echo '.include "/etc/jail.conf.d/*.conf";' >> /etc/jail.conf
+EOD
+    }
+}
+```
+
+```ucl
+# containers/web.conf
+pkg = [ "nginx" ];
+```
+
+```ucl
+# systems/host.conf
+pkg = [ "tmux" ];
+```
+
+```console
+$ shtetl config show containers/web
+# containers/web.conf: a container's recipe, its layers merged
+# layers, nearest last: shtetl.conf, container in shtetl.conf, containers/web.conf
+pkg {
+    sudo = true;  # shtetl.conf
+    ca_root_nss = true;  # container in shtetl.conf
+    nginx = true;  # containers/web.conf
+}
+commands {
+    motd {  # shtetl.conf
+        "shtetl.conf" = "echo shtetl > /etc/motd.template";
+    }
+    hosts {  # container in shtetl.conf
+        "container in shtetl.conf" = "echo 127.0.0.1 localhost > /etc/hosts";
+    }
+}
+$ shtetl config show systems/host
+# systems/host.conf: a system's recipe, its layers merged
+# layers, nearest last: shtetl.conf, system in shtetl.conf, systems/host.conf
+pkg {
+    sudo = true;  # shtetl.conf
+    tmux = true;  # systems/host.conf
+}
+commands {
+    motd {  # shtetl.conf
+        "shtetl.conf" = "echo shtetl > /etc/motd.template";
+    }
+    jails {  # system in shtetl.conf
+        "system in shtetl.conf" = <<EOD
+grep -qxF '.include "/etc/jail.conf.d/*.conf";' /etc/jail.conf 2>/dev/null ||
+    echo '.include "/etc/jail.conf.d/*.conf";' >> /etc/jail.conf
+EOD
+    }
+}
+```
+
+The container takes `ca_root_nss` and its `hosts` piece from the
+container block, `sudo` and `motd` from shtetl.conf itself; the
+system takes the `jails` piece, which puts the jails' directory in
+the system's `/etc/jail.conf`, and nothing of the container's.
+
 ## 7. Checks after the merge
 
 Some things only the merged recipe can answer:

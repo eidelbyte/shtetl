@@ -68,6 +68,12 @@ struct sh_rkey {
 const struct sh_rkey *sh_rkey(const char *key);
 
 /*
+ * KEY as a kind's block of the default (planning.md 5.4): "foundation",
+ * "container" or "system", that kind; 0, no block.
+ */
+unsigned sh_schema_block(const char *key);
+
+/*
  * Checks LAYER, the tree of FILE, against the keys a KIND recipe
  * takes: every problem reported to E, and their number returned. A
  * layer that passes may still be refused by the checks on the merged
@@ -79,7 +85,9 @@ unsigned sh_schema_recipe(const struct sh_node *layer, enum sh_kind kind,
 /*
  * Checks LAYER, a file of the default layer (planning.md 5.4):
  * shtetl.conf, or a file it imports. It may give any kind's keys,
- * each recipe taking those of its own; SETTINGS says the file is
+ * each recipe taking those of its own, and a block of one kind's keys,
+ * foundation, container or system, which only that kind's recipes
+ * take (no import in it); SETTINGS says the file is
  * shtetl.conf itself, whose site settings (5.2) are left to
  * sh_site_check.
  */

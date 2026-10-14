@@ -389,6 +389,37 @@ test_default(void)
 	CHECK(cap_has(&c, "kernconf: must be a quoted string"));
 }
 
+/*
+ * CK24: a block of one kind's keys in a file of the default, checked as
+ * that kind's; no import in it; not an object refused; no block in a
+ * recipe's own file.
+ */
+static void
+test_blocks(void)
+{
+	CHECK(DF("container { pkg = [ \"nginx\" ]; jailconf = \"x;\"; }\n"
+	    "foundation { kernconf = \"GENERIC\"; }\n"
+	    "system { commands { jails = \"echo j\"; } }\n", 1) == 0);
+	CHECK(DF("container { kernconf = \"X\"; }\n", 1) == 1);
+	CHECK(cap_has(&c, "shtetl.conf: container.kernconf: valid only in "
+	    "foundation recipe"));
+	CHECK(DF("foundation { requires = [ \"db\" ]; }\n", 0) == 1);
+	CHECK(cap_has(&c, "shtetl.conf: foundation.requires: valid only in "
+	    "container recipe"));
+	CHECK(DF("system { import = \"a.conf\"; }\n", 1) == 1);
+	CHECK(cap_has(&c, "shtetl.conf: system.import: not valid in a "
+	    "kind's block"));
+	CHECK(DF("system = 5;\n", 1) == 1);
+	CHECK(cap_has(&c, "shtetl.conf: system: must be an object"));
+	CHECK(DF("container { container { pkg = [ \"a\" ]; } frob = 1; }\n",
+	    1) == 2);
+	CHECK(cap_has(&c, "shtetl.conf: container.container: invalid key"));
+	CHECK(cap_has(&c, "shtetl.conf: container.frob: invalid key"));
+	CHECK(DF("container { pkg = [ \"Bad Name\" ]; }\n", 1) == 1);
+	bad("container { pkg = [ \"nginx\" ]; }\n", SH_CONTAINER,
+	    "t.conf: container: invalid key");
+}
+
 int
 main(void)
 {
@@ -404,6 +435,7 @@ main(void)
 	test_requires_patches();
 	test_reporting();
 	test_default();
+	test_blocks();
 	cap_close(&c);
 	printf("check_schema: %d checks\n", checks);
 	return (0);
