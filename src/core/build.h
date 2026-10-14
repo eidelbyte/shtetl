@@ -84,6 +84,7 @@ struct sh_tools {
 	const char	*tl_sh;
 	const char	*tl_jail;
 	const char	*tl_jexec;
+	const char	*tl_jls;
 	int		(*tl_securelevel)(void);
 };
 

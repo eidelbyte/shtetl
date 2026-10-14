@@ -1,0 +1,651 @@
+/*
+ * shtetl update X (planning.md 7.6, 7.6.2, 7.7): tests/MATRIX.md
+ * families U and G, over the fake ZFS and the fake rebaser
+ * (tests/rbfake.c), with jail and jls played by scripts that keep which
+ * jails run.
+ */
+
+#include <sys/stat.h>
+
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#include "check.h"
+#include "core/beam.h"
+#include "core/build.h"
+#include "core/parse.h"
+#include "core/rebase.h"
+#include "core/spaces.h"
+#include "core/update.h"
+#include "core/zfs.h"
+#include "rbfake.h"
+#include "zfake.h"
+
+#define	LF	"tank/shtetl/foundations/generic"
+#define	RF	"fast/run/foundations/generic"
+#define	RX	"fast/run/containers/x"
+#define	RXS	"fast/run/containers/x-staging"
+#define	LX	"tank/shtetl/containers/x"
+#define	LXS	"tank/shtetl/containers/x-staging"
+#define	V0	"15.1-releng-2026-09-01-0f691888dc56"
+#define	V1	"15.1-releng-2026-10-01-0f691888dc56"
+#define	V2	"15.1-releng-2026-10-08-0f691888dc56"
+#define	BCFG	"tank/zconfig@build-generic-20261001-120000"
+#define	UCFG	"tank/zconfig@update-x-20261008-120000"
+#define	S1	"save-2026-10-02-100000"
+#define	S2	"save-2026-10-03-100000"
+#define	S3	"save-2026-10-08-120000"
+#define	S4	"save-2026-10-08-120000-2"
+/* 2026-10-08 12:00:00 UTC */
+#define	NOON	((time_t)1791460800)
+
+static struct cap c, wc;
+static struct sh_zfs *z;
+static struct sh_spaces s;
+static struct sh_uplan p;
+static struct sh_tools fake;
+static struct sh_node *site;
+static char root[1200], jaildir[1200], rundir[1200], mnt[1200];
+static char toollog[1200], running[1200];
+static char *ran;
+
+static int
+is(const char *got, const char *want)
+{
+	if (strcmp(got, want) != 0) {
+		printf("got \"%s\", wanted \"%s\"\n", got, want);
+		return (0);
+	}
+	return (1);
+}
+
+static const char *
+prop(const char *name, const char *pr)
+{
+	static char val[4][512];
+	static int n;
+
+	n = (n + 1) % 4;
+	cap_reset(&wc);
+	if (sh_zfs_get(z, name, pr, val[n], sizeof (val[n]), NULL,
+	    &wc.c_err) != 0)
+		return ("(refused)");
+	return (val[n]);
+}
+
+static int
+there(const char *name)
+{
+	return (strcmp(prop(name, "type"), "(refused)") != 0);
+}
+
+static const char *
+slurp(const char *path)
+{
+	static char buf[16384];
+	size_t n;
+	FILE *f;
+
+	if ((f = fopen(path, "r")) == NULL)
+		return ("(none)");
+	n = fread(buf, 1, sizeof (buf) - 1, f);
+	buf[n] = '\0';
+	(void) fclose(f);
+	return (buf);
+}
+
+static int
+asked(const char *text)
+{
+	return (strstr(slurp(toollog), text) != NULL);
+}
+
+/* Whether the jail NAME runs, as the fakes keep it. */
+static int
+runs(const char *name)
+{
+	char path[1300];
+
+	(void) snprintf(path, sizeof (path), "%s/%s", running, name);
+	return (access(path, F_OK) == 0);
+}
+
+static void
+spath(char *buf, size_t len, const char *name)
+{
+	(void) snprintf(buf, len, "%s", scratch_path(name));
+}
+
+static const char *
+tool(const char *name, const char *body)
+{
+	char text[4096], rel[64];
+	static char path[4][1200];
+	static int n;
+
+	(void) snprintf(text, sizeof (text), "#!/bin/sh\n"
+	    "echo \"%s $*\" >> %s\n%sexit 0\n", name, toollog, body);
+	(void) snprintf(rel, sizeof (rel), "tools/%s", name);
+	(void) scratch_write(rel, text);
+	n = (n + 1) % 4;
+	spath(path[n], sizeof (path[n]), rel);
+	CHECK(chmod(path[n], 0755) == 0);
+	return (path[n]);
+}
+
+/* The configuration root, and the fakes. */
+static void
+config(void)
+{
+	static const char *const files[] = {
+		"conf/shtetl.conf",
+		"ver = \">=15.1\";\ndatasets { var {} \"usr/local\" {} }\n",
+		"conf/containers/x.conf",
+		"datasets { var { compression = \"zstd\"; } www {} }\n"
+		"jailconf = \"allow.raw_sockets;\";\n",
+		"conf/containers/new.conf", "ver = \">=16.0\";\n",
+		NULL
+	};
+	char body[2048];
+	size_t i;
+
+	for (i = 0; files[i] != NULL; i += 2)
+		(void) scratch_write(files[i], files[i + 1]);
+	spath(root, sizeof (root), "conf");
+	spath(jaildir, sizeof (jaildir), "jail.conf.d");
+	spath(rundir, sizeof (rundir), "update");
+	spath(mnt, sizeof (mnt), "mnt");
+	spath(toollog, sizeof (toollog), "tools.log");
+	spath(running, sizeof (running), "running");
+	(void) scratch_write("running/.keep", "");
+	(void) snprintf(body, sizeof (body),
+	    "case \"$3\" in\n-c) touch %s/$4;;\n-r) rm -f %s/$4;;\nesac\n",
+	    running, running);
+	fake.tl_jail = tool("jail", body);
+	(void) snprintf(body, sizeof (body), "[ -f %s/$2 ] || exit 1\n",
+	    running);
+	fake.tl_jls = tool("jls", body);
+	fake.tl_chroot = tool("chroot", "");
+	fake.tl_sh = "/bin/sh";
+}
+
+/* LF and its datasets snapshotted as V, its revision 15.1. */
+static void
+version(const char *v)
+{
+	static const char *const ds[] = { LF, LF "/usr", LF "/usr/local",
+	    LF "/var" };
+	char names[4][512];
+	const char *np[4];
+	struct sh_zprop zp[3];
+	size_t i;
+
+	for (i = 0; i < 4; i++) {
+		(void) snprintf(names[i], sizeof (names[i]), "%s@%s", ds[i], v);
+		np[i] = names[i];
+	}
+	zp[0].zp_name = "shtetl:kind";
+	zp[0].zp_value = "version";
+	zp[1].zp_name = "shtetl:config";
+	zp[1].zp_value = BCFG;
+	zp[2].zp_name = "shtetl:revision";
+	zp[2].zp_value = "15.1";
+	cap_reset(&wc);
+	CHECK(sh_zfs_snapshot(z, np, 4, zp, 3, &wc.c_err) == 0);
+}
+
+/* X's datasets snapshotted as the save S, its message MSG. */
+static void
+xsave(const char *snap, const char *msg)
+{
+	static const char *const ds[] = { RX, RX "/usr", RX "/usr/local",
+	    RX "/var", RX "/www" };
+	char names[5][512];
+	const char *np[5];
+	struct sh_zprop zp[3];
+	size_t i;
+
+	for (i = 0; i < 5; i++) {
+		(void) snprintf(names[i], sizeof (names[i]), "%s@%s", ds[i],
+		    snap);
+		np[i] = names[i];
+	}
+	zp[0].zp_name = "shtetl:kind";
+	zp[0].zp_value = "save";
+	zp[1].zp_name = "shtetl:commit";
+	zp[1].zp_value = msg;
+	zp[2].zp_name = "shtetl:config";
+	zp[2].zp_value = BCFG;
+	cap_reset(&wc);
+	CHECK(sh_zfs_snapshot(z, np, 5, zp, 3, &wc.c_err) == 0);
+}
+
+/*
+ * The world: generic in zlake at V0, V1, V2; V1 on zrun; x cloned from
+ * V1 as create clones (usr a placeholder, www its own), mounted, its
+ * jail running, saved twice.
+ */
+static void
+world(int run)
+{
+	static const struct sh_zprop cfg = { "shtetl:kind", "config" };
+	static const struct sh_zprop off = { "canmount", "off" };
+	static const char *const bcfg[] = { BCFG };
+	static const char *const xs[] = { RX, RX "/usr/local", RX "/var",
+	    RX "/www" };
+	struct sh_beam b;
+	size_t i;
+	FILE *f;
+
+	zfake_reset();
+	rbfake_reset();
+	zfake_pool("tank");
+	zfake_fs("tank/shtetl");
+	zfake_set("tank/shtetl", "shtetl:space", "lake");
+	zfake_set("tank/shtetl", "mountpoint", "none");
+	zfake_fs("tank/shtetl/foundations");
+	zfake_fs("tank/shtetl/containers");
+	zfake_fs("tank/zconfig");
+	zfake_set("tank/zconfig", "shtetl:space", "config");
+	zfake_fs(LF);
+	zfake_fs(LF "/usr");
+	zfake_set(LF "/usr", "canmount", "off");
+	zfake_fs(LF "/usr/local");
+	zfake_fs(LF "/var");
+	cap_reset(&wc);
+	CHECK(sh_zfs_snapshot(z, bcfg, 1, &cfg, 1, &wc.c_err) == 0);
+	version(V0);
+	version(V1);
+	zfake_pool("fast");
+	if (run) {
+		zfake_fs("fast/run");
+		zfake_set("fast/run", "shtetl:space", "run");
+		zfake_set("fast/run", "mountpoint", "none");
+		zfake_fs("fast/run/foundations");
+		zfake_set("fast/run/foundations", "mountpoint",
+		    "/shtetl/foundations");
+		zfake_set("fast/run/foundations", "canmount", "off");
+		zfake_fs("fast/run/containers");
+		zfake_set("fast/run/containers", "mountpoint", mnt);
+	}
+	sh_spaces_free(&s);
+	cap_reset(&c);
+	CHECK(sh_spaces_discover(z, &s, &c.c_err) == 0);
+	(void) unlink(toollog);
+	(void) unlink(scratch_path("update/x/update.conf"));
+	(void) unlink(scratch_path("jail.conf.d/x-staging.conf"));
+	(void) unlink(scratch_path("running/x"));
+	(void) unlink(scratch_path("running/x-staging"));
+	if (!run)
+		return;
+	CHECK(sh_beam_plan(z, &s, "generic", V1, &b, &c.c_err) == 0);
+	CHECK((f = fopen("/dev/null", "w")) != NULL);
+	CHECK(sh_beam_run(z, &b, f, &c.c_err) == 0);
+	(void) fclose(f);
+	version(V2);
+	CHECK(sh_zfs_clone(z, RF "@" V1, RX, NULL, 0, &c.c_err) == 0);
+	CHECK(sh_zfs_clone(z, RF "/usr@" V1, RX "/usr", &off, 1, &c.c_err) ==
+	    0);
+	CHECK(sh_zfs_clone(z, RF "/usr/local@" V1, RX "/usr/local", NULL, 0,
+	    &c.c_err) == 0);
+	CHECK(sh_zfs_clone(z, RF "/var@" V1, RX "/var", NULL, 0, &c.c_err) ==
+	    0);
+	CHECK(sh_zfs_create(z, RX "/www", NULL, 0, &c.c_err) == 0);
+	for (i = 0; i < 4; i++)
+		CHECK(sh_zfs_mount(z, xs[i], &c.c_err) == 0);
+	xsave(S1, "first");
+	xsave(S2, "second");
+	(void) scratch_write("jail.conf.d/x.conf", "x {}\n");
+	(void) scratch_write("running/x", "");
+}
+
+/* The site's settings TEXT, or none. */
+static void
+settings(const char *text)
+{
+	sh_node_free(site);
+	site = NULL;
+	if (text != NULL) {
+		cap_reset(&wc);
+		site = sh_parse_buf(text, strlen(text), "shtetl.conf",
+		    &wc.c_err);
+		CHECK(site != NULL);
+	}
+}
+
+static int
+plan(const char *target, const char *version, enum sh_uverb verb)
+{
+	sh_update_free(&p);
+	cap_reset(&c);
+	cap_reset(&wc);
+	return (sh_update_plan(z, &s, site, root, target, version, verb,
+	    jaildir, rundir, &p, &c.c_err, &wc.c_err));
+}
+
+static void
+refused(const char *target, const char *version, const char *want)
+{
+	int rc;
+
+	rc = plan(target, version, SH_UV_NEW);
+	if (rc == 0 || !cap_has(&c, want))
+		printf("%s: wanted \"%s\", got:\n%s", target, want,
+		    cap_text(&c));
+	CHECK(rc == -1 && cap_has(&c, want));
+}
+
+static int
+run(int tty)
+{
+	size_t len;
+	FILE *f;
+	int rc;
+
+	free(ran);
+	ran = NULL;
+	f = open_memstream(&ran, &len);
+	CHECK(f != NULL);
+	cap_reset(&c);
+	rc = sh_update_run(z, &p, &s, &fake, &rbfake, tty, NOON, f, &c.c_err);
+	CHECK(fclose(f) == 0);
+	return (rc);
+}
+
+/* VERB on x, planned and run. */
+static int
+update(enum sh_uverb verb, int tty)
+{
+	if (plan("x", NULL, verb) != 0) {
+		printf("plan refused:\n%s", cap_text(&c));
+		CHECK(0);
+	}
+	return (run(tty));
+}
+
+/* U1: what is refused. */
+static void
+test_refused(void)
+{
+	settings(NULL);
+	world(0);
+	refused("x", NULL, "no run root");
+	world(1);
+	refused("X.y", NULL, "X.y: invalid container name");
+	refused("nope", NULL, "no container nope");
+	refused("x", "v9", "foundation generic has no version v9");
+	refused("x", V1, "container x is on generic@" V1 " already");
+	refused("x", V0, "generic@" V0 " is older than " V1 ", x's");
+	zfake_set(RX "/var", "zfs_rebase:phase", "conflicts");
+	refused("x", NULL, RX "/var: an open rebase");
+	world(1);
+	zfake_fs(RXS);
+	refused("x", NULL, "x-staging exists: cut it over or abandon it");
+	world(1);
+	(void) scratch_write("update/x/update.conf", "version = \"" V2 "\";\n"
+	    "config = \"" UCFG "\";\nstate = \"paused\";\n"
+	    "saves = [ \"" S1 "\" ];\n");
+	refused("x", NULL, "an update of x is under way");
+	CHECK(plan("x", NULL, SH_UV_CONTINUE) == 0);
+	(void) unlink(scratch_path("update/x/update.conf"));
+	CHECK(plan("x", NULL, SH_UV_CONTINUE) == -1);
+	CHECK(cap_has(&c, "no update of x to take up"));
+	/* a container no clone of a foundation's version */
+	world(1);
+	CHECK(sh_zfs_create(z, "fast/run/containers/new", NULL, 0,
+	    &c.c_err) == 0);
+	refused("new", NULL, "container new is no clone of a foundation's "
+	    "version");
+}
+
+/* U2: the plan, and its showing. */
+static void
+test_plan(void)
+{
+	size_t len;
+	FILE *f;
+
+	settings(NULL);
+	world(1);
+	CHECK(plan("containers/x", NULL, SH_UV_NEW) == 0);
+	CHECK(is(p.up_name, "x") && is(p.up_stagename, "x-staging"));
+	CHECK(is(p.up_found, "generic") && is(p.up_old, V1));
+	CHECK(is(p.up_version, V2) && p.up_beam == 1);
+	CHECK(is(p.up_stage, RXS) && is(p.up_runf, RF));
+	CHECK(p.up_nds == 5);
+	CHECK(is(p.up_dss[0].ud_rel, "") &&
+	    p.up_dss[0].ud_how == SH_UH_REPLAY);
+	CHECK(is(p.up_dss[1].ud_rel, "usr") &&
+	    p.up_dss[1].ud_how == SH_UH_TARGET && p.up_dss[1].ud_placeholder);
+	CHECK(is(p.up_dss[2].ud_rel, "usr/local") &&
+	    p.up_dss[2].ud_how == SH_UH_REPLAY);
+	CHECK(is(p.up_dss[3].ud_rel, "var") &&
+	    p.up_dss[3].ud_how == SH_UH_REPLAY && p.up_dss[3].ud_props != NULL);
+	CHECK(is(p.up_dss[4].ud_rel, "www") &&
+	    p.up_dss[4].ud_how == SH_UH_OWN);
+	CHECK(p.up_nsaves == 2 && is(p.up_saves[0], S1) &&
+	    is(p.up_saves[1], S2));
+	ran = NULL;
+	f = open_memstream(&ran, &len);
+	CHECK(f != NULL);
+	sh_update_show(f, &p);
+	CHECK(fclose(f) == 0);
+	CHECK(strstr(ran, "container x, from generic@" V1 " to @" V2 ", "
+	    "beamed to zrun first\n") != NULL);
+	CHECK(strstr(ran, "  + " RXS "/usr  cloned from the target, "
+	    "canmount=off\n") != NULL);
+	CHECK(strstr(ran, "  + " RXS "/www  cloned from the from-save\n") !=
+	    NULL);
+	CHECK(strstr(ran, "  saves replayed: " S1 " " S2 ", then the "
+	    "from-save\n") != NULL);
+	free(ran);
+	ran = NULL;
+	/* U5: update.depth */
+	settings("update { depth = 2; }\n");
+	CHECK(plan("x", NULL, SH_UV_NEW) == 0 && p.up_nsaves == 1 &&
+	    is(p.up_saves[0], S2));
+	settings("update { depth = 1; suffix = \"next\"; }\n");
+	CHECK(plan("x", NULL, SH_UV_NEW) == 0 && p.up_nsaves == 0);
+	CHECK(is(p.up_stagename, "x-next"));
+	settings(NULL);
+	/* one given, on zrun already */
+	world(1);
+	CHECK(plan("x", V2, SH_UV_NEW) == 0 && p.up_beam == 1);
+}
+
+/* U3, U4: a whole run, no conflict. */
+static void
+test_run(void)
+{
+	char path[1300];
+	const char *log;
+
+	settings(NULL);
+	world(1);
+	CHECK(update(SH_UV_NEW, 0) == 0);
+	if (c.c_err.se_count != 0)
+		printf("%s", cap_text(&c));
+	/* X stopped; its from-save */
+	CHECK(asked("jail -f ") && !runs("x"));
+	CHECK(is(prop(RX "@" S3, "shtetl:kind"), "save"));
+	CHECK(is(prop(RX "@" S3, "shtetl:commit"), "update to generic@" V2));
+	CHECK(is(prop(UCFG, "shtetl:kind"), "config"));
+	/* the replays, three saves each */
+	log = rbfake_log();
+	CHECK(strstr(log, "start --from " RX "@" S1 " --onto " RF "@" V2
+	    " --result " RXS "\n") != NULL);
+	CHECK(strstr(log, "start --from " RX "@" S2 " --onto " RXS
+	    " --result " S1 " --base\n  base " RX "@" S1 "\n") != NULL);
+	CHECK(strstr(log, "start --from " RX "@" S3 " --onto " RXS
+	    " --result " S2 " --base\n  base " RX "@" S2 "\n") != NULL);
+	CHECK(strstr(log, "start --from " RX "/var@" S1 " --onto " RF
+	    "/var@" V2 " --result " RXS "/var\n") != NULL);
+	CHECK(strstr(log, "--result " RXS "/usr\n") == NULL);
+	CHECK(strstr(log, "--result " RXS "/www\n") == NULL);
+	/* each replayed save as X's, its guid */
+	CHECK(is(prop(RXS "@" S1, "shtetl:kind"), "save"));
+	CHECK(is(prop(RXS "@" S1, "shtetl:commit"), "first"));
+	CHECK(is(prop(RXS "@" S2, "shtetl:commit"), "second"));
+	CHECK(is(prop(RXS "@" S3, "shtetl:commit"), "update to generic@" V2));
+	CHECK(is(prop(RXS "/var@" S1, "shtetl:replayed-from"),
+	    prop(RX "/var@" S1, "guid")));
+	/* placed, its properties, its placeholder, its own */
+	CHECK(is(prop(RXS, "origin"), RF "@" V2));
+	CHECK(is(prop(RXS, "readonly"), "off"));
+	CHECK(is(prop(RXS, "mounted"), "yes"));
+	(void) snprintf(path, sizeof (path), "%s/x-staging", mnt);
+	CHECK(is(prop(RXS, "mountpoint"), path));
+	CHECK(is(prop(RXS "/var", "compression"), "zstd"));
+	CHECK(is(prop(RXS "/usr", "origin"), RF "/usr@" V2));
+	CHECK(is(prop(RXS "/usr", "canmount"), "off"));
+	CHECK(is(prop(RXS "/usr/local", "origin"), RF "/usr/local@" V2));
+	CHECK(is(prop(RXS "/www", "origin"), RX "/www@" S3));
+	CHECK(is(prop(RXS "/www", "mounted"), "yes"));
+	/* F away again; X-staging the version, started, saved */
+	CHECK(is(prop(RF, "mounted"), "no"));
+	CHECK(is(prop(RXS "@" V2, "shtetl:kind"), "version"));
+	CHECK(is(prop(RXS "/www@" V2, "shtetl:config"), UCFG));
+	(void) snprintf(path, sizeof (path), "%s/x-staging.conf", jaildir);
+	CHECK(strstr(slurp(path), "x-staging {\n\tpath = \"") != NULL);
+	CHECK(strstr(slurp(path), "\thost.hostname = \"x\";\n") != NULL);
+	CHECK(strstr(slurp(path), "\tallow.raw_sockets;\n") != NULL);
+	CHECK(runs("x-staging") && !runs("x"));
+	CHECK(is(prop(RXS "@" S4, "shtetl:kind"), "save"));
+	CHECK(is(prop(LXS, "origin"), LF "@" V2));
+	CHECK(is(prop(LXS "/www", "origin"), LX "/www@" S3));
+	CHECK(strstr(slurp(scratch_path("update/x/update.conf")),
+	    "state = \"staged\";") != NULL);
+	CHECK(strstr(ran, "staged x-staging on generic@" V2 ": shtetl "
+	    "cutover x, or abandon x\n") != NULL);
+	/* the update done: continuing it refused */
+	CHECK(plan("x", NULL, SH_UV_CONTINUE) == -1);
+	CHECK(cap_has(&c, "the update of x is done"));
+	/* U5: depth 1, one rebase a dataset */
+	settings("update { depth = 1; }\n");
+	world(1);
+	CHECK(update(SH_UV_NEW, 0) == 0);
+	CHECK(strstr(rbfake_log(), "--base") == NULL);
+	CHECK(strstr(rbfake_log(), "start --from " RX "@" S3 " --onto " RF
+	    "@" V2 " --result " RXS "\n") != NULL);
+	CHECK(is(prop(RXS "@" S3, "shtetl:commit"), "update to generic@" V2));
+	CHECK(!there(RXS "@" S1));
+	settings(NULL);
+}
+
+/* Every line still "-" of the resolution at PATH answered keep. */
+static int
+answer(const char *path, void *arg)
+{
+	struct sh_resolution r;
+	const char *all[16];
+	size_t i, n;
+
+	(void) arg;
+	(void) memset(&r, 0, sizeof (r));
+	if (sh_res_read(path, &r, &wc.c_err) != 0) {
+		sh_res_free(&r);
+		return (-1);
+	}
+	for (i = n = 0; i < r.rs_n && n < 16; i++)
+		all[n++] = r.rs_lines[i].rl_path;
+	(void) sh_res_keep(&r, all, n);
+	(void) sh_res_write(path, &r, &wc.c_err);
+	sh_res_free(&r);
+	return (0);
+}
+
+/* U6: a gate, paused and taken up; the picker; --abort. */
+static void
+test_gate(void)
+{
+	static const char *const gate[] = { "/etc/rc.conf", NULL };
+	const char *res;
+
+	settings(NULL);
+	world(1);
+	rbfake_conflicts(RXS "/var", 2, gate);
+	CHECK(update(SH_UV_NEW, 0) == 1);
+	CHECK(strstr(ran, "paused: " RXS "/var stopped at conflicts, step 2 "
+	    "of 3, 1 name unanswered: answer ") != NULL);
+	CHECK(strstr(slurp(scratch_path("update/x/update.conf")),
+	    "state = \"paused\";") != NULL);
+	CHECK(!runs("x") && !runs("x-staging"));
+	CHECK(is(prop(RF, "mounted"), "no"));
+	CHECK(is(prop(RXS "/var", "zfs_rebase:phase"), "conflicts"));
+	/* taken up unanswered: paused again */
+	CHECK(update(SH_UV_CONTINUE, 0) == 1);
+	CHECK(strstr(ran, "paused: ") != NULL);
+	/* answered by hand: on to the end */
+	CHECK((res = rbfake_resolution(RXS "/var")) != NULL);
+	CHECK(answer(res, NULL) == 0);
+	CHECK(update(SH_UV_CONTINUE, 0) == 0);
+	if (c.c_err.se_count != 0)
+		printf("%s", cap_text(&c));
+	CHECK(is(prop(RXS "/var", "zfs_rebase:phase"), "-"));
+	CHECK(there(RXS "/var@" S3) && there(RXS "/www@" V2));
+	CHECK(runs("x-staging"));
+	/* the picker, on a terminal: answered there, no pause */
+	world(1);
+	rbfake_conflicts(RXS, 1, gate);
+	rbfake_picker(answer, NULL);
+	CHECK(update(SH_UV_NEW, 1) == 0);
+	CHECK(strstr(rbfake_log(), "continue " RXS " --no-merge -i\n") !=
+	    NULL);
+	CHECK(strstr(rbfake_log(), "continue " RXS "\n") != NULL);
+	/* --abort: the rebase aborted, the tree gone, x running again */
+	world(1);
+	rbfake_conflicts(RXS "/usr/local", 3, gate);
+	CHECK(update(SH_UV_NEW, 0) == 1);
+	CHECK(update(SH_UV_ABORT, 0) == 0);
+	CHECK(strstr(rbfake_log(), "abort " RXS "/usr/local\n") != NULL);
+	CHECK(!zfake_exists(RXS));
+	CHECK(runs("x") && !runs("x-staging"));
+	CHECK(access(scratch_path("update/x/update.conf"), F_OK) != 0);
+	CHECK(there(RX "@" S3));
+	CHECK(strstr(ran, "gave up the update of x\n") != NULL);
+}
+
+/* U7: a rebase refused, or failed part way: undone. */
+static void
+test_failures(void)
+{
+	settings(NULL);
+	world(1);
+	rbfake_exit(RXS "/usr/local", 1, SH_RB_REFUSED);
+	CHECK(update(SH_UV_NEW, 0) == -1);
+	CHECK(cap_has(&c, RXS "/usr/local: zfs_rebase refused"));
+	CHECK(cap_has(&c, "update of x failed and was given up"));
+	CHECK(!zfake_exists(RXS) && runs("x"));
+	CHECK(access(scratch_path("update/x/update.conf"), F_OK) != 0);
+	world(1);
+	rbfake_exit(RXS "/var", 2, SH_RB_FAILED);
+	CHECK(update(SH_UV_NEW, 0) == -1);
+	CHECK(strstr(rbfake_log(), "abort " RXS "/var\n") != NULL);
+	CHECK(!zfake_exists(RXS) && runs("x"));
+}
+
+int
+main(void)
+{
+	cap_open(&c);
+	cap_open(&wc);
+	CHECK(sh_zfs_open(&z, &c.c_err) == 0);
+	config();
+	test_refused();
+	test_plan();
+	test_run();
+	test_gate();
+	test_failures();
+	sh_update_free(&p);
+	sh_spaces_free(&s);
+	sh_node_free(site);
+	sh_zfs_close(z);
+	free(ran);
+	rbfake_reset();
+	cap_close(&c);
+	cap_close(&wc);
+	scratch_clean();
+	printf("check_update: %d checks\n", checks);
+	return (0);
+}

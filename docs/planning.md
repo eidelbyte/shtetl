@@ -1211,6 +1211,47 @@ a 15.2 target at check time.
 
 The suffix is `update.suffix` in shtetl.conf, `staging` by default.
 
+As built (M5, `src/core/update.c`, `src/core/rebase.c`):
+
+    shtetl update [-y] [--to v] X
+    shtetl update --continue X
+    shtetl update --abort X
+
+- Checked first: X a container that is a clone of its foundation's
+  version on zrun; the target, F's newest version or -pkg, or `--to`,
+  newer than X's own and its revision meeting X's `ver`, beamed first
+  if zrun lacks it; no X-staging; no update of X under way; no open
+  rebase on X.
+- The run: the config root snapshotted (`update-X-<time>`); X's jail
+  stopped; the from-save; F's datasets mounted; each dataset of X,
+  parents first, replayed, cloned from the target (F's placeholder,
+  `canmount=off`) or cloned from the from-save (X's own), the recipe's
+  properties set locally; F unmounted; X-staging snapshotted as the
+  target (`shtetl:kind=version`); its jail's block written (the name
+  X-staging, X's hostname, X's jailconf) and started; X-staging saved.
+- A replay: step 1 `--from X/d@s1 --onto F/d@V --result X-staging/d`,
+  placed (mountpoint inherited, readonly off, mounted); step k
+  `--allow-unrelated --base X/d@s(k-1) --from X/d@sk --onto
+  X-staging/d --result s(k-1)`; then X-staging/d@sn. Every replayed
+  snapshot carries its original's `shtetl:*` and
+  `shtetl:replayed-from`, the original's guid. A rebase is named by its
+  result dataset, which carries the tool's record in both forms; its
+  manifest goes to `/var/db/shtetl/update/X/rebase/` (`-o`).
+- At a conflicts gate (7.7): with a person at the terminal, the picker
+  (`--continue -i --no-merge`); the document complete, `--continue`.
+  With no terminal, or names left unanswered, the update pauses
+  (PROPOSAL): exit 3, the resolution's path said, the record
+  `/var/db/shtetl/update/X/update.conf` written (the target, the config
+  snapshot, the saves replayed, its state). `--continue` takes it up,
+  reading from ZFS which step each dataset stands at: the count of
+  its saves the staging dataset holds, and the tool's record on it.
+- `--abort`, and any failure: every open rebase aborted, X-staging's
+  jail stopped and its block removed, X-staging destroyed, F unmounted,
+  X started again, the record removed. X's from-save and the config
+  snapshot stay.
+- `update.depth` given as an interval replays every save, with a
+  warning: intervals are M7's.
+
 ### 7.6.1 One rebase
 
     zfs_rebase --from containers/X/d@<save> \

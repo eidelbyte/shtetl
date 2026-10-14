@@ -353,7 +353,7 @@
     ],
     "provides": "A container updated onto a new foundation version in staging, its history kept.",
     "estimated_size": "large",
-    "completed": "not-started"
+    "completed": "testing"
   },
   "m5-gate": {
     "description": "Conflicts and derivations, the text first (planning.md 7.7): at a gate, a conflicted derived path answered keep and its derivation noted; the picker on a terminal (--continue -i --no-merge); with the document complete, each noted derivation whose source is in the tree run once per command in a chroot of the result's private mount, then --continue; a source answered from: its derivation after done, in the placed result. Verify: MATRIX family G; the box.",

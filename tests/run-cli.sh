@@ -125,6 +125,15 @@ t x8-on create x --on
 t x8-version create x --on generic --version
 t x8-option create --frob x --on generic
 t x8-nozfs create x --on generic -y
+
+# U8: update
+t u8-none update
+t u8-two update x y
+t u8-option update --frob x
+t u8-to update x --to
+t u8-both update --continue --abort x
+t u8-tocont update --continue --to v x
+t u8-nozfs update -y x
 if [ "$(cat build/.flavor 2>/dev/null)" = portable ]; then
 	t b1-nozfs bootstrap --lake tank/shtetl -y
 	t f18-nozfs -C tests/conf/site build generic -y

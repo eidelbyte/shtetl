@@ -17,6 +17,8 @@
 #include "core/boot.h"
 #include "core/beam.h"
 #include "core/create.h"
+#include "core/rebase.h"
+#include "core/update.h"
 #include "core/edit.h"
 #include "core/save.h"
 #include "core/build.h"
@@ -31,7 +33,7 @@
 #define	SH_EXIT_OK	0
 #define	SH_EXIT_REFUSED	1
 #define	SH_EXIT_USAGE	2
-#define	SH_EXIT_PAUSED	3	/* a build, at a patch (planning.md 7.1.1) */
+#define	SH_EXIT_PAUSED	3	/* a build at a patch, an update at a gate */
 
 /*
  * What every command is handed. sc_root is the configuration root
@@ -61,6 +63,7 @@ static int cmd_pkg_upgrade(struct sh_ctx *, int, char **);
 static int cmd_beam(struct sh_ctx *, int, char **);
 static int cmd_save(struct sh_ctx *, int, char **);
 static int cmd_create(struct sh_ctx *, int, char **);
+static int cmd_update(struct sh_ctx *, int, char **);
 static int cmd_config_show(struct sh_ctx *, int, char **);
 static int cmd_spaces(struct sh_ctx *, int, char **);
 
@@ -97,6 +100,13 @@ static const struct sh_cmd sh_cmds[] = {
 	    "foundation's version, its\n    newest by default, its jail "
 	    "started and saved; shown first,\n    done once confirmed (-y "
 	    "confirms)", cmd_create },
+	{ "update", NULL, "[-y] [--to v] container\n"
+	    "           | --continue container | --abort container",
+	    "a container's datasets\n    replayed onto its foundation's "
+	    "newer version, or v, into\n    its staging tree, which is "
+	    "started; shown first, done once\n    confirmed (-y confirms); "
+	    "an update paused at a conflict\n    carried on, or given up",
+	    cmd_update },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 
@@ -122,7 +132,8 @@ usage(FILE *f)
 		    c->cm_verb != NULL ? " " : "",
 		    c->cm_verb != NULL ? c->cm_verb : "", c->cm_what);
 	(void) fprintf(f, "\nexit: 0 done, 1 refused (the reasons are on "
-	    "standard error), 2 usage,\n      3 a build paused at a patch\n");
+	    "standard error), 2 usage,\n      3 a build paused at a patch, "
+	    "an update at a conflict\n");
 }
 
 /*
@@ -586,6 +597,99 @@ cmd_create(struct sh_ctx *ctx, int argc, char **argv)
 	if (plan != NULL)
 		sh_create_free(plan);
 	free(plan);
+	free(dir);
+	return (rc);
+}
+
+/*
+ * update X: planned, shown, confirmed, run (planning.md 7.6); a paused
+ * one taken up or given up. The recipe and the settings are read where
+ * the config root is mounted, as a build's are.
+ */
+static int
+cmd_update(struct sh_ctx *ctx, int argc, char **argv)
+{
+	struct sh_uplan *plan;
+	struct sh_site site;
+	struct sh_err e, w;
+	char *dir, a[PATH_MAX], b[PATH_MAX];
+	const char *target, *version;
+	enum sh_uverb verb;
+	int i, yes, rc, r;
+
+	yes = 0;
+	verb = SH_UV_NEW;
+	target = version = NULL;
+	for (i = 0; i < argc; i++) {
+		if (strcmp(argv[i], "-y") == 0) {
+			yes = 1;
+		} else if (strcmp(argv[i], "--continue") == 0 ||
+		    strcmp(argv[i], "--abort") == 0) {
+			if (verb != SH_UV_NEW)
+				return (die_usage("update: one of --continue "
+				    "and --abort", ""));
+			verb = argv[i][2] == 'c' ? SH_UV_CONTINUE : SH_UV_ABORT;
+		} else if (strcmp(argv[i], "--to") == 0) {
+			if (i + 1 == argc)
+				return (die_usage("--to needs a version", ""));
+			version = argv[++i];
+		} else if (argv[i][0] == '-') {
+			return (die_usage("update: unknown option ", argv[i]));
+		} else if (target != NULL) {
+			return (die_usage("update takes one container", ""));
+		} else {
+			target = argv[i];
+		}
+	}
+	if (target == NULL)
+		return (die_usage("update: no container given", ""));
+	if (verb != SH_UV_NEW && version != NULL)
+		return (die_usage("update: --to is a new update's", ""));
+	sh_err_init(&e, stderr, "shtetl: ");
+	sh_err_init(&w, stderr, "shtetl: warning: ");
+	if (ctx_zfs(ctx, &e) != 0 ||
+	    sh_spaces_config_dir(ctx->sc_zfs, &ctx->sc_spaces, &dir, &e) != 0)
+		return (SH_EXIT_REFUSED);
+	if (ctx->sc_root != NULL && (realpath(ctx->sc_root, a) == NULL ||
+	    realpath(dir, b) == NULL || strcmp(a, b) != 0)) {
+		sh_errf(&e, "-C %s: not the config root's mountpoint, %s",
+		    ctx->sc_root, dir);
+		free(dir);
+		return (SH_EXIT_REFUSED);
+	}
+	if (sh_site_load(dir, &site, &e) != 0) {
+		free(dir);
+		return (SH_EXIT_REFUSED);
+	}
+	rc = SH_EXIT_REFUSED;
+	if ((plan = calloc(1, sizeof (*plan))) == NULL) {
+		sh_err_nomem(&e);
+	} else if (sh_update_plan(ctx->sc_zfs, &ctx->sc_spaces,
+	    site.ss_merged, dir, target, version, verb, SH_JAIL_DIR,
+	    SH_UPDATE_DIR, plan, &e, &w) == 0) {
+		if (verb == SH_UV_NEW) {
+			sh_update_show(stdout, plan);
+			(void) fflush(stdout);
+		}
+		if (verb == SH_UV_NEW && !sh_confirm(stdin, stdout, yes,
+		    isatty(STDIN_FILENO), "Update as above?")) {
+			sh_errf(&e, "%s", isatty(STDIN_FILENO) ?
+			    "not confirmed" : "not confirmed: no terminal, use "
+			    "-y");
+		} else {
+			r = sh_update_run(ctx->sc_zfs, plan, &ctx->sc_spaces,
+			    &sh_build_tools, &sh_zfs_rebaser,
+			    isatty(STDIN_FILENO), time(NULL), stdout, &e);
+			if (r >= 0)
+				rc = out_done();
+			if (r == 1 && rc == SH_EXIT_OK)
+				rc = SH_EXIT_PAUSED;
+		}
+	}
+	if (plan != NULL)
+		sh_update_free(plan);
+	free(plan);
+	sh_site_free(&site);
 	free(dir);
 	return (rc);
 }

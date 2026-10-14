@@ -76,3 +76,44 @@ picker path; the resolution read, refused, answered and written byte
 for byte; the fake held to the tool's contract); make check, gate,
 xcheck. The real tool on the box comes with the update (W7).
 tracker: m5-rebase testing.
+
+## m5-update
+
+shtetl update [-y] [--to v] X, --continue X, --abort X (planning.md
+7.6, 7.6.2), src/core/update.c; three commits before it: the jail's
+block in src/core/jail.c (create's, now shared), save taking a staging
+tree's clones of another container's datasets (S10), sh_tools' jls.
+
+- The plan: X's foundation and version from its root's origin; the
+  target and its checks (U1); X's datasets classified: replayed (F's,
+  not a placeholder), cloned from the target (F's placeholder), cloned
+  from the from-save (X's own); X's saves to replay, update.depth's
+  newest but the from-save, which the run takes.
+- The run: config snapshot, beam, X stopped, the from-save, F mounted,
+  each dataset in order, F unmounted, X-staging@V, its jail, its save.
+  A replay is a loop that reads where the dataset stands from ZFS each
+  time round: the leading saves the staging dataset holds (step 1 left
+  none, step k left the pre-apply s(k-1)) and whether the tool's record
+  is on it (a step open at its gate). So a paused update, or one cut
+  short, is taken up from what is there, not from a counter.
+- A gate: the picker on a terminal, then --continue once complete; or
+  a pause, exit 3, the record written with state paused. --abort and
+  every failure share uq_undo.
+- Decided beyond the plan (PROPOSAL, 7.6 as built): the pause and its
+  record; X stopped for the whole update, started by --abort; the
+  staging jail named X-staging with X's hostname; depth's interval
+  read as every save for now.
+
+Gotchas:
+- A mutation written f() * 0 or (f() != 0 && 0) still calls f; only
+  (0 && f() != 0) skips it. Two such were redone.
+- A finished update keeps its record, state staged, until cutover or
+  abandon: a test's world clears it.
+
+Verification: check_update 392 checks (U1 - U7: refusals; the plan and
+its showing; a whole run with three saves replayed, a placeholder and
+an own dataset; depth 1 and 2; a gate paused, taken up unanswered,
+answered and continued; the picker on a terminal; --abort; a refused
+and a failed rebase undone); seven mutations of update.c caught;
+run-cli U8 (59 cases); doccheck; make check, gate, xcheck. The box
+owed (U9). tracker: m5-update testing.
