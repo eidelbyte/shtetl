@@ -692,13 +692,48 @@ sh_zfs_clone(struct sh_zfs *z, const char *origin, const char *ds,
 	return (r != 0 ? -1 : 0);
 }
 
+/* A walk of snapshots: each one's name into ARG, the newest last. */
+static int
+zz_last(void *arg, const char *snap)
+{
+	(void) snprintf(arg, ZFS_MAX_DATASET_NAME_LEN, "%s", snap);
+	return (0);
+}
+
+/*
+ * Whether FS's newest snapshot is FROM's counterpart: 1, 0, or -1
+ * refused. The receive itself asks less: dmu_recv.c looks back through
+ * FS's snapshots for FROM's guid and refuses only a change since it,
+ * so one taken after it with nothing changed is passed over (box run
+ * 4, Z16). zfs.h asks for the newest, as beam and save send.
+ */
+static int
+zz_newest_is(struct sh_zfs *z, const char *fs, const char *from,
+    struct sh_err *e)
+{
+	char last[ZFS_MAX_DATASET_NAME_LEN];
+	char name[ZFS_MAX_DATASET_NAME_LEN * 2], g1[64], g2[64];
+
+	last[0] = '\0';
+	if (sh_zfs_snapshots(z, fs, zz_last, last, e) != 0)
+		return (-1);
+	if (last[0] == '\0')
+		return (0);
+	(void) snprintf(name, sizeof (name), "%s@%s", fs, last);
+	if (sh_zfs_get(z, name, "guid", g1, sizeof (g1), NULL, e) != 0 ||
+	    sh_zfs_get(z, from, "guid", g2, sizeof (g2), NULL, e) != 0)
+		return (-1);
+	return (strcmp(g1, g2) == 0 ? 1 : 0);
+}
+
 /*
  * lzc_send in a child, into a pipe, lzc_receive from it here: the
  * stream as zfs send -Lec makes it, nothing of -p. What each refuses
- * is looked at first, so that it is said in zfs.h's words; after,
- * the sender's errno (EXDEV: FROM no ancestor) and the receiver's
- * (dmu_recv.c: ENODEV, the base not FROM's counterpart; EEXIST, the
- * target there; ETXTBSY, changed since its newest snapshot).
+ * is looked at first, so that it is said in zfs.h's words, the
+ * target's newest snapshot among it; after, the sender's errno
+ * (EXDEV: FROM no ancestor) and the receiver's (dmu_recv.c: ENODEV,
+ * the base not FROM's counterpart; EEXIST, the target there; ETXTBSY,
+ * changed since its newest snapshot).
  */
 int
 sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
@@ -706,7 +741,7 @@ sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
 {
 	char tofs[ZFS_MAX_DATASET_NAME_LEN];
 	const char *at;
-	int fds[2], st, rr, sr;
+	int fds[2], st, rr, sr, r;
 	pid_t pid;
 
 	if (!zz_there(z, snap, ZFS_TYPE_SNAPSHOT) || (from != NULL &&
@@ -732,6 +767,11 @@ sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
 			return (-1);
 	} else if (!zz_there(z, tofs, ZFS_TYPE_FILESYSTEM)) {
 		sh_errf(e, "%s: no such filesystem", tofs);
+		return (-1);
+	} else if ((r = zz_newest_is(z, tofs, from, e)) != 1) {
+		if (r == 0)
+			sh_errf(e, "%s: newest snapshot is not %s's "
+			    "counterpart", tofs, from);
 		return (-1);
 	}
 	if (pipe(fds) != 0) {

@@ -45,6 +45,18 @@ have passed on the mac and failed on the box. The fake refuses
 check_zfs 190 checks, zcheck over the fake 63 cells). check_build
 passed unchanged: build's undo already unmounts first.
 
+Box run 4 (run.sh at f04c6e7, results dc592a7): 111 ok, 3 failed, all
+one cell, Z16's "newest snapshot is not FROM's counterpart" (Z10 and
+Z11 follow from it). The send of s@v3 from s@v1 onto a target at v2
+succeeded: dmu_recv.c's recv_begin_check_existing_impl looks back
+through the target's snapshots for FROM's guid, and without -F
+refuses only a target changed since it (ETXTBSY); zcheck's snapshots
+hold no data, so nothing had. The contract, the fake and shtetl's
+sends (beam and save from the target's newest) all mean the newest,
+so the real layer now looks at it first (zz_newest_is), by guid, as
+it looks at every other refusal. Z1 - Z15, Z17 - Z20 green on the
+box, Z20 among them.
+
 ## m4-beam (568d9a2, 7b4a227)
 
 shtetl beam [-y] [--version v] F (planning.md 7.3), src/core/beam.c.
