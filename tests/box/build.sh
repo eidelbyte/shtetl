@@ -462,9 +462,9 @@ EOF
 	    "$_rf@$_v2-pkg "
 	check K7 "its jail running again" "$(jls -j shbup name 2>/dev/null)" \
 	    shbup
-	check K7 "the old tree archived in zlake" "$(zfs list -H -o name \
-	    -r $P/shtetl/archive/containers |
-	    grep -c '/shbup-[0-9]*-[0-9]*-[0-9]*$')" 1
+	check K7 "the old tree archived in zlake, named for its version" \
+	    "$(zfs list -H -o name $P/shtetl/archive/containers/shbup-$_v \
+	    2>/dev/null)" "$P/shtetl/archive/containers/shbup-$_v"
 	check K7 "zlake's shbup on box's newest" "$(prop $_lu origin)" \
 	    "$P/shtetl/foundations/box@$_v2-pkg"
 	# an abandon

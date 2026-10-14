@@ -19,8 +19,8 @@
 #include "core/spaces.h"
 #include "core/zfs.h"
 
-#define	SH_UPDATE_DIR	"/var/db/shtetl/update"	/* records, logs */
-#define	SH_UPDATE_RECORD "update.conf"		/* in X's directory */
+#define	SH_UPDATE_DIR	"/var/db/shtetl/update"	/* manifests, logs */
+#define	SH_UPDATE_MARK	"shtetl:update"	/* X's from-save: the target */
 #define	SH_UPDATE_DS	64
 #define	SH_UPDATE_SAVES	64
 #define	SH_UPDATE_NAME	256
@@ -69,7 +69,7 @@ struct sh_uplan {
 	/* X's saves replayed, oldest first; the from-save last, once taken */
 	char		up_saves[SH_UPDATE_SAVES][SH_UPDATE_NAME];
 	size_t		up_nsaves;
-	char		up_cfgsnap[SH_UPDATE_NAME * 2];	/* from the record */
+	char		up_cfgsnap[SH_UPDATE_NAME * 2];	/* at the end */
 };
 
 /*
@@ -102,14 +102,21 @@ int sh_update_run(struct sh_zfs *z, struct sh_uplan *p,
     const struct sh_rebaser *rb, int tty, time_t now, FILE *out,
     struct sh_err *e);
 
+/* Where an update of X stands, as ZFS says. */
+enum sh_ustate {
+	SH_US_NONE,	/* no staging tree */
+	SH_US_UNDERWAY,	/* a staging tree, not done: paused, or cut short */
+	SH_US_DONE	/* the staging tree snapshotted as its version */
+};
+
 /*
- * The record of X's update in RUNDIR (SH_UPDATE_DIR): its target into
- * VERSION, X's from-save into FROM, its state ("running", "paused",
- * "staged") into STATE. 1 when there is none; -1 refused, said in E.
+ * The update of X (RUN, run/containers/X) into STAGE, read from ZFS:
+ * DONE when STAGE carries a snapshot of shtetl:kind version and no
+ * rebase is open in it; its target into VERSION and X's from-save (the
+ * newest of X's saves marked SH_UPDATE_MARK) into FROM. -1 refused.
  */
-int sh_update_record(const char *rundir, const char *name, char *version,
-    size_t vlen, char *from, size_t flen, char *state, size_t slen,
-    struct sh_err *e);
+int sh_update_state(struct sh_zfs *z, const char *run, const char *stage,
+    char *version, size_t vlen, char *from, size_t flen, struct sh_err *e);
 
 void sh_update_free(struct sh_uplan *p);
 

@@ -1222,12 +1222,13 @@ As built (M5, `src/core/update.c`, `src/core/rebase.c`):
   newer than X's own and its revision meeting X's `ver`, beamed first
   if zrun lacks it; no X-staging; no update of X under way; no open
   rebase on X.
-- The run: the config root snapshotted (`update-X-<time>`); X's jail
-  stopped; the from-save; F's datasets mounted; each dataset of X,
+- The run: X's jail stopped; the from-save, marked `shtetl:update`
+  with the target; F's datasets mounted; each dataset of X,
   parents first, replayed, cloned from the target (F's placeholder,
   `canmount=off`) or cloned from the from-save (X's own), the recipe's
-  properties set locally; F unmounted; X-staging snapshotted as the
-  target (`shtetl:kind=version`); its jail's block written (the name
+  properties set locally; F unmounted; the config root snapshotted
+  (`update-X-<time>`); X-staging snapshotted as the target
+  (`shtetl:kind=version`); its jail's block written (the name
   X-staging, X's hostname, X's jailconf) and started; X-staging saved.
 - A replay: step 1 `--from X/d@s1 --onto F/d@V --result X-staging/d`,
   placed (mountpoint inherited, readonly off, mounted); step k
@@ -1240,15 +1241,20 @@ As built (M5, `src/core/update.c`, `src/core/rebase.c`):
 - At a conflicts gate (7.7): with a person at the terminal, the picker
   (`--continue -i --no-merge`); the document complete, `--continue`.
   With no terminal, or names left unanswered, the update pauses
-  (PROPOSAL): exit 3, the resolution's path said, the record
-  `/var/db/shtetl/update/X/update.conf` written (the target, the config
-  snapshot, the saves replayed, its state). `--continue` takes it up,
-  reading from ZFS which step each dataset stands at: the count of
-  its saves the staging dataset holds, and the tool's record on it.
-- `--abort`, and any failure: every open rebase aborted, X-staging's
-  jail stopped and its block removed, X-staging destroyed, F unmounted,
-  X started again, the record removed. X's from-save and the config
-  snapshot stay.
+  (ruled 2026-10-14): exit 3, the resolution's path said. shtetl keeps
+  no record of its own: a pause leaves the tool's manifest and
+  resolution, and where the update stands is read from ZFS. A staging
+  tree with a rebase open, or without its version snapshot, is an
+  update under way; with it, done. `--continue` takes one up: its
+  target from X's marked from-save, the saves up to it, and each
+  dataset's step from the count of its saves the staging dataset holds
+  and the tool's record on it.
+- X stays stopped until the update is done or fails (ruled
+  2026-10-14); `--abort`, and any failure: every open rebase aborted,
+  X-staging's jail stopped and its block removed, X-staging destroyed,
+  F unmounted, X started again, the from-save's mark removed. X's
+  from-save stays, a save like any other. Done, the tool's documents
+  are removed and the log kept.
 - `update.depth` given as an interval replays every save, with a
   warning: intervals are M7's.
 
@@ -1470,18 +1476,20 @@ As built (M5, `src/core/cutover.c`):
 
 - Both refused while the update is not done (paused at a gate, or cut
   short): `shtetl update --continue` or `--abort` settles it first
-  (PROPOSAL). A cutover is refused while X-staging has no mirror in
-  zlake; a save of it makes one.
+  (ruled 2026-10-14). A cutover is refused while X-staging has no
+  mirror in zlake; a save of it makes one.
 - Cutover: X's `written@<from-save>` read for every dataset and shown;
   above zero, a final save of X before anything else, which its
   archive keeps. X-staging's jail stopped; its clones of X's datasets
   promoted; X's jail stopped if it runs; X unmounted and destroyed;
   X-staging renamed X, its block removed and X's written again with
   the new path. In zlake the staging mirror's clones of X's promoted,
-  X moved to `archive/containers/X-<YYYY-MM-DD>` (`-2` and on for
-  another that day, PROPOSAL), the staging mirror renamed X. X started
-  and saved, the save mirrored onto the renamed mirror; the update's
-  record and documents removed, its log kept.
+  X moved to `archive/containers/X-<X's version before the update>`
+  (ruled 2026-10-14; a cutover is refused while that name is taken),
+  the staging mirror renamed X. X started and saved, the save mirrored
+  onto the renamed mirror. The archive's snapshots are the old X's
+  saves as they were mirrored, named `save-<date>-<time>`; the
+  version is in its name and its origin.
 - A cutover that fails part way stops there and says what it has done;
   nothing is undone, the old X perhaps being gone (PROPOSAL).
 - Abandon: X-staging's jail stopped and its block removed; X-staging
@@ -1755,6 +1763,25 @@ below that change the plan are folded into the sections named.
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-14 (M5's proposals)
+
+Asked the update's seven particulars: "1. agree, if there's a conflict
+manifest, otherwise it shouldn't be needed. 2. X stays stopped until
+the update finishes or fails. if it fails, X should restart 3. correct
+4. correct 5. correct 6. It should be X-<old-foundation>-<date>."
+then "let's just do archive/containers/X-<old version>"; and of the
+seventh, a cutover stopping part way: "how could this happen? isn't
+this all zfs at that point?" (answered: separate ZFS steps on two
+pools, mounts and jail(8), no transaction over them).
+
+So (7.6, 7.7, 7.9): a pause keeps nothing of shtetl's beside the
+tool's manifest and resolution, where an update stands being read
+from ZFS and its from-save marked `shtetl:update`; X is stopped until
+the update is done or fails, and started again when it fails; the
+staging jail X-staging with X's hostname; a failing derivation pauses;
+cutover and abandon wait for the update to be done; the archive is
+`archive/containers/X-<old version>`. The seventh is open.
 
 ### 2026-10-14 (commands-external)
 

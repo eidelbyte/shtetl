@@ -291,7 +291,6 @@ world(int run)
 	cap_reset(&c);
 	CHECK(sh_spaces_discover(z, &s, &c.c_err) == 0);
 	(void) unlink(toollog);
-	(void) unlink(scratch_path("update/x/update.conf"));
 	(void) unlink(scratch_path("jail.conf.d/x-staging.conf"));
 	(void) unlink(scratch_path("running/x"));
 	(void) unlink(scratch_path("running/x-staging"));
@@ -397,18 +396,16 @@ test_refused(void)
 	refused("x", V0, "generic@" V0 " is older than " V1 ", x's");
 	zfake_set(RX "/var", "zfs_rebase:phase", "conflicts");
 	refused("x", NULL, RX "/var: an open rebase");
+	/* an update under way, as ZFS says it: a staging tree not done */
 	world(1);
 	zfake_fs(RXS);
-	refused("x", NULL, "x-staging exists: cut it over or abandon it");
+	refused("x", NULL, "an update of x is under way: shtetl update "
+	    "--continue x, or --abort x");
 	world(1);
-	(void) scratch_write("update/x/update.conf", "version = \"" V2 "\";\n"
-	    "config = \"" UCFG "\";\nstate = \"paused\";\n"
-	    "saves = [ \"" S1 "\" ];\n");
-	refused("x", NULL, "an update of x is under way");
-	CHECK(plan("x", NULL, SH_UV_CONTINUE) == 0);
-	(void) unlink(scratch_path("update/x/update.conf"));
 	CHECK(plan("x", NULL, SH_UV_CONTINUE) == -1);
 	CHECK(cap_has(&c, "no update of x to take up"));
+	CHECK(plan("x", NULL, SH_UV_ABORT) == -1);
+	CHECK(cap_has(&c, "no update of x to give up"));
 	/* a container no clone of a foundation's version */
 	world(1);
 	CHECK(sh_zfs_create(z, "fast/run/containers/new", NULL, 0,
@@ -532,8 +529,17 @@ test_run(void)
 	CHECK(is(prop(RXS "@" S4, "shtetl:kind"), "save"));
 	CHECK(is(prop(LXS, "origin"), LF "@" V2));
 	CHECK(is(prop(LXS "/www", "origin"), LX "/www@" S3));
-	CHECK(strstr(slurp(scratch_path("update/x/update.conf")),
-	    "state = \"staged\";") != NULL);
+	/* done, as ZFS says it; no record of shtetl's, the tool's gone */
+	{
+		char v[256], from[256];
+
+		CHECK(sh_update_state(z, RX, RXS, v, sizeof (v), from,
+		    sizeof (from), &c.c_err) == SH_US_DONE);
+		CHECK(is(v, V2) && is(from, S3));
+		CHECK(is(prop(RX "@" S3, "shtetl:update"), V2));
+	}
+	CHECK(access(scratch_path("update/x/rebase/d0.1.manifest"), F_OK) !=
+	    0);
 	CHECK(strstr(ran, "staged x-staging on generic@" V2 ": shtetl "
 	    "cutover x, or abandon x\n") != NULL);
 	/* the update done: continuing it refused */
@@ -586,8 +592,16 @@ test_gate(void)
 	CHECK(update(SH_UV_NEW, 0) == 1);
 	CHECK(strstr(ran, "paused: " RXS "/var stopped at conflicts, step 2 "
 	    "of 3, 1 name unanswered: answer ") != NULL);
-	CHECK(strstr(slurp(scratch_path("update/x/update.conf")),
-	    "state = \"paused\";") != NULL);
+	/* paused: the tool's documents, and ZFS, say so */
+	{
+		char v[256], from[256];
+
+		CHECK(sh_update_state(z, RX, RXS, v, sizeof (v), from,
+		    sizeof (from), &c.c_err) == SH_US_UNDERWAY);
+	}
+	CHECK(access(scratch_path("update/x/rebase/d3.2.manifest.resolution"),
+	    F_OK) == 0);
+	refused("x", NULL, "an update of x is under way");
 	CHECK(!runs("x") && !runs("x-staging"));
 	CHECK(is(prop(RF, "mounted"), "no"));
 	CHECK(is(prop(RXS "/var", "zfs_rebase:phase"), "conflicts"));
@@ -619,8 +633,10 @@ test_gate(void)
 	CHECK(strstr(rbfake_log(), "abort " RXS "/usr/local\n") != NULL);
 	CHECK(!zfake_exists(RXS));
 	CHECK(runs("x") && !runs("x-staging"));
-	CHECK(access(scratch_path("update/x/update.conf"), F_OK) != 0);
+	CHECK(access(scratch_path("update/x/rebase/d2.3.manifest"), F_OK) !=
+	    0);
 	CHECK(there(RX "@" S3));
+	CHECK(is(prop(RX "@" S3, "shtetl:update"), "-"));
 	CHECK(strstr(ran, "gave up the update of x\n") != NULL);
 }
 
@@ -727,7 +743,7 @@ test_derivations(void)
 	CHECK(is(prop(RXS, "zfs_rebase:phase"), "-"));
 }
 
-#define	ARCH	"tank/shtetl/archive/containers/x-2026-10-08"
+#define	ARCH	"tank/shtetl/archive/containers/x-" V1
 #define	S5	"save-2026-10-08-120000-3"
 
 /* Cutting x over (ABANDON 0) or abandoning it: the plan's return. */
@@ -826,7 +842,6 @@ test_cutover(void)
 	/* saved, and mirrored onto the renamed mirror */
 	CHECK(is(prop(RX "@" S5, "shtetl:commit"), "cutover to " V2));
 	CHECK(there(LX "@" S5) && there(LX "/www@" S5));
-	CHECK(access(scratch_path("update/x/update.conf"), F_OK) != 0);
 	CHECK(strstr(ran, "cut over x\n") != NULL);
 	/* the next update finds x on V2 */
 	CHECK(plan("x", NULL, SH_UV_NEW) == -1);
@@ -841,7 +856,6 @@ test_cutover(void)
 	(void) snprintf(path, sizeof (path), "%s/x-staging.conf", jaildir);
 	CHECK(access(path, F_OK) != 0);
 	CHECK(is(prop(RX, "origin"), RF "@" V1));
-	CHECK(access(scratch_path("update/x/update.conf"), F_OK) != 0);
 	CHECK(strstr(ran, "abandoned x-staging\n") != NULL);
 	/* no mirror in zlake: a cutover refused */
 	world(1);
@@ -849,6 +863,12 @@ test_cutover(void)
 	CHECK(sh_zw_destroy(z, LXS, &c.c_err) == 0);
 	CHECK(kplan("x", 0) == -1);
 	CHECK(cap_has(&c, "x-staging has no mirror in zlake: save it first"));
+	/* an archive of x on that version there: refused */
+	world(1);
+	CHECK(update(SH_UV_NEW, 0) == 0);
+	zfake_fs(ARCH);
+	CHECK(kplan("x", 0) == -1);
+	CHECK(cap_has(&c, ARCH ": an archive of x on that version exists"));
 	/* K5: a failure part way, said with what is done */
 	world(1);
 	CHECK(update(SH_UV_NEW, 0) == 0);
@@ -870,7 +890,6 @@ test_failures(void)
 	CHECK(cap_has(&c, RXS "/usr/local: zfs_rebase refused"));
 	CHECK(cap_has(&c, "update of x failed and was given up"));
 	CHECK(!zfake_exists(RXS) && runs("x"));
-	CHECK(access(scratch_path("update/x/update.conf"), F_OK) != 0);
 	world(1);
 	rbfake_exit(RXS "/var", 2, SH_RB_FAILED);
 	CHECK(update(SH_UV_NEW, 0) == -1);

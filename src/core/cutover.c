@@ -5,9 +5,10 @@
  * the update is not done (paused at a gate, or cut short), which
  * shtetl update --continue or --abort settles; a cutover is refused
  * when the staging tree has no mirror in zlake yet, which a save of it
- * makes; the archive is archive/containers/X-<YYYY-MM-DD> (-2 and on
- * for another that day); a cutover that fails part way stops there and
- * says what is done, nothing being undone (the old X may be gone).
+ * makes; the archive is archive/containers/X-<X's version before the
+ * update> (ruled 2026-10-14), a cutover refused when it is there; a
+ * cutover that fails part way stops there and says what is done,
+ * nothing being undone (the old X may be gone).
  */
 
 #include <sys/stat.h>
@@ -49,7 +50,7 @@ sh_cutover_plan(struct sh_zfs *z, const struct sh_spaces *s,
     struct sh_err *e, struct sh_err *w)
 {
 	const struct sh_node *v;
-	char val[SH_ZFS_VALMAX], state[32], rpath[SH_CUT_NAME + 16];
+	char val[SH_ZFS_VALMAX], rpath[SH_CUT_NAME + 16];
 	char prop[SH_CUT_NAME + 16], **all;
 	const char *suffix;
 	unsigned before;
@@ -80,36 +81,34 @@ sh_cutover_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	    s->ss_root[SH_SP_LAKE], p->kp_name);
 	(void) snprintf(p->kp_lakestage, sizeof (p->kp_lakestage),
 	    "%s/containers/%s", s->ss_root[SH_SP_LAKE], p->kp_stagename);
-	(void) snprintf(p->kp_archive, sizeof (p->kp_archive),
-	    "%s/archive/containers", s->ss_root[SH_SP_LAKE]);
 	(void) snprintf(p->kp_jailfile, sizeof (p->kp_jailfile), "%s/%s.conf",
 	    jaildir, p->kp_name);
 	(void) snprintf(p->kp_stagejail, sizeof (p->kp_stagejail),
 	    "%s/%s.conf", jaildir, p->kp_stagename);
 	(void) snprintf(p->kp_rundir, sizeof (p->kp_rundir), "%s/%s", rundir,
 	    p->kp_name);
-	if ((r = sh_zfs_get(z, p->kp_run, "type", val, sizeof (val), NULL,
+	if ((r = sh_zfs_get(z, p->kp_run, "origin", val, sizeof (val), NULL,
 	    e)) != 0) {
 		if (r == 1)
 			sh_errf(e, "no container %s", p->kp_name);
 		return (-1);
 	}
+	/* the archive: X-<its version>, from its origin, F@V */
+	(void) snprintf(p->kp_old, sizeof (p->kp_old), "%s",
+	    strchr(val, '@') != NULL ? strchr(val, '@') + 1 : "");
+	(void) snprintf(p->kp_archive, sizeof (p->kp_archive),
+	    "%s/archive/containers/%s-%s", s->ss_root[SH_SP_LAKE],
+	    p->kp_name, p->kp_old);
 	if (sh_zfs_get(z, p->kp_stage, "type", val, sizeof (val), NULL,
 	    e) != 0) {
 		sh_errf(e, "no %s: no update of %s to %s", p->kp_stagename,
 		    p->kp_name, abandon ? "abandon" : "cut over");
 		return (-1);
 	}
-	if ((r = sh_update_record(rundir, p->kp_name, p->kp_version,
-	    sizeof (p->kp_version), p->kp_from, sizeof (p->kp_from), state,
-	    sizeof (state), e)) < 0)
+	if ((r = sh_update_state(z, p->kp_run, p->kp_stage, p->kp_version,
+	    sizeof (p->kp_version), p->kp_from, sizeof (p->kp_from), e)) < 0)
 		return (-1);
-	if (r == 1) {
-		sh_errf(e, "%s is no update's: its record is gone",
-		    p->kp_stagename);
-		return (-1);
-	}
-	if (strcmp(state, "staged") != 0) {
+	if (r != SH_US_DONE) {
 		sh_errf(e, "the update of %s is not done: shtetl update "
 		    "--continue %s, or --abort %s", p->kp_name, p->kp_name,
 		    p->kp_name);
@@ -124,6 +123,17 @@ sh_cutover_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	    e) != 0) {
 		sh_errf(e, "%s has no mirror in zlake: save it first",
 		    p->kp_stagename);
+		return (-1);
+	}
+	if (sh_zfs_get(z, p->kp_archive, "type", val, sizeof (val), NULL,
+	    e) == 0) {
+		sh_errf(e, "%s: an archive of %s on that version exists",
+		    p->kp_archive, p->kp_name);
+		return (-1);
+	}
+	if (p->kp_from[0] == '\0') {
+		sh_errf(e, "container %s has no save the update started from",
+		    p->kp_name);
 		return (-1);
 	}
 	/* what X wrote since its from-save, dataset by dataset */
@@ -199,7 +209,8 @@ sh_cutover_show(FILE *out, const struct sh_kplan *p)
 	if (p->kp_nown == 0)
 		(void) fprintf(out, " none");
 	(void) fprintf(out, "\n  %s destroyed on zrun, %s renamed %s\n"
-	    "  in zlake: %s to %s, %s renamed %s\n  %s started and saved\n",
+	    "  in zlake: %s archived as %s, %s renamed %s\n"
+	    "  %s started and saved\n",
 	    p->kp_run, p->kp_stage, p->kp_run, p->kp_lake, p->kp_archive,
 	    p->kp_lakestage, p->kp_lake, p->kp_name);
 }
@@ -291,7 +302,7 @@ kc_stop(struct kc *c, const char *file, const char *name)
 	return (0);
 }
 
-/* The update's record and its documents gone; its log kept. */
+/* The update's documents gone, if any are left; its log kept. */
 static void
 kc_unrecord(struct kc *c)
 {
@@ -299,10 +310,6 @@ kc_unrecord(struct kc *c)
 	struct dirent *de;
 	DIR *d;
 
-	(void) snprintf(path, sizeof (path), "%s/" SH_UPDATE_RECORD,
-	    c->k_p->kp_rundir);
-	if (unlink(path) != 0 && errno != ENOENT)
-		sh_errf(c->k_err, "%s: %s", path, strerror(errno));
 	(void) snprintf(dir, sizeof (dir), "%s/rebase", c->k_p->kp_rundir);
 	if ((d = opendir(dir)) == NULL)
 		return;
@@ -351,11 +358,8 @@ static int
 kc_cutover(struct kc *c)
 {
 	struct sh_kplan *p = c->k_p;
-	char arch[SH_CUT_NAME * 2], mp[SH_ZFS_VALMAX], msg[SH_CUT_NAME * 2];
-	char day[16];
-	struct tm tm;
+	char mp[SH_ZFS_VALMAX], msg[SH_CUT_NAME * 2];
 	size_t i;
-	int n;
 
 	if (p->kp_wrote > 0) {
 		(void) snprintf(msg, sizeof (msg), "written during the soak "
@@ -393,16 +397,10 @@ kc_cutover(struct kc *c)
 	/* zlake: the same promotes, the old tree archived, the rename */
 	if (kc_lakepromote(c) != 0)
 		return (-1);
-	(void) gmtime_r(&c->k_now, &tm);
-	(void) strftime(day, sizeof (day), "%Y-%m-%d", &tm);
-	(void) snprintf(arch, sizeof (arch), "%s/%s-%s", p->kp_archive,
-	    p->kp_name, day);
-	for (n = 2; n < 100 && kc_there(c, arch); n++)
-		(void) snprintf(arch, sizeof (arch), "%s/%s-%s-%d",
-		    p->kp_archive, p->kp_name, day, n);
-	if (sh_zfs_rename(c->k_z, p->kp_lake, arch, c->k_err) != 0)
+	if (sh_zfs_rename(c->k_z, p->kp_lake, p->kp_archive, c->k_err) != 0)
 		return (-1);
-	(void) fprintf(c->k_out, "archived %s as %s\n", p->kp_lake, arch);
+	(void) fprintf(c->k_out, "archived %s as %s\n", p->kp_lake,
+	    p->kp_archive);
 	if (sh_zfs_rename(c->k_z, p->kp_lakestage, p->kp_lake,
 	    c->k_err) != 0)
 		return (-1);

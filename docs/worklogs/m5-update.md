@@ -191,3 +191,24 @@ real zfs_rebase must be on shtetl's PATH (/usr/local/sbin, where make
 install puts it); without it the script says so and skips. teardown
 aborts any rebase a stopped run left open, whose holds would keep the
 pool's datasets from being destroyed, and stops every test jail.
+
+## The rulings on M5's proposals (2026-10-14)
+
+- No record of shtetl's: update.conf is gone. sh_update_state reads an
+  update's standing from ZFS (a staging tree with a rebase open, or
+  without its shtetl:kind version snapshot, is under way; with it,
+  done); X's from-save is marked shtetl:update with the target, which
+  --continue and cutover read; the config snapshot is taken at the end;
+  a pause leaves only the tool's manifest and resolution, which are
+  removed when the update is done or given up.
+- X stays stopped until the update is done or fails; a failure and
+  --abort start it again and take the mark off the from-save (only a
+  mark this run set: an earlier update's, copied onto a replayed save,
+  stays).
+- The archive is archive/containers/X-<old version> (X's origin's
+  snapshot before the update); a cutover is refused while that name is
+  taken.
+
+Verification: check_update 731 checks (U1's refusals from ZFS, the
+state after a run, a pause and an abort, the mark; K's archive name
+and its refusal); make check, gate, xcheck.

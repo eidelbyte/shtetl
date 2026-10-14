@@ -28,7 +28,8 @@ struct sh_kplan {
 	char		kp_stage[SH_CUT_NAME];		/* .../X-staging */
 	char		kp_lake[SH_CUT_NAME];		/* lake/containers/X */
 	char		kp_lakestage[SH_CUT_NAME];	/* .../X-staging */
-	char		kp_archive[SH_CUT_NAME];	/* lake/archive/... */
+	char		kp_archive[SH_CUT_NAME * 2];	/* lake/archive/... */
+	char		kp_old[SH_CUT_NAME];		/* X's version */
 	char		kp_jailfile[1024];		/* X's block */
 	char		kp_stagejail[1024];		/* X-staging's */
 	char		kp_rundir[1024];		/* the update's */

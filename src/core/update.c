@@ -9,17 +9,19 @@
  * datasets from X's from-save. Each dataset's replay ends before a
  * child of it is made (P4).
  *
- * Decided here, beyond the plan (PROPOSAL): an update whose rebase
- * stops at its conflicts gate with no person at a terminal, or whose
- * person leaves the picker with names unanswered, pauses (exit 3, as a
- * build at a patch does), its record in SH_UPDATE_DIR/X/update.conf;
- * shtetl update --continue X takes it up and --abort X gives it up.
- * What a paused update has done is read back from ZFS, not the record:
- * a dataset's step is the count of its saves the staging dataset holds
- * already and whether the tool's record is on it. X's jail is stopped
- * for the whole update and started again by --abort; the staging
- * tree's jail is X-staging, X's hostname and settings. update.depth
- * given as an interval replays every save (intervals are M7's).
+ * Decided here, beyond the plan (ruled 2026-10-14): an update whose
+ * rebase stops at its conflicts gate with no person at a terminal, or
+ * whose person leaves the picker with names unanswered, pauses (exit
+ * 3, as a build at a patch does); shtetl update --continue X takes it
+ * up and --abort X gives it up. shtetl keeps no record of its own: the
+ * tool's manifest and resolution are what a pause leaves, and where
+ * the update stands is read from ZFS (sh_update_state; a dataset's step
+ * is the count of its saves the staging dataset holds and whether the
+ * tool's record is on it). X's from-save carries SH_UPDATE_MARK, the
+ * target. X is stopped until the update is done or fails, and started
+ * again by --abort or a failure; the staging tree's jail is X-staging,
+ * X's hostname and settings. update.depth given as an interval
+ * replays every save (intervals are M7's).
  */
 
 #include <sys/stat.h>
@@ -38,7 +40,6 @@
 #include "core/cascade.h"
 #include "core/err.h"
 #include "core/jail.h"
-#include "core/parse.h"
 #include "core/rebase.h"
 #include "core/run.h"
 #include "core/save.h"
@@ -52,44 +53,6 @@
 #define	UQ_PHASE	"zfs_rebase:phase"	/* the tool's record */
 
 /* ---- the plan ------------------------------------------------------ */
-
-/* The record of P's update at PATH, or 1 if there is none. */
-static int
-uq_read(const char *path, struct sh_uplan *p, char *state, size_t slen,
-    struct sh_err *e)
-{
-	const struct sh_node *v, *saves;
-	struct sh_node *top;
-	struct stat st;
-	size_t i;
-
-	if (stat(path, &st) != 0)
-		return (1);
-	if ((top = sh_parse_file(path, SH_UPDATE_RECORD, e)) == NULL)
-		return (-1);
-	if ((v = sh_obj_get(top, "version")) != NULL && v->sn_type == SH_STR)
-		(void) snprintf(p->up_version, sizeof (p->up_version), "%s",
-		    v->sn_str);
-	if ((v = sh_obj_get(top, "config")) != NULL && v->sn_type == SH_STR)
-		(void) snprintf(p->up_cfgsnap, sizeof (p->up_cfgsnap), "%s",
-		    v->sn_str);
-	if ((v = sh_obj_get(top, "state")) != NULL && v->sn_type == SH_STR)
-		(void) snprintf(state, slen, "%s", v->sn_str);
-	saves = sh_obj_get(top, "saves");
-	for (i = 0; saves != NULL && saves->sn_type == SH_ARRAY &&
-	    i < saves->sn_arr.ar_n && i < SH_UPDATE_SAVES; i++) {
-		if (saves->sn_arr.ar_v[i]->sn_type == SH_STR)
-			(void) snprintf(p->up_saves[i], SH_UPDATE_NAME, "%s",
-			    saves->sn_arr.ar_v[i]->sn_str);
-	}
-	p->up_nsaves = i;
-	sh_node_free(top);
-	if (p->up_version[0] == '\0' || p->up_nsaves == 0) {
-		sh_errf(e, "%s: not an update's record", path);
-		return (-1);
-	}
-	return (0);
-}
 
 /* X's datasets, how each reaches X-staging (7.6 steps 5, 6). */
 static int
@@ -257,6 +220,125 @@ uq_saves(struct sh_zfs *z, struct sh_uplan *p, struct sh_err *e)
 	return (0);
 }
 
+/*
+ * The saves of an update under way: X's, oldest first, up to the
+ * newest marked SH_UPDATE_MARK, update.depth of them; its target the
+ * mark's.
+ */
+static int
+uq_marked(struct sh_zfs *z, struct sh_uplan *p, struct sh_err *e)
+{
+	char name[SH_UPDATE_NAME * 2], val[SH_ZFS_VALMAX], **snaps;
+	char *keep[SH_UPDATE_SAVES];
+	size_t i, n, first, last;
+
+	if ((snaps = sh_zw_snaps(z, p->up_run, e)) == NULL)
+		return (-1);
+	n = 0;
+	last = 0;
+	for (i = 0; snaps[i] != NULL; i++) {
+		(void) snprintf(name, sizeof (name), "%s@%s", p->up_run,
+		    snaps[i]);
+		if (sh_zfs_get(z, name, "shtetl:kind", val, sizeof (val), NULL,
+		    e) != 0) {
+			sh_zw_free(snaps);
+			return (-1);
+		}
+		if (strcmp(val, "save") != 0)
+			continue;
+		if (n == SH_UPDATE_SAVES) {
+			(void) memmove(keep, keep + 1,
+			    (n - 1) * sizeof (*keep));
+			n--;
+		}
+		keep[n++] = snaps[i];
+		if (sh_zfs_get(z, name, SH_UPDATE_MARK, val, sizeof (val),
+		    NULL, e) != 0) {
+			sh_zw_free(snaps);
+			return (-1);
+		}
+		if (strcmp(val, "-") != 0) {
+			last = n;
+			(void) snprintf(p->up_version, sizeof (p->up_version),
+			    "%s", val);
+		}
+	}
+	if (last == 0) {
+		sh_zw_free(snaps);
+		sh_errf(e, "container %s has no save an update started from",
+		    p->up_name);
+		return (-1);
+	}
+	first = 0;
+	if (p->up_depth > 0)
+		first = last > p->up_depth ? last - p->up_depth : 0;
+	for (i = first; i < last; i++)
+		(void) snprintf(p->up_saves[p->up_nsaves++], SH_UPDATE_NAME,
+		    "%s", keep[i]);
+	sh_zw_free(snaps);
+	return (0);
+}
+
+int
+sh_update_state(struct sh_zfs *z, const char *run, const char *stage,
+    char *version, size_t vlen, char *from, size_t flen, struct sh_err *e)
+{
+	char name[SH_UPDATE_NAME * 2], val[SH_ZFS_VALMAX], **all, **snaps;
+	size_t i;
+	int r, open;
+
+	version[0] = from[0] = '\0';
+	if ((r = sh_zfs_get(z, stage, "type", val, sizeof (val), NULL,
+	    e)) != 0)
+		return (r == 1 ? SH_US_NONE : -1);
+	if ((all = sh_zw_new(e)) == NULL)
+		return (-1);
+	r = sh_zw_add(&all, stage) != 0 ? -1 : sh_zw_walk(z, stage, &all, e);
+	open = 0;
+	for (i = 0; r == 0 && all[i] != NULL; i++) {
+		if (sh_zfs_get(z, all[i], UQ_PHASE, val, sizeof (val), NULL,
+		    e) != 0)
+			r = -1;
+		else if (strcmp(val, "-") != 0)
+			open = 1;
+	}
+	sh_zw_free(all);
+	if (r != 0)
+		return (-1);
+	if (open)
+		return (SH_US_UNDERWAY);
+	if ((snaps = sh_zw_snaps(z, stage, e)) == NULL)
+		return (-1);
+	for (i = 0; snaps[i] != NULL; i++) {
+		(void) snprintf(name, sizeof (name), "%s@%s", stage, snaps[i]);
+		if (sh_zfs_get(z, name, "shtetl:kind", val, sizeof (val), NULL,
+		    e) != 0) {
+			sh_zw_free(snaps);
+			return (-1);
+		}
+		if (strcmp(val, "version") == 0)
+			(void) snprintf(version, vlen, "%s", snaps[i]);
+	}
+	sh_zw_free(snaps);
+	if (version[0] == '\0')
+		return (SH_US_UNDERWAY);
+	/* X's from-save: its newest save marked with the target */
+	if ((snaps = sh_zw_snaps(z, run, e)) == NULL)
+		return (-1);
+	for (i = 0; snaps[i] != NULL; i++) {
+		(void) snprintf(name, sizeof (name), "%s@%s", run, snaps[i]);
+		if (sh_zfs_get(z, name, SH_UPDATE_MARK, val, sizeof (val),
+		    NULL, e) != 0) {
+			sh_zw_free(snaps);
+			return (-1);
+		}
+		if (strcmp(val, version) == 0)
+			(void) snprintf(from, flen, "%s", snaps[i]);
+	}
+	sh_zw_free(snaps);
+	return (SH_US_DONE);
+}
+
 int
 sh_update_plan(struct sh_zfs *z, const struct sh_spaces *s,
     const struct sh_node *site, const char *root, const char *target,
@@ -266,7 +348,7 @@ sh_update_plan(struct sh_zfs *z, const struct sh_spaces *s,
 {
 	const struct sh_node *upd, *v;
 	char val[SH_ZFS_VALMAX], lakef[SH_UPDATE_NAME * 2];
-	char rec[1100], rpath[SH_UPDATE_NAME + 16], state[32];
+	char rec[1100], rpath[SH_UPDATE_NAME + 16], from[SH_UPDATE_NAME];
 	const char *suffix, *at, *slash;
 	unsigned before;
 	size_t i, rl;
@@ -332,32 +414,25 @@ sh_update_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	    s->ss_root[SH_SP_RUN], p->up_found);
 	(void) snprintf(lakef, sizeof (lakef), "%s/foundations/%s",
 	    s->ss_root[SH_SP_LAKE], p->up_found);
-	(void) snprintf(rec, sizeof (rec), "%s/" SH_UPDATE_RECORD,
-	    p->up_rundir);
-	state[0] = '\0';
-	if ((r = uq_read(rec, p, state, sizeof (state), e)) < 0)
+	if ((r = sh_update_state(z, p->up_run, p->up_stage, p->up_version,
+	    sizeof (p->up_version), from, sizeof (from), e)) < 0)
 		return (-1);
-	if (verb == SH_UV_NEW) {
-		if (r == 0)
-			sh_errf(e, "an update of %s is under way: shtetl "
-			    "update --continue %s, or --abort %s",
-			    p->up_name, p->up_name, p->up_name);
-		else if (sh_zfs_get(z, p->up_stage, "type", val, sizeof (val),
-		    NULL, e) == 0)
-			sh_errf(e, "%s exists: cut it over or abandon it",
-			    p->up_stagename);
-	} else if (r == 1) {
-		sh_errf(e, "no update of %s to take up", p->up_name);
-	} else if (verb == SH_UV_CONTINUE && strcmp(state, "staged") == 0) {
+	if (r == SH_US_DONE)
 		sh_errf(e, "the update of %s is done: shtetl cutover %s, or "
 		    "abandon %s", p->up_name, p->up_name, p->up_name);
-	}
+	else if (verb == SH_UV_NEW && r == SH_US_UNDERWAY)
+		sh_errf(e, "an update of %s is under way: shtetl update "
+		    "--continue %s, or --abort %s", p->up_name, p->up_name,
+		    p->up_name);
+	else if (verb != SH_UV_NEW && r == SH_US_NONE)
+		sh_errf(e, "no update of %s to %s", p->up_name,
+		    verb == SH_UV_CONTINUE ? "take up" : "give up");
 	if (e->se_count != before)
 		return (-1);
 	if (uq_datasets(z, p, e) != 0)
 		return (-1);
 	if (verb != SH_UV_NEW)
-		return (0);
+		return (uq_marked(z, p, e));
 	for (i = 0; i < p->up_nds; i++) {
 		(void) snprintf(rec, sizeof (rec), "%s%s%s", p->up_run,
 		    i > 0 ? "/" : "", p->up_dss[i].ud_rel);
@@ -424,6 +499,7 @@ struct uq {
 	char			c_log[1100];
 	int			c_logfd;
 	char			c_pause[2048];	/* what a pause says */
+	int			c_marked;	/* the from-save is marked */
 };
 
 /* WORDS run, ENV their environment (NULL: shtetl's), to the log. */
@@ -570,50 +646,14 @@ uq_open(struct uq *c, const char *ds)
 	    c->c_err) == 0 && strcmp(val, "-") != 0);
 }
 
-/* The record of the update: STATE "running", "paused" or "staged". */
-static int
-uq_record(struct uq *c, const char *state)
-{
-	struct sh_uplan *p = c->c_p;
-	char path[1100];
-	size_t i;
-	FILE *f;
-	int bad;
-
-	(void) snprintf(path, sizeof (path), "%s/" SH_UPDATE_RECORD,
-	    p->up_rundir);
-	if ((f = fopen(path, "w")) == NULL) {
-		sh_errf(c->c_err, "%s: %s", path, strerror(errno));
-		return (-1);
-	}
-	(void) fprintf(f, "# an update of %s: shtetl update --continue %s or "
-	    "--abort %s reads it\n", p->up_name, p->up_name, p->up_name);
-	(void) fprintf(f, "version = \"%s\";\nconfig = \"%s\";\nstate = "
-	    "\"%s\";\nsaves = [", p->up_version, p->up_cfgsnap, state);
-	for (i = 0; i < p->up_nsaves; i++)
-		(void) fprintf(f, "%s\"%s\"", i == 0 ? " " : ", ",
-		    p->up_saves[i]);
-	(void) fprintf(f, " ];\n");
-	bad = ferror(f);
-	if (fclose(f) != 0 || bad) {
-		sh_errf(c->c_err, "%s: %s", path, strerror(errno));
-		return (-1);
-	}
-	return (0);
-}
-
-/* The record and the rebases' documents gone: the update has ended. */
+/* The rebases' documents gone, the log kept: the update has ended. */
 static void
-uq_unrecord(struct uq *c)
+uq_tidy(struct uq *c)
 {
 	struct sh_uplan *p = c->c_p;
 	char path[1100];
 	size_t i, k;
 
-	(void) snprintf(path, sizeof (path), "%s/" SH_UPDATE_RECORD,
-	    p->up_rundir);
-	if (unlink(path) != 0 && errno != ENOENT)
-		sh_errf(c->c_err, "%s: %s", path, strerror(errno));
 	for (i = 0; i < p->up_nds; i++) {
 		for (k = 1; k <= p->up_nsaves; k++) {
 			(void) snprintf(path, sizeof (path),
@@ -1218,9 +1258,17 @@ uq_undo(struct uq *c)
 	    c->c_err) == 0)
 		(void) fprintf(c->c_out, "destroyed %s\n", p->up_stage);
 	(void) uq_mountf(c, 0);
+	/* the from-save a save like any, no longer an update's */
+	if (c->c_marked && p->up_nsaves > 0) {
+		(void) snprintf(ds, sizeof (ds), "%s@%s", p->up_run,
+		    p->up_saves[p->up_nsaves - 1]);
+		if (uq_there(c, ds))
+			(void) sh_zfs_inherit(c->c_z, ds, SH_UPDATE_MARK,
+			    c->c_err);
+	}
 	if (!uq_running(c, p->up_name) && access(p->up_jailfile, F_OK) == 0)
 		(void) uq_jail(c, p->up_jailfile, p->up_name, "-c");
-	uq_unrecord(c);
+	uq_tidy(c);
 }
 
 /* After the replays: F away, X-staging as the version, started, saved. */
@@ -1238,6 +1286,8 @@ uq_finish(struct uq *c)
 	(void) snprintf(names[0], sizeof (names[0]), "%s@%s", p->up_stage,
 	    p->up_version);
 	if (!uq_there(c, names[0])) {
+		if (uq_config(c) != 0)
+			return (-1);
 		for (i = 0; i < p->up_nds; i++) {
 			uq_ds(p, p->up_stage, i, ds, sizeof (ds));
 			(void) snprintf(names[i], sizeof (names[i]), "%s@%s",
@@ -1300,6 +1350,7 @@ sh_update_run(struct sh_zfs *z, struct sh_uplan *p,
 	c.c_err = e;
 	c.c_now = now;
 	c.c_tty = tty;
+	c.c_marked = p->up_verb != SH_UV_NEW;
 	(void) snprintf(dir, sizeof (dir), "%s/rebase", p->up_rundir);
 	if (uq_mkdirs(&c, dir) != 0)
 		return (-1);
@@ -1317,8 +1368,7 @@ sh_update_run(struct sh_zfs *z, struct sh_uplan *p,
 		return (e->se_count == 0 ? 0 : -1);
 	}
 	if (p->up_verb == SH_UV_NEW) {
-		if (uq_config(&c) != 0 ||
-		    (p->up_beam && sh_beam_run(z, &p->up_beamplan, out,
+		if ((p->up_beam && sh_beam_run(z, &p->up_beamplan, out,
 		    e) != 0) ||
 		    (uq_running(&c, p->up_name) && uq_jail(&c, p->up_jailfile,
 		    p->up_name, "-r") != 0) ||
@@ -1326,8 +1376,11 @@ sh_update_run(struct sh_zfs *z, struct sh_uplan *p,
 			goto fail;
 		(void) snprintf(p->up_saves[p->up_nsaves++], SH_UPDATE_NAME,
 		    "%s", snap);
-		if (uq_record(&c, "running") != 0)
+		/* the from-save marked: an update's, and its target */
+		(void) snprintf(dir, sizeof (dir), "%s@%s", p->up_run, snap);
+		if (sh_zfs_set(z, dir, SH_UPDATE_MARK, p->up_version, e) != 0)
 			goto fail;
+		c.c_marked = 1;
 	}
 	if (uq_mountf(&c, 1) != 0)
 		goto fail;
@@ -1336,8 +1389,6 @@ sh_update_run(struct sh_zfs *z, struct sh_uplan *p,
 		    uq_clone(&c, i);
 		if (r == 1) {
 			(void) uq_mountf(&c, 0);
-			if (uq_record(&c, "paused") != 0)
-				goto fail;
 			(void) fprintf(out, "paused: %s\n", c.c_pause);
 			(void) close(c.c_logfd);
 			return (1);
@@ -1345,8 +1396,9 @@ sh_update_run(struct sh_zfs *z, struct sh_uplan *p,
 		if (r != 0)
 			goto fail;
 	}
-	if (uq_finish(&c) != 0 || uq_record(&c, "staged") != 0)
+	if (uq_finish(&c) != 0)
 		goto fail;
+	uq_tidy(&c);
 	(void) fprintf(out, "staged %s on %s@%s: shtetl cutover %s, or "
 	    "abandon %s\n", p->up_stagename, p->up_found, p->up_version,
 	    p->up_name, p->up_name);
@@ -1358,31 +1410,6 @@ fail:
 	    p->up_name, c.c_log);
 	(void) close(c.c_logfd);
 	return (-1);
-}
-
-int
-sh_update_record(const char *rundir, const char *name, char *version,
-    size_t vlen, char *from, size_t flen, char *state, size_t slen,
-    struct sh_err *e)
-{
-	struct sh_uplan *p;
-	char path[1100];
-	int r;
-
-	if ((p = calloc(1, sizeof (*p))) == NULL) {
-		sh_err_nomem(e);
-		return (-1);
-	}
-	(void) snprintf(path, sizeof (path), "%s/%s/" SH_UPDATE_RECORD,
-	    rundir, name);
-	state[0] = '\0';
-	if ((r = uq_read(path, p, state, slen, e)) == 0) {
-		(void) snprintf(version, vlen, "%s", p->up_version);
-		(void) snprintf(from, flen, "%s",
-		    p->up_saves[p->up_nsaves - 1]);
-	}
-	free(p);
-	return (r);
 }
 
 void
