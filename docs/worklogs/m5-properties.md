@@ -20,3 +20,18 @@ check_build's resume-after-destroy cell still covers it).
 Verification: check_save, check_build and box F11 now assert the
 property is not set; make check, gate, xcheck. The box owes F11's
 new line with the next build.sh run.
+
+## shtetl:replayed-from dropped
+
+Set by the update on each replayed save (the original's guid) and read
+by nothing. A replayed save keeps its original's name in the staging
+dataset, which is the link; after a cutover the originals are in
+zlake's archive under the same names. uq_snapprops was the guid and
+the copy; the copy (sh_shtetl_copy) is called in its place.
+
+tools/story.py and the story pages still show it; they have been
+stale since draft 4 and are regenerated separately.
+
+Verification: check_update asserts the replayed save carries its
+original's shtetl:commit and no shtetl:replayed-from; make check,
+gate, xcheck.

@@ -498,13 +498,13 @@ test_run(void)
 	    "/var@" V2 " --result " RXS "/var\n") != NULL);
 	CHECK(strstr(log, "--result " RXS "/usr\n") == NULL);
 	CHECK(strstr(log, "--result " RXS "/www\n") == NULL);
-	/* each replayed save as X's, its guid */
+	/* each replayed save as X's, its name and shtetl:* */
 	CHECK(is(prop(RXS "@" S1, "shtetl:kind"), "save"));
 	CHECK(is(prop(RXS "@" S1, "shtetl:commit"), "first"));
 	CHECK(is(prop(RXS "@" S2, "shtetl:commit"), "second"));
 	CHECK(is(prop(RXS "@" S3, "shtetl:commit"), "update to generic@" V2));
-	CHECK(is(prop(RXS "/var@" S1, "shtetl:replayed-from"),
-	    prop(RX "/var@" S1, "guid")));
+	CHECK(is(prop(RXS "/var@" S1, "shtetl:commit"), "first"));
+	CHECK(is(prop(RXS "/var@" S1, "shtetl:replayed-from"), "-"));
 	/* placed, its properties, its placeholder, its own */
 	CHECK(is(prop(RXS, "origin"), RF "@" V2));
 	CHECK(is(prop(RXS, "readonly"), "off"));

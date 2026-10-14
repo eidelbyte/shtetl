@@ -744,21 +744,6 @@ uq_mountf(struct uq *c, int up)
 	return (0);
 }
 
-/* X/d@SAVE's shtetl:* on STAGE/d@SAVE, and shtetl:replayed-from. */
-static int
-uq_snapprops(struct uq *c, const char *xsnap, const char *ssnap)
-{
-	char guid[64];
-
-	if (sh_shtetl_copy(c->c_z, xsnap, ssnap, c->c_err) != 0 ||
-	    sh_zfs_get(c->c_z, xsnap, "guid", guid, sizeof (guid), NULL,
-	    c->c_err) != 0 ||
-	    sh_zfs_set(c->c_z, ssnap, "shtetl:replayed-from", guid,
-	    c->c_err) != 0)
-		return (-1);
-	return (0);
-}
-
 /* The clone a first step made placed: X-staging's mountpoint, writable. */
 static int
 uq_place(struct uq *c, const char *ds)
@@ -1125,7 +1110,9 @@ uq_replay(struct uq *c, size_t i)
 				    xds, p->up_saves[m - 1]);
 				(void) snprintf(snap, sizeof (snap), "%s@%s",
 				    stage, p->up_saves[m - 1]);
-				if (uq_snapprops(c, from, snap) != 0)
+				/* X/d@SAVE's shtetl:* on STAGE/d@SAVE */
+				if (sh_shtetl_copy(c->c_z, from, snap,
+				    c->c_err) != 0)
 					return (-1);
 			}
 			k = m + 1;
@@ -1137,7 +1124,8 @@ uq_replay(struct uq *c, size_t i)
 				    xds, p->up_saves[n - 1]);
 				if (sh_zfs_snapshot(c->c_z, &one, 1, NULL, 0,
 				    c->c_err) != 0 ||
-				    uq_snapprops(c, from, snap) != 0)
+				    sh_shtetl_copy(c->c_z, from, snap,
+				    c->c_err) != 0)
 					return (-1);
 				(void) fprintf(c->c_out, "replayed %s, %zu "
 				    "save%s\n", stage, n, n == 1 ? "" : "s");

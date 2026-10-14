@@ -632,7 +632,7 @@ never the name.
 | container/system after an update | the version it was rebased onto | version |
 | container/system after a pkg upgrade | the same with `-pkg` | pkg |
 | save | `@save-<ISO-date>-<HHMMSS>` (UTC) | save |
-| a save replayed by an update (7.6.2) | the original's name | save, plus `shtetl:replayed-from` |
+| a save replayed by an update (7.6.2) | the original's name | save |
 
 The version lives in the snapshot name, not the dataset name (ruled
 2026-10-09). A foundation is one dataset for its whole life:
@@ -1234,8 +1234,8 @@ As built (M5, `src/core/update.c`, `src/core/rebase.c`):
   placed (mountpoint inherited, readonly off, mounted); step k
   `--allow-unrelated --base X/d@s(k-1) --from X/d@sk --onto
   X-staging/d --result s(k-1)`; then X-staging/d@sn. Every replayed
-  snapshot carries its original's `shtetl:*` and
-  `shtetl:replayed-from`, the original's guid. A rebase is named by its
+  snapshot carries its original's `shtetl:*` (no
+  `shtetl:replayed-from`, ruled 2026-10-14, 14). A rebase is named by its
   result dataset, which carries the tool's record in both forms; its
   manifest goes to `/var/db/shtetl/update/X/rebase/` (`-o`).
 - At a conflicts gate (7.7): with a person at the terminal, the picker
@@ -1366,9 +1366,9 @@ generation and ctime coinciding by chance, which the prune does not
 accept as proof.
 
 **Names.** Each replayed snapshot keeps its original's name and
-`shtetl:commit`, plus `shtetl:replayed-from` (the original's guid), so
-the staging tree's snapshots line up by name with the container-only
-datasets', which carry the originals themselves after the promote.
+`shtetl:commit`, so the staging tree's snapshots line up by name with
+the container-only datasets', which carry the originals themselves
+after the promote.
 
 `update.depth = 1` replays only the from-snapshot: one rebase per
 dataset. Container-only datasets are never replayed.
@@ -1575,8 +1575,7 @@ History moves forward with the container (ruled 2026-10-09):
 
 - **Rebased datasets** carry their saves by replay (7.6.2), as deep as
   `update.depth` allows. The replayed snapshots have the originals'
-  names and messages and point back at them with
-  `shtetl:replayed-from`.
+  names and messages.
 - **Container-only datasets** carry theirs by the promote at cutover.
 - **The old tree** goes to zlake's archive whole, kept by
   `retention.archive`.
