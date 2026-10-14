@@ -334,7 +334,7 @@ test_sends(void)
 	CHECK(is(get("tank/x", "compression", &src), "zstd") &&
 	    src == SH_ZSRC_LOCAL);
 	CHECK(is(get("tank/x", "mounted", NULL), "no"));
-	CHECK(is(get("tank/f", "origin", NULL), "-"));
+	CHECK(is(get("tank/f", "origin", &src), "-") && src == SH_ZSRC_NONE);
 	cap_reset(&c);
 	CHECK(sh_zfs_clone(z, "tank/f@v9", "tank/y", NULL, 0, &c.c_err) == -1);
 	CHECK(cap_has(&c, "tank/f@v9: no such snapshot"));

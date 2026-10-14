@@ -243,11 +243,11 @@ sh_zfs_get(struct sh_zfs *z, const char *ds, const char *prop, char *val,
 		zfs_close(zhp);
 		return (0);
 	}
+	/* none to have, as zfs get's get_callback shows it: "-" */
 	if (zfs_prop_get(zhp, p, val, len, &zs, where, sizeof (where),
 	    B_FALSE) != 0) {
-		sh_errf(e, "%s: %s does not apply", ds, prop);
-		zfs_close(zhp);
-		return (-1);
+		(void) snprintf(val, len, "-");
+		zs = ZPROP_SRC_NONE;
 	}
 	if (src != NULL) {
 		switch (zs) {

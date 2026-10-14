@@ -54,7 +54,10 @@ int sh_zfs_local(struct sh_zfs *z, const char *prop,
 /*
  * PROP of DS, a filesystem or a snapshot (ds@snap), native or user:
  * its value into VAL and, when SRC is not NULL, where it comes from.
- * 1, and nothing reported, when there is no DS.
+ * A property DS has no value of, a user property unset or a native
+ * one that is not DS's (the origin of a filesystem that is no clone),
+ * is "-", from nowhere, as zfs get shows it. 1, and nothing reported,
+ * when there is no DS.
  */
 int sh_zfs_get(struct sh_zfs *z, const char *ds, const char *prop,
     char *val, size_t len, enum sh_zsrc *src, struct sh_err *e);

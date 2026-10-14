@@ -392,6 +392,9 @@ main(int argc, char **argv)
 	cell("Z14", "the source made, with a version",
 	    sh_zfs_create(z, at("s"), NULL, 0, &e) == 0 &&
 	    sh_zfs_snapshot(z, &sv1, 1, &kver, 1, &e) == 0);
+	cell("Z14", "no clone: its origin -, from nowhere",
+	    strcmp(get(at("s"), "origin", &src), "-") == 0 &&
+	    src == SH_ZSRC_NONE);
 	cell("Z14", "a clone, a property from its birth, its origin",
 	    sh_zfs_clone(z, sv1, at("x"), &zstd, 1, &e) == 0 &&
 	    strcmp(get(at("x"), "origin", NULL), sv1) == 0 &&

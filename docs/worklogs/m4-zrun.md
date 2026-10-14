@@ -70,6 +70,18 @@ errnos after the stream stay, for a change between. Lesson: a check
 added to the real layer goes where the fake has it, every Z cell
 walked against both before the box.
 
+Box run 6 (run.sh at 4c30413, 00912eb): 114 ok, 0 failed. The first
+build.sh with M4 (build 9, a460f91): 78 ok, 21 failed, all of X9 and
+S9 behind one: create's first save refused "srv: origin does not
+apply". Save reads every dataset's origin; libzfs has none to give
+for a filesystem that is no clone, and the real sh_zfs_get called
+that a refusal where the fake, like zfs get (zfs_main.c's
+get_callback), says "-". zcheck read origin only of clones. Now a
+native property with no value is "-", from nowhere, over libzfs too
+(zfs.h says so), and Z14 has the box cell. Create's undo ran on the
+box: the jail stopped, its block gone, the container destroyed. B13,
+shtetl-recipes cloned from GitHub by default, green.
+
 ## m4-beam (568d9a2, 7b4a227)
 
 shtetl beam [-y] [--version v] F (planning.md 7.3), src/core/beam.c.
