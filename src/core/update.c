@@ -622,6 +622,9 @@ uq_unrecord(struct uq *c)
 			(void) strncat(path, ".resolution",
 			    sizeof (path) - strlen(path) - 1);
 			(void) unlink(path);
+			(void) snprintf(path, sizeof (path),
+			    "%s/rebase/d%zu.%zu.derive", p->up_rundir, i, k);
+			(void) unlink(path);
 		}
 	}
 	(void) snprintf(path, sizeof (path), "%s/rebase", p->up_rundir);
@@ -758,24 +761,206 @@ uq_manifest(struct uq *c, size_t i, size_t k, char *buf, size_t len)
 	    c->c_p->up_rundir, i, k);
 }
 
+/* One derivation of X's recipe, as one dataset's tree spells it. */
+struct uq_deriv {
+	char		dv_path[SH_UPDATE_NAME * 2];	/* /etc/pwd.db */
+	char		dv_source[SH_UPDATE_NAME * 2];	/* /etc/master.passwd */
+	const char	*dv_command;
+};
+
+/* The dataset of P that holds PATH, X-relative: the longest prefix. */
+static size_t
+uq_owner(const struct sh_uplan *p, const char *path)
+{
+	size_t i, best, len, blen;
+
+	best = 0;
+	blen = 0;
+	for (i = 1; i < p->up_nds; i++) {
+		len = strlen(p->up_dss[i].ud_rel);
+		if (len > blen &&
+		    strncmp(path, p->up_dss[i].ud_rel, len) == 0 &&
+		    path[len] == '/') {
+			best = i;
+			blen = len;
+		}
+	}
+	return (best);
+}
+
+/* PATH, X-relative, as dataset I's tree spells it, into BUF. */
+static void
+uq_treepath(const struct sh_uplan *p, size_t i, const char *path,
+    char *buf, size_t len)
+{
+	size_t rl = strlen(p->up_dss[i].ud_rel);
+
+	(void) snprintf(buf, len, "/%s", rl > 0 ? path + rl + 1 : path);
+}
+
 /*
- * At a gate of dataset I, step K, its rebase IDENT: the picker on a
- * terminal while names are unanswered, then --continue once the
- * document is complete. 0 the step done; 1 paused; -1 failed.
+ * The derivations of X's recipe whose derived path is in dataset I,
+ * into D: how many. One whose source is in another dataset spans two
+ * rebases (7.7's open detail), and is left out, with a warning.
+ */
+static size_t
+uq_derivs(struct uq *c, size_t i, struct uq_deriv *d, size_t max)
+{
+	const struct sh_uplan *p = c->c_p;
+	const struct sh_node *all, *src, *cmd;
+	const char *path;
+	size_t j, n;
+
+	all = sh_obj_get(p->up_recipe.sr_merged, "derivations");
+	for (j = n = 0; all != NULL && j < all->sn_obj.ob_n && n < max; j++) {
+		path = all->sn_obj.ob_v[j].pr_key;
+		src = sh_obj_get(all->sn_obj.ob_v[j].pr_val, "source");
+		cmd = sh_obj_get(all->sn_obj.ob_v[j].pr_val, "command");
+		if (src == NULL || cmd == NULL || uq_owner(p, path) != i)
+			continue;
+		if (uq_owner(p, src->sn_str) != i) {
+			(void) fprintf(c->c_out, "warning: the derivation of "
+			    "%s has its source in another dataset: not run\n",
+			    path);
+			continue;
+		}
+		uq_treepath(p, i, path, d[n].dv_path, sizeof (d[n].dv_path));
+		uq_treepath(p, i, src->sn_str, d[n].dv_source,
+		    sizeof (d[n].dv_source));
+		d[n++].dv_command = cmd->sn_str;
+	}
+	return (n);
+}
+
+static const char *const uq_env[] = { "PATH=" SH_RUN_PATH, "HOME=/root",
+	NULL };
+
+/*
+ * The derivations D (N) that RES notes, the derived path a line of it,
+ * whose source is FROM's (WANT 1: answered from) or not (WANT 0), run
+ * in a chroot of DIR, each distinct command once. 0, or -1 said.
+ */
+static int
+uq_derive(struct uq *c, const struct sh_resolution *res,
+    const struct uq_deriv *d, size_t n, int want, const char *dir)
+{
+	const struct sh_resline *l;
+	const char *w[7], *done[32];
+	size_t j, k, ndone;
+	int from;
+
+	ndone = 0;
+	for (j = 0; j < n; j++) {
+		if (sh_res_find(res, d[j].dv_path) == NULL)
+			continue;
+		l = sh_res_find(res, d[j].dv_source);
+		from = l != NULL && strcmp(l->rl_choice, "from") == 0;
+		if (from != want)
+			continue;
+		for (k = 0; k < ndone; k++) {
+			if (strcmp(done[k], d[j].dv_command) == 0)
+				break;
+		}
+		if (k < ndone)
+			continue;
+		w[0] = c->c_t->tl_chroot;
+		w[1] = dir;
+		w[2] = "/bin/sh";
+		w[3] = "-e";
+		w[4] = "-c";
+		w[5] = d[j].dv_command;
+		w[6] = NULL;
+		(void) fprintf(c->c_out, "derived %s, in %s\n", d[j].dv_path,
+		    dir);
+		if (uq_exec(c, w, uq_env, 0) != 0) {
+			(void) snprintf(c->c_pause, sizeof (c->c_pause),
+			    "the derivation of %s failed (log %s): shtetl "
+			    "update --continue %s runs it again",
+			    d[j].dv_path, c->c_log, c->c_p->up_name);
+			return (-1);
+		}
+		if (ndone < 32)
+			done[ndone++] = d[j].dv_command;
+	}
+	return (0);
+}
+
+/* The marker of dataset I's step K: derivations owed after its done. */
+static void
+uq_owed(struct uq *c, size_t i, size_t k, char *buf, size_t len)
+{
+	(void) snprintf(buf, len, "%s/rebase/d%zu.%zu.derive",
+	    c->c_p->up_rundir, i, k);
+}
+
+/*
+ * The derivations of a source answered from (7.7 step 5), owed by
+ * dataset I's step K once done, run in a chroot of DS where it is
+ * placed; the marker removed. 0, or 1 paused.
+ */
+static int
+uq_owing(struct uq *c, size_t i, size_t k, const char *ds)
+{
+	struct uq_deriv d[32];
+	struct sh_resolution res;
+	char man[1100], path[1200], mark[1200], mp[SH_ZFS_VALMAX];
+	size_t n;
+	int r;
+
+	uq_owed(c, i, k, mark, sizeof (mark));
+	if (access(mark, F_OK) != 0)
+		return (0);
+	uq_manifest(c, i, k, man, sizeof (man));
+	(void) snprintf(path, sizeof (path), "%s.resolution", man);
+	(void) memset(&res, 0, sizeof (res));
+	if (uq_place(c, ds) != 0 || sh_zfs_get(c->c_z, ds, "mountpoint", mp,
+	    sizeof (mp), NULL, c->c_err) != 0 ||
+	    sh_res_read(path, &res, c->c_err) != 0) {
+		sh_res_free(&res);
+		return (-1);
+	}
+	n = uq_derivs(c, i, d, 32);
+	r = uq_derive(c, &res, d, n, 1, mp);
+	sh_res_free(&res);
+	if (r != 0)
+		return (1);
+	(void) unlink(mark);
+	return (0);
+}
+
+/*
+ * At a gate of dataset I, step K, its rebase IDENT (7.7): each
+ * conflicted derived path answered keep; the picker on a terminal while
+ * names are unanswered; the document complete, the derivations whose
+ * source is in the tree run in the private mount, those of a source
+ * answered from owed; then --continue. 0 the step done; 1 paused; -1.
  */
 static int
 uq_gate(struct uq *c, size_t i, size_t k, const char *ident)
 {
 	struct sh_uplan *p = c->c_p;
 	struct sh_resolution res;
-	char man[1100], path[1200];
+	struct uq_deriv d[32];
+	const char *paths[32];
+	char man[1100], path[1200], mark[1200], priv[1100];
 	unsigned left;
-	int rc;
+	size_t n, j;
+	int rc, owed;
+	FILE *f;
 
 	uq_manifest(c, i, k, man, sizeof (man));
 	(void) snprintf(path, sizeof (path), "%s.resolution", man);
 	(void) memset(&res, 0, sizeof (res));
 	if (sh_res_read(path, &res, c->c_err) != 0) {
+		sh_res_free(&res);
+		return (-1);
+	}
+	/* the text first: a derived file kept, made again from it */
+	n = uq_derivs(c, i, d, 32);
+	for (j = 0; j < n; j++)
+		paths[j] = d[j].dv_path;
+	if (sh_res_keep(&res, paths, n) > 0 &&
+	    sh_res_write(path, &res, c->c_err) != 0) {
 		sh_res_free(&res);
 		return (-1);
 	}
@@ -801,9 +986,35 @@ uq_gate(struct uq *c, size_t i, size_t k, const char *ident)
 		    left, left == 1 ? "" : "s", path, p->up_name);
 		return (1);
 	}
+	if (sh_res_read(path, &res, c->c_err) != 0) {
+		sh_res_free(&res);
+		return (-1);
+	}
+	sh_rb_privmnt(ident, priv, sizeof (priv));
+	rc = uq_derive(c, &res, d, n, 0, priv);
+	owed = 0;
+	for (j = 0; rc == 0 && j < n; j++) {
+		const struct sh_resline *l = sh_res_find(&res,
+		    d[j].dv_source);
+
+		if (sh_res_find(&res, d[j].dv_path) != NULL && l != NULL &&
+		    strcmp(l->rl_choice, "from") == 0)
+			owed = 1;
+	}
+	sh_res_free(&res);
+	if (rc != 0)
+		return (1);
+	if (owed) {
+		uq_owed(c, i, k, mark, sizeof (mark));
+		if ((f = fopen(mark, "w")) == NULL) {
+			sh_errf(c->c_err, "%s: %s", mark, strerror(errno));
+			return (-1);
+		}
+		(void) fclose(f);
+	}
 	rc = c->c_rb->rb_continue(c->c_rb, ident, 0, c->c_logfd, c->c_err);
 	if (rc == SH_RB_DONE)
-		return (0);
+		return (uq_owing(c, i, k, ident));
 	if (rc == SH_RB_GATE) {
 		(void) snprintf(c->c_pause, sizeof (c->c_pause), "%s at its "
 		    "conflicts gate again, step %zu of %zu: see %s, then "
@@ -838,6 +1049,12 @@ uq_replay(struct uq *c, size_t i)
 	uq_ds(p, p->up_run, i, xds, sizeof (xds));
 	uq_ds(p, p->up_runf, i, fds, sizeof (fds));
 	for (;;) {
+		/* derivations a step done still owes, first */
+		for (k = 1; k <= n && uq_there(c, stage) && !uq_open(c, stage);
+		    k++) {
+			if ((rc = uq_owing(c, i, k, stage)) != 0)
+				return (rc);
+		}
 		/* the saves the staging dataset holds, from the first */
 		for (m = 0; m < n; m++) {
 			(void) snprintf(snap, sizeof (snap), "%s@%s", stage,

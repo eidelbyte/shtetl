@@ -369,7 +369,7 @@
     ],
     "provides": "Updates whose conflicts are answered with derived files kept consistent.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing"
   },
   "m5-cutover": {
     "description": "shtetl cutover X and shtetl abandon X (planning.md 7.9, 7.10): cutover asks about writes to X since its from-save (written@), promotes X-staging's own clones, destroys the old X on zrun, renames X-staging to X, its jail block with it, starts and saves X; in zlake the same promotes, the old X moved to archive/containers/X-<ISO-date>, the staging mirror renamed. abandon stops and destroys X-staging, on zrun and in zlake, and starts X. Verify: MATRIX family K; the box.",

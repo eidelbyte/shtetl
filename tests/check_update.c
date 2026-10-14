@@ -143,7 +143,17 @@ config(void)
 		"ver = \">=15.1\";\ndatasets { var {} \"usr/local\" {} }\n",
 		"conf/containers/x.conf",
 		"datasets { var { compression = \"zstd\"; } www {} }\n"
-		"jailconf = \"allow.raw_sockets;\";\n",
+		"jailconf = \"allow.raw_sockets;\";\n"
+		"derivations {\n"
+		"  \"etc/pwd.db\" { source = \"etc/master.passwd\"; "
+		"command = \"pwd_mkdb -p -d /etc /etc/master.passwd\"; }\n"
+		"  \"var/db/x.db\" { source = \"var/db/x\"; "
+		"command = \"mkx\"; }\n"
+		"  \"etc/bad.db\" { source = \"etc/bad\"; "
+		"command = \"fail me\"; }\n"
+		"  \"etc/spool.db\" { source = \"var/spool\"; "
+		"command = \"cross\"; }\n"
+		"}\n",
 		"conf/containers/new.conf", "ver = \">=16.0\";\n",
 		NULL
 	};
@@ -166,7 +176,10 @@ config(void)
 	(void) snprintf(body, sizeof (body), "[ -f %s/$2 ] || exit 1\n",
 	    running);
 	fake.tl_jls = tool("jls", body);
-	fake.tl_chroot = tool("chroot", "");
+	(void) snprintf(body, sizeof (body),
+	    "case \"$5\" in *fail*) [ -f %s ] && exit 4;; esac\n",
+	    scratch_path("failing"));
+	fake.tl_chroot = tool("chroot", body);
 	fake.tl_sh = "/bin/sh";
 }
 
@@ -606,6 +619,109 @@ test_gate(void)
 	CHECK(strstr(ran, "gave up the update of x\n") != NULL);
 }
 
+/* The line of NAME in the resolution at PATH given CHOICE. */
+static void
+choose(const char *path, const char *name, const char *choice)
+{
+	struct sh_resolution r;
+	const struct sh_resline *l;
+	char *line, *sp, *nl, *un;
+	size_t at;
+
+	(void) memset(&r, 0, sizeof (r));
+	CHECK(sh_res_read(path, &r, &wc.c_err) == 0);
+	CHECK((l = sh_res_find(&r, name)) != NULL);
+	at = (size_t)(l - r.rs_lines);
+	line = r.rs_text[l->rl_line];
+	CHECK((sp = strrchr(line, ' ')) != NULL);
+	CHECK((nl = malloc((size_t)(sp - line) + strlen(choice) + 2)) != NULL);
+	(void) sprintf(nl, "%.*s %s", (int)(sp - line), line, choice);
+	free(r.rs_text[l->rl_line]);
+	r.rs_text[l->rl_line] = nl;
+	(void) snprintf(r.rs_lines[at].rl_choice,
+	    sizeof (r.rs_lines[at].rl_choice), "%s", choice);
+	CHECK((un = malloc(32)) != NULL);
+	(void) snprintf(un, 32, "#unanswered %u", sh_res_unanswered(&r));
+	free(r.rs_text[r.rs_unline]);
+	r.rs_text[r.rs_unline] = un;
+	CHECK(sh_res_write(path, &r, &wc.c_err) == 0);
+	sh_res_free(&r);
+}
+
+/* G1 - G5: conflicts and derivations, the text first. */
+static void
+test_derivations(void)
+{
+	static const char *const pw[] = { "/etc/master.passwd",
+	    "/etc/pwd.db", NULL };
+	static const char *const vx[] = { "/db/x", "/db/x.db", NULL };
+	static const char *const bad[] = { "/etc/bad", "/etc/bad.db", NULL };
+	struct sh_resolution r;
+	const char *res;
+	char priv[1100], want[1400];
+
+	settings(NULL);
+	/* G1, G3: pwd.db kept, made again in the private mount */
+	world(1);
+	rbfake_conflicts(RXS, 1, pw);
+	CHECK(update(SH_UV_NEW, 0) == 1);
+	CHECK((res = rbfake_resolution(RXS)) != NULL);
+	(void) memset(&r, 0, sizeof (r));
+	CHECK(sh_res_read(res, &r, &wc.c_err) == 0);
+	CHECK(is(sh_res_find(&r, "/etc/pwd.db")->rl_choice, "keep"));
+	CHECK(is(sh_res_find(&r, "/etc/master.passwd")->rl_choice, "-"));
+	CHECK(sh_res_unanswered(&r) == 1);
+	sh_res_free(&r);
+	CHECK(!asked("chroot "));
+	CHECK(strstr(ran, "warning: the derivation of etc/spool.db has its "
+	    "source in another dataset: not run\n") != NULL);
+	choose(res, "/etc/master.passwd", "keep");
+	CHECK(update(SH_UV_CONTINUE, 0) == 0);
+	sh_rb_privmnt(RXS, priv, sizeof (priv));
+	(void) snprintf(want, sizeof (want), "chroot %s /bin/sh -e -c "
+	    "pwd_mkdb -p -d /etc /etc/master.passwd\n", priv);
+	CHECK(asked(want));
+	CHECK(!asked("-c mkx") && !asked("-c fail"));
+	/* G4: its source answered from, made after done where placed */
+	world(1);
+	rbfake_conflicts(RXS, 1, pw);
+	CHECK(update(SH_UV_NEW, 0) == 1);
+	choose(rbfake_resolution(RXS), "/etc/master.passwd", "from");
+	CHECK(update(SH_UV_CONTINUE, 0) == 0);
+	CHECK(!asked(want));
+	(void) snprintf(want, sizeof (want), "chroot %s/x-staging /bin/sh "
+	    "-e -c pwd_mkdb -p -d /etc /etc/master.passwd\n", mnt);
+	CHECK(asked(want));
+	CHECK(access(scratch_path("update/x/rebase/d0.1.derive"), F_OK) != 0);
+	/* in var's tree: /db/x.db */
+	world(1);
+	rbfake_conflicts(RXS "/var", 1, vx);
+	CHECK(update(SH_UV_NEW, 0) == 1);
+	(void) memset(&r, 0, sizeof (r));
+	CHECK(sh_res_read(rbfake_resolution(RXS "/var"), &r, &wc.c_err) == 0);
+	CHECK(is(sh_res_find(&r, "/db/x.db")->rl_choice, "keep"));
+	sh_res_free(&r);
+	choose(rbfake_resolution(RXS "/var"), "/db/x", "onto");
+	CHECK(update(SH_UV_CONTINUE, 0) == 0);
+	sh_rb_privmnt(RXS "/var", priv, sizeof (priv));
+	(void) snprintf(want, sizeof (want), "chroot %s /bin/sh -e -c mkx\n",
+	    priv);
+	CHECK(asked(want));
+	/* G5: one failing pauses; taken up, it runs again */
+	world(1);
+	(void) scratch_write("failing", "");
+	rbfake_conflicts(RXS, 1, bad);
+	CHECK(update(SH_UV_NEW, 0) == 1);
+	choose(rbfake_resolution(RXS), "/etc/bad", "keep");
+	CHECK(update(SH_UV_CONTINUE, 0) == 1);
+	CHECK(strstr(ran, "paused: the derivation of /etc/bad.db failed") !=
+	    NULL);
+	CHECK(is(prop(RXS, "zfs_rebase:phase"), "conflicts"));
+	(void) unlink(scratch_path("failing"));
+	CHECK(update(SH_UV_CONTINUE, 0) == 0);
+	CHECK(is(prop(RXS, "zfs_rebase:phase"), "-"));
+}
+
 /* U7: a rebase refused, or failed part way: undone. */
 static void
 test_failures(void)
@@ -636,6 +752,7 @@ main(void)
 	test_plan();
 	test_run();
 	test_gate();
+	test_derivations();
 	test_failures();
 	sh_update_free(&p);
 	sh_spaces_free(&s);

@@ -117,3 +117,31 @@ answered and continued; the picker on a terminal; --abort; a refused
 and a failed rebase undone); seven mutations of update.c caught;
 run-cli U8 (59 cases); doccheck; make check, gate, xcheck. The box
 owed (U9). tracker: m5-update testing.
+
+## m5-gate
+
+Conflicts and derivations, the text first (planning.md 7.7), in
+update.c's gate.
+
+- uq_derivs: the recipe's derivations whose derived path is in the
+  dataset at hand (uq_owner, the longest dataset path in front of it),
+  their paths as that dataset's tree spells them; a source in another
+  dataset is warned of and left out (7.7's open detail).
+- uq_gate: the derived paths still "-" answered keep (sh_res_keep,
+  written whole); the picker or a pause; then, the document complete,
+  uq_derive runs each noted derivation whose source is not answered
+  from, by chroot into the private mount (sh_rb_privmnt), one run per
+  distinct command; a source answered from leaves a marker,
+  d<i>.<k>.derive beside the manifest, and its derivations run after
+  done, by chroot into the placed dataset (uq_owing). The replay loop
+  pays every owed step first, so a pause or a crash between done and
+  the run loses nothing.
+- A derivation failing pauses the update with the step's rebase still
+  at its gate; --continue runs it again.
+
+Verification: check_update 537 checks (G1 - G5: pwd.db kept and made
+again in the private mount; its source answered from, made after done
+in the placed tree; var's /db/x.db; a failing one paused and run
+again; a source in another dataset warned of); five mutations of the
+gate caught; make check, gate, xcheck. The box owed (U9).
+tracker: m5-gate testing.

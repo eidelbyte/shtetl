@@ -1413,6 +1413,25 @@ so sources settle before the files derived from them.
 Open detail: a derivation whose source and output are in different
 datasets spans two rebases and two private mounts.
 
+As built (M5, `src/core/update.c`):
+
+- A derivation's paths are the container's; each belongs to the
+  dataset that holds it (the longest dataset path in front of it) and
+  is read in that dataset's tree (`var/db/x.db` is `/db/x.db` in var's).
+  One whose source is in another dataset is left out, with a warning
+  (the open detail above).
+- At a gate: each conflicted derived path still `-` answered `keep`;
+  the picker on a terminal, or a pause; the document complete, each
+  derivation whose derived path is a line of it and whose source is
+  not answered `from` run by `chroot <private mount> /bin/sh -e -c`,
+  each distinct command once; then `--continue`.
+- A source answered `from`: its derivation is owed (a marker beside
+  the manifest) and run after done, by `chroot` into the dataset where
+  it is placed, before the next step; a paused or interrupted update
+  pays what it owes first when taken up.
+- A derivation failing pauses the update at its gate (the step's
+  rebase still open), and `--continue` runs it again (PROPOSAL).
+
 ### 7.8 Soak
 
 X-staging runs; X is stopped and untouched. Rolling back is `shtetl
