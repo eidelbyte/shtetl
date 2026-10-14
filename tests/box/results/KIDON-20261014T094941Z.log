@@ -1,0 +1,163 @@
+shtetl box tests 2026-10-14T09:49:41Z on KIDON, 15.1-RELEASE-p2, zfs-2.4.2-1-FreeBSD_g6330a45b0, shtetl f04c6e7
+== D1: no roots yet
+# shtetl spaces -> 0
+ok   D1 exit
+ok   D1 every space none
+== B6: a child that is not shtetl's
+# shtetl bootstrap -y --lake shbtank/shtetl -> 1
+ok   B6 exit
+ok   B6 the refusal
+ok   B6 nothing marked
+== B16, B8: shown, and not confirmed
+# shtetl bootstrap --lake shbtank/shtetl --run shbfast/run --config shbtank/zconfig --build shbtank/zbuild -> 1
+ok   B16 exit
+ok   B16 the refusal
+ok   B16 nothing marked
+ok   B16 nothing made
+ok   B8 the lake root's table
+ok   B8 the ashift warning
+ok   B8 autotrim
+== B10, B11, B13, B14, B17, B18: bootstrap, confirmed
+# shtetl bootstrap -y --lake shbtank/shtetl --run shbfast/run --config shbtank/zconfig --build shbtank/zbuild --recipes /tmp/shtetl-box/repo -> 0
+ok   B10 exit
+ok   B14 the layout there, taken
+ok   B10 lake mountpoint
+ok   B10 lake canmount
+ok   B10 lake atime
+ok   B10 lake compression
+ok   B10 lake aclmode
+ok   B10 lake layout
+ok   B10 lake mark
+ok   B10 the mark is local
+ok   B10 config mark
+ok   B10 build mark
+ok   B11 run mark
+ok   B11 foundations' mountpoint
+ok   B11 foundations' canmount
+ok   B11 foundations not mounted
+ok   B11 containers' mountpoint
+ok   B11 containers' canmount
+ok   B11 containers mounted
+ok   B11 systems' mountpoint
+ok   B17 autotrim on shbtank
+ok   B17 autotrim on shbfast
+ok   B13 the recipes cloned
+ok   B13 a snapshot before the clone
+== D2, D16: shtetl spaces
+# shtetl spaces -> 0
+ok   D16 exit
+ok   D16 the lake root
+ok   D16 the config root, mounted
+ok   D16 the build root, mounted
+ok   D16 the run root
+== D14: the configuration found without -C
+# shtetl config show -> 0
+ok   D14 exit
+ok   D14 the settings
+== B3: a root named again
+# shtetl bootstrap -y --lake shbtank/shtetl -> 1
+ok   B3 exit
+ok   B3 the refusal
+== B4: a second run root
+# shtetl bootstrap -y --run shbtank/run2 -> 1
+ok   B4 exit
+ok   B4 the refusal
+ok   B4 nothing marked
+== D5: two config roots, found
+# shtetl spaces -> 1
+ok   D5 exit
+ok   D5 the refusal
+== Z11: the ZFS calls of M3 and M4 against libzfs
+ok   Z1 three snapshots at once
+ok   Z1 one createtxg for all three
+ok   Z1 the properties on each, local
+ok   Z1 a second version
+ok   Z5 f: v1 v2
+ok   Z5 f/usr: v1 v2, not f's
+ok   Z5 the walk stopped, its value returned
+ok   Z5 no such filesystem refused
+ok   Z2 one taken: refused
+ok   Z2 a filesystem missing: refused
+ok   Z2 a name twice: refused
+ok   Z2 a malformed name: refused
+ok   Z2 and none taken
+ok   Z3 type snapshot
+ok   Z3 a guid
+ok   Z3 the filesystem's user property, inherited
+ok   Z4 a user property set on a snapshot
+ok   Z4 the filesystem's own unchanged
+ok   Z4 a native property on a snapshot refused
+ok   Z4 a missing snapshot's property refused
+ok   Z4 a missing snapshot: 1, as a missing filesystem
+ok   Z6 rollback to an older one refused
+ok   Z6 rollback of a missing filesystem refused
+ok   Z6 rollback to the newest
+ok   Z7 a snapshot destroyed
+ok   Z7 children and a snapshot: refused for the snapshot
+ok   Z7 a filesystem with snapshots refused
+ok   Z7 its snapshots, then it
+ok   Z7 a missing filesystem refused
+ok   Z7 a missing snapshot refused
+ok   Z7 f's last snapshot destroyed
+ok   Z7 a filesystem with children refused
+ok   Z8 a mountpoint set locally
+ok   Z8 and inherited again, f's below it
+ok   Z8 f's inherited where none is set: the default
+ok   Z9 unmounted
+ok   Z9 mounted again
+ok   Z12 a mountpoint set: f mounted, and f/usr below it
+ok   Z12 canmount off, or a mountpoint of its own: not
+ok   Z13 mounted there already: nothing to do
+ok   Z13 canmount off refused
+ok   Z13 no mountpoint refused
+ok   Z12 inherited: moved where the default says
+ok   Z20 a filesystem mounted, with a snapshot
+ok   Z20 destroyed while mounted: refused, before its snapshots
+ok   Z20 unmounted, its snapshot destroyed, then it
+ok   Z14 the source made, with a version
+ok   Z14 a clone, a property from its birth, its origin
+ok   Z14 no such snapshot
+ok   Z14 the name taken
+ok   Z14 no parent
+ok   Z14 its origin not destroyed
+ok   Z15 a whole send into the other pool, nothing but data
+ok   Z15 the target there already
+ok   Z16 an incremental send
+ok   Z16 the target missing
+FAIL Z16 its newest not the base's counterpart
+ok   Z16 a base that is no earlier
+ok   Z17 a clone stream, received as a clone of the counterpart
+ok   Z17 the origin missing
+ok   Z17 the origin not the base's counterpart
+ok   Z18 a snapshot's own user properties, copied over
+FAIL Z10 every refusal above said why, as the fake does
+FAIL Z11 box_zcheck's exit: got [1], wanted [0]
+    zcheck: shbtank/zc/nope: no such filesystem
+    zcheck: shbtank/zc/f/usr@v2: taken
+    zcheck: shbtank/zc/g@v3: no such filesystem
+    zcheck: shbtank/zc/f@v3: named twice
+    zcheck: shbtank/zc/f/usr: not a snapshot's name
+    zcheck: shbtank/zc/f@v2: this property can not be modified for snapshots
+    zcheck: shbtank/zc/f@v9: no such snapshot
+    zcheck: shbtank/zc/f@v1: not the newest snapshot
+    zcheck: shbtank/zc/nope: no such filesystem
+    zcheck: shbtank/zc/f: has snapshots
+    zcheck: shbtank/zc/f/var: has snapshots
+    zcheck: shbtank/zc/f/var: no such dataset
+    zcheck: shbtank/zc/f@v9: no such dataset
+    zcheck: shbtank/zc/f: has children
+    zcheck: shbtank/zc/f/off: canmount is off
+    zcheck: shbtank/zc/f/none: no mountpoint
+    zcheck: shbtank/zc/f/m: mounted
+    zcheck: shbtank/zc/s@v9: no such snapshot
+    zcheck: shbtank/zc/x: exists
+    zcheck: shbtank/zc/q/r: no parent
+    zcheck: shbtank/zc/s@v1: has clones
+    zcheck: shbfast/zc2/s: exists
+    zcheck: shbfast/zc2/nope: no such filesystem
+    zcheck: (nothing reported)
+    zcheck: wanted shbfast/zc2/s: newest snapshot is not shbtank/zc/s@v1's counterpart
+    zcheck: shbtank/zc/s@v3: not an earlier snapshot of shbtank/zc/s@v1
+    zcheck: shbfast/zc2/s@v9: no such snapshot
+    zcheck: shbfast/zc2/s@v2: not shbtank/zc/s@v1's counterpart
+== 111 ok, 3 failed
