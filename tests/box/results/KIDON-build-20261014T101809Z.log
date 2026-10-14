@@ -1,0 +1,297 @@
+shtetl box build 2026-10-14T10:18:09Z on KIDON, 15.1-RELEASE-p2, zfs-2.4.2-1-FreeBSD_g6330a45b0, shtetl 00912eb, releng/15.1
+== the pool kept from the last run: /var/tmp/shtetl-boxbuild/shbbuild.img
+== the build root kept: its checkout, its files' times
+== bootstrap: lake, run, config, build
+# shtetl bootstrap -y --lake shbbuild/shtetl --run shbbuild/run --config shbbuild/zconfig --build shbbuild/zbuild -> 0
+ok   B10 bootstrap
+ok   B13 shtetl-recipes cloned by default, from GitHub
+ok   B13 its README there
+== box's obj cache for releng/15.1 kept: an incremental build
+== P17: patches made from releng/15.1's share/misc/bsd-family-tree
+== F13: a build that fails at the fetch, undone
+# shtetl build -y nope -> 1
+ok   F13 exit
+ok   F13 the refusal
+ok   F13 F's datasets gone
+ok   F13 the build root's mark cleared
+ok   F13 the config snapshot kept
+ok   F13 the obj cache kept, unmounted
+== P17: build box: a patch already in, one applied, one paused
+# shtetl build -y box -> 3
+    foundation box, new, from releng/15.1
+      version 15.1-releng-<day>-<commit>
+      + shbbuild/shtetl/foundations/box
+      + shbbuild/shtetl/foundations/box/tmp
+      + shbbuild/shtetl/foundations/box/var
+      + shbbuild/shtetl/foundations/box/usr  canmount=off
+      + shbbuild/shtetl/foundations/box/usr/local
+      checkout releng/15.1 in shbbuild/zbuild (/var/tmp/shtetl-boxbuild/alt/zbuild)
+      patches: file:///var/tmp/shtetl-boxbuild/p17/repo, patches/box
+      kernel GENERIC
+      src.conf from 1 file
+      make -j<hw.ncpu> buildworld buildkernel
+      install world, kernel and distribution (install -C)
+      pkg: none
+      commands: motd
+      snapshot -r shbbuild/shtetl/foundations/box@<version>
+    snapshot shbbuild/zconfig@build-box-20261014-101812
+    made shbbuild/shtetl/foundations/box
+    made shbbuild/shtetl/foundations/box/tmp
+    made shbbuild/shtetl/foundations/box/var
+    made shbbuild/shtetl/foundations/box/usr
+    made shbbuild/shtetl/foundations/box/usr/local
+    checkout releng/15.1 at e38a7085f3a8
+    version 15.1-releng-2026-10-14-e38a7085f3a8 (REVISION 15.1)
+    fetched file:///var/tmp/shtetl-boxbuild/p17/repo at 715ebd2c40b9
+    copied patches/box
+    3 patches from 2 sources
+    snapshot shbbuild/zbuild@shtetl-patch-0
+    patch 2-in.patch from file:///var/tmp/shtetl-boxbuild/p17/repo: already in, skipped
+    patch 1-one.patch from patches/box: applied
+    patch 3-two.patch from patches/box: does not apply; merged three ways, conflict markers left
+      the patch: /var/db/shtetl/build/box/patches/2/3-two.patch
+      in /var/tmp/shtetl-boxbuild/alt/zbuild: share/misc/bsd-family-tree
+    build of box paused; then one of:
+      shtetl build box --continue   the fix made, go on
+      shtetl build box --skip       the patch left out
+      shtetl build box --abort      nothing built, all undone
+ok   P17 the pause's exit
+ok   P17 already in, from the git source
+ok   P17 applied, from the directory
+ok   P17 paused, conflict markers left
+ok   P17 the record
+ok   P17 the build root's mark
+ok   P17 a snapshot before each patch, and the first
+ok   P17 the markers in the tree
+# shtetl build box --continue -> 1
+ok   P17 --continue refused while a marker is left
+ok   P17 naming it
+== F11, F19, P17: --continue, the build for real (hours)
+# shtetl build box --continue -> 0
+# 1 minutes
+    build of box, paused at patch 3-two.patch
+    patch 3-two.patch from patches/box: fixed by hand; the fix: /var/db/shtetl/build/box/fixed/2/3-two.patch
+    wrote /var/db/shtetl/build/box/BOX, /var/db/shtetl/build/box/src.conf
+    mounted shbbuild/shtetl/foundation-builds/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/obj, shbbuild/shtetl/foundations/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/root
+    kept 1 fix in /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/obj/patches/15.1-releng-2026-10-14-e38a7085f3a8
+    make buildworld buildkernel (log /var/db/shtetl/build/box/build.log)
+    make installworld (log /var/db/shtetl/build/box/build.log)
+    make installkernel (log /var/db/shtetl/build/box/build.log)
+    kernel into shbbuild/shtetl/foundations/box: 0 kept, 1715 copied, 0 removed
+    make distribution (log /var/db/shtetl/build/box/build.log)
+    commands motd, from foundations/box.conf
+    snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8
+    rolled back shbbuild/zbuild to @shtetl-patch-0
+    the time of now on 1 patched file, for the next build's make
+    built shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8
+ok   F11 exit
+# version 15.1-releng-2026-10-14-e38a7085f3a8
+ok   F12 the version's name
+ok   F11 every dataset snapshotted
+ok   F11 shtetl:kind
+ok   F11 shtetl:config names the config snapshot
+ok   F11 shtetl:config-guid is its guid
+ok   F17 shtetl:commit, the build's own
+ok   F11 the placeholder
+ok   F11 F unmounted
+ok   F11 its mountpoint back
+ok   F11 the obj cache unmounted
+ok   F11 the build root's mark cleared
+ok   P17 shtetl:patches
+ok   P17 the build root rolled back, its checkout clean
+ok   P17 every patch snapshot gone
+ok   P17 the fix written out
+ok   P17 the record gone
+== what was built, mounted for a look
+ok   F19 the world went into F (installworld)
+ok   F19 the kernel (installkernel)
+ok   F19 /etc (distribution)
+ok   F11 the command ran in F
+ok   P17 the patched tree built: both lines installed
+ok   F16 the kernel's ident, BOX
+ok   F11 usr/local is its own dataset
+ok   F11 the run's log kept
+== F27: box again, an update over it (the obj cache warm)
+# shtetl build -y box -> 0
+# 1 minutes
+    foundation box, an update of @15.1-releng-2026-10-14-e38a7085f3a8, from releng/15.1
+      version 15.1-releng-<day>-<commit>
+      = shbbuild/shtetl/foundations/box
+      = shbbuild/shtetl/foundations/box/tmp
+      = shbbuild/shtetl/foundations/box/var
+      = shbbuild/shtetl/foundations/box/usr
+      = shbbuild/shtetl/foundations/box/usr/local
+      checkout releng/15.1 in shbbuild/zbuild (/var/tmp/shtetl-boxbuild/alt/zbuild)
+      patches: file:///var/tmp/shtetl-boxbuild/p17/repo, patches/box
+      kernel GENERIC
+      src.conf from 1 file
+      make -j<hw.ncpu> buildworld buildkernel
+      make delete-old delete-old-libs, then
+      install world, kernel and distribution (install -C)
+      installworld's backups removed
+      pkg: none
+      commands: motd
+      snapshot -r shbbuild/shtetl/foundations/box@<version>
+    snapshot shbbuild/zconfig@build-box-20261014-101927
+    checkout releng/15.1 at e38a7085f3a8
+    version 15.1-releng-2026-10-14-e38a7085f3a8.2 (REVISION 15.1)
+    fetched file:///var/tmp/shtetl-boxbuild/p17/repo at 715ebd2c40b9
+    copied patches/box
+    4 patches from 2 sources
+    snapshot shbbuild/zbuild@shtetl-patch-0
+    patch 2-in.patch from file:///var/tmp/shtetl-boxbuild/p17/repo: already in, skipped
+    patch 1-one.patch from patches/box: applied
+    patch 4-init.c.patch from patches/box: applied
+    patch 4-rtld.c.patch from patches/box: applied
+    wrote /var/db/shtetl/build/box/BOX, /var/db/shtetl/build/box/src.conf
+    mounted shbbuild/shtetl/foundation-builds/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/obj, shbbuild/shtetl/foundations/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/root
+    make buildworld buildkernel (log /var/db/shtetl/build/box/build.log)
+    make delete-old delete-old-libs (log /var/db/shtetl/build/box/build.log)
+    make installworld (log /var/db/shtetl/build/box/build.log)
+    make installkernel (log /var/db/shtetl/build/box/build.log)
+    kernel into shbbuild/shtetl/foundations/box: 1715 kept, 0 copied, 0 removed
+    make distribution (log /var/db/shtetl/build/box/build.log)
+    removed installworld's backups: libexec/ld-elf.so.1.old, libexec/ld-elf32.so.1.old, sbin/init.bak
+    commands motd, from foundations/box.conf
+    snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2
+    rolled back shbbuild/zbuild to @shtetl-patch-0
+    the time of now on 3 patched files, for the next build's make
+    built shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2
+ok   F27 exit
+ok   F27 the plan an update
+ok   F27 delete-old before the install
+ok   F27 installworld's backups removed: init's
+ok   F27 and rtld's
+ok   F27 the kernel synced into F
+# version 15.1-releng-2026-10-14-e38a7085f3a8.2
+ok   F27 a new version, on the same datasets
+ok   F27 two versions on each dataset
+ok   F27 the first kept
+ok   F27 no kernel.old
+ok   F27 no loader backup
+ok   F27 no ld-elf backup
+ok   F27 no init.bak
+ok   F27 an unchanged module keeps its object (aac.ko)
+ok   F27 the changed init installed
+ok   F27 the new tree installed: one patch line now
+ok   F27 the command ran again, over distribution's file
+== F33: pkg-upgrade box
+# shtetl pkg-upgrade -y box -> 0
+    foundation box, its packages upgraded, from @15.1-releng-2026-10-14-e38a7085f3a8.2
+      mounted below /var/db/shtetl/build/box/root, with its datasets
+      pkg -c <root> upgrade -y
+      snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg
+    pkg upgrade in /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/root (log /var/db/shtetl/build/box/pkg.log)
+    snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg
+    upgraded shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg
+ok   F33 exit
+ok   F33 the -pkg of the update's version
+ok   F33 shtetl:kind pkg, on every dataset
+ok   F33 the version's config carried over
+ok   F33 F unmounted, the mark cleared
+== M8: box to zrun, its first version whole, its newest after
+# shtetl beam -y --version 15.1-releng-2026-10-14-e38a7085f3a8 box -> 0
+    foundation box, @15.1-releng-2026-10-14-e38a7085f3a8 to zrun, whole
+      shbbuild/shtetl/foundations/box -> shbbuild/run/foundations/box
+      shbbuild/shtetl/foundations/box/usr -> shbbuild/run/foundations/box/usr  (placeholder)
+      shbbuild/shtetl/foundations/box/usr/local -> shbbuild/run/foundations/box/usr/local
+      shbbuild/shtetl/foundations/box/var -> shbbuild/run/foundations/box/var
+      shbbuild/shtetl/foundations/box/tmp -> shbbuild/run/foundations/box/tmp
+      readonly=on, canmount=noauto; a placeholder's canmount=off
+    received shbbuild/run/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8, whole
+    received shbbuild/run/foundations/box/usr@15.1-releng-2026-10-14-e38a7085f3a8, whole
+    received shbbuild/run/foundations/box/usr/local@15.1-releng-2026-10-14-e38a7085f3a8, whole
+    received shbbuild/run/foundations/box/var@15.1-releng-2026-10-14-e38a7085f3a8, whole
+    received shbbuild/run/foundations/box/tmp@15.1-releng-2026-10-14-e38a7085f3a8, whole
+    beamed box@15.1-releng-2026-10-14-e38a7085f3a8 to shbbuild/run/foundations/box
+ok   M8 the first beam's exit
+ok   M8 each dataset received
+ok   M8 readonly, inherited below
+ok   M8 canmount noauto, the placeholder's off
+ok   M8 nothing mounted
+ok   M8 shtetl:* copied, the config too
+# shtetl beam -y box -> 0
+    foundation box, @15.1-releng-2026-10-14-e38a7085f3a8.2-pkg to zrun, from @15.1-releng-2026-10-14-e38a7085f3a8
+      shbbuild/shtetl/foundations/box -> shbbuild/run/foundations/box
+      shbbuild/shtetl/foundations/box/usr -> shbbuild/run/foundations/box/usr  (placeholder)
+      shbbuild/shtetl/foundations/box/usr/local -> shbbuild/run/foundations/box/usr/local
+      shbbuild/shtetl/foundations/box/var -> shbbuild/run/foundations/box/var
+      shbbuild/shtetl/foundations/box/tmp -> shbbuild/run/foundations/box/tmp
+    received shbbuild/run/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg, from its last
+    received shbbuild/run/foundations/box/usr@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg, from its last
+    received shbbuild/run/foundations/box/usr/local@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg, from its last
+    received shbbuild/run/foundations/box/var@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg, from its last
+    received shbbuild/run/foundations/box/tmp@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg, from its last
+    beamed box@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg to shbbuild/run/foundations/box
+ok   M8 the later beam's exit
+ok   M8 the newest, the update's -pkg, from the first
+ok   M8 its kind pkg
+# shtetl beam -y box -> 1
+ok   M8 beamed again: refused, on zrun already
+== X9: the container shbweb on box, its jail; S9: saved again
+# shtetl create -y -m the first shbweb --on box -> 1
+    container shbweb, on box@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg
+      + shbbuild/run/containers/shbweb  clone
+      + shbbuild/run/containers/shbweb/usr  clone, canmount=off
+      + shbbuild/run/containers/shbweb/usr/local  clone
+      + shbbuild/run/containers/shbweb/var  clone, compression=lz4
+      + shbbuild/run/containers/shbweb/tmp  clone
+      + shbbuild/run/containers/shbweb/srv  its own, canmount=off
+      + shbbuild/run/containers/shbweb/srv/www  its own
+      jail: /etc/jail.conf.d/shbweb.conf
+      pkg: none
+      commands: hello (containers/shbweb.conf)
+      save, mirrored into zlake
+    snapshot shbbuild/zconfig@create-shbweb-20261014-102047
+    cloned shbbuild/run/containers/shbweb
+    cloned shbbuild/run/containers/shbweb/usr
+    cloned shbbuild/run/containers/shbweb/usr/local
+    cloned shbbuild/run/containers/shbweb/var
+    cloned shbbuild/run/containers/shbweb/tmp
+    made shbbuild/run/containers/shbweb/srv
+    made shbbuild/run/containers/shbweb/srv/www
+    mounted shbbuild/run/containers/shbweb at /var/tmp/shtetl-boxbuild/alt/containers/shbweb
+    copied the host's resolv.conf into shbweb
+    wrote /etc/jail.conf.d/shbweb.conf; started the jail shbweb
+    commands hello, from containers/shbweb.conf
+    destroyed shbbuild/run/containers/shbweb
+FAIL X9 create's exit: got [1], wanted [0]
+    shtetl: shbbuild/run/containers/shbweb/srv: origin does not apply
+    shtetl: create of shbweb failed; log /var/db/shtetl/create/shbweb/create.log
+FAIL X9 box's datasets cloned at its newest, srv/www its own: got [ ], wanted [shbbuild/run/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg shbbuild/run/foundations/box/usr/local@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg]
+FAIL X9 srv/www its own, srv a placeholder: got [ ], wanted [- off]
+cannot open 'shbbuild/run/containers/shbweb': dataset does not exist
+FAIL X9 seven datasets: got [0], wanted [7]
+FAIL X9 the recipe's lz4 set on the clone, locally: got [ ], wanted [lz4 local]
+FAIL X9 mounted, the placeholders not: got [ ], wanted [yes no]
+FAIL X9 srv/www mounted, srv not: got [ ], wanted [yes no]
+FAIL X9 writable: readonly is box's on zrun, not the clone's: got [], wanted [off]
+grep: /etc/jail.conf.d/shbweb.conf: No such file or directory
+FAIL X9 the jail's block, its path the mount: no [path = "";] in:
+sed: /etc/jail.conf.d/shbweb.conf: No such file or directory
+grep: /etc/jail.conf.d/shbweb.conf: No such file or directory
+FAIL X9 the recipe's jailconf in it: no [allow.raw_sockets;] in:
+sed: /etc/jail.conf.d/shbweb.conf: No such file or directory
+FAIL X9 the jail running, its hostname its name: got [ ], wanted [shbweb shbweb]
+FAIL X9 the command ran in the jail: got [], wanted [shtetl-box]
+ok   X9 the host's resolv.conf copied in
+cannot open 'shbbuild/run/containers/shbweb': dataset does not exist
+FAIL X9 the first save: its kind, the create's config snapshot: got [ ], wanted [save shbbuild/zconfig@create]
+FAIL X9 mirrored: a clone of zlake's box: got [], wanted [shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg]
+FAIL X9 stopped by its block, devfs with it: got [1], wanted [0]
+FAIL X9 started again from its block: got [], wanted [shbweb]
+# shtetl create -y shbweb --on box -> 1
+ok   X9 created again: refused, it exists
+tests/box/build.sh: cannot create /srv/www/second.txt: No such file or directory
+# shtetl save -m the second shbweb -> 1
+FAIL S9 the second save's exit: got [1], wanted [0]
+    shtetl: no container shbweb
+cannot open 'shbbuild/run/containers/shbweb': dataset does not exist
+FAIL S9 two saves on zrun: got [0], wanted [2]
+cannot open 'shbbuild/shtetl/containers/shbweb': dataset does not exist
+FAIL S9 both mirrored in zlake: got [0], wanted [2]
+cannot open 'shbbuild/shtetl/containers/shbweb': dataset does not exist
+FAIL S9 the second's message in zlake, its config carried: got [, ], wanted [the second, ]
+cannot open 'shbbuild/shtetl/containers/shbweb/srv/www': dataset does not exist
+FAIL S9 srv/www's mirror whole, then from its first: got [ 0], wanted [- 2]
+== 78 ok, 21 failed
