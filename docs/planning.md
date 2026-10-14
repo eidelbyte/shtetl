@@ -430,7 +430,7 @@ stacks:
 | pkg, requires | the union |
 | datasets, patches | the union by identity (below); an entry's fields compose |
 | derivations | the union by identity; each one given once, whole |
-| commands | the union by label; a label's text stacks, a piece from each file that gives it, keyed by the file |
+| commands, commands-external | the union by label; a label's text stacks, a piece from each file that gives it, keyed by the file |
 | src_branch | one value: every file that gives it must give the same |
 | kernconf's config | one value, given by one file of the stack |
 
@@ -483,7 +483,7 @@ Every collection is an object keyed by its element's identity:
 | datasets | dataset path |
 | derivations | derived file path |
 | requires | container name |
-| commands | a label the recipe gives the block |
+| commands, commands-external | a label the recipe gives the block |
 | patches | the source's location |
 
 Order is kept: libucl iterates object keys in insertion order
@@ -565,7 +565,8 @@ As built (`src/core/cascade.c`):
 | patches | foundation | keyed by location: {ref, dir} | patch files applied to the src tree before the build (7.1.1) |
 | datasets | all | keyed | child datasets, created before anything is installed |
 | pkg | all | keyed | packages, installed at creation |
-| commands | all | keyed heredocs, sh | run once at creation, after pkg; never on update |
+| commands | all | keyed heredocs, sh | run once at creation, after pkg, inside the object; never on update |
+| commands-external | all | keyed heredocs, sh | run once at creation from outside the object, on the host, before anything runs inside it; the object's root in `$SHTETL_ROOT`; never on update |
 | derivations | all | keyed by derived path: {source, command} | how to regenerate a binary from its text source when a rebase conflicts on it (7.7) |
 | requires | container | keyed | containers that must exist first |
 | jailconf | container | heredoc | options, inside the jail's block shtetl writes |
@@ -721,7 +722,8 @@ F is named after its recipe (6.1): `foundations/generic.conf` builds
    `MAKEOBJDIRPREFIX` on foundation-builds/F.
 5. `make installworld installkernel distribution DESTDIR=<F mount>
    INSTALL_CMD="install -C"` (7.2).
-6. Foundation pkg and commands, in a chroot of F.
+6. Foundation external commands, on the host; then pkg and commands,
+   in a chroot of F.
 7. Unmount; `zfs snapshot -r` F with the version name (6.1),
    carrying `shtetl:patches` (7.1.1).
 8. Unmount foundation-builds/F; roll the src root back to before the
@@ -757,6 +759,11 @@ As built (M3, `src/core/build.c`; patches in 7.1.1; updates to come):
   `KERNCONFDIR`, `KERNCONF`, `SRCCONF` and `-j` (`build.make_jobs`,
   or the CPUs online), and `MAKEOBJDIRPREFIX` in its environment, the
   only place make reads it.
+- External commands (ruled 2026-10-14): each piece `sh -e -c` on the
+  host, after the installs and before anything runs inside F, with
+  `SHTETL_ROOT` (F's root as mounted), `SHTETL_NAME` (F) and
+  `SHTETL_KIND` (foundation) in its environment (PROPOSAL, the
+  environment).
 - Packages: `pkg -c <root> install -y`, with devfs mounted in F and,
   where F has no resolv.conf, the host's copied in while pkg runs.
   Commands: each piece `chroot <root> /bin/sh -e -c`, in order
@@ -965,8 +972,9 @@ a version is an update; there with none, it is refused.
   the installs; installworld's backups after them, each file's flags
   cleared first, then removed: `boot/kernel.old` and boot's other
   `*.old`, `libexec/ld-elf*.so.1.old`, `sbin/init.bak`.
-- pkg and the commands run again (ruled 2026-10-13): the installs put
-  back every file they install, undoing what a command changed.
+- The external commands, pkg and the commands run again (ruled
+  2026-10-13): the installs put back every file they install, undoing
+  what a command changed.
 - Found on the box: `boot/kernel.old` never comes about in a
   foundation. installkernel keeps the old kernel only when installing
   over the running kernel's directory, which a DESTDIR's never is;
@@ -1095,12 +1103,16 @@ As built (M4, `src/core/create.c`):
   (`shtetl:kind=config`), the first save's `shtetl:config`; the
   version beamed if zrun lacks it (7.3); the clones, parents first;
   X's own; each that mounts mounted (not `canmount=off`, `none` or
-  `legacy`); the host's `/etc/resolv.conf` copied in where X has none,
-  before rc runs, and kept, the jail resolving names with it (ruled
-  2026-10-14; to be done by shtetl.conf's commands for containers);
-  the jail's block written and the jail started; `pkg -j X install
-  -y` with every package; each command piece by `jexec X /bin/sh -e
-  -c`; the first save (7.5), its message `-m`'s or `create X on F@v`.
+  `legacy`); each external command piece by `sh -e -c` on the host,
+  `SHTETL_ROOT` X's mount, `SHTETL_KIND` container, before anything
+  runs inside X; the jail's block written and the jail started;
+  `pkg -j X install -y` with every package; each command piece by
+  `jexec X /bin/sh -e -c`; the first save (7.5), its message `-m`'s
+  or `create X on F@v`. A piece of either kind of command the
+  foundation ran is left out. The host's resolv.conf is no longer
+  create's to copy: shtetl-recipes' container block does it with an
+  external command (ruled 2026-10-14), and the jail resolves names
+  with it.
 - The jail (ruled 2026-10-14, after parasa's): its block is shtetl's,
   written whole to `/etc/jail.conf.d/X.conf`: `path` the container's
   mount as ZFS reports it, `host.hostname` X,
@@ -1424,8 +1436,10 @@ Outer space is a root-on-RAM system reached with `reboot -r` (ruled
 considered and declined.
 
 A system's commands (PROPOSAL, for M6): run once, when S is created,
-after its pkg, by `chroot` into S's datasets mounted below a run
-directory, before S ever boots: a system has no jail to `jexec` into.
+its external commands first, on the host with S's root in
+`SHTETL_ROOT`, then its pkg and commands by `chroot` into S's datasets
+mounted below a run directory, before S ever boots: a system has no
+jail to `jexec` into.
 A piece its foundation ran is left out, as a container's is (7.4), and
 none runs again on an update, which rebases what S has. They run from
 wherever S is made: the host that runs shtetl for a new S, outer space
@@ -1657,6 +1671,21 @@ below that change the plan are folded into the sections named.
 
 ## 14. Rulings
 
+### 2026-10-14 (commands-external)
+
+Asked how a container gets the host's resolv.conf when its commands
+run in its jail, which cannot read it: "we should have a
+commands-external block which runs from the outside of an object
+before anything inside the object for all three kinds of object". And:
+"so in the shtetl.conf layer, the global block applies to all objects,
+and each object block (eg container {}) applies to that object. the
+global and object-type blocks should stack on stackable keys". So
+(5.5, 7.1, 7.4, 7.11): a recipe key `commands-external`, of every
+kind, stacking as `commands` does; each piece runs by `sh -e -c` on
+the host, the object's root in `$SHTETL_ROOT`, after the object's
+files are there and before anything runs inside it. The resolv.conf
+moves out of create into shtetl-recipes' container block.
+
 ### 2026-10-14 (shtetl.conf: a block of each kind)
 
 Told that shtetl.conf's keys reach every kind, so a command meant for
@@ -1693,8 +1722,9 @@ systems adding `.include "/etc/jail.conf.d/*.conf";` to
 that rc.d/jail starts every container with `jail_enable` alone. Both
 waited on how shtetl.conf gives a command to one kind of recipe only:
 ruled the same day, a block of each kind (5.4). The system's command
-is in shtetl-recipes' system block; the resolv.conf, not yet: a
-container's commands run in its jail, which cannot read the host's.
+is in shtetl-recipes' system block; the resolv.conf waited on a
+command run outside the jail, which cannot read the host's: ruled
+the same day, `commands-external` (7.4).
 
 ### 2026-10-14 (Q-AB: shtetl-recipes by default)
 

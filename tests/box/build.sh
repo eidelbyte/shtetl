@@ -286,8 +286,10 @@ EOF
 	    "$X $X"
 	check X9 "the command ran in the jail" \
 	    "$(cat "$_mp/srv/www/index.txt" 2>/dev/null)" shtetl-box
+	check F35 "box's external piece ran on the host, into box" \
+	    "$(cat "$_mp/etc/shtetl-external" 2>/dev/null)" "box foundation"
 	if [ -f /etc/resolv.conf ]; then
-		check X9 "the host's resolv.conf copied in" \
+		check X9 "the host's resolv.conf put in, an external piece" \
 		    "$(cmp -s /etc/resolv.conf "$_mp/etc/resolv.conf" &&
 		    echo same)" same
 	fi
@@ -381,6 +383,21 @@ cases() {
 ver = ">=15.1";
 kernconf = "GENERIC";
 datasets { tmp {} var {} "usr/local" {} }
+foundation {
+    commands-external {
+        mark = <<EOD
+echo "$SHTETL_NAME $SHTETL_KIND" > "$SHTETL_ROOT/etc/shtetl-external"
+EOD
+    }
+}
+container {
+    commands-external {
+        resolv = <<EOD
+[ ! -f /etc/resolv.conf ] || [ -e "$SHTETL_ROOT/etc/resolv.conf" ] ||
+    cp /etc/resolv.conf "$SHTETL_ROOT/etc/resolv.conf"
+EOD
+    }
+}
 EOF
 	echo "== P17: patches made from $BRANCH's $PF"
 	_d=$T/p17

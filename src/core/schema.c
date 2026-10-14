@@ -40,6 +40,8 @@ static const struct sh_rkey rkeys[] = {
 	{ "datasets", SH_ALLKINDS, SH_V_COLL, SH_C_DATASETS, SH_M_COLL },
 	{ "pkg", SH_ALLKINDS, SH_V_COLL, SH_C_PKG, SH_M_COLL },
 	{ "commands", SH_ALLKINDS, SH_V_COLL, SH_C_COMMANDS, SH_M_COLL },
+	{ "commands-external", SH_ALLKINDS, SH_V_COLL, SH_C_COMMANDS,
+	    SH_M_COLL },
 	{ "derivations", SH_ALLKINDS, SH_V_COLL, SH_C_DERIVATIONS, SH_M_COLL },
 	{ "requires", C, SH_V_COLL, SH_C_REQUIRES, SH_M_COLL },
 	{ "jailconf", C, SH_V_STRING, SH_C_NONE, SH_M_TEXT },

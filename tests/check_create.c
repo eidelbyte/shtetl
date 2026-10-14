@@ -142,11 +142,12 @@ block(void)
 	return (want);
 }
 
-static const char shtetl_conf[] =
-	"ver = \">=15.1\";\n"
-	"datasets { var {} \"usr/local\" {} }\n"
-	"commands { base = \"echo base\"; }\n"
-	"container { commands { resolv = \"echo resolv\"; } }\n";
+/*
+ * shtetl.conf, made by config: an external command the foundation ran,
+ * and the container block's, the host's resolv.conf put in by one, as
+ * shtetl-recipes puts it in, another saying where it ran.
+ */
+static char shtetl_conf[2048];
 
 /*
  * The configuration root: shtetl.conf, the foundation generic, the
@@ -173,6 +174,8 @@ config(void)
 		"conf/containers/fails.conf",
 		"commands { bad = \"echo fail\"; }\n",
 		"conf/containers/123.conf", "",
+		"conf/containers/extfail.conf",
+		"commands-external { bad = \"exit 3\"; }\n",
 		"conf/.zfs/snapshot/" BSNAP "/shtetl.conf", shtetl_conf,
 		"conf/.zfs/snapshot/" BSNAP "/foundations/generic.conf",
 		"src_branch = \"releng/15.1\";\n",
@@ -180,17 +183,31 @@ config(void)
 	};
 	size_t i;
 
+	spath(toollog, sizeof (toollog), "tools.log");
+	(void) scratch_write("resolv.conf", "nameserver 192.0.2.53\n");
+	spath(hostresolv, sizeof (hostresolv), "resolv.conf");
+	(void) snprintf(shtetl_conf, sizeof (shtetl_conf),
+	    "ver = \">=15.1\";\n"
+	    "datasets { var {} \"usr/local\" {} }\n"
+	    "commands { base = \"echo base\"; }\n"
+	    "commands-external { early = \"echo early >> %s\"; }\n"
+	    "container {\n"
+	    "    commands { motd = \"echo motd\"; }\n"
+	    "    commands-external {\n"
+	    "        resolv = \"[ -e \\\"$SHTETL_ROOT/etc/resolv.conf\\\" ] || "
+	    "cp %s \\\"$SHTETL_ROOT/etc/resolv.conf\\\"\";\n"
+	    "        mark = \"echo \\\"external $SHTETL_NAME $SHTETL_KIND "
+	    "$SHTETL_ROOT\\\" >> %s\";\n"
+	    "    }\n"
+	    "}\n", toollog, hostresolv, toollog);
 	for (i = 0; files[i] != NULL; i += 2)
 		(void) scratch_write(files[i], files[i + 1]);
 	spath(root, sizeof (root), "conf");
 	spath(jaildir, sizeof (jaildir), "jail.conf.d");
 	spath(logbase, sizeof (logbase), "log");
 	spath(mnt, sizeof (mnt), "mnt");
-	spath(toollog, sizeof (toollog), "tools.log");
 	spath(failed, sizeof (failed), "fail");
 	(void) scratch_write("fail/.keep", "");
-	(void) scratch_write("resolv.conf", "nameserver 192.0.2.53\n");
-	spath(hostresolv, sizeof (hostresolv), "resolv.conf");
 	fake.tl_jail = tool("jail", "");
 	fake.tl_jexec = tool("jexec", "case \"$5\" in *fail*) exit 4;; esac\n");
 	fake.tl_pkg = tool("pkg", "");
@@ -234,7 +251,7 @@ world(int run, int beamed)
 {
 	static const struct sh_zprop cfg = { "shtetl:kind", "config" };
 	static const char *const bcfg[] = { BCFG };
-	static const char *const xs[] = { "x", "db", "fails" };
+	static const char *const xs[] = { "x", "db", "fails", "extfail" };
 	char path[1300];
 	struct sh_beam b;
 	size_t i;
@@ -273,7 +290,7 @@ world(int run, int beamed)
 	cap_reset(&c);
 	CHECK(sh_spaces_discover(z, &s, &c.c_err) == 0);
 	/* each container's /etc, as a foundation's clone has it; no jail */
-	for (i = 0; i < 3; i++) {
+	for (i = 0; i < 4; i++) {
 		(void) snprintf(path, sizeof (path), "%s/%s/etc/resolv.conf",
 		    mnt, xs[i]);
 		(void) unlink(path);
@@ -303,7 +320,6 @@ plan(const char *target, const char *found, const char *version)
 	cap_reset(&wc);
 	rc = sh_create_plan(z, &s, root, target, found, version, jaildir,
 	    logbase, &p, &c.c_err, &wc.c_err);
-	(void) snprintf(p.cp_resolv, sizeof (p.cp_resolv), "%s", hostresolv);
 	return (rc);
 }
 
@@ -410,16 +426,20 @@ test_plan(void)
 	CHECK(is(p.cp_dss[5].cd_rel, "www/data") && !p.cp_dss[5].cd_clone &&
 	    !p.cp_dss[5].cd_placeholder);
 	/*
-	 * shtetl.conf's base the foundation ran; x's base and web not,
-	 * nor shtetl.conf's container block, no foundation's
+	 * shtetl.conf's base and early the foundation ran; x's base and
+	 * web not, nor the container block's, no foundation's
 	 */
 	CHECK(p.cp_ncmds == 3 && p.cp_skipped == 1);
 	CHECK(is(p.cp_cmds[0].cp_label, "base"));
 	CHECK(is(p.cp_cmds[0].cp_file, "containers/x.conf"));
 	CHECK(is(p.cp_cmds[0].cp_text, "echo x"));
-	CHECK(is(p.cp_cmds[1].cp_label, "resolv"));
+	CHECK(is(p.cp_cmds[1].cp_label, "motd"));
 	CHECK(is(p.cp_cmds[1].cp_file, "container in shtetl.conf"));
 	CHECK(is(p.cp_cmds[2].cp_label, "web"));
+	CHECK(p.cp_next == 2 && p.cp_extskipped == 1);
+	CHECK(is(p.cp_ext[0].cp_label, "resolv"));
+	CHECK(is(p.cp_ext[0].cp_file, "container in shtetl.conf"));
+	CHECK(is(p.cp_ext[1].cp_label, "mark"));
 	CHECK(strncmp(p.cp_jailfile, jaildir, strlen(jaildir)) == 0 &&
 	    is(p.cp_jailfile + strlen(jaildir), "/x.conf"));
 	ran = NULL;
@@ -436,7 +456,10 @@ test_plan(void)
 	CHECK(strstr(ran, "  + " RX "/www  its own, canmount=off\n") != NULL);
 	CHECK(strstr(ran, "  + " RX "/www/data  its own\n") != NULL);
 	CHECK(strstr(ran, "  pkg: nginx, curl\n") != NULL);
-	CHECK(strstr(ran, "  commands: base (containers/x.conf), resolv "
+	CHECK(strstr(ran, "  external: resolv (container in shtetl.conf), "
+	    "mark (container in shtetl.conf); 1 the foundation ran\n") !=
+	    NULL);
+	CHECK(strstr(ran, "  commands: base (containers/x.conf), motd "
 	    "(container in shtetl.conf), web (containers/x.conf); 1 the "
 	    "foundation ran\n") != NULL);
 	free(ran);
@@ -503,8 +526,14 @@ test_run(void)
 	CHECK(asked("pkg -j x install -y -- nginx curl\n"));
 	CHECK(asked("jexec x /bin/sh -e -c echo x\n"));
 	CHECK(asked("jexec x /bin/sh -e -c echo web\n"));
-	CHECK(asked("jexec x /bin/sh -e -c echo resolv\n"));
-	CHECK(!asked("echo base"));
+	CHECK(asked("jexec x /bin/sh -e -c echo motd\n"));
+	CHECK(!asked("echo base") && !asked("early"));
+	/* the external pieces on the host, X's root theirs, before the jail */
+	(void) snprintf(path, sizeof (path), "external x container %s/x\n",
+	    mnt);
+	CHECK(asked(path));
+	CHECK(strstr(slurp(toollog), "external x") < strstr(slurp(toollog),
+	    "jail -f"));
 	CHECK(strstr(slurp(toollog), "pkg -j") < strstr(slurp(toollog),
 	    "jexec"));
 	(void) snprintf(path, sizeof (path), "%s/x/create.log", logbase);
@@ -532,7 +561,8 @@ test_run(void)
 	world(1, 1);
 	CHECK(create("db", "db") == 0);
 	CHECK(asked("pkg -j db install -y -- postgresql17-server\n"));
-	CHECK(asked("jexec db /bin/sh -e -c echo resolv\n"));
+	CHECK(asked("jexec db /bin/sh -e -c echo motd\n"));
+	CHECK(asked("external db container "));
 	CHECK(!asked("echo x") && !asked("echo base"));
 }
 
@@ -602,6 +632,13 @@ test_undo(void)
 	world(1, 1);
 	CHECK(plan("x", "generic", NULL) == 0);
 	CHECK(run("") == -1 && undone() && cap_has(&c, "empty message"));
+	/* an external command failing: before the jail, all undone */
+	world(1, 1);
+	CHECK(plan("extfail", "generic", NULL) == 0);
+	CHECK(run("m") == -1);
+	CHECK(!zfake_exists("fast/run/containers/extfail"));
+	CHECK(asked("external extfail") && !asked("jail -f"));
+	CHECK(cap_has(&c, "create of extfail failed"));
 	/* the mirror, after the save: x stands, saved, its jail running */
 	world(1, 1);
 	CHECK(plan("x", "generic", NULL) == 0);

@@ -533,7 +533,9 @@ sh_build_show(FILE *out, const struct sh_fplan *p)
 	    "(install -C)\n");
 	if (p->fp_update)
 		(void) fprintf(out, "  installworld's backups removed\n");
-	(void) fprintf(out, "  pkg: ");
+	(void) fprintf(out, "  external: ");
+	fb_keys(out, p, "commands-external");
+	(void) fprintf(out, "\n  pkg: ");
 	fb_keys(out, p, "pkg");
 	(void) fprintf(out, "\n  commands: ");
 	fb_keys(out, p, "commands");
@@ -2544,6 +2546,46 @@ fb_chroot(struct fb *b, int pkg)
 	return (0);
 }
 
+/*
+ * The recipe's external commands, each piece by sh -e -c on the host,
+ * F's root in SHTETL_ROOT, before anything runs inside F (7.1 step 6).
+ */
+static int
+fb_external(struct fb *b)
+{
+	struct sh_fplan *p = b->fb_p;
+	const struct sh_node *cmds, *block;
+	char root[SH_BUILD_PATH + 16], name[SH_BUILD_NAME + 16];
+	const char *env[6], *w[5];
+	size_t i, j;
+
+	cmds = sh_obj_get(p->fp_recipe.sr_merged, "commands-external");
+	(void) snprintf(root, sizeof (root), "SHTETL_ROOT=%s", b->fb_rootdir);
+	(void) snprintf(name, sizeof (name), "SHTETL_NAME=%s", p->fp_name);
+	env[0] = "PATH=" SH_RUN_PATH;
+	env[1] = "HOME=/root";
+	env[2] = root;
+	env[3] = name;
+	env[4] = "SHTETL_KIND=foundation";
+	env[5] = NULL;
+	for (i = 0; cmds != NULL && i < cmds->sn_obj.ob_n; i++) {
+		block = cmds->sn_obj.ob_v[i].pr_val;
+		for (j = 0; j < block->sn_obj.ob_n; j++) {
+			w[0] = b->fb_t->tl_sh;
+			w[1] = "-e";
+			w[2] = "-c";
+			w[3] = block->sn_obj.ob_v[j].pr_val->sn_str;
+			w[4] = NULL;
+			(void) fprintf(b->fb_out, "external %s, from %s\n",
+			    cmds->sn_obj.ob_v[i].pr_key,
+			    block->sn_obj.ob_v[j].pr_key);
+			if (fb_exec(b, w, env, 0, NULL, 0) != 0)
+				return (-1);
+		}
+	}
+	return (0);
+}
+
 /* The recipe's packages and commands, in a chroot of F (7.1 step 6). */
 static int
 fb_inside(struct fb *b)
@@ -2707,7 +2749,8 @@ sh_build_run(struct sh_zfs *z, struct sh_fplan *p,
 		goto out;
 	}
 	if (r != 0 || fb_configs(b) != 0 || fb_mounts(b, &fmark) != 0 ||
-	    fb_keepfixes(b) != 0 || fb_world(b) != 0 || fb_inside(b) != 0)
+	    fb_keepfixes(b) != 0 || fb_world(b) != 0 ||
+	    fb_external(b) != 0 || fb_inside(b) != 0)
 		goto fail;
 	/* F unmounted, its mountpoint back, and then the version */
 	fb_undo(b, fmark, 0);

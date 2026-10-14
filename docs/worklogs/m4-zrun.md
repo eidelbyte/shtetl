@@ -212,3 +212,33 @@ default. On the way: runs 4 and 5 (Z16, the send's refusals over
 libzfs: the target's newest, then the fake's order) and build 9 (a
 non-clone's origin "-"). tracker: m4-zfs, m4-beam, m4-save, m4-create
 tested.
+
+## Later: commands-external (2026-10-14)
+
+Ruled after M4 (planning.md 14): a recipe key of every kind,
+`commands-external`, run from outside the object, on the host, before
+anything runs inside it. It stacks as `commands` does (schema.c gives
+it the commands collection), so pieces, kind blocks and create's skip
+of what the foundation ran all apply as they are.
+
+- build.c: fb_external, after fb_world (the installs, the kernel's
+  sync) and before fb_inside (pkg and the chroot's commands), each
+  piece by tl_sh -e -c, SHTETL_ROOT the mounted root, SHTETL_NAME,
+  SHTETL_KIND foundation; an update runs it again with the rest. The
+  plan shows "external:".
+- create.c: cr_external after the mounts and before the jail's block,
+  SHTETL_KIND container; cr_pieces gives both kinds of piece, each
+  with its count of what the foundation ran. cr_resolv and cr_copy are
+  gone: the host's resolv.conf is shtetl-recipes' container block's,
+  `[ -e "$SHTETL_ROOT/etc/resolv.conf" ] || cp /etc/resolv.conf ...`.
+- The environment's names (SHTETL_ROOT, SHTETL_NAME, SHTETL_KIND) are
+  a PROPOSAL; parasa and mishkan had none to follow.
+
+Verified: check_build (F35: the piece wrote its name, kind and root
+into F's /etc, between the installs and pkg), check_create (the
+container block's resolv and a marker on the host before the jail, a
+top-level piece the foundation ran left out, an external failure
+undone before the jail); a mutation skipping either external step
+caught (one that only ignored failure was not, and was redone);
+make check, gate, xcheck. The box: build.sh's shtetl.conf gives the
+foundation a mark and the container the resolv.conf, both external.

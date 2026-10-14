@@ -9,9 +9,9 @@
  * default), then the recipe's jailconf. The jail is started with
  * jail -f and -c, and rc.conf is left alone. Commands run by jexec X
  * /bin/sh -e -c, the packages by pkg -j X. The host's resolv.conf is
- * copied in where the container has none, and kept: the jail resolves
- * names with it (for now: it is to be done by shtetl.conf's commands
- * for containers). requires names containers that must be there, not
+ * put in by the recipe, an external command of shtetl.conf's container
+ * block (commands-external: on the host, before anything runs inside
+ * X), not by create. requires names containers that must be there, not
  * that they run; one container mounting another's data is later work.
  * A name of digits only is refused, which jail(8) would take for a
  * jail's id.
@@ -199,19 +199,21 @@ cr_datasets(struct sh_zfs *z, struct sh_cplan *p, const char *lakef,
 }
 
 /*
- * The command pieces X's recipe gives, a piece the foundation's recipe
- * (as of the version's shtetl:config) gives too, the same label, file
- * and text, left out: the foundation ran it (7.4 step 6).
+ * The pieces of KEY, commands or commands-external, X's recipe gives,
+ * into OUT (N of them); a piece the foundation's recipe (as of the
+ * version's shtetl:config) gives too, the same label, file and text,
+ * left out, counted in SKIPPED: the foundation ran it (7.4 step 6).
  */
 static void
-cr_commands(struct sh_cplan *p)
+cr_pieces(struct sh_cplan *p, const char *key, struct sh_cpiece *out,
+    size_t *n, size_t *skipped)
 {
 	const struct sh_node *xc, *fc, *xb, *fb, *ft;
 	const char *label, *file, *text;
 	size_t i, j;
 
-	xc = sh_obj_get(p->cp_recipe.sr_merged, "commands");
-	fc = sh_obj_get(p->cp_frecipe.sr_merged, "commands");
+	xc = sh_obj_get(p->cp_recipe.sr_merged, key);
+	fc = sh_obj_get(p->cp_frecipe.sr_merged, key);
 	for (i = 0; xc != NULL && i < xc->sn_obj.ob_n; i++) {
 		label = xc->sn_obj.ob_v[i].pr_key;
 		xb = xc->sn_obj.ob_v[i].pr_val;
@@ -222,14 +224,14 @@ cr_commands(struct sh_cplan *p)
 			ft = sh_obj_get(fb, file);
 			if (ft != NULL && ft->sn_type == SH_STR &&
 			    strcmp(ft->sn_str, text) == 0) {
-				p->cp_skipped++;
+				(*skipped)++;
 				continue;
 			}
-			if (p->cp_ncmds == SH_CREATE_DS)
+			if (*n == SH_CREATE_DS)
 				continue;
-			p->cp_cmds[p->cp_ncmds].cp_label = label;
-			p->cp_cmds[p->cp_ncmds].cp_file = file;
-			p->cp_cmds[p->cp_ncmds++].cp_text = text;
+			out[*n].cp_label = label;
+			out[*n].cp_file = file;
+			out[(*n)++].cp_text = text;
 		}
 	}
 }
@@ -272,8 +274,6 @@ sh_create_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	    jaildir, p->cp_name);
 	(void) snprintf(p->cp_logdir, sizeof (p->cp_logdir), "%s/%s", logbase,
 	    p->cp_name);
-	(void) snprintf(p->cp_resolv, sizeof (p->cp_resolv),
-	    "/etc/resolv.conf");
 	(void) snprintf(rpath, sizeof (rpath), "containers/%s", p->cp_name);
 	if (sh_recipe_resolve(root, rpath, &p->cp_recipe, e, w) != 0)
 		return (-1);
@@ -325,7 +325,9 @@ sh_create_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	    p->cp_found);
 	if (sh_recipe_resolve(snapdir, rpath, &p->cp_frecipe, e, NULL) != 0)
 		return (-1);
-	cr_commands(p);
+	cr_pieces(p, "commands-external", p->cp_ext, &p->cp_next,
+	    &p->cp_extskipped);
+	cr_pieces(p, "commands", p->cp_cmds, &p->cp_ncmds, &p->cp_skipped);
 	return (e->se_count == before ? 0 : -1);
 }
 
@@ -343,6 +345,24 @@ cr_props(FILE *out, const struct sh_cds *d)
 		    pr->pr_val->sn_type == SH_BOOL ? (pr->pr_val->sn_bool ?
 		    "on" : "off") : pr->pr_val->sn_str);
 	}
+}
+
+/* LABEL, then the pieces P, N of them, and SKIPPED the foundation ran. */
+static void
+cr_showpieces(FILE *out, const char *label, const struct sh_cpiece *p,
+    size_t n, size_t skipped)
+{
+	size_t i;
+
+	(void) fprintf(out, "  %s:", label);
+	for (i = 0; i < n; i++)
+		(void) fprintf(out, "%s %s (%s)", i == 0 ? "" : ",",
+		    p[i].cp_label, p[i].cp_file);
+	if (n == 0)
+		(void) fprintf(out, " none");
+	if (skipped > 0)
+		(void) fprintf(out, "; %zu the foundation ran", skipped);
+	(void) fprintf(out, "\n");
 }
 
 /* The keys of the merged recipe's KEY, a collection: a, b, c. */
@@ -376,17 +396,14 @@ sh_create_show(FILE *out, const struct sh_cplan *p)
 		cr_props(out, d);
 		(void) fprintf(out, "\n");
 	}
+	cr_showpieces(out, "external", p->cp_ext, p->cp_next,
+	    p->cp_extskipped);
 	(void) fprintf(out, "  jail: %s\n  pkg: ", p->cp_jailfile);
 	cr_keys(out, sh_obj_get(p->cp_recipe.sr_merged, "pkg"));
-	(void) fprintf(out, "\n  commands:");
-	for (i = 0; i < p->cp_ncmds; i++)
-		(void) fprintf(out, "%s %s (%s)", i == 0 ? "" : ",",
-		    p->cp_cmds[i].cp_label, p->cp_cmds[i].cp_file);
-	if (p->cp_ncmds == 0)
-		(void) fprintf(out, " none");
-	if (p->cp_skipped > 0)
-		(void) fprintf(out, "; %zu the foundation ran", p->cp_skipped);
-	(void) fprintf(out, "\n  save, mirrored into zlake\n");
+	(void) fprintf(out, "\n");
+	cr_showpieces(out, "commands", p->cp_cmds, p->cp_ncmds,
+	    p->cp_skipped);
+	(void) fprintf(out, "  save, mirrored into zlake\n");
 }
 
 /* ---- the run ---------------------------------------------------- */
@@ -677,52 +694,37 @@ cr_jail(struct cr *c)
 	return (0);
 }
 
-/* The small file FROM copied to TO. */
+/*
+ * The external command pieces, each by sh -e -c on the host, X's root
+ * in SHTETL_ROOT, before anything runs inside X (7.4).
+ */
 static int
-cr_copy(struct cr *c, const char *from, const char *to)
+cr_external(struct cr *c)
 {
-	char buf[8192];
-	FILE *in, *o;
-	size_t n;
-	int bad;
+	struct sh_cplan *p = c->c_p;
+	char root[1100], name[SH_CREATE_NAME + 16];
+	const char *env[6], *w[5];
+	size_t i;
 
-	if ((in = fopen(from, "r")) == NULL) {
-		sh_errf(c->c_err, "%s: %s", from, strerror(errno));
-		return (-1);
+	(void) snprintf(root, sizeof (root), "SHTETL_ROOT=%s", c->c_path);
+	(void) snprintf(name, sizeof (name), "SHTETL_NAME=%s", p->cp_name);
+	env[0] = "PATH=" SH_RUN_PATH;
+	env[1] = "HOME=/root";
+	env[2] = root;
+	env[3] = name;
+	env[4] = "SHTETL_KIND=container";
+	env[5] = NULL;
+	for (i = 0; i < p->cp_next; i++) {
+		w[0] = c->c_t->tl_sh;
+		w[1] = "-e";
+		w[2] = "-c";
+		w[3] = p->cp_ext[i].cp_text;
+		w[4] = NULL;
+		(void) fprintf(c->c_out, "external %s, from %s\n",
+		    p->cp_ext[i].cp_label, p->cp_ext[i].cp_file);
+		if (cr_exec(c, w, env) != 0)
+			return (-1);
 	}
-	if ((o = fopen(to, "w")) == NULL) {
-		sh_errf(c->c_err, "%s: %s", to, strerror(errno));
-		(void) fclose(in);
-		return (-1);
-	}
-	bad = 0;
-	while ((n = fread(buf, 1, sizeof (buf), in)) > 0) {
-		if (fwrite(buf, 1, n, o) != n)
-			bad = 1;
-	}
-	(void) fclose(in);
-	if (fclose(o) != 0 || bad) {
-		sh_errf(c->c_err, "%s: %s", to, strerror(errno));
-		return (-1);
-	}
-	return (0);
-}
-
-/* The host's resolv.conf copied in where X has none, before rc runs. */
-static int
-cr_resolv(struct cr *c)
-{
-	char resolv[1100];
-	struct stat st;
-
-	(void) snprintf(resolv, sizeof (resolv), "%s/etc/resolv.conf",
-	    c->c_path);
-	if (lstat(resolv, &st) == 0 || stat(c->c_p->cp_resolv, &st) != 0)
-		return (0);
-	if (cr_copy(c, c->c_p->cp_resolv, resolv) != 0)
-		return (-1);
-	(void) fprintf(c->c_out, "copied the host's resolv.conf into %s\n",
-	    c->c_p->cp_name);
 	return (0);
 }
 
@@ -835,7 +837,7 @@ sh_create_run(struct sh_zfs *z, struct sh_cplan *p,
 		return (-1);
 	if (p->cp_beam && sh_beam_run(z, &p->cp_beamplan, out, e) != 0)
 		goto fail;
-	if (cr_datasets_run(&c) != 0 || cr_resolv(&c) != 0 ||
+	if (cr_datasets_run(&c) != 0 || cr_external(&c) != 0 ||
 	    cr_jail(&c) != 0 || cr_inside(&c) != 0)
 		goto fail;
 	if ((sp = calloc(1, sizeof (*sp))) == NULL) {

@@ -240,7 +240,8 @@ test_show(void)
 		"buildopts = \"WITHOUT_LIB32=yes\";\n"
 		"datasets { \"usr/local\" { compression = \"zstd-9\"; "
 		"exec = false; } }\n"
-		"commands { motd = \"echo hi > /etc/motd\"; }\n",
+		"commands { motd = \"echo hi > /etc/motd\"; }\n"
+		"commands-external { conf = \"true\"; }\n",
 		NULL
 	};
 	char *out;
@@ -271,6 +272,7 @@ test_show(void)
 	    "  src.conf from 1 file\n"
 	    "  make -j<hw.ncpu> buildworld buildkernel\n"
 	    "  install world, kernel and distribution (install -C)\n"
+	    "  external: conf\n"
 	    "  pkg: sudo\n"
 	    "  commands: motd\n"
 	    "  snapshot -r tank/shtetl/foundations/generic@<version>\n"));
@@ -453,7 +455,9 @@ static const char *const recipe[] = {
 	"kernconf = <<EOD\nnooptions WITNESS\nEOD\n"
 	"buildopts = \"WITHOUT_LIB32=yes\";\n"
 	"datasets { \"usr/local\" { compression = \"zstd-9\"; } }\n"
-	"commands { setup = <<EOD\necho two\nEOD\n}\n",
+	"commands { setup = <<EOD\necho two\nEOD\n}\n"
+	"commands-external { mark = \"echo \\\"$SHTETL_NAME $SHTETL_KIND "
+	"$SHTETL_ROOT\\\" > \\\"$SHTETL_ROOT/etc/external\\\"\"; }\n",
 	NULL
 };
 
@@ -500,6 +504,7 @@ test_run(void)
 		"version " VERSION " (REVISION 15.1)\n",
 		"make buildworld buildkernel (log ",
 		"make installworld", "make installkernel", "make distribution",
+		"external mark, from foundations/generic.conf\n",
 		"pkg install in ", "commands setup, from common/cmd.conf\n",
 		"commands setup, from foundations/generic.conf\n",
 		"snapshot -r " F "@" VERSION "\n",
@@ -518,6 +523,10 @@ test_run(void)
 		printf("%s", cap_text(&c));
 	CHECK(in_order(slurp(scratch_path("tools.log")), steps));
 	CHECK(in_order(ran, said));
+	/* F35: the external piece on the host, F's root its own */
+	(void) snprintf(want, sizeof (want), "generic foundation %s\n",
+	    scratch_path("run/generic/root"));
+	CHECK(is(slurp(scratch_path("run/generic/root/etc/external")), want));
 	/* the version, on every dataset, with its properties */
 	CHECK(zfake_snapshot(F "@" VERSION));
 	CHECK(zfake_snapshot(F "/usr@" VERSION));

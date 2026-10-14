@@ -47,14 +47,16 @@ struct sh_cplan {
 	char		cp_root[1024];			/* its directory */
 	char		cp_jailfile[1024];		/* jaildir/X.conf */
 	char		cp_logdir[1024];		/* logbase/X */
-	char		cp_resolv[1024];	/* the host's resolv.conf */
 	int		cp_beam;			/* V not on zrun */
 	struct sh_beam	cp_beamplan;
 	struct sh_recipe cp_recipe;			/* containers/X */
 	struct sh_recipe cp_frecipe;	/* F's, as of V's shtetl:config */
 	struct sh_cds	cp_dss[SH_CREATE_DS];
 	size_t		cp_nds;
-	struct sh_cpiece cp_cmds[SH_CREATE_DS];
+	struct sh_cpiece cp_ext[SH_CREATE_DS];	/* on the host */
+	size_t		cp_next;
+	size_t		cp_extskipped;	/* pieces the foundation ran */
+	struct sh_cpiece cp_cmds[SH_CREATE_DS];	/* in the jail */
 	size_t		cp_ncmds;
 	size_t		cp_skipped;	/* pieces the foundation ran */
 };
@@ -79,11 +81,12 @@ void sh_create_show(FILE *out, const struct sh_cplan *p);
  * The plan P carried out at NOW, each step said on OUT (7.4): the
  * config root snapshotted; the version beamed if zrun lacks it; F's
  * datasets cloned, parents first, a placeholder canmount=off, the
- * recipe's properties set locally; X's own made; X mounted; the jail's
- * block written and the jail started; the host's resolv.conf copied in
- * where X has none; pkg -j X install, then each command piece by jexec
- * (a piece the foundation ran left out); the first save, its message
- * MSG or the create's own. A failure before the save undoes all of it
+ * recipe's properties set locally; X's own made; X mounted; each
+ * external command piece by sh -e -c on the host, X's root in
+ * SHTETL_ROOT; the jail's block written and the jail started; pkg -j X
+ * install, then each command piece by jexec (a piece of either the
+ * foundation ran left out); the first save, its message MSG or the
+ * create's own. A failure before the save undoes all of it
  * but the config snapshot; a mirror failing after the save leaves X.
  */
 int sh_create_run(struct sh_zfs *z, struct sh_cplan *p,

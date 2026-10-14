@@ -275,6 +275,7 @@ shtetl: shtetl.conf: retention.lake: invalid key
 | `datasets` | all | keyed by path | the union; a property may be overridden, with a warning |
 | `pkg` | all | keyed by name | the union |
 | `commands` | all | keyed by label | the union; a label's text a piece from each file |
+| `commands-external` | all | keyed by label | the union; a label's text a piece from each file |
 | `derivations` | all | keyed by derived path | the union; each given once, whole |
 | `requires` | container | keyed by name | the union |
 | `jailconf` | container | text | a piece from each file |
@@ -435,6 +436,24 @@ never on an update, keyed by a label of letters, digits, `-`, `_` and
 Labels run in the order they were first given. A label given in
 several files stacks: each file's text is a piece of it, run in file
 order (section 5).
+
+### commands-external
+
+sh(1) text run once when the recipe is made, like `commands`, but from
+outside the object, on the host, before anything runs inside it: for
+a foundation after its installs and before its packages, for a
+container before its jail starts. The object's root, as mounted, is in
+`$SHTETL_ROOT`, its name in `$SHTETL_NAME`, its kind in
+`$SHTETL_KIND`. It stacks as `commands` does:
+
+    container {
+        commands-external {
+            resolv = <<EOD
+    [ -e "$SHTETL_ROOT/etc/resolv.conf" ] ||
+        cp /etc/resolv.conf "$SHTETL_ROOT/etc/resolv.conf"
+    EOD
+        }
+    }
 
 ### derivations
 
@@ -703,7 +722,7 @@ is refused, since dropping values is illegal. How each key stacks:
 | `pkg`, `requires` | the union; an entry listed again adds nothing |
 | `datasets`, `patches` | the union by key; an entry's fields compose, each field given once; a dataset's property may be given again, with a warning |
 | `derivations` | the union by path; each derivation given once, whole |
-| `commands` | the union by label; a label's text stacks, a piece from each file |
+| `commands`, `commands-external` | the union by label; a label's text stacks, a piece from each file |
 | `ver` | every constraint kept; all must hold |
 | `buildopts`, `jailconf`, `kernconf`'s lines | a piece from each file, in file order |
 | `src_branch` | one value: the files that give it give the same |
