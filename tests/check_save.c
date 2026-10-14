@@ -22,6 +22,8 @@
 #define	RF	"fast/run/foundations/generic"
 #define	RX	"fast/run/containers/x"
 #define	LX	"tank/shtetl/containers/x"
+#define	RY	"fast/run/containers/y"
+#define	LY	"tank/shtetl/containers/y"
 #define	CFG	"tank/zconfig@create-x-20261008-120000"
 #define	S1	"save-2026-10-08-120000"
 /* 2026-10-08 12:00:00 UTC */
@@ -191,7 +193,7 @@ test_refused(void)
 	CHECK(sh_zfs_clone(z, RX "/www@s0", RX "/odd", NULL, 0,
 	    &wc.c_err) == 0);
 	refused("x", CFG, RX "/odd: a clone of " RX "/www@s0, not of a "
-	    "foundation");
+	    "foundation or another container");
 }
 
 /* S2 - S5: the snapshot, the mirror, the copy of shtetl:*. */
@@ -235,6 +237,38 @@ test_saves(void)
 	CHECK(zfake_snapshot(LX "/www@" S1) &&
 	    zfake_snapshot(LX "/www@" S1 "-2"));
 	CHECK(is(prop(LX "/www@" S1 "-2", "shtetl:commit", NULL), "second"));
+}
+
+/*
+ * S10: a staging tree's save, y as an update makes it: its root a clone
+ * of the foundation's version, its www a clone of x's www at x's save,
+ * mirrored as a clone of zlake's x/www at that save.
+ */
+static void
+test_staging(void)
+{
+	size_t len;
+	FILE *f;
+
+	world(1);
+	CHECK(save(CFG, "first") == 0);
+	CHECK(sh_zfs_clone(z, RF "@v1", RY, NULL, 0, &wc.c_err) == 0);
+	CHECK(sh_zfs_clone(z, RX "/www@" S1, RY "/www", NULL, 0,
+	    &wc.c_err) == 0);
+	CHECK(plan("y", CFG) == 0 && p.sv_n == 2);
+	CHECK(is(p.sv_origin[1], RX "/www@" S1));
+	free(ran);
+	ran = NULL;
+	f = open_memstream(&ran, &len);
+	CHECK(f != NULL);
+	cap_reset(&c);
+	CHECK(sh_save_run(z, &p, "staged", NOON + 60, snapname,
+	    sizeof (snapname), f, &c.c_err) == 0);
+	CHECK(fclose(f) == 0);
+	CHECK(is(prop(LY "/www", "origin", NULL), LX "/www@" S1));
+	CHECK(is(prop(LY, "origin", NULL), LF "@v1"));
+	CHECK(strstr(ran, "mirrored " LY "/www@save-2026-10-08-120100, a "
+	    "clone of zlake's container\n") != NULL);
 }
 
 /* S6: a mirror failing part way, brought up to date by the next. */
@@ -336,6 +370,7 @@ main(void)
 	test_refused();
 	test_saves();
 	test_mirror_failing();
+	test_staging();
 	test_editor();
 	free(ran);
 	sh_spaces_free(&s);

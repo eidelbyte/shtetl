@@ -559,7 +559,7 @@ newest save, given by create, neither}.
 | S7 | the message from an editor, as git commit takes one: $VISUAL, $EDITOR or vi, on a file with a comment saying what it is for; lines beginning # left out, trailing blank lines too; empty refused; the editor failing refused | covered: check_save.c |
 | S8 | the command line: save with no container, two, an unknown option, -m with no message; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
 | S9 | for real: a container cloned from box on zrun saved twice, the mirror a clone of zlake's box and then incremental | box: tests/box/build.sh, build 10 (f271e2d, at 8fa7022) green |
-| S10 | a staging tree's save (M5): a dataset that is a clone of a container's own dataset (an update's container-only clone) mirrored as a clone of zlake's counterpart, which the container's own save has mirrored; a clone of anything else still refused | covered: check_save.c |
+| S10 | a staging tree's save (M5): a dataset that is a clone of another container's own dataset (an update's container-only clone) mirrored as a clone of zlake's counterpart, which that container's own save has mirrored; a clone of the container's own dataset, or of anything else, still refused (S1) | covered: check_save.c test_staging |
 
 # Family X: a new container (M4; planning.md 7.4; src/core/create.c)
 

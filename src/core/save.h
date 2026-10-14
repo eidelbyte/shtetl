@@ -22,8 +22,8 @@ struct sh_save {
 	char	sv_name[SH_SAVE_NAME];		/* X */
 	char	sv_run[SH_SAVE_NAME];		/* run/containers/X */
 	char	sv_lake[SH_SAVE_NAME];		/* lake/containers/X */
-	char	sv_runf[SH_SAVE_NAME];		/* run/foundations */
-	char	sv_lakef[SH_SAVE_NAME];		/* lake/foundations */
+	char	sv_runroot[SH_SAVE_NAME];	/* the run root */
+	char	sv_lakeroot[SH_SAVE_NAME];	/* the lake root */
 	char	sv_rel[SH_SAVE_DS][SH_SAVE_NAME];	/* "" for X */
 	char	sv_origin[SH_SAVE_DS][SH_SAVE_NAME * 2];	/* "": own */
 	size_t	sv_n;

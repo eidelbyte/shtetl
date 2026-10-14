@@ -85,7 +85,8 @@ sh_save_plan(struct sh_zfs *z, const struct sh_spaces *s,
     const char *target, const char *config, struct sh_save *p,
     struct sh_err *e)
 {
-	char val[SH_ZFS_VALMAX], prefix[SH_SAVE_NAME + 2], **all;
+	char val[SH_ZFS_VALMAX], pf[SH_SAVE_NAME + 16], pc[SH_SAVE_NAME + 16];
+	char **all;
 	unsigned before;
 	size_t i;
 	int r;
@@ -104,9 +105,9 @@ sh_save_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	    s->ss_root[SH_SP_RUN], p->sv_name);
 	(void) snprintf(p->sv_lake, sizeof (p->sv_lake), "%s/containers/%s",
 	    s->ss_root[SH_SP_LAKE], p->sv_name);
-	(void) snprintf(p->sv_runf, sizeof (p->sv_runf), "%s/foundations",
+	(void) snprintf(p->sv_runroot, sizeof (p->sv_runroot), "%s",
 	    s->ss_root[SH_SP_RUN]);
-	(void) snprintf(p->sv_lakef, sizeof (p->sv_lakef), "%s/foundations",
+	(void) snprintf(p->sv_lakeroot, sizeof (p->sv_lakeroot), "%s",
 	    s->ss_root[SH_SP_LAKE]);
 	if ((r = sh_zfs_get(z, p->sv_run, "type", val, sizeof (val), NULL,
 	    e)) != 0) {
@@ -121,7 +122,8 @@ sh_save_plan(struct sh_zfs *z, const struct sh_spaces *s,
 		sh_zw_free(all);
 		return (-1);
 	}
-	(void) snprintf(prefix, sizeof (prefix), "%s/", p->sv_runf);
+	(void) snprintf(pf, sizeof (pf), "%s/foundations/", p->sv_runroot);
+	(void) snprintf(pc, sizeof (pc), "%s/containers/", p->sv_runroot);
 	for (i = 0; all[i] != NULL; i++) {
 		if (i == SH_SAVE_DS) {
 			sh_errf(e, "container %s: more than %d datasets",
@@ -133,12 +135,20 @@ sh_save_plan(struct sh_zfs *z, const struct sh_spaces *s,
 		if (sh_zfs_get(z, all[i], "origin", val, sizeof (val), NULL,
 		    e) != 0)
 			break;
-		/* a foundation's on zrun, or none: X's own */
-		if (strcmp(val, "-") != 0 && strncmp(val, prefix,
-		    strlen(prefix)) != 0)
-			sh_errf(e, "%s: a clone of %s, not of a foundation",
-			    all[i], val);
-		else if (strcmp(val, "-") != 0)
+		/*
+		 * a foundation's on zrun; another container's own, as an
+		 * update's staging tree clones X's (7.6 step 6); or none
+		 */
+		if (strcmp(val, "-") == 0)
+			continue;
+		if (strncmp(val, pf, strlen(pf)) != 0 &&
+		    (strncmp(val, pc, strlen(pc)) != 0 ||
+		    (strncmp(val, p->sv_run, strlen(p->sv_run)) == 0 &&
+		    (val[strlen(p->sv_run)] == '/' ||
+		    val[strlen(p->sv_run)] == '@'))))
+			sh_errf(e, "%s: a clone of %s, not of a foundation "
+			    "or another container", all[i], val);
+		else
 			(void) snprintf(p->sv_origin[i],
 			    sizeof (p->sv_origin[i]), "%s", val);
 	}
@@ -195,10 +205,15 @@ sv_mirror1(struct sh_zfs *z, const struct sh_save *p, size_t i,
 	if ((r = sh_zfs_get(z, lds, "type", val, sizeof (val), NULL, e)) < 0)
 		return (-1);
 	if (r == 1 && p->sv_origin[i][0] != '\0') {
-		(void) snprintf(lorigin, sizeof (lorigin), "%s%s", p->sv_lakef,
-		    p->sv_origin[i] + strlen(p->sv_runf));
+		/* the same path below the lake root */
+		(void) snprintf(lorigin, sizeof (lorigin), "%s%s",
+		    p->sv_lakeroot, p->sv_origin[i] + strlen(p->sv_runroot));
 		r = sh_zfs_send(z, from, p->sv_origin[i], to, lorigin, e);
-		how = "a clone of zlake's foundation";
+		(void) snprintf(val, sizeof (val), "%s/foundations/",
+		    p->sv_runroot);
+		how = strncmp(p->sv_origin[i], val, strlen(val)) == 0 ?
+		    "a clone of zlake's foundation" :
+		    "a clone of zlake's container";
 	} else if (r == 1) {
 		r = sh_zfs_send(z, from, NULL, to, NULL, e);
 		how = "whole";
