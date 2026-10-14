@@ -242,3 +242,7 @@ undone before the jail); a mutation skipping either external step
 caught (one that only ignored failure was not, and was redone);
 make check, gate, xcheck. The box: build.sh's shtetl.conf gives the
 foundation a mark and the container the resolv.conf, both external.
+Box run 8 (2d1ef76, at 2c89594): 115 ok, 0 failed. Build 11 (d86ccaf):
+101 ok, 0 failed: box's external mark ran in its first build and its
+update, seen in the container (F35); the container's resolv.conf came
+by its external piece, before the jail (X9).
