@@ -386,6 +386,9 @@ snapshots}; ZFS refusing.
 | Z18 | a snapshot's own user properties walked, not what it inherits; FN's stop returned; set again on a received snapshot (6.2's copy) | covered: check_zfs.c; box: zcheck.c |
 | Z19 | the refusals of Z14 - Z17 in the same words over libzfs and the fake | covered: check_zfs.c; box: zcheck.c |
 | Z20 | a mounted filesystem not destroyed: refused for its mount, before its snapshots, as its mount holds it (dsl_destroy_head_check_impl's long holds); unmounted, destroyed. An undo that skips an unmount fails here over the fake, not first on the box | covered: check_zfs.c; box: zcheck.c |
+| Z21 | promote (M5): a clone promoted takes its origin's snapshots up to the origin, the old dataset a clone of it after; refused: no such filesystem, not a clone | covered: check_zfs.c; box: zcheck.c |
+| Z22 | rename (M5): a filesystem and everything below it to a new name in the same pool, its mounts following its inherited mountpoint; refused: no such filesystem, the new name taken, its parent missing | covered: check_zfs.c; box: zcheck.c |
+| Z23 | written@SNAP (M5): what a filesystem wrote since its snapshot SNAP, a number, 0 when nothing was | covered: check_zfs.c; box: zcheck.c |
 
 # Family F: building a foundation (M3; planning.md 7.1; src/core/build.c)
 
@@ -556,6 +559,7 @@ newest save, given by create, neither}.
 | S7 | the message from an editor, as git commit takes one: $VISUAL, $EDITOR or vi, on a file with a comment saying what it is for; lines beginning # left out, trailing blank lines too; empty refused; the editor failing refused | covered: check_save.c |
 | S8 | the command line: save with no container, two, an unknown option, -m with no message; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
 | S9 | for real: a container cloned from box on zrun saved twice, the mirror a clone of zlake's box and then incremental | box: tests/box/build.sh, build 10 (f271e2d, at 8fa7022) green |
+| S10 | a staging tree's save (M5): a dataset that is a clone of a container's own dataset (an update's container-only clone) mirrored as a clone of zlake's counterpart, which the container's own save has mirrored; a clone of anything else still refused | covered: check_save.c |
 
 # Family X: a new container (M4; planning.md 7.4; src/core/create.c)
 
@@ -585,3 +589,76 @@ own run already}; resolv.conf {there, not}; a failure {at each step}.
 | X7 | a failure at each step undone, an external command's among them (before the jail): the jail stopped, its block removed, X's datasets destroyed, the config snapshot kept; a failure of the save's mirror after the save leaves X created, said | covered: check_create.c |
 | X8 | the command line: create with no container, two, no --on, an unknown option; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
 | X9 | for real: a container on box created on the box, its jail started and stopped, saved again (family S's S9 with it) | box: tests/box/build.sh, build 9 (a460f91) failed on a non-clone's origin (Z14), build 10 (f271e2d, at 8fa7022) green |
+
+# Family W: zfs_rebase as shtetl runs it (M5; planning.md 9, 7.6.1, 7.7; src/core/rebase.c)
+
+shtetl starts, continues and aborts rebases with the zfs_rebase command
+(the injected rebaser of src/core/rebase.h: the real one runs the
+tool, tests/rbfake.c acts on the fake ZFS), and reads and answers the
+resolution document beside each manifest.
+
+Dimensions: the form {clone (--onto a snapshot), dataset (--onto a
+filesystem)}; the base {derived, --allow-unrelated --base}; the exit
+{0 done, 1 at the conflicts gate, 2 refused, 3 failed or drift}; the
+verb {start, --continue (plain, --no-merge, -i on a terminal), --abort};
+the resolution {header, nested directories, escaped names, conflict
+and drift lines, each choice, #unanswered right or wrong, malformed}.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| W1 | a start's command: --from, --onto, --result, -o the manifest in shtetl's run directory; the dataset form's --result a snapshot's short name; --allow-unrelated --base for a replay step | covered: check_rebase.c |
+| W2 | each exit said: 0 done, 1 stopped at conflicts, 2 refused, 3 failed part way or drift; the tool's output in shtetl's log | covered: check_rebase.c |
+| W3 | --continue (with --no-merge; with -i, the picker on the terminal shtetl has), --abort, each by IDENT, the result's name | covered: check_rebase.c |
+| W4 | the resolution read: the header's counts, names in their directories, \ooo escapes decoded, a directory's trailing slash, conflict N and drift lines, each choice; #unanswered held to the lines; a line out of place refused | covered: check_rebase.c |
+| W5 | the resolution answered: the lines of the paths given, still "-", answered keep; #unanswered recounted; every other byte as it was; written whole, a reader finding it as it was or as it is | covered: check_rebase.c |
+| W6 | the fake rebaser holds to the tool's contract over the fake ZFS: the clone form's result made unmounted, mountpoint none, readonly; the dataset form's pre-apply snapshot; a conflict left at the gate with its resolution; --continue and --abort | covered: check_rebase.c |
+| W7 | for real: the real tool, through an update on the box | box: tests/box/build.sh |
+
+# Family U: updating a container into staging (M5; planning.md 7.6, 7.6.2; src/core/update.c)
+
+shtetl update X [--to V]: X stopped, a from-save, every dataset of X
+replayed onto the target version of its foundation in X-staging, saves
+oldest first as update.depth allows, the container-only ones cloned,
+X-staging started and saved; paused at a conflicts gate, taken up with
+--continue, given up with --abort.
+
+Dimensions: the target {the newest, one given, not on zrun, older or
+X's own}; X's datasets {inherited, a placeholder, its own, its own
+below an inherited one}; the saves {one, several, update.depth 1, N, 0};
+the steps {clone form first, dataset form after, --base the previous
+save}; a gate {none, at step 1, at a later step}; a terminal {yes, no};
+a failure {refused, failed part way, after a gate}.
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| U1 | refused: no lake, run or config root; a bad name; no container X; X no clone of a foundation's version; the target not F's version, not newer than X's, its revision not meeting X's ver; X-staging there; an update of X paused; an open rebase on X | covered: check_update.c |
+| U2 | the plan: the target, F's newest version or -pkg or the one given, beamed first when zrun lacks it; X's version; each dataset replayed, cloned from the target (a placeholder) or cloned from the from-save (X's own); the saves replayed, oldest first, update.depth of them, the from-save last; shown | covered: check_update.c |
+| U3 | the run: X's jail stopped; the from-save, "update to F@V"; F's datasets mounted, placeholders not; per dataset, parents first: step 1 the clone form onto F/d@V; the result placed (mountpoint inherited, readonly off, mounted); steps 2 and on the dataset form with --allow-unrelated --base X/d@s(k-1) and --result s(k-1); the last save's name taken; each replayed snapshot with its original's shtetl:commit and shtetl:config, shtetl:kind save and shtetl:replayed-from its guid; the recipe's properties set locally | covered: check_update.c |
+| U4 | the rest: a placeholder cloned from F/d@V, canmount=off; X's own datasets cloned from their from-save; F unmounted; X-staging snapshotted as V, shtetl:kind version; its jail's block written (X's settings, its own name and path) and started; its first save, mirrored | covered: check_update.c |
+| U5 | update.depth: 1 replays the from-save alone, one rebase a dataset; N the newest N; 0 every save zrun holds | covered: check_update.c |
+| U6 | a gate: the update paused at it with no terminal, exit 3, the resolution's path said, the record written, X stopped; --continue with the document complete takes the step on, then the rest; still incomplete, paused again; --abort: every rebase the update started aborted, X-staging destroyed, its block removed, X started again, the record gone | covered: check_update.c |
+| U7 | a failure: a rebase refused (2) or failed (3), a later step's included, undone as --abort is; a failure after the staging save leaves X-staging, said | covered: check_update.c |
+| U8 | the command line: update with no container, two, an unknown option, --to without a version, --continue or --abort with --to; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
+| U9 | for real: a container created on box's first version updated onto its newest, its saves replayed, at a gate answered by hand and continued, started as X-staging | box: tests/box/build.sh |
+
+# Family G: conflicts and derivations, the text first (M5; planning.md 7.7; src/core/update.c)
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| G1 | at a gate: each conflicted name that is a derivation's derived path answered keep, and the derivation noted; every other line left as it was | covered: check_update.c |
+| G2 | with a terminal: the picker, zfs_rebase --continue -i --no-merge, on it; the document read again after | covered: check_update.c |
+| G3 | the document complete: each noted derivation whose source is now in the tree (keep, onto, a hand merge, or never in conflict) run once per distinct command, in a chroot of the result's private mount; then --continue | covered: check_update.c |
+| G4 | a source answered from: its derivation run after done, in a chroot of the placed result, before the next step | covered: check_update.c |
+| G5 | a derivation failing: the update paused at the gate, said; --continue runs it again | covered: check_update.c |
+
+# Family K: cutover and abandon (M5; planning.md 7.9, 7.10; src/core/cutover.c)
+
+| cell | scenario | disposition |
+|------|----------|-------------|
+| K1 | refused: no container X; no X-staging; an update of X paused | covered: check_cutover.c |
+| K2 | cutover: X's written@ its from-save, each dataset; above zero said and asked, yes a final save of X; X-staging's jail stopped; its own clones promoted; the old X destroyed on zrun; X-staging renamed X; the jail's block X's again, its path X's; X started; saved | covered: check_cutover.c |
+| K3 | cutover's zlake: the staging mirror's own clones promoted, the old X moved to archive/containers/X-<ISO-date>, the staging mirror renamed X, before the save that mirrors the rest | covered: check_cutover.c |
+| K4 | abandon: X-staging's jail stopped and its block removed; X-staging destroyed on zrun and in zlake; X started | covered: check_cutover.c |
+| K5 | a failure part way said, what is done and what is not | covered: check_cutover.c |
+| K6 | the command line: cutover and abandon with no container, two, an unknown option | covered: run-cli.sh |
+| K7 | for real: the updated container cut over on the box, its archive in zlake; and an abandon | box: tests/box/build.sh |

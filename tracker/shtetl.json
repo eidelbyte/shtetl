@@ -12,7 +12,8 @@
       "spaces",
       "build",
       "lifecycle",
-      "housekeeping"
+      "housekeeping",
+      "zrun"
     ],
     "milestones": {
       "M0": "probes (planning.md 13)",
@@ -287,5 +288,106 @@
     "provides": "Containers on zrun, cloned from a foundation version, saved.",
     "estimated_size": "large",
     "completed": "tested"
+  },
+  "m5-zfs": {
+    "description": "The ZFS calls M5 needs, in src/core/zfs.h over libzfs and the fake: sh_zfs_promote (lzc_promote), sh_zfs_rename (a filesystem and its children, mounts following), written@SNAP read as a number. Verify: MATRIX Z21 - Z23; the box (zcheck).",
+    "requires": [
+      "m4-zfs"
+    ],
+    "epic": "lifecycle",
+    "milestone": "M5",
+    "expected_changed_files": [
+      "src/core/zfs.h",
+      "src/fbsd/zfs.c",
+      "src/core/zstub.c",
+      "tests/zfake.c",
+      "tests/check_zfs.c",
+      "tests/box/zcheck.c",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Promote, rename and written@ for cutover and abandon.",
+    "estimated_size": "small",
+    "completed": "not-started"
+  },
+  "m5-rebase": {
+    "description": "zfs_rebase as shtetl runs it (planning.md 9, 7.6.1): src/core/rebase.c, an injected rebaser (start in the clone or dataset form, with --allow-unrelated --base for a replay step, -o the manifest in shtetl's run directory; --continue with --no-merge or -i on the terminal; --abort; exits 0 - 3), the real one running the tool, tests/rbfake.c acting on the fake ZFS; and the resolution document read and answered (v4-manifest.md 8: tree scoping, escapes, #unanswered recounted, written whole). Verify: MATRIX family W.",
+    "requires": [
+      "m5-zfs"
+    ],
+    "epic": "lifecycle",
+    "milestone": "M5",
+    "expected_changed_files": [
+      "src/core/rebase.c",
+      "src/core/rebase.h",
+      "src/core/build.c",
+      "src/core/build.h",
+      "tests/rbfake.c",
+      "tests/rbfake.h",
+      "tests/check_rebase.c",
+      "Makefile",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Rebases started, continued, aborted and answered, over the real tool or the fake.",
+    "estimated_size": "large",
+    "completed": "not-started"
+  },
+  "m5-update": {
+    "description": "shtetl update X [--to V] [-y] (planning.md 7.6, 7.6.2, 6.1): the checks; X stopped; the from-save; F mounted; each dataset replayed into X-staging, parents first (step 1 the clone form, placed, steps 2 and on the dataset form with --allow-unrelated --base the previous save, update.depth saves), placeholders cloned from the target, X's own datasets cloned from the from-save; shtetl:* on the replayed snapshots; X-staging snapshotted as the version, its jail written and started, saved (save widened for an own dataset's clone, S10). Paused at a conflicts gate with no terminal (exit 3, PROPOSAL), --continue and --abort. Verify: MATRIX families U, S10; the box.",
+    "requires": [
+      "m5-rebase",
+      "m4-create",
+      "m4-save"
+    ],
+    "epic": "lifecycle",
+    "milestone": "M5",
+    "expected_changed_files": [
+      "src/core/update.c",
+      "src/core/update.h",
+      "src/core/save.c",
+      "src/main.c",
+      "tests/check_update.c",
+      "tests/check_save.c",
+      "tests/run-cli.sh",
+      "tests/MATRIX.md",
+      "docs/planning.md"
+    ],
+    "provides": "A container updated onto a new foundation version in staging, its history kept.",
+    "estimated_size": "large",
+    "completed": "not-started"
+  },
+  "m5-gate": {
+    "description": "Conflicts and derivations, the text first (planning.md 7.7): at a gate, a conflicted derived path answered keep and its derivation noted; the picker on a terminal (--continue -i --no-merge); with the document complete, each noted derivation whose source is in the tree run once per command in a chroot of the result's private mount, then --continue; a source answered from: its derivation after done, in the placed result. Verify: MATRIX family G; the box.",
+    "requires": [
+      "m5-update"
+    ],
+    "epic": "lifecycle",
+    "milestone": "M5",
+    "expected_changed_files": [
+      "src/core/update.c",
+      "tests/check_update.c",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Updates whose conflicts are answered with derived files kept consistent.",
+    "estimated_size": "medium",
+    "completed": "not-started"
+  },
+  "m5-cutover": {
+    "description": "shtetl cutover X and shtetl abandon X (planning.md 7.9, 7.10): cutover asks about writes to X since its from-save (written@), promotes X-staging's own clones, destroys the old X on zrun, renames X-staging to X, its jail block with it, starts and saves X; in zlake the same promotes, the old X moved to archive/containers/X-<ISO-date>, the staging mirror renamed. abandon stops and destroys X-staging, on zrun and in zlake, and starts X. Verify: MATRIX family K; the box.",
+    "requires": [
+      "m5-update"
+    ],
+    "epic": "lifecycle",
+    "milestone": "M5",
+    "expected_changed_files": [
+      "src/core/cutover.c",
+      "src/core/cutover.h",
+      "src/main.c",
+      "tests/check_cutover.c",
+      "tests/run-cli.sh",
+      "tests/MATRIX.md"
+    ],
+    "provides": "An update finished or given up, X carrying on either way.",
+    "estimated_size": "medium",
+    "completed": "not-started"
   }
 }
