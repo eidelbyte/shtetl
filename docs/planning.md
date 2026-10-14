@@ -146,10 +146,12 @@ As built (M2, `src/core/boot.c`):
   the recipes clone, and `shtetl:space` on each root **last**. A
   bootstrap stopped part way is finished by the same command again,
   which takes the layout already made.
-- The recipes are cloned only with `--recipes`, and only into an
-  empty config root, after a snapshot of it (4.4); shtetl-recipes'
-  URL is not the default (Q-AB). A failed clone marks no root
-  (PROPOSAL, Q-AB).
+- The recipes are cloned into an empty config root, after a
+  snapshot of it (4.4): from `--recipes`'s URL, or without it from
+  shtetl-recipes, https://github.com/eidelbyte/shtetl-recipes.git
+  (ruled 2026-10-14, Q-AB). A config root with anything in it is not
+  cloned into, which is how a site bootstraps without them. A failed
+  clone marks no root (PROPOSAL).
 - A pool imported with an altroot shows mountpoints below it; the
   layout already there is read below the altroot.
 
@@ -1632,6 +1634,14 @@ below that change the plan are folded into the sections named.
 
 ## 14. Rulings
 
+### 2026-10-14 (Q-AB: shtetl-recipes by default)
+
+Asked whether, the recipes published, their URL should be
+bootstrap's default: "yes, the repo should be the recipe default
+URL." So (4.2): an empty config root is given the recipes of
+https://github.com/eidelbyte/shtetl-recipes.git when `--recipes`
+names no other; one with anything in it is left as it is.
+
 ### 2026-10-14 (the recipes published, shtetl-recipes)
 
 "publish under shtetl-recipes"; "yes, migrate to shtetl-recipes
@@ -2001,10 +2011,8 @@ M2's:
   but shtetl's layout, so that the properties it sets on the root
   reach nothing of the user's. The other reading: create a missing
   root, and accept children, listing them as affected.
-- **Q-AB, the recipes clone.** Built: only with `--recipes URL`, written
-  while the recipes had no repository. They have one now,
-  shtetl-recipes (14, 2026-10-14), published at
-  https://github.com/eidelbyte/shtetl-recipes, so its URL could be the default.
+- **Q-AB, the recipes clone.** RULED 2026-10-14 (14): shtetl-recipes'
+  URL is the default; `--recipes` names another.
 
 M1's:
 

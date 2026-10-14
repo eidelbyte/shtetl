@@ -73,8 +73,10 @@ static const struct sh_cmd sh_cmds[] = {
 	    "build are mounted", cmd_spaces },
 	{ "bootstrap", NULL, "[--lake ds] [--run ds] [--config ds]\n"
 	    "           [--build ds] [--recipes url] [-y]", "datasets you "
-	    "have made the roots of the spaces, and laid\n    out; shown "
-	    "first, done once confirmed (-y confirms)", cmd_bootstrap },
+	    "have made the roots of the spaces, and laid\n    out, the "
+	    "recipes cloned into an empty config root, from\n    "
+	    "--recipes or shtetl-recipes; shown first, done once confirmed\n"
+	    "    (-y confirms)", cmd_bootstrap },
 	{ "build", NULL, "[-y] [-m msg] [--continue | --skip | --abort]\n"
 	    "           foundation", "a foundation built from its recipe "
 	    "into zlake; shown\n    first, done once confirmed (-y "
@@ -661,6 +663,7 @@ cmd_bootstrap(struct sh_ctx *ctx, int argc, char **argv)
 	int i, yes, have, tty, rc;
 
 	(void) memset(&req, 0, sizeof (req));
+	req.br_recipes = SH_RECIPES_URL;
 	yes = 0;
 	for (i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "-y") == 0 ||

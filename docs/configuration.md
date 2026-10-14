@@ -34,7 +34,9 @@ Contents:
 ## 1. Files
 
 The configuration root is zconfig, a clone of the recipes repository
-(planning.md 4.4):
+(planning.md 4.4), which `shtetl bootstrap` makes of an empty one:
+https://github.com/eidelbyte/shtetl-recipes.git, or the URL its
+`--recipes` names:
 
     <config root>/
         shtetl.conf            the site's settings, and the default recipe
@@ -1270,7 +1272,9 @@ usage: shtetl [-C dir] command ...
     with its layers merged, or the site's settings
   spaces: each space's root, and where config and build are mounted
   bootstrap: datasets you have made the roots of the spaces, and laid
-    out; shown first, done once confirmed (-y confirms)
+    out, the recipes cloned into an empty config root, from
+    --recipes or shtetl-recipes; shown first, done once confirmed
+    (-y confirms)
   build: a foundation built from its recipe into zlake; shown
     first, done once confirmed (-y confirms); a build paused at a
     patch carried on, the fix made or the patch left out, or

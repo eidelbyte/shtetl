@@ -302,7 +302,7 @@ confirmation {-y, a terminal's answer, no terminal}.
 | B9 | a property's value: built-in, then properties.default, then properties.<space> | covered: check_boot.c |
 | B10 | a lake root laid out: foundations, foundation-builds, containers, systems, archive and its two; the root's properties; shtetl:space last | covered: check_boot.c |
 | B11 | the run root laid out: foundations at /shtetl/foundations and never mounted, containers at /containers and mounted, systems | covered: check_boot.c |
-| B13 | the config root: with --recipes and an empty directory, a snapshot and then git clone; not empty, no clone; no --recipes, no clone; a failed clone leaves the root unmarked | covered: check_boot.c |
+| B13 | the config root: with a URL and an empty directory, a snapshot and then git clone; not empty, no clone; no URL, no clone; a failed clone leaves the root unmarked. The command line's URL: --recipes's, or shtetl-recipes' (SH_RECIPES_URL) | covered: check_boot.c; box: run.sh with a repository of its own, build.sh with shtetl-recipes from GitHub |
 | B14 | an apply interrupted (a create fails): no root marked; the same command again finishes, taking the layout already made | covered: check_boot.c |
 | B15 | a layout child already there but not as shtetl makes it is refused, naming the difference | covered: check_boot.c |
 | B16 | without -y and no terminal: refused, nothing done; -y: done; a terminal answers y or yes, anything else is no | covered: check_boot.c (the decision, sh_confirm); the command itself on the box, tests/box |

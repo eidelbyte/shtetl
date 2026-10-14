@@ -23,12 +23,15 @@
 #define	SH_BOOT_NAME	256	/* a dataset's name */
 #define	SH_BOOT_VAL	256	/* a property's value, as shown */
 
+/* The recipes bootstrap clones without --recipes (planning.md 4.2). */
+#define	SH_RECIPES_URL	"https://github.com/eidelbyte/shtetl-recipes.git"
+
 /* What the user asked for. */
 struct sh_bootreq {
 	const char	*br_ds[SH_BOOT_MAX];
 	enum sh_space	br_sp[SH_BOOT_MAX];
 	size_t		br_n;
-	const char	*br_recipes;	/* git URL for the config root */
+	const char	*br_recipes;	/* git URL to clone, or NULL */
 };
 
 /* One property of a root: a line of the table. */

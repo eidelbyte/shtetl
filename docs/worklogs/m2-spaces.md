@@ -48,7 +48,12 @@ its section 15:
   root with children not shtetl's.
 - Q-AA: with several run roots, the first owns /containers; a later
   one's containers has canmount=off.
-- Q-AB: the recipes are cloned only with --recipes.
+- Q-AB: the recipes are cloned only with --recipes. Ruled otherwise
+  on 2026-10-14, once the recipes were published: without --recipes,
+  bootstrap clones shtetl-recipes (SH_RECIPES_URL, given by the
+  command line, so sh_boot_plan's NULL still means no clone) into an
+  empty config root; tests/box/build.sh clones it from GitHub, and
+  run.sh, on a box without git, fills the config root first.
 
 Smaller ones, in the commit messages: the pool's ashift is read from
 its top-level vdevs, not the pool property of that name; a pool's

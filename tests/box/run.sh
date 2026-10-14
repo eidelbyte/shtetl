@@ -191,6 +191,10 @@ cases() {
 	has B8 "autotrim" "$T/out" "autotrim off, set to on"
 
 	echo "== B10, B11, B13, B14, B17, B18: bootstrap, confirmed"
+	# without git, a config root with a file in it: shtetl-recipes,
+	# the default, is not cloned into it
+	[ -n "$RECIPES" ] ||
+	    echo "# the box: no git, no recipes" >"$ALT/zconfig/shtetl.conf"
 	sht bootstrap -y --lake $P1/shtetl --run $P2/run \
 	    --config $P1/zconfig --build $P1/zbuild $RECIPES
 	check B10 "exit" "$RC" 0
@@ -234,7 +238,8 @@ cases() {
 		    "$(zfs list -H -t snapshot -o name -r $P1/zconfig |
 		    grep -c '@bootstrap-')" 1
 	else
-		echo "skip B13: no git on this system"
+		has B13 "not empty: nothing cloned" "$T/out" \
+		    "$ALT/zconfig is not empty: not cloned into"
 	fi
 
 	echo "== D2, D16: shtetl spaces"

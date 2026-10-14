@@ -271,6 +271,11 @@ cases() {
 	    --build $P/zbuild
 	check B10 "bootstrap" "$RC" 0
 	[ "$RC" = 0 ] || { sed 's/^/    /' "$T/err"; return 1; }
+	check B13 "shtetl-recipes cloned by default, from GitHub" \
+	    "$(git -C "$ALT/zconfig" remote get-url origin 2>/dev/null)" \
+	    https://github.com/eidelbyte/shtetl-recipes.git
+	check B13 "its README there" \
+	    "$(head -1 "$ALT/zconfig/README.md" 2>/dev/null)" "# shtetl recipes"
 	if zfs list -H -o name $OBJKEEP >/dev/null 2>&1; then
 		echo "== box's obj cache for $BRANCH kept: an incremental build"
 		zfs rename $OBJKEEP $OBJ || return 1
