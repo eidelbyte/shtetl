@@ -365,7 +365,7 @@ frame("After bootstrap",
 	"mounts by itself (<code>canmount=noauto</code>): zfs_rebase reads "
 	"every side at its own mountpoint, so shtetl mounts a foundation "
 	"there for the length of an update, and no longer.",
-	"zconfig is a clone of the zshtetl-recipes repo: <code>default.conf</code> "
+	"zconfig is a clone of the shtetl-recipes repo: <code>default.conf</code> "
 	"came from upstream, <code>shtetl.conf</code> was written by bootstrap. "
 	"zbuild is a FreeBSD src checkout the admin already had. From here on "
 	"every frame shows the same four boxes; only what the story does "
@@ -1636,7 +1636,7 @@ svg .ltag-from { fill: var(--accent); }
 CAST = [
 	("machine", "<code>kfar</code>: pools <code>fast</code> (NVMe, boot) "
 	    "and <code>tank</code> (HDD)"),
-	("zconfig", "<code>fast/shtetl/config</code>, the zshtetl-recipes "
+	("zconfig", "<code>fast/shtetl/config</code>, the shtetl-recipes "
 	    "clone, at <code>/shtetl/config</code>"),
 	("zbuild", "<code>fast/shtetl/src</code>, a freebsd-src checkout"),
 	("zlake", "<code>tank/shtetl</code>"),

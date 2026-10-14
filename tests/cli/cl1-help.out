@@ -11,7 +11,7 @@ usage: shtetl [-C dir] command ...
        shtetl [-C dir] create [-y] [-m msg] container --on foundation
            [--version v]
 
-  -C dir  the configuration root (the zshtetl-recipes clone);
+  -C dir  the configuration root (the shtetl-recipes clone);
           without it, the config root's mountpoint
 
   config show: the recipe (foundations/F, containers/X, systems/S)

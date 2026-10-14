@@ -4,7 +4,7 @@ UCL ("universal configuration language") is the format of FreeBSD's
 `pkg.conf` and of the repo files under `/etc/pkg/`; base also links it
 into `ctld(8)`, `bhyve(8)` and `iovctl(8)`. It is a superset of JSON
 with a lighter, nginx-like syntax. shtetl reads all of its
-configuration with libucl: every file in the zshtetl-recipes clone,
+configuration with libucl: every file in the shtetl-recipes clone,
 `shtetl.conf` included. Why UCL rather than TOML, JSON or YAML is in
 planning.md section 5.1.
 

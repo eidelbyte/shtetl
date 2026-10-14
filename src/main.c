@@ -111,7 +111,7 @@ usage(FILE *f)
 		    c->cm_args[0] != '\0' ? " " : "", c->cm_args);
 	}
 	(void) fprintf(f, "\n  -C dir  the configuration root (the "
-	    "zshtetl-recipes clone);\n          without it, the config "
+	    "shtetl-recipes clone);\n          without it, the config "
 	    "root's mountpoint\n");
 	if (sh_cmds[0].cm_word != NULL)
 		(void) fprintf(f, "\n");

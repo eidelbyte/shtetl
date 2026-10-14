@@ -65,9 +65,10 @@ were silent:
 - A `kernconf_file` with a `/` is a path in zconfig and must exist
   there. Without one it names a config in the src tree, which M3's
   build checks once the tree is checked out.
-- shtetl-recipes/ sits in this repository until zshtetl-recipes
-  exists. Its .gitignore follows 4.4: it ignores everything but what
-  it ships.
+- shtetl-recipes/ sits in this repository until the recipes have a
+  repository of their own (since 2026-10-14,
+  github.com/eidelbyte/shtetl-recipes). Its .gitignore follows 4.4: it
+  ignores everything but what it ships.
 
 ## Verification
 

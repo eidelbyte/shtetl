@@ -173,7 +173,7 @@ svg .ltag-from { fill: var(--accent); }
 </nav>
 <div class="tablewrap"><table class="cast"><tr><th>name</th><th>what it is in this story</th></tr>
 <tr><td><code>machine</code></td><td><code>kfar</code>: pools <code>fast</code> (NVMe, boot) and <code>tank</code> (HDD)</td></tr>
-<tr><td><code>zconfig</code></td><td><code>fast/shtetl/config</code>, the zshtetl-recipes clone, at <code>/shtetl/config</code></td></tr>
+<tr><td><code>zconfig</code></td><td><code>fast/shtetl/config</code>, the shtetl-recipes clone, at <code>/shtetl/config</code></td></tr>
 <tr><td><code>zbuild</code></td><td><code>fast/shtetl/src</code>, a freebsd-src checkout</td></tr>
 <tr><td><code>zlake</code></td><td><code>tank/shtetl</code></td></tr>
 <tr><td><code>zrun</code></td><td><code>fast/shtetl/run</code>; containers at <code>/containers</code></td></tr>
@@ -191,7 +191,7 @@ svg .ltag-from { fill: var(--accent); }
 <section class="frame" id="f1">
 <div class="fnum">Frame 1</div><h3>After bootstrap</h3>
 <p>Bootstrap touched no device. It set a local user property, <code>shtetl:space</code>, on each root, created the empty parents under zlake and zrun with parasa's defaults (<code>atime=off</code>, <code>compression=zstd</code>, <code>aclmode=passthrough</code>, <code>mountpoint=none</code>, <code>canmount=noauto</code>), and made <code>zrun/containers</code> the one parent that mounts by itself, at <code>/containers</code>. <code>zrun/foundations</code> gets a real mountpoint, <code>/shtetl/foundations</code>, but nothing under it mounts by itself (<code>canmount=noauto</code>): zfs_rebase reads every side at its own mountpoint, so shtetl mounts a foundation there for the length of an update, and no longer.</p>
-<p>zconfig is a clone of the zshtetl-recipes repo: <code>default.conf</code> came from upstream, <code>shtetl.conf</code> was written by bootstrap. zbuild is a FreeBSD src checkout the admin already had. From here on every frame shows the same four boxes; only what the story does changes.</p>
+<p>zconfig is a clone of the shtetl-recipes repo: <code>default.conf</code> came from upstream, <code>shtetl.conf</code> was written by bootstrap. zbuild is a FreeBSD src checkout the admin already had. From here on every frame shows the same four boxes; only what the story does changes.</p>
 <div class="diagram"><svg viewBox="0 0 1110 716" role="img" aria-label="After bootstrap">
 <defs>
 <marker id="m1-build" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk mk-build" d="M0,0 L10,5 L0,10 z"/></marker>

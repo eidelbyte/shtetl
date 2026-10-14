@@ -42,8 +42,9 @@ away:
   `git rebase`.
 
 Recipes stay. They live in their own plain-text git repo,
-zshtetl-recipes, whose clone is zconfig (section 5). That repo is the
-one place git remains, and only as a way to share recipe text.
+shtetl-recipes (github.com/eidelbyte/shtetl-recipes), whose clone is zconfig
+(section 5). That repo is the one place git remains, and only as a way
+to share recipe text.
 
 ## 2. Names
 
@@ -52,7 +53,7 @@ Four logical spaces, names settled:
 | space   | role                                   | parasa                |
 |---------|----------------------------------------|-----------------------|
 | zlake   | foundation archive, obj caches, a mirror of zrun as of each entity's last save, archives | zbamidbar |
-| zconfig | the zshtetl-recipes clone, shtetl.conf included | zshemot (config half) |
+| zconfig | the shtetl-recipes clone, shtetl.conf included | zshemot (config half) |
 | zbuild  | the FreeBSD src checkout               | zshemot (build half)  |
 | zrun    | everything that runs                   | zbereshit             |
 
@@ -117,7 +118,7 @@ is read from the config root's mountpoint, where it is mounted.
    a warning when they differ from the recommended value.
 3. On confirmation it creates the layout under each root (4.4 - 4.7)
    with those properties, and sets `shtetl:space` on each root.
-4. If the config root is empty, it clones zshtetl-recipes into it.
+4. If the config root is empty, it clones shtetl-recipes into it.
 
 As built (M2, `src/core/boot.c`):
 
@@ -145,9 +146,10 @@ As built (M2, `src/core/boot.c`):
   the recipes clone, and `shtetl:space` on each root **last**. A
   bootstrap stopped part way is finished by the same command again,
   which takes the layout already made.
-- The recipes are cloned only with `--recipes`, since zshtetl-recipes
-  does not exist yet, and only into an empty config root, after a
-  snapshot of it (4.4). A failed clone marks no root (PROPOSAL, Q-AB).
+- The recipes are cloned only with `--recipes`, and only into an
+  empty config root, after a snapshot of it (4.4); shtetl-recipes'
+  URL is not the default (Q-AB). A failed clone marks no root
+  (PROPOSAL, Q-AB).
 - A pool imported with an altroot shows mountpoints below it; the
   layout already there is read below the altroot.
 
@@ -199,7 +201,7 @@ devices.
 
 ### 4.4 zconfig: the recipes clone
 
-The config root **is** the zshtetl-recipes working tree:
+The config root **is** the shtetl-recipes working tree:
 
     <config root>/
         .git/
@@ -342,8 +344,8 @@ the `textproc/libucl` port.
 It holds two things (ruled 2026-10-12): the site's settings, below,
 in their own schema, about this machine and never about a recipe; and
 beside them, at the top level, the default recipe (5.4), every key any
-kind of recipe takes. The settings are its sections (`spaces`,
-`properties`, `build`, `update`, `retention`); any other top-level key
+kind of recipe takes. The settings are its sections (`properties`,
+`build`, `update`, `retention`); any other top-level key
 is the default recipe's and is checked by the recipe schema, so a
 setting never reaches a recipe and a recipe key never reaches the
 settings.
@@ -1630,6 +1632,15 @@ below that change the plan are folded into the sections named.
 
 ## 14. Rulings
 
+### 2026-10-14 (the recipes published, shtetl-recipes)
+
+"publish under shtetl-recipes"; "yes, migrate to shtetl-recipes
+everywhere. License BSD-3 for eidelbyte is good." So: the recipes'
+repository is shtetl-recipes, public at
+https://github.com/eidelbyte/shtetl-recipes, BSD 3-Clause
+(eidelbyte) as shtetl is. The plan's name for it, zshtetl-recipes,
+is gone.
+
 ### 2026-10-14 (the recipes, a repository of their own)
 
 "fyi, shtetl-recipes should be a new git repo, not a sub-dir of this
@@ -1889,7 +1900,7 @@ So (5.4, 5.5):
 
 ### 2026-10-09 (open questions of draft 2)
 
-- A: zshtetl-recipes ships a catch-all `.gitignore`; a user whitelists
+- A: shtetl-recipes ships a catch-all `.gitignore`; a user whitelists
   what they share. git is only for sharing; ZFS snapshots are the
   record of the site's configuration.
 - B: a foundation has one zrun copy, so its containers share a pool.
@@ -1990,10 +2001,10 @@ M2's:
   but shtetl's layout, so that the properties it sets on the root
   reach nothing of the user's. The other reading: create a missing
   root, and accept children, listing them as affected.
-- **Q-AB, the recipes clone.** Built: only with `--recipes URL`, since
-  zshtetl-recipes does not exist yet; once it does, the URL can be the
-  default. Its seed is a repository of its own now (14, 2026-10-14),
-  split out of this one; publishing it is the author's to do.
+- **Q-AB, the recipes clone.** Built: only with `--recipes URL`, written
+  while the recipes had no repository. They have one now,
+  shtetl-recipes (14, 2026-10-14), published at
+  https://github.com/eidelbyte/shtetl-recipes, so its URL could be the default.
 
 M1's:
 
