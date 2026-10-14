@@ -1,0 +1,192 @@
+shtetl box build 2026-10-14T02:30:21Z on KIDON, 15.1-RELEASE-p2, zfs-2.4.2-1-FreeBSD_g6330a45b0, shtetl 920c214, releng/15.1
+== a new pool: /var/tmp/shtetl-boxbuild/shbbuild.img
+== the checkout: /usr/src cloned, shared; origin https://git.freebsd.org/src.git
+== bootstrap: lake, config, build
+# shtetl bootstrap -y --lake shbbuild/shtetl --config shbbuild/zconfig --build shbbuild/zbuild -> 0
+ok   B10 bootstrap
+== no obj cache kept for releng/15.1: a whole build
+== P17: patches made from releng/15.1's share/misc/bsd-family-tree
+== F13: a build that fails at the fetch, undone
+# shtetl build -y nope -> 1
+ok   F13 exit
+ok   F13 the refusal
+ok   F13 F's datasets gone
+ok   F13 the build root's mark cleared
+ok   F13 the config snapshot kept
+ok   F13 the obj cache kept, unmounted
+== P17: build box: a patch already in, one applied, one paused
+# shtetl build -y box -> 3
+    foundation box, new, from releng/15.1
+      version 15.1-releng-<day>-<commit>
+      + shbbuild/shtetl/foundations/box
+      + shbbuild/shtetl/foundations/box/tmp
+      + shbbuild/shtetl/foundations/box/var
+      + shbbuild/shtetl/foundations/box/usr  canmount=off
+      + shbbuild/shtetl/foundations/box/usr/local
+      + shbbuild/shtetl/foundation-builds/box
+      checkout releng/15.1 in shbbuild/zbuild (/var/tmp/shtetl-boxbuild/alt/zbuild)
+      patches: file:///var/tmp/shtetl-boxbuild/p17/repo, patches/box
+      kernel GENERIC
+      src.conf from 1 file
+      make -j<hw.ncpu> buildworld buildkernel
+      install world, kernel and distribution (install -C)
+      pkg: none
+      commands: motd
+      snapshot -r shbbuild/shtetl/foundations/box@<version>
+    snapshot shbbuild/zconfig@build-box-20261014-023030
+    made shbbuild/shtetl/foundations/box
+    made shbbuild/shtetl/foundations/box/tmp
+    made shbbuild/shtetl/foundations/box/var
+    made shbbuild/shtetl/foundations/box/usr
+    made shbbuild/shtetl/foundations/box/usr/local
+    made shbbuild/shtetl/foundation-builds/box
+    checkout releng/15.1 at e38a7085f3a8
+    version 15.1-releng-2026-10-14-e38a7085f3a8 (REVISION 15.1)
+    fetched file:///var/tmp/shtetl-boxbuild/p17/repo at 1024deb06848
+    copied patches/box
+    3 patches from 2 sources
+    snapshot shbbuild/zbuild@shtetl-patch-0
+    patch 2-in.patch from file:///var/tmp/shtetl-boxbuild/p17/repo: already in, skipped
+    patch 1-one.patch from patches/box: applied
+    patch 3-two.patch from patches/box: does not apply; merged three ways, conflict markers left
+      the patch: /var/db/shtetl/build/box/patches/2/3-two.patch
+      in /var/tmp/shtetl-boxbuild/alt/zbuild: share/misc/bsd-family-tree
+    build of box paused; then one of:
+      shtetl build box --continue   the fix made, go on
+      shtetl build box --skip       the patch left out
+      shtetl build box --abort      nothing built, all undone
+ok   P17 the pause's exit
+ok   P17 already in, from the git source
+ok   P17 applied, from the directory
+ok   P17 paused, conflict markers left
+ok   P17 the record
+ok   P17 the build root's mark
+ok   P17 a snapshot before each patch, and the first
+ok   P17 the markers in the tree
+# shtetl build box --continue -> 1
+ok   P17 --continue refused while a marker is left
+ok   P17 naming it
+== F11, F19, P17: --continue, the build for real (hours)
+# shtetl build box --continue -> 0
+# 30 minutes
+    build of box, paused at patch 3-two.patch
+    patch 3-two.patch from patches/box: fixed by hand; the fix: /var/db/shtetl/build/box/fixed/2/3-two.patch
+    wrote /var/db/shtetl/build/box/BOX, /var/db/shtetl/build/box/src.conf
+    mounted shbbuild/shtetl/foundation-builds/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/obj, shbbuild/shtetl/foundations/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/root
+    kept 1 fix in /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/obj/patches/15.1-releng-2026-10-14-e38a7085f3a8
+    make buildworld buildkernel (log /var/db/shtetl/build/box/build.log)
+    make installworld (log /var/db/shtetl/build/box/build.log)
+    make installkernel (log /var/db/shtetl/build/box/build.log)
+    kernel into shbbuild/shtetl/foundations/box: 0 kept, 1715 copied, 0 removed
+    make distribution (log /var/db/shtetl/build/box/build.log)
+    commands motd, from foundations/box.conf
+    snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8
+    rolled back shbbuild/zbuild to @shtetl-patch-0
+    the time of now on 1 patched file, for the next build's make
+    built shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8
+ok   F11 exit
+# version 15.1-releng-2026-10-14-e38a7085f3a8
+ok   F12 the version's name
+ok   F11 every dataset snapshotted
+ok   F11 shtetl:kind
+ok   F11 shtetl:config names the config snapshot
+ok   F11 shtetl:config-guid is its guid
+ok   F17 shtetl:commit, the build's own
+ok   F11 the placeholder
+ok   F11 F unmounted
+ok   F11 its mountpoint back
+ok   F11 the obj cache unmounted
+ok   F11 the build root's mark cleared
+ok   P17 shtetl:patches
+ok   P17 the build root rolled back, its checkout clean
+ok   P17 every patch snapshot gone
+ok   P17 the fix written out
+ok   P17 the record gone
+== what was built, mounted for a look
+ok   F19 the world went into F (installworld)
+ok   F19 the kernel (installkernel)
+ok   F19 /etc (distribution)
+ok   F11 the command ran in F
+ok   P17 the patched tree built: both lines installed
+ok   F16 the kernel's ident, BOX
+ok   F11 usr/local is its own dataset
+ok   F11 the run's log kept
+== F27: box again, an update over it (the obj cache warm)
+# shtetl build -y box -> 0
+# 1 minutes
+    foundation box, an update of @15.1-releng-2026-10-14-e38a7085f3a8, from releng/15.1
+      version 15.1-releng-<day>-<commit>
+      = shbbuild/shtetl/foundations/box
+      = shbbuild/shtetl/foundations/box/tmp
+      = shbbuild/shtetl/foundations/box/var
+      = shbbuild/shtetl/foundations/box/usr
+      = shbbuild/shtetl/foundations/box/usr/local
+      checkout releng/15.1 in shbbuild/zbuild (/var/tmp/shtetl-boxbuild/alt/zbuild)
+      patches: file:///var/tmp/shtetl-boxbuild/p17/repo, patches/box
+      kernel GENERIC
+      src.conf from 1 file
+      make -j<hw.ncpu> buildworld buildkernel
+      make delete-old delete-old-libs, then
+      install world, kernel and distribution (install -C)
+      installworld's backups removed
+      pkg: none
+      commands: motd
+      snapshot -r shbbuild/shtetl/foundations/box@<version>
+    snapshot shbbuild/zconfig@build-box-20261014-030118
+    checkout releng/15.1 at e38a7085f3a8
+    version 15.1-releng-2026-10-14-e38a7085f3a8.2 (REVISION 15.1)
+    fetched file:///var/tmp/shtetl-boxbuild/p17/repo at 1024deb06848
+    copied patches/box
+    4 patches from 2 sources
+    snapshot shbbuild/zbuild@shtetl-patch-0
+    patch 2-in.patch from file:///var/tmp/shtetl-boxbuild/p17/repo: already in, skipped
+    patch 1-one.patch from patches/box: applied
+    patch 4-init.c.patch from patches/box: applied
+    patch 4-rtld.c.patch from patches/box: applied
+    wrote /var/db/shtetl/build/box/BOX, /var/db/shtetl/build/box/src.conf
+    mounted shbbuild/shtetl/foundation-builds/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/obj, shbbuild/shtetl/foundations/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/root
+    make buildworld buildkernel (log /var/db/shtetl/build/box/build.log)
+    make delete-old delete-old-libs (log /var/db/shtetl/build/box/build.log)
+    make installworld (log /var/db/shtetl/build/box/build.log)
+    make installkernel (log /var/db/shtetl/build/box/build.log)
+    kernel into shbbuild/shtetl/foundations/box: 1715 kept, 0 copied, 0 removed
+    make distribution (log /var/db/shtetl/build/box/build.log)
+    removed installworld's backups: libexec/ld-elf.so.1.old, libexec/ld-elf32.so.1.old, sbin/init.bak
+    commands motd, from foundations/box.conf
+    snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2
+    rolled back shbbuild/zbuild to @shtetl-patch-0
+    the time of now on 3 patched files, for the next build's make
+    built shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2
+ok   F27 exit
+ok   F27 the plan an update
+ok   F27 delete-old before the install
+ok   F27 installworld's backups removed: init's
+ok   F27 and rtld's
+ok   F27 the kernel synced into F
+# version 15.1-releng-2026-10-14-e38a7085f3a8.2
+ok   F27 a new version, on the same datasets
+ok   F27 two versions on each dataset
+ok   F27 the first kept
+ok   F27 no kernel.old
+ok   F27 no loader backup
+ok   F27 no ld-elf backup
+ok   F27 no init.bak
+ok   F27 an unchanged module keeps its object (aac.ko)
+ok   F27 the changed init installed
+ok   F27 the new tree installed: one patch line now
+ok   F27 the command ran again, over distribution's file
+== F33: pkg-upgrade box
+# shtetl pkg-upgrade -y box -> 0
+    foundation box, its packages upgraded, from @15.1-releng-2026-10-14-e38a7085f3a8.2
+      mounted below /var/db/shtetl/build/box/root, with its datasets
+      pkg -c <root> upgrade -y
+      snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg
+    pkg upgrade in /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/root (log /var/db/shtetl/build/box/pkg.log)
+    snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg
+    upgraded shbbuild/shtetl/foundations/box@15.1-releng-2026-10-14-e38a7085f3a8.2-pkg
+ok   F33 exit
+ok   F33 the -pkg of the update's version
+ok   F33 shtetl:kind pkg, on every dataset
+ok   F33 the version's config carried over
+ok   F33 F unmounted, the mark cleared
+== 64 ok, 0 failed
