@@ -172,3 +172,22 @@ save in the archive, the archive's www a clone of the live www at the
 from-save as P11 found, the next save mirrored; an abandon; a rename
 failing, said); four mutations caught; run-cli K6 (63 cases); make
 check, gate, xcheck. The box owed (K7). tracker: m5-cutover testing.
+
+## The box (U9, W7, K7)
+
+tests/box/build.sh gains updates(), after the container cells:
+shbup created on box's first version, an admin's line added to
+/usr/share/misc/bsd-family-tree (which box's update changes, F27) and
+a later edit to /etc/motd.template, each saved; shtetl update -y with
+no terminal pauses at the conflict; the script answers every unanswered
+line onto, as a person would in the file, and --continues, through as
+many gates as come (the jail's rc writes /var between saves, and the
+foundation's update may meet them); then the staging tree is checked
+(box's newest under it, the family tree onto's, the motd edit replayed,
+www cloned with its file, the commits kept, its jail running, the
+tool's output in the log), cut over (its archive in zlake, zlake's
+shbup on box's newest) and, for shbab, updated and abandoned. The
+real zfs_rebase must be on shtetl's PATH (/usr/local/sbin, where make
+install puts it); without it the script says so and skips. teardown
+aborts any rebase a stopped run left open, whose holds would keep the
+pool's datasets from being destroyed, and stops every test jail.

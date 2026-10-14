@@ -6,8 +6,13 @@
 # carried on into the build); then F27, box built again, an update
 # over the first, on the obj cache the first left; F33, its packages
 # upgraded, the update's -pkg; M8, box beamed to the run root, whole
-# and then incremental; and X9 and S9, the container shbweb created on
-# box, its jail started, stopped and started again, saved again.
+# and then incremental; X9 and S9, the container shbweb created on
+# box, its jail started, stopped and started again, saved again; and
+# U9, W7 and K7 (M5): shbup created on box's first version, saved
+# with an edit the update conflicts with, updated with the real
+# zfs_rebase (which must be installed on shtetl's PATH), paused at the
+# gate, answered by hand, taken up and cut over; shbab updated and
+# abandoned.
 # A buildworld and buildkernel take hours the first time; nothing here
 # asks anything, so start it and leave it.
 #
@@ -38,10 +43,11 @@
 # IMGDIR, imported with an altroot under it, so every mount lands
 # there; shtetl's run directories of the foundations it builds,
 # /var/db/shtetl/build/box and /var/db/shtetl/build/nope; and the
-# container's jail, shbweb, its block /etc/jail.conf.d/shbweb.conf and
-# its log /var/db/shtetl/create/shbweb. A run that was stopped is put
-# away first; it will not start while any other pool has a shtetl
-# root, or a jail shbweb is there.
+# containers' jails, JAILS below, their blocks in /etc/jail.conf.d,
+# their logs in /var/db/shtetl/create and /var/db/shtetl/update, and
+# the rebases' run directories in /var/db/zfs_rebase/shbbuild. A run
+# that was stopped is put away first; it will not start while any
+# other pool has a shtetl root, or a jail of those names is there.
 set -u
 cd "$(dirname "$0")/../.." || exit 2
 . tests/box/send.sh
@@ -61,6 +67,7 @@ SH=$PWD/shtetl
 RUNS=/var/db/shtetl/build
 X=shbweb
 JAILF=/etc/jail.conf.d/$X.conf
+JAILS="shbweb shbup shbup-staging shbab shbab-staging"
 
 # A run's own files, and the run directories of the two foundations
 # built here, by name.
@@ -68,8 +75,12 @@ runfiles() {
 	rm -f "$T/out" "$T/err"
 	rm -rf "$T/p17"
 	rm -rf /var/db/shtetl/build/box /var/db/shtetl/build/nope
-	rm -rf /var/db/shtetl/create/$X
-	rmdir $RUNS /var/db/shtetl/create /var/db/shtetl 2>/dev/null
+	for _j in $JAILS; do
+		rm -rf /var/db/shtetl/create/$_j /var/db/shtetl/update/$_j
+	done
+	rm -rf /var/db/zfs_rebase/$P
+	rmdir $RUNS /var/db/shtetl/create /var/db/shtetl/update \
+	    /var/db/shtetl /var/db/zfs_rebase 2>/dev/null
 	return 0
 }
 
@@ -78,15 +89,23 @@ runfiles() {
 # stopped among its patches, a root no longer; the pool exported.
 teardown() {
 	zpool list -H -o name $P >/dev/null 2>&1 || { runfiles; return 0; }
-	# the container's jail: stopped by its block, which goes too
-	if jls -j $X jid >/dev/null 2>&1; then
-		if [ -f $JAILF ]; then
-			jail -f $JAILF -r $X
-		else
-			jail -r $X
+	# the containers' jails: stopped by their blocks, which go too
+	for _j in $JAILS; do
+		if jls -j $_j jid >/dev/null 2>&1; then
+			if [ -f /etc/jail.conf.d/$_j.conf ]; then
+				jail -f /etc/jail.conf.d/$_j.conf -r $_j
+			else
+				jail -r $_j
+			fi
 		fi
-	fi
-	rm -f $JAILF
+		rm -f /etc/jail.conf.d/$_j.conf
+	done
+	# rebases a stopped run left open: their holds would keep
+	# what they read from being destroyed
+	zfs get -H -r -s local -o name zfs_rebase:phase $P/run 2>/dev/null |
+	    while read -r _ds; do
+		zfs_rebase --abort "$_ds" >/dev/null 2>&1
+	    done
 	if zfs list -H -o name $OBJ >/dev/null 2>&1; then
 		zfs unmount $OBJ 2>/dev/null
 		zfs inherit mountpoint $OBJ
@@ -142,10 +161,13 @@ if zpool list -H -o name $P >/dev/null 2>&1; then
 	echo "boxbuild: pool $P imported: a run stopped; put away first"
 	teardown
 fi
-if jls -j $X jid >/dev/null 2>&1 || [ -e $JAILF ]; then
-	echo "boxbuild: a jail $X, or its block $JAILF, is there"
-	exit 2
-fi
+for _j in $JAILS; do
+	if jls -j $_j jid >/dev/null 2>&1 ||
+	    [ -e /etc/jail.conf.d/$_j.conf ]; then
+		echo "boxbuild: a jail $_j, or its block, is there"
+		exit 2
+	fi
+done
 _roots=$(zfs get -H -s local -o name,value shtetl:space 2>/dev/null)
 if [ -n "$_roots" ]; then
 	echo "boxbuild: this system has shtetl roots, which discovery would find:"
@@ -325,6 +347,136 @@ EOF
 	check S9 "srv/www's mirror whole, then from its first" \
 	    "$(prop $_lx/srv/www origin) $(zfs list -H -t snapshot \
 	    -o name $_lx/srv/www | grep -c @save-)" "- 2"
+}
+
+# zfs_rebase where shtetl runs it from (its SH_RUN_PATH), or nothing.
+zfs_rebase_path() {
+	for _d in /sbin /bin /usr/sbin /usr/bin /usr/local/sbin \
+	    /usr/local/bin; do
+		[ -x "$_d/zfs_rebase" ] && { echo "$_d/zfs_rebase"; return 0; }
+	done
+	return 1
+}
+
+# The resolution at $1: every name still unanswered answered onto.
+answer_onto() {
+	sed -e 's/ conflict \([0-9]*\) -$/ conflict \1 onto/' \
+	    -e 's/^#unanswered [0-9]*$/#unanswered 0/' "$1" >"$1.box" &&
+	    mv "$1.box" "$1"
+}
+
+# The update of $1 taken through every gate it pauses at, each answered
+# onto: RC its last exit; SEEN 1 if a gate's resolution named $2.
+update_through() {
+	sht update -y "$1"
+	sed 's/^/    /' "$T/out"
+	SEEN=0
+	_n=0
+	while [ "$RC" = 3 ] && [ $_n -lt 20 ]; do
+		_res=$(sed -n 's/.*answer \(.*\.resolution\), then.*/\1/p' \
+		    "$T/out")
+		[ -n "$_res" ] || break
+		grep -q "$2" "$_res" && SEEN=1
+		answer_onto "$_res"
+		sht update --continue "$1"
+		sed 's/^/    /' "$T/out"
+		_n=$((_n + 1))
+	done
+	[ "$RC" = 0 ] || sed 's/^/    /' "$T/err"
+}
+
+# U9, W7, K7 (M5): updates on box, the real zfs_rebase.
+updates() {
+	echo "== U9, W7, K7: shbup on box's first version, updated, cut over"
+	if ! _zr=$(zfs_rebase_path); then
+		no "W7 zfs_rebase on shtetl's PATH: install it" \
+		    "(zfs_rebase_tool: make freebsd && make install)"
+		return 0
+	fi
+	ok "W7 zfs_rebase at $_zr"
+	_u=$P/run/containers/shbup
+	_us=$P/run/containers/shbup-staging
+	_lu=$P/shtetl/containers/shbup
+	cat >"$ALT/zconfig/containers/shbup.conf" <<'EOF'
+datasets { "srv/www" {} }
+EOF
+	cat >"$ALT/zconfig/containers/shbab.conf" <<'EOF'
+datasets { "srv/www" {} }
+EOF
+	sht create -y -m "the first" shbup --on box --version "$_v"
+	check U9 "created on box's first version" \
+	    "$RC $(prop $_u origin)" "0 $_rf@$_v"
+	if [ "$RC" != 0 ]; then
+		sed 's/^/    /' "$T/err"
+		echo "skip U9 and K7: no container"
+		return 0
+	fi
+	_um=$(prop $_u mountpoint)
+	case "$_um" in
+	"$ALT"/?*)
+		;;
+	*)
+		no "U9 its mount below the altroot: got [$_um]"
+		return 0
+		;;
+	esac
+	# a history: an edit the update meets, then one it does not
+	echo "an admin's line" >>"$_um/usr/share/misc/bsd-family-tree"
+	echo hello >"$_um/srv/www/index.html"
+	sht save -m "the family tree edited" shbup
+	check U9 "the second save" "$RC" 0
+	echo "another line" >>"$_um/etc/motd.template"
+	sht save -m "motd" shbup
+	check U9 "the third save" "$RC" 0
+	update_through shbup "bsd-family-tree conflict"
+	check U9 "paused at the family tree's conflict, answered onto" \
+	    "$SEEN" 1
+	check U9 "taken up, staged" "$RC" 0
+	check U9 "the staging tree on box's newest" "$(prop $_us origin)" \
+	    "$_rf@$_v2-pkg"
+	_usm=$(prop $_us mountpoint)
+	_ft=$_usm/usr/share/misc/bsd-family-tree
+	check U9 "the family tree onto's, the update's" \
+	    "$(grep -c "an admin's line" "$_ft")" 0
+	check U9 "the later edit replayed" \
+	    "$(grep -c '^another line$' "$_usm/etc/motd.template")" 1
+	check U9 "its own www cloned from the from-save" \
+	    "$(cat "$_usm/srv/www/index.html" 2>/dev/null)" hello
+	check U9 "the saves replayed, their commits kept" \
+	    "$(zfs list -H -t snapshot -o shtetl:commit $_us |
+	    grep -c '^motd$')" 1
+	check U9 "the staging tree's jail running" \
+	    "$(jls -j shbup-staging name 2>/dev/null)" shbup-staging
+	check U9 "x stopped meanwhile" "$(jls -j shbup jid 2>/dev/null)" ""
+	if [ -s /var/db/shtetl/update/shbup/update.log ]; then
+		ok "W7 the tool's output in the update's log"
+	else
+		no "W7 the tool's output in the update's log"
+	fi
+	sht cutover -y shbup
+	sed 's/^/    /' "$T/out"
+	check K7 "cutover's exit" "$RC" 0
+	[ "$RC" = 0 ] || sed 's/^/    /' "$T/err"
+	check K7 "shbup on box's newest, the staging tree gone" \
+	    "$(prop $_u origin) $(zfs list -H -o name $_us 2>/dev/null)" \
+	    "$_rf@$_v2-pkg "
+	check K7 "its jail running again" "$(jls -j shbup name 2>/dev/null)" \
+	    shbup
+	check K7 "the old tree archived in zlake" "$(zfs list -H -o name \
+	    -r $P/shtetl/archive/containers |
+	    grep -c '/shbup-[0-9]*-[0-9]*-[0-9]*$')" 1
+	check K7 "zlake's shbup on box's newest" "$(prop $_lu origin)" \
+	    "$P/shtetl/foundations/box@$_v2-pkg"
+	# an abandon
+	sht create -y -m "the first" shbab --on box --version "$_v"
+	check K7 "shbab created" "$RC" 0
+	update_through shbab "-"
+	check K7 "shbab updated" "$RC" 0
+	sht abandon -y shbab
+	check K7 "abandoned: the staging tree gone, shbab running, unchanged" \
+	    "$RC $(zfs list -H -o name $P/run/containers/shbab-staging \
+	    2>/dev/null)$(jls -j shbab name 2>/dev/null) $(prop \
+	    $P/run/containers/shbab origin)" "0 shbab $_rf@$_v"
 }
 
 cases() {
@@ -670,6 +822,7 @@ EOF
 	check M8 "beamed again: refused, on zrun already" "$RC" 1
 
 	container
+	updates
 
 	echo "== $pass ok, $fail failed"
 	[ "$fail" = 0 ]
