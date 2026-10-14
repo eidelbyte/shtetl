@@ -3,12 +3,16 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
+#include "core/build.h"
 #include "core/err.h"
 #include "core/jail.h"
+#include "core/run.h"
 #include "core/tree.h"
 
 /* MERGED's jailconf pieces, joined, each line a tab in; "" for none. */
@@ -75,4 +79,80 @@ sh_jail_write(const char *file, const char *name, const char *host,
 		return (-1);
 	}
 	return (0);
+}
+
+/* WORDS (four, and NULL) run, the output to LOG or nowhere; E or none. */
+static int
+jl_run(const char *const *words, const char *log, struct sh_err *e)
+{
+	struct sh_err q;
+	struct sh_run r;
+	char *argv[6];
+	size_t i, n;
+	FILE *null;
+	int fd, rc;
+
+	for (n = 0; words[n] != NULL && n < 5; n++)
+		;
+	for (i = 0; i < n; i++) {
+		if ((argv[i] = strdup(words[i])) == NULL) {
+			while (i > 0)
+				free(argv[--i]);
+			if (e != NULL)
+				sh_err_nomem(e);
+			return (-1);
+		}
+	}
+	argv[n] = NULL;
+	null = NULL;
+	if (e == NULL) {
+		if ((null = fopen("/dev/null", "w")) == NULL) {
+			for (i = 0; i < n; i++)
+				free(argv[i]);
+			return (-1);
+		}
+		sh_err_init(&q, null, "");
+	}
+	fd = log != NULL ? open(log, O_WRONLY | O_CREAT | O_APPEND |
+	    O_CLOEXEC, 0644) : -1;
+	(void) memset(&r, 0, sizeof (r));
+	r.ru_argv = argv;
+	r.ru_log = fd;
+	rc = sh_run(&r, e != NULL ? e : &q) == 0 ? 0 : -1;
+	free(r.ru_out);
+	if (fd != -1)
+		(void) close(fd);
+	if (null != NULL)
+		(void) fclose(null);
+	for (i = 0; i < n; i++)
+		free(argv[i]);
+	return (rc);
+}
+
+int
+sh_jail_running(const struct sh_tools *t, const char *name)
+{
+	const char *w[5];
+
+	w[0] = t->tl_jls;
+	w[1] = "-j";
+	w[2] = name;
+	w[3] = "jid";
+	w[4] = NULL;
+	return (jl_run(w, NULL, NULL) == 0);
+}
+
+int
+sh_jail_do(const struct sh_tools *t, const char *file, const char *name,
+    const char *verb, const char *log, struct sh_err *e)
+{
+	const char *w[6];
+
+	w[0] = t->tl_jail;
+	w[1] = "-f";
+	w[2] = file;
+	w[3] = verb;
+	w[4] = name;
+	w[5] = NULL;
+	return (jl_run(w, log, e));
 }

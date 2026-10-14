@@ -1360,6 +1360,31 @@ fail:
 	return (-1);
 }
 
+int
+sh_update_record(const char *rundir, const char *name, char *version,
+    size_t vlen, char *from, size_t flen, char *state, size_t slen,
+    struct sh_err *e)
+{
+	struct sh_uplan *p;
+	char path[1100];
+	int r;
+
+	if ((p = calloc(1, sizeof (*p))) == NULL) {
+		sh_err_nomem(e);
+		return (-1);
+	}
+	(void) snprintf(path, sizeof (path), "%s/%s/" SH_UPDATE_RECORD,
+	    rundir, name);
+	state[0] = '\0';
+	if ((r = uq_read(path, p, state, slen, e)) == 0) {
+		(void) snprintf(version, vlen, "%s", p->up_version);
+		(void) snprintf(from, flen, "%s",
+		    p->up_saves[p->up_nsaves - 1]);
+	}
+	free(p);
+	return (r);
+}
+
 void
 sh_update_free(struct sh_uplan *p)
 {

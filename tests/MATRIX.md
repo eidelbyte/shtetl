@@ -653,12 +653,15 @@ a failure {refused, failed part way, after a gate}.
 
 # Family K: cutover and abandon (M5; planning.md 7.9, 7.10; src/core/cutover.c)
 
+A cutover needs an update done, so its tests are check_update.c's,
+after its own.
+
 | cell | scenario | disposition |
 |------|----------|-------------|
-| K1 | refused: no container X; no X-staging; an update of X paused | covered: check_cutover.c |
-| K2 | cutover: X's written@ its from-save, each dataset; above zero said and asked, yes a final save of X; X-staging's jail stopped; its own clones promoted; the old X destroyed on zrun; X-staging renamed X; the jail's block X's again, its path X's; X started; saved | covered: check_cutover.c |
-| K3 | cutover's zlake: the staging mirror's own clones promoted, the old X moved to archive/containers/X-<ISO-date>, the staging mirror renamed X, before the save that mirrors the rest | covered: check_cutover.c |
-| K4 | abandon: X-staging's jail stopped and its block removed; X-staging destroyed on zrun and in zlake; X started | covered: check_cutover.c |
-| K5 | a failure part way said, what is done and what is not | covered: check_cutover.c |
+| K1 | refused: no container X; no X-staging; an update of X paused | covered: check_update.c test_cutover |
+| K2 | cutover: X's written@ its from-save, each dataset; above zero said and asked, yes a final save of X; X-staging's jail stopped; its own clones promoted; the old X destroyed on zrun; X-staging renamed X; the jail's block X's again, its path X's; X started; saved | covered: check_update.c test_cutover |
+| K3 | cutover's zlake: the staging mirror's own clones promoted, the old X moved to archive/containers/X-<ISO-date>, the staging mirror renamed X, before the save that mirrors the rest | covered: check_update.c test_cutover |
+| K4 | abandon: X-staging's jail stopped and its block removed; X-staging destroyed on zrun and in zlake; X started | covered: check_update.c test_cutover |
+| K5 | a failure part way said, what is done and what is not | covered: check_update.c test_cutover |
 | K6 | the command line: cutover and abandon with no container, two, an unknown option | covered: run-cli.sh |
 | K7 | for real: the updated container cut over on the box, its archive in zlake; and an abandon | box: tests/box/build.sh |

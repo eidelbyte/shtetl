@@ -145,3 +145,30 @@ in the placed tree; var's /db/x.db; a failing one paused and run
 again; a source in another dataset warned of); five mutations of the
 gate caught; make check, gate, xcheck. The box owed (U9).
 tracker: m5-gate testing.
+
+## m5-cutover
+
+shtetl cutover [-y] X and shtetl abandon [-y] X (planning.md 7.9,
+7.10), src/core/cutover.c; jail.c gains sh_jail_running and
+sh_jail_do, update.c exports its record (sh_update_record).
+
+- The plan: X and X-staging there, the update's record saying staged;
+  for a cutover, the staging mirror in zlake, X's written@ its
+  from-save per dataset, and X-staging's clones of X's datasets (the
+  promotes). Shown before the confirmation, writes and all.
+- The cutover: a final save if X wrote; X-staging stopped, its clones
+  promoted; X stopped, unmounted, destroyed; X-staging renamed X, the
+  jail's block rewritten; in zlake the same promotes, the old X to
+  archive/containers/X-<date>, the rename; X started and saved, its
+  save going onto the renamed mirror incrementally. A failure stops and
+  says what is done. The abandon: the staging tree gone on both sides,
+  X started.
+- The tests are check_update.c's (test_cutover): a cutover needs an
+  update done, and that file has the world for one.
+
+Verification: check_update 704 checks (K1 - K5: refusals, paused and
+mirrorless; a cutover after the container was written to, its final
+save in the archive, the archive's www a clone of the live www at the
+from-save as P11 found, the next save mirrored; an abandon; a rename
+failing, said); four mutations caught; run-cli K6 (63 cases); make
+check, gate, xcheck. The box owed (K7). tracker: m5-cutover testing.

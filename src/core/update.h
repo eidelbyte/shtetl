@@ -102,6 +102,15 @@ int sh_update_run(struct sh_zfs *z, struct sh_uplan *p,
     const struct sh_rebaser *rb, int tty, time_t now, FILE *out,
     struct sh_err *e);
 
+/*
+ * The record of X's update in RUNDIR (SH_UPDATE_DIR): its target into
+ * VERSION, X's from-save into FROM, its state ("running", "paused",
+ * "staged") into STATE. 1 when there is none; -1 refused, said in E.
+ */
+int sh_update_record(const char *rundir, const char *name, char *version,
+    size_t vlen, char *from, size_t flen, char *state, size_t slen,
+    struct sh_err *e);
+
 void sh_update_free(struct sh_uplan *p);
 
 #endif	/* SH_UPDATE_H */

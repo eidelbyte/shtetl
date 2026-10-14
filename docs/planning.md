@@ -1463,6 +1463,31 @@ Destroying the old tree is the user's decision, made after the soak.
 `shtetl abandon X`: stop X-staging; destroy it and its zlake mirror;
 start X.
 
+As built (M5, `src/core/cutover.c`):
+
+    shtetl cutover [-y] X
+    shtetl abandon [-y] X
+
+- Both refused while the update is not done (paused at a gate, or cut
+  short): `shtetl update --continue` or `--abort` settles it first
+  (PROPOSAL). A cutover is refused while X-staging has no mirror in
+  zlake; a save of it makes one.
+- Cutover: X's `written@<from-save>` read for every dataset and shown;
+  above zero, a final save of X before anything else, which its
+  archive keeps. X-staging's jail stopped; its clones of X's datasets
+  promoted; X's jail stopped if it runs; X unmounted and destroyed;
+  X-staging renamed X, its block removed and X's written again with
+  the new path. In zlake the staging mirror's clones of X's promoted,
+  X moved to `archive/containers/X-<YYYY-MM-DD>` (`-2` and on for
+  another that day, PROPOSAL), the staging mirror renamed X. X started
+  and saved, the save mirrored onto the renamed mirror; the update's
+  record and documents removed, its log kept.
+- A cutover that fails part way stops there and says what it has done;
+  nothing is undone, the old X perhaps being gone (PROPOSAL).
+- Abandon: X-staging's jail stopped and its block removed; X-staging
+  destroyed on zrun and its mirror in zlake; X started if it is not
+  running; the record removed.
+
 ### 7.10 zlake mirrors zrun
 
 zlake/containers and zlake/systems are a mirror of zrun's dataset graph

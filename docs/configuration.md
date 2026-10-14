@@ -1375,6 +1375,8 @@ usage: shtetl [-C dir] command ...
            [--version v]
        shtetl [-C dir] update [-y] [--to v] container
            | --continue container | --abort container
+       shtetl [-C dir] cutover [-y] container
+       shtetl [-C dir] abandon [-y] container
 
   -C dir  the configuration root (the shtetl-recipes clone);
           without it, the config root's mountpoint
@@ -1405,6 +1407,11 @@ usage: shtetl [-C dir] command ...
     its staging tree, which is started; shown first, done once
     confirmed (-y confirms); an update paused at a conflict
     carried on, or given up
+  cutover: the container's staging tree made the container, the
+    old tree archived in zlake; shown first, done once confirmed
+    (-y confirms)
+  abandon: the container's staging tree destroyed, the container
+    started again; shown first, done once confirmed (-y confirms)
 
 exit: 0 done, 1 refused (the reasons are on standard error), 2 usage,
       3 a build paused at a patch, an update at a conflict

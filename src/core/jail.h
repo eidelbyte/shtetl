@@ -6,6 +6,7 @@
 #ifndef	SH_JAIL_H
 #define	SH_JAIL_H
 
+#include "core/build.h"
 #include "core/err.h"
 #include "core/tree.h"
 
@@ -17,5 +18,15 @@
  */
 int sh_jail_write(const char *file, const char *name, const char *host,
     const char *path, const struct sh_node *merged, struct sh_err *e);
+
+/* Whether the jail NAME runs: jls -j NAME, by the tools T. */
+int sh_jail_running(const struct sh_tools *t, const char *name);
+
+/*
+ * jail -f FILE VERB NAME, VERB -c (start) or -r (stop), its output
+ * appended to the file LOG. 0, or -1 said in E.
+ */
+int sh_jail_do(const struct sh_tools *t, const char *file, const char *name,
+    const char *verb, const char *log, struct sh_err *e);
 
 #endif	/* SH_JAIL_H */

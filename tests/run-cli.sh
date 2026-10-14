@@ -134,6 +134,12 @@ t u8-to update x --to
 t u8-both update --continue --abort x
 t u8-tocont update --continue --to v x
 t u8-nozfs update -y x
+
+# K6: cutover and abandon
+t k6-none cutover
+t k6-two cutover x y
+t k6-option abandon --frob x
+t k6-nozfs abandon -y x
 if [ "$(cat build/.flavor 2>/dev/null)" = portable ]; then
 	t b1-nozfs bootstrap --lake tank/shtetl -y
 	t f18-nozfs -C tests/conf/site build generic -y

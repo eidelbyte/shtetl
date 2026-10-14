@@ -388,6 +388,6 @@
     ],
     "provides": "An update finished or given up, X carrying on either way.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing"
   }
 }
