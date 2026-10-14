@@ -373,6 +373,14 @@ answer_onto() {
 	    mv "$1.box" "$1"
 }
 
+# The end of $1's update log, the tool's output in it, into this log:
+# the run's teardown removes the file.
+updlog() {
+	[ -s "/var/db/shtetl/update/$1/update.log" ] || return 0
+	echo "    -- the end of /var/db/shtetl/update/$1/update.log"
+	tail -60 "/var/db/shtetl/update/$1/update.log" | sed 's/^/    /'
+}
+
 # The update of $1 taken through every gate it pauses at, each answered
 # onto: RC its last exit; SEEN 1 if a gate's resolution named $2.
 update_through() {
@@ -390,7 +398,10 @@ update_through() {
 		sed 's/^/    /' "$T/out"
 		_n=$((_n + 1))
 	done
-	[ "$RC" = 0 ] || sed 's/^/    /' "$T/err"
+	if [ "$RC" != 0 ]; then
+		sed 's/^/    /' "$T/err"
+		updlog "$1"
+	fi
 }
 
 # U9, W7, K7 (M5): updates on box, the real zfs_rebase.
@@ -464,7 +475,10 @@ EOF
 	sht cutover -y shbup
 	sed 's/^/    /' "$T/out"
 	check K7 "cutover's exit" "$RC" 0
-	[ "$RC" = 0 ] || sed 's/^/    /' "$T/err"
+	if [ "$RC" != 0 ]; then
+		sed 's/^/    /' "$T/err"
+		updlog shbup
+	fi
 	check K7 "shbup on box's newest, the staging tree gone" \
 	    "$(prop $_u origin) $(zfs list -H -o name $_us 2>/dev/null)" \
 	    "$_rf@$_v2-pkg "
@@ -481,6 +495,10 @@ EOF
 	update_through shbab "-"
 	check K7 "shbab updated" "$RC" 0
 	sht abandon -y shbab
+	if [ "$RC" != 0 ]; then
+		sed 's/^/    /' "$T/err"
+		updlog shbab
+	fi
 	check K7 "abandoned: the staging tree gone, shbab running, unchanged" \
 	    "$RC $(zfs list -H -o name $P/run/containers/shbab-staging \
 	    2>/dev/null)$(jls -j shbab name 2>/dev/null) $(prop \

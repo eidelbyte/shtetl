@@ -273,3 +273,16 @@ snapshots a promote takes along not refused. 15 mutations, all caught
 but two, both dead code and removed (the zlake unmark, the zlake
 look). make check, gate, xcheck. The box owed: build.sh's K7 runs the
 whole cutover; a stopped one is not provoked there.
+
+## The box trip written up (2026-10-14)
+
+tests/box/m5-trip.md: what the box owes since its last runs (run.sh at
+2c89594, build.sh at 2d1ef76), zfs_rebase installed first, the cells
+new or changed, what a failure most likely means, what the box does
+not cover. tests/box/README.md says build.sh's update cells need
+zfs_rebase. build.sh copies the end of an update's own log
+(/var/db/shtetl/update/X/update.log, zfs_rebase's output) into the
+results log when an update, cutover or abandon goes wrong: the run's
+teardown deletes the file, so a failure would otherwise come back
+without the tool's words. Checked with sh -n and the gate; it runs
+with the trip.

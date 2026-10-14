@@ -34,3 +34,9 @@ links the textproc/libucl package), and for the recipes clone
 while its pools (`shbtank`, `shbfast`) exist, or while any other pool
 has a shtetl root, which discovery would find. `sudo sh
 tests/box/run.sh --clean` removes what a crash left.
+
+build.sh's update cells (U9, W7, K7) need the real zfs_rebase on
+shtetl's PATH, where zfs_rebase_tool's `make freebsd && sudo make
+install` puts it (/usr/local/sbin); without it they are skipped, and
+the log says so. A trip's own checklist, when there is one, is beside
+this file (m5-trip.md).
