@@ -611,7 +611,6 @@ struct fb {
 	char			fb_sha[64];
 	char			fb_version[SH_VERSION_MAX];
 	char			fb_cfgsnap[SH_BUILD_NAME + 64];
-	char			fb_cfgguid[64];
 	char			fb_rev[32];	/* REVISION, N.M */
 	struct sh_pause		fb_pz;		/* the patches, so far */
 	struct fb_pa		*fb_pa;
@@ -901,9 +900,7 @@ fb_begin(struct fb *b, time_t now)
 		(void) snprintf(b->fb_cfgsnap, sizeof (b->fb_cfgsnap),
 		    "%s@build-%s-%s-%d", p->fp_config, p->fp_name, stamp, n);
 	one = b->fb_cfgsnap;
-	if (sh_zfs_snapshot(b->fb_z, &one, 1, &kind, 1, b->fb_err) != 0 ||
-	    sh_zfs_get(b->fb_z, b->fb_cfgsnap, "guid", b->fb_cfgguid,
-	    sizeof (b->fb_cfgguid), NULL, b->fb_err) != 0)
+	if (sh_zfs_snapshot(b->fb_z, &one, 1, &kind, 1, b->fb_err) != 0)
 		return (-1);
 	(void) fprintf(b->fb_out, "snapshot %s\n", b->fb_cfgsnap);
 	return (0);
@@ -1589,7 +1586,7 @@ fb_resume(struct fb *b)
 {
 	struct sh_fplan *p = b->fb_p;
 	struct sh_pause *pz = &p->fp_pause;
-	char snap[SH_BUILD_NAME + 32];
+	char snap[SH_BUILD_NAME + 32], val[SH_ZFS_VALMAX];
 	long major, minor;
 	size_t i, at;
 
@@ -1606,8 +1603,9 @@ fb_resume(struct fb *b)
 		return (-1);
 	if (b->fb_msg == NULL && pz->pz_msg[0] != '\0')
 		b->fb_msg = pz->pz_msg;
-	if (sh_zfs_get(b->fb_z, b->fb_cfgsnap, "guid", b->fb_cfgguid,
-	    sizeof (b->fb_cfgguid), NULL, b->fb_err) != 0)
+	/* the recipe was read from it; gone, the build stays paused */
+	if (sh_zfs_get(b->fb_z, b->fb_cfgsnap, "type", val, sizeof (val),
+	    NULL, b->fb_err) != 0)
 		return (-1);
 	fb_push(b, FU_UNLOCK, 0, p->fp_src);
 	for (i = 0; i < p->fp_nds; i++)
@@ -2674,9 +2672,7 @@ fb_snapshot(struct fb *b, const char *msg, const char *kind)
 	zp[1].zp_value = msg;
 	zp[2].zp_name = "shtetl:config";
 	zp[2].zp_value = b->fb_cfgsnap;
-	zp[3].zp_name = "shtetl:config-guid";
-	zp[3].zp_value = b->fb_cfgguid;
-	nzp = 4;
+	nzp = 3;
 	if (b->fb_rev[0] != '\0') {
 		zp[nzp].zp_name = "shtetl:revision";
 		zp[nzp++].zp_value = b->fb_rev;
@@ -2910,8 +2906,6 @@ sh_pkg_run(struct sh_zfs *z, struct sh_fplan *p,
 	if (fb_mkdirs(b, p->fp_rundir) != 0 ||
 	    sh_zfs_get(z, snap, "shtetl:config", b->fb_cfgsnap,
 	    sizeof (b->fb_cfgsnap), NULL, e) != 0 ||
-	    sh_zfs_get(z, snap, "shtetl:config-guid", b->fb_cfgguid,
-	    sizeof (b->fb_cfgguid), NULL, e) != 0 ||
 	    sh_zfs_get(z, snap, "shtetl:patches", b->fb_prec,
 	    sizeof (b->fb_prec), NULL, e) != 0 ||
 	    sh_zfs_get(z, snap, "shtetl:revision", b->fb_rev,

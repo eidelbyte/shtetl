@@ -512,7 +512,7 @@ test_run(void)
 		NULL
 	};
 	struct utsname u;
-	char want[2048], guid[64];
+	char want[2048];
 	enum sh_zsrc src;
 
 	config("run", recipe);
@@ -539,9 +539,7 @@ test_run(void)
 	CHECK(is(prop(F "/var@" VERSION, "shtetl:revision", NULL), "15.1"));
 	CHECK(is(prop(F "@" VERSION, "shtetl:config", NULL),
 	    "tank/zconfig@build-generic-20261008-120000"));
-	(void) snprintf(guid, sizeof (guid), "%s",
-	    prop("tank/zconfig@build-generic-20261008-120000", "guid", NULL));
-	CHECK(is(prop(F "@" VERSION, "shtetl:config-guid", NULL), guid));
+	CHECK(is(prop(F "@" VERSION, "shtetl:config-guid", NULL), "-"));
 	CHECK(is(prop("tank/zconfig@build-generic-20261008-120000",
 	    "shtetl:kind", NULL), "config"));
 	/* the datasets as made */

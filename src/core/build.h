@@ -134,9 +134,9 @@ void sh_build_show(FILE *out, const struct sh_fplan *p);
  * and the commands in a chroot of F; everything unmounted; F and its
  * datasets snapshotted as the version, NOW's day, carrying
  * shtetl:kind=version, shtetl:commit (MSG, or a message of the
- * build's own), shtetl:config and shtetl:config-guid. On a failure,
- * everything done is undone, a new F's datasets destroyed, and the
- * logs left in the run directory. 0, or -1 with the reasons in E.
+ * build's own) and shtetl:config. On a failure, everything done is
+ * undone, a new F's datasets destroyed, and the logs left in the run
+ * directory. 0, or -1 with the reasons in E.
  *
  * With the recipe's patches (7.1.1): fetched, applied after the
  * checkout, the build root rolled back at the end, shtetl:patches on
@@ -159,7 +159,7 @@ int sh_build_run(struct sh_zfs *z, struct sh_fplan *p,
  * version or the pkg upgrade of one, its packages upgraded in a chroot
  * of F, and F and its datasets snapshotted as that version's -pkg
  * (-pkg.2 and on after the first), shtetl:kind=pkg, carrying the
- * version's shtetl:config, shtetl:config-guid and shtetl:patches.
+ * version's shtetl:config and shtetl:patches.
  * Planned into P: refused with no lake or build root, no such
  * foundation, F with no version, a build under way or paused (the
  * upgrade takes the build root's mark too). Run like a build, undone

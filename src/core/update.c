@@ -1279,9 +1279,9 @@ static int
 uq_finish(struct uq *c)
 {
 	struct sh_uplan *p = c->c_p;
-	struct sh_zprop zp[4];
+	struct sh_zprop zp[3];
 	char names[SH_UPDATE_DS][SH_UPDATE_NAME * 3], ds[SH_UPDATE_NAME * 2];
-	char mp[SH_ZFS_VALMAX], msg[SH_UPDATE_NAME * 3], guid[64], snap[256];
+	char mp[SH_ZFS_VALMAX], msg[SH_UPDATE_NAME * 3], snap[256];
 	const char *np[SH_UPDATE_DS];
 	size_t i;
 
@@ -1299,18 +1299,13 @@ uq_finish(struct uq *c)
 		}
 		(void) snprintf(msg, sizeof (msg), "update to %s@%s",
 		    p->up_found, p->up_version);
-		if (sh_zfs_get(c->c_z, p->up_cfgsnap, "guid", guid,
-		    sizeof (guid), NULL, c->c_err) != 0)
-			return (-1);
 		zp[0].zp_name = "shtetl:kind";
 		zp[0].zp_value = "version";
 		zp[1].zp_name = "shtetl:commit";
 		zp[1].zp_value = msg;
 		zp[2].zp_name = "shtetl:config";
 		zp[2].zp_value = p->up_cfgsnap;
-		zp[3].zp_name = "shtetl:config-guid";
-		zp[3].zp_value = guid;
-		if (sh_zfs_snapshot(c->c_z, np, p->up_nds, zp, 4,
+		if (sh_zfs_snapshot(c->c_z, np, p->up_nds, zp, 3,
 		    c->c_err) != 0)
 			return (-1);
 		(void) fprintf(c->c_out, "snapshot %s@%s\n", p->up_stage,

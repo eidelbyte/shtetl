@@ -28,7 +28,6 @@ struct sh_save {
 	char	sv_origin[SH_SAVE_DS][SH_SAVE_NAME * 2];	/* "": own */
 	size_t	sv_n;
 	char	sv_config[SH_SAVE_NAME * 2];	/* the config snapshot */
-	char	sv_guid[64];
 };
 
 /*
@@ -41,8 +40,8 @@ int sh_save_target(const char *target, char *name, size_t len,
 /*
  * The plan for saving the container TARGET into P: its datasets,
  * parents first, each a clone of a foundation's version on zrun or
- * the container's own; shtetl:config and its guid from CONFIG, a
- * config snapshot, or else from X's newest save. Refused, with every
+ * the container's own; shtetl:config from CONFIG, a config
+ * snapshot, or else from X's newest save. Refused, with every
  * reason: no lake or run root; no such container; a dataset a clone
  * of something not a foundation's; nothing to take shtetl:config
  * from.

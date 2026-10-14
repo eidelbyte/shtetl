@@ -213,8 +213,7 @@ test_saves(void)
 	    src == SH_ZSRC_LOCAL);
 	CHECK(is(prop(RX "@" S1, "shtetl:commit", NULL), "first"));
 	CHECK(is(prop(RX "@" S1, "shtetl:config", NULL), CFG));
-	CHECK(is(prop(RX "@" S1, "shtetl:config-guid", NULL),
-	    prop(CFG, "guid", NULL)));
+	CHECK(is(prop(RX "@" S1, "shtetl:config-guid", NULL), "-"));
 	/* S3: the mirror */
 	CHECK(strstr(ran, "mirrored " LX "@" S1 ", a clone of zlake's "
 	    "foundation\n") != NULL);

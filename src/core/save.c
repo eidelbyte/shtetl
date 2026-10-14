@@ -48,7 +48,7 @@ sh_save_target(const char *target, char *name, size_t len,
 	return (0);
 }
 
-/* X's newest save's shtetl:config and its guid into P; 1: none. */
+/* X's newest save's shtetl:config into P; 1: none. */
 static int
 sv_lastconfig(struct sh_zfs *z, struct sh_save *p, struct sh_err *e)
 {
@@ -72,9 +72,7 @@ sv_lastconfig(struct sh_zfs *z, struct sh_save *p, struct sh_err *e)
 		if (strcmp(kind, "save") != 0)
 			continue;
 		r = sh_zfs_get(z, name, "shtetl:config", p->sv_config,
-		    sizeof (p->sv_config), NULL, e) != 0 ||
-		    sh_zfs_get(z, name, "shtetl:config-guid", p->sv_guid,
-		    sizeof (p->sv_guid), NULL, e) != 0 ? -1 : 0;
+		    sizeof (p->sv_config), NULL, e) != 0 ? -1 : 0;
 	}
 	sh_zw_free(snaps);
 	return (r);
@@ -159,8 +157,8 @@ sh_save_plan(struct sh_zfs *z, const struct sh_spaces *s,
 	if (config != NULL) {
 		(void) snprintf(p->sv_config, sizeof (p->sv_config), "%s",
 		    config);
-		if (sh_zfs_get(z, config, "guid", p->sv_guid,
-		    sizeof (p->sv_guid), NULL, e) != 0) {
+		if (sh_zfs_get(z, config, "type", val, sizeof (val), NULL,
+		    e) != 0) {
 			sh_errf(e, "%s: no such config snapshot", config);
 			return (-1);
 		}
@@ -278,9 +276,7 @@ sh_save_run(struct sh_zfs *z, const struct sh_save *p, const char *msg,
 	zp[1].zp_value = msg;
 	zp[2].zp_name = "shtetl:config";
 	zp[2].zp_value = p->sv_config;
-	zp[3].zp_name = "shtetl:config-guid";
-	zp[3].zp_value = p->sv_guid;
-	if (sh_zfs_snapshot(z, np, p->sv_n, zp, 4, e) != 0)
+	if (sh_zfs_snapshot(z, np, p->sv_n, zp, 3, e) != 0)
 		return (-1);
 	(void) fprintf(out, "saved %s@%s\n", p->sv_run, snap);
 	for (i = 0; i < p->sv_n; i++) {

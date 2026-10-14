@@ -223,8 +223,8 @@ file. The history of the site's files is zconfig's snapshots:
   and before any git operation;
 - every snapshot shtetl takes anywhere (a foundation version, a save,
   an update's result) records the config snapshot it was made with in
-  `shtetl:config` (name and guid), so any build or save leads back to
-  the exact recipes that produced it.
+  `shtetl:config`, by name, so any build or save leads back to the
+  exact recipes that produced it.
 
 Sharing a file (PROPOSAL): `shtetl share containers/nginx.conf` runs
 `git add -f` on it. A tracked file is no longer subject to
@@ -742,8 +742,8 @@ As built (M3, `src/core/build.c`; patches in 7.1.1; updates to come):
   the build snapshots: `-C` may name only that one. The snapshot is
   `<config root>@build-F-<YYYYmmdd-HHMMSS>` (`-2`, `-3` after it for
   another build in the same second), `shtetl:kind=config`,
-  and the version records it in two properties, `shtetl:config` (its
-  name) and `shtetl:config-guid` (PROPOSAL).
+  and the version records its name in `shtetl:config` (PROPOSAL; its
+  guid dropped, ruled 2026-10-14, 14).
 - One build at a time: `shtetl:build=F` on the build root while it
   runs (PROPOSAL).
 - The obj cache is mounted at `<run dir>/obj` and F at
@@ -769,8 +769,8 @@ As built (M3, `src/core/build.c`; patches in 7.1.1; updates to come):
   Commands: each piece `chroot <root> /bin/sh -e -c`, in order
   (PROPOSAL).
 - The version is every dataset of F at once, with `shtetl:kind`,
-  `shtetl:commit` (`-m`, or "build <branch> at <commit>"),
-  `shtetl:config` and `shtetl:config-guid`.
+  `shtetl:commit` (`-m`, or "build <branch> at <commit>") and
+  `shtetl:config`.
 - Every step that changes something is recorded and undone on a
   failure anywhere: mounts, mountpoints, the mark, and a new F's
   datasets, which are destroyed. The config snapshot, the obj cache
@@ -1000,9 +1000,9 @@ the build root's mark taken, so it and a build never overlap; F and
 its datasets mounted below the run directory, placeholders not;
 devfs and the host's resolv.conf while pkg runs; `pkg -c <root>
 upgrade -y`; the snapshot `<version>-pkg` (`-pkg.2` and on after the
-first), `shtetl:kind=pkg`, carrying the version's `shtetl:config`,
-`shtetl:config-guid` and `shtetl:patches` (PROPOSAL); on a failure, F
-back to its last snapshot.
+first), `shtetl:kind=pkg`, carrying the version's `shtetl:config`
+and `shtetl:patches` (PROPOSAL); on a failure, F back to its last
+snapshot.
 
 **`install -C`** (ruled 2026-10-11, Q-O). Left to itself, installworld
 rewrites every file, so on the onto side every file has a new object,
@@ -1807,6 +1807,30 @@ the update is done or fails, and started again when it fails; the
 staging jail X-staging with X's hostname; a failing derivation pauses;
 cutover and abandon wait for the update to be done; the archive is
 `archive/containers/X-<old version>`. The seventh is ruled below.
+
+### 2026-10-14 (fewer properties, fewer config snapshots)
+
+Asked what every `shtetl:` property is for, the user answered: "we
+can cut down on some noise. We only need to snapshot config if the
+file is different from the last snapshot. the config snaps can be more
+arbitrarily named than they currently are. We can just use like
+@[three-little-words] type solution. Let's also not keep
+shtetl:config-guid, it's paranoid. unless there's a reason to hang
+onto it (like searching for a snap by guid is easier in code).
+shtetl:revision is redundant against snapshot name, but I do
+understand how string parsing is annoying. We may then want a
+shtetl:src_branch too? does shtetl:replayed-from actually get used?
+the snap is the same name, right? is this vaguely useless?"
+
+So: `shtetl:config-guid` goes (nothing compared it; snapshots are
+found by name). `shtetl:replayed-from` goes: nothing read it, and a
+replayed save has the original's name in the staging dataset. A build,
+create or update takes a config snapshot only when ZFS says the config
+root was written to since the newest one (`written@`), and otherwise
+records that one; a new one is named three words, and its
+`shtetl:commit` says what took it. `shtetl:revision` stays (create and
+update check `ver` against it; version names are built, never parsed);
+no `shtetl:src_branch`, nothing would read it.
 
 ### 2026-10-14 (a cutover stopped part way)
 

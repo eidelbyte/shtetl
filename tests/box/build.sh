@@ -652,8 +652,8 @@ EOF
 	_c=$(prop "$F@$_v" shtetl:config)
 	check F11 "shtetl:config names the config snapshot" \
 	    "$(zfs list -H -o name "$_c" 2>/dev/null)" "$_c"
-	check F11 "shtetl:config-guid is its guid" \
-	    "$(prop "$F@$_v" shtetl:config-guid)" "$(prop "$_c" guid)"
+	check F11 "no shtetl:config-guid" \
+	    "$(prop "$F@$_v" shtetl:config-guid)" -
 	case "$(prop "$F@$_v" shtetl:commit)" in
 	"build $BRANCH at "*) ok "F17 shtetl:commit, the build's own" ;;
 	*) no "F17 shtetl:commit: $(prop "$F@$_v" shtetl:commit)" ;;
