@@ -212,3 +212,64 @@ pool's datasets from being destroyed, and stops every test jail.
 Verification: check_update 731 checks (U1's refusals from ZFS, the
 state after a run, a pause and an abort, the mark; K's archive name
 and its refusal); make check, gate, xcheck.
+
+## A cutover carried on (2026-10-14)
+
+Ruled 2026-10-14 (planning.md 14): a cutover or an abandon stopped part
+way is carried on by the same command. src/core/cutover.c rewritten
+around it; nothing records progress, every step asks ZFS whether it
+is done.
+
+- Where it stands, from the four trees (X, X-staging, and their zlake
+  mirrors) and X's shtetl:update mark. X-staging there: from the start,
+  or (X gone) from the rename. X-staging gone from zrun: X's newest
+  marked snapshot names the target, and X's newest shtetl:kind version
+  snapshot is that target when X is the staging tree renamed (a
+  cutover stopped after the rename), or is not (an abandon stopped
+  after the staging tree's destroy). The replayed from-save carries the
+  mark because the replay copies shtetl:* (uq_snapprops), so the
+  renamed tree is recognisable; the last step takes every mark off X.
+  zlake's half: the old mirror archived while both mirrors are there,
+  the staging mirror renamed while it is.
+- sh_update_state now answers DONE with FROM "" when X is gone (a
+  cutover stopped between the destroy and the rename); before, it
+  refused on the missing snapshots.
+- Idempotent steps: jails stopped or started only when jls says so;
+  the jail blocks written each run; promotes only of datasets still
+  clones of the old tree's; the closing save skipped when X's newest
+  save already carries "cutover to V" (otherwise a run stopped at the
+  unmark would save twice); X's written@ read only before any promote,
+  since a promote takes the snapshot it is measured from (found by the
+  destroy cell: the re-plan asked written@ of a snapshot that had
+  moved).
+- Refused in the plan, every reason said, nothing done: a hold on a
+  snapshot of the old X, or a clone of one outside it (walking the run
+  root), unless the promotes take that snapshot along (kp_moves: a
+  staging clone of the same dataset at or after it); a staging
+  dataset's snapshot named like one its promote would take over, on
+  zrun and in zlake; the archive's name taken. An abandon is refused
+  once a cutover has begun promoting or destroyed X (sh_zw_destroy
+  would otherwise destroy half of the staging tree and stop on a
+  snapshot the old X's datasets are now clones of), and on a hold or
+  outside clone on the staging tree.
+- Dropped: unmarking zlake. Its snapshots never carry the mark (a save
+  sends only the newest snapshot, and X's from-save is marked after its
+  save), and a mutation removing that step showed no test could see it.
+  Also a run-time look for zlake's X before the archive rename, which
+  the plan already decides.
+- The fake: zfake_hold, userrefs, and a destroy of a held snapshot
+  refused (EBUSY in dsl_destroy_snapshot_check_impl). The test jail
+  fails a start while a scratch file jailfails is there.
+
+Verification: check_update 1296 checks. K5 runs a cutover stopped by
+a failure at each of: the zrun rename, the archive rename, the staging
+mirror's rename, either promote, the destroy, X's jail start, the
+save, the unmark; each run again from a fresh plan (which says where
+it takes up) to the whole run's end, with one closing save. K8: abandon
+refused after a promote and after the destroy; an abandon stopped at
+the jail start, and one with the zlake mirror left, taken up; done,
+nothing to take up. K9: the plan's refusals, the held and cloned
+snapshots a promote takes along not refused. 15 mutations, all caught
+but two, both dead code and removed (the zlake unmark, the zlake
+look). make check, gate, xcheck. The box owed: build.sh's K7 runs the
+whole cutover; a stopped one is not provoked there.

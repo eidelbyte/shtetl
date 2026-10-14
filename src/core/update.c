@@ -323,6 +323,9 @@ sh_update_state(struct sh_zfs *z, const char *run, const char *stage,
 	if (version[0] == '\0')
 		return (SH_US_UNDERWAY);
 	/* X's from-save: its newest save marked with the target */
+	if ((r = sh_zfs_get(z, run, "type", val, sizeof (val), NULL,
+	    e)) != 0)
+		return (r == 1 ? SH_US_DONE : -1);
 	if ((snaps = sh_zw_snaps(z, run, e)) == NULL)
 		return (-1);
 	for (i = 0; snaps[i] != NULL; i++) {

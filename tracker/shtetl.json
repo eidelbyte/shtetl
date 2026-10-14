@@ -388,6 +388,7 @@
     ],
     "provides": "An update finished or given up, X carrying on either way.",
     "estimated_size": "medium",
-    "completed": "testing"
+    "completed": "testing",
+    "note": "2026-10-14: carried on when stopped part way (ruled, planning.md 14): every step asks ZFS whether it is done; the plan refuses on holds, outside clones, promote name clashes, the archive name; abandon refused once a cutover has promoted. MATRIX K5, K8, K9; check_update 1296 checks. Box owed (K7)."
   }
 }

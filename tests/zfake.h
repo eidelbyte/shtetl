@@ -38,6 +38,9 @@ int zfake_exists(const char *ds);
  */
 int zfake_snapshot(const char *name);
 
+/* A hold on the snapshot SNAP: userrefs counts it, destroy refuses. */
+void zfake_hold(const char *snap);
+
 /* BYTES written to DS now, which written@ counts after its snapshots. */
 void zfake_write(const char *ds, unsigned long bytes);
 const char *zfake_last_snapshot(void);

@@ -46,6 +46,7 @@ struct zf_snap {
 	int		zs_n;
 	unsigned long	zs_txg;
 	unsigned long	zs_guid;
+	int		zs_holds;	/* zfake_hold's */
 };
 
 struct sh_zfs {
@@ -504,6 +505,11 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 	if (zf_fails("destroy", e))
 		return (-1);
 	if ((s = zf_snap(name)) != NULL) {
+		/* dsl_destroy_snapshot_check_impl: EEXIST cloned, EBUSY held */
+		if (s->zs_holds > 0) {
+			sh_errf(e, "zfake: %s: has holds", name);
+			return (-1);
+		}
 		for (i = 0; i < zf_n; i++) {
 			if (strcmp(zf_ds[i].zd_origin, name) == 0) {
 				sh_errf(e, "zfake: %s: has clones", name);
@@ -764,6 +770,16 @@ sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
 	np->zs_txg = ++zf_txg;
 	np->zs_guid = sp->zs_guid;
 	return (0);
+}
+
+void
+zfake_hold(const char *snap)
+{
+	struct zf_snap *s;
+
+	if ((s = zf_snap(snap)) == NULL)
+		zf_die("no such snapshot", snap);
+	s->zs_holds++;
 }
 
 void
@@ -1128,6 +1144,10 @@ zf_get_snap(const char *name, const char *prop, char *val, size_t len,
 	if (strcmp(prop, "createtxg") == 0 || strcmp(prop, "guid") == 0) {
 		(void) snprintf(val, len, "%lu", prop[0] == 'c' ? s->zs_txg :
 		    s->zs_guid);
+		return (0);
+	}
+	if (strcmp(prop, "userrefs") == 0) {
+		(void) snprintf(val, len, "%d", s->zs_holds);
 		return (0);
 	}
 	if (strchr(prop, ':') == NULL) {

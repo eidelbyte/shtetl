@@ -113,7 +113,8 @@ enum sh_ustate {
  * The update of X (RUN, run/containers/X) into STAGE, read from ZFS:
  * DONE when STAGE carries a snapshot of shtetl:kind version and no
  * rebase is open in it; its target into VERSION and X's from-save (the
- * newest of X's saves marked SH_UPDATE_MARK) into FROM. -1 refused.
+ * newest of X's saves marked SH_UPDATE_MARK) into FROM, "" with RUN
+ * gone (a cutover part way). -1 refused.
  */
 int sh_update_state(struct sh_zfs *z, const char *run, const char *stage,
     char *version, size_t vlen, char *from, size_t flen, struct sh_err *e);

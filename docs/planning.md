@@ -1478,8 +1478,8 @@ As built (M5, `src/core/cutover.c`):
   short): `shtetl update --continue` or `--abort` settles it first
   (ruled 2026-10-14). A cutover is refused while X-staging has no
   mirror in zlake; a save of it makes one.
-- Cutover: X's `written@<from-save>` read for every dataset and shown;
-  above zero, a final save of X before anything else, which its
+- Cutover: X's `written@<its newest save>` read for every dataset and
+  shown; above zero, a final save of X before anything else, which its
   archive keeps. X-staging's jail stopped; its clones of X's datasets
   promoted; X's jail stopped if it runs; X unmounted and destroyed;
   X-staging renamed X, its block removed and X's written again with
@@ -1490,11 +1490,36 @@ As built (M5, `src/core/cutover.c`):
   onto the renamed mirror. The archive's snapshots are the old X's
   saves as they were mirrored, named `save-<date>-<time>`; the
   version is in its name and its origin.
-- A cutover that fails part way stops there and says what it has done;
-  nothing is undone, the old X perhaps being gone (PROPOSAL).
+  The last step takes `shtetl:update` off X's snapshots: the replayed
+  from-save carries it from X's, and while it does the cutover is not
+  done.
+- Every step asks ZFS first whether it is done, and a cutover stopped
+  part way says to run it again, which carries on from there (ruled
+  2026-10-14, 14). Where it stands is read from the trees: X-staging
+  there and X with it, from the start (X's written read only before
+  the promotes, which take its newest save along); X-staging there and
+  X gone, from the rename; X-staging gone from zrun and X's newest
+  version snapshot the one its marked from-save names, from zlake's
+  half. zlake's half likewise: the old mirror archived while it and the
+  staging mirror are both there, the staging mirror renamed while it
+  is. Jails are started and stopped only when they are not already,
+  the blocks written again each run, and the closing save taken only
+  if X's newest save is not already it.
+- Refused in the plan, before anything changes, with every reason: a
+  hold (`userrefs`) on a snapshot of the old X, or a clone of one
+  outside it found by walking the run root, either of which would keep
+  the destroy from going through, unless the promotes take that
+  snapshot along; a snapshot of a staging dataset with the name of one
+  a promote of it would take over (`dsl_dataset_promote` refuses it),
+  on zrun and in zlake; the archive's name taken.
 - Abandon: X-staging's jail stopped and its block removed; X-staging
   destroyed on zrun and its mirror in zlake; X started if it is not
-  running; the record removed.
+  running; the mark taken off X's from-save. Run again it carries on
+  too: X's from-save still marked and X not the staging tree renamed
+  is an abandon stopped part way. It is refused once a cutover has
+  begun promoting or has destroyed the old X, which only the cutover
+  can finish, and on a hold on X-staging's snapshots or a clone of one
+  outside it.
 
 ### 7.10 zlake mirrors zrun
 
@@ -1781,7 +1806,20 @@ from ZFS and its from-save marked `shtetl:update`; X is stopped until
 the update is done or fails, and started again when it fails; the
 staging jail X-staging with X's hostname; a failing derivation pauses;
 cutover and abandon wait for the update to be done; the archive is
-`archive/containers/X-<old version>`. The seventh is open.
+`archive/containers/X-<old version>`. The seventh is ruled below.
+
+### 2026-10-14 (a cutover stopped part way)
+
+Answered that the cutover's steps are separate, and offered to build
+it to carry on from where it stopped: "On 7: Ok I get why this could
+fail. Building it to continue from where it got to is good." So
+(7.9): every step of a cutover or an abandon asks first whether it is
+done, and the same command run again carries on; where it stands is
+read from the trees and X's `shtetl:update` mark, which the last step
+takes off. What would stop it part way that can be seen beforehand --
+holds and clones keeping the old X, a promote's name clash, the
+archive's name taken -- is refused in the plan. An abandon is refused
+once a cutover has begun promoting.
 
 ### 2026-10-14 (commands-external)
 
