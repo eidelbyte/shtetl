@@ -1066,13 +1066,13 @@ As built (M4, `src/core/create.c`):
     shtetl create [-y] [-m msg] X --on F [--version v]
 
 - Checked first, every reason said: the lake, run and config roots; X
-  a container name, and not digits only (PROPOSAL: jail(8) takes
-  digits for a jail's id); X not on zrun; X's recipe; F in zlake with
+  a container name, and not digits only (ruled 2026-10-14: jail(8)
+  takes digits for a jail's id); X not on zrun; X's recipe; F in zlake with
   a version; the version, F's newest version or -pkg by default, or
   the one given; X's `ver` met by the version's `shtetl:revision`
   (REVISION, which the build records); each of `requires` a container
-  on zrun (PROPOSAL: only that; one container mounting another's data
-  is later work).
+  on zrun (ruled 2026-10-14: only that it is there, not that it
+  runs; one container mounting another's data is later work).
 - X's datasets: F's at the version (one F split later is not the
   version's), each a clone, a placeholder `canmount=off`; a property
   X's recipe gives one of F's set on its clone from its birth; X's own
@@ -1083,13 +1083,15 @@ As built (M4, `src/core/create.c`):
   version beamed if zrun lacks it (7.3); the clones, parents first;
   X's own; each that mounts mounted (not `canmount=off`, `none` or
   `legacy`); the host's `/etc/resolv.conf` copied in where X has none,
-  before rc runs (PROPOSAL: kept, the jail resolves names with it);
+  before rc runs, and kept, the jail resolving names with it (ruled
+  2026-10-14; to be done by shtetl.conf's commands for containers);
   the jail's block written and the jail started; `pkg -j X install
   -y` with every package; each command piece by `jexec X /bin/sh -e
   -c`; the first save (7.5), its message `-m`'s or `create X on F@v`.
-- The jail (PROPOSAL, after parasa's): its block is shtetl's, written
-  whole to `/etc/jail.conf.d/X.conf`: `path` the container's mount as
-  ZFS reports it, `host.hostname` X, `exec.start "/bin/sh /etc/rc"`,
+- The jail (ruled 2026-10-14, after parasa's): its block is shtetl's,
+  written whole to `/etc/jail.conf.d/X.conf`: `path` the container's
+  mount as ZFS reports it, `host.hostname` X,
+  `exec.start "/bin/sh /etc/rc"`,
   `exec.stop "/bin/sh /etc/rc.shutdown jail"`, `exec.clean`,
   `mount.devfs`, `devfs_ruleset = 4`, `ip4` and `ip6` inherited, then
   the recipe's `jailconf`, a tab in. It is started with `jail -f
@@ -1633,6 +1635,26 @@ below that change the plan are folded into the sections named.
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-14 (the jails)
+
+Asked the five particulars of create's jails (7.4 as built): "1: yes
+each container installs in /etc/jail.conf.d/ (also shtetl.conf should
+have a system command to add that dir to the default /etc/jail.conf)
+2: yes 3: yes, we'll do this through shtetl.conf>container>commands
+4: I think thats ok? not sure if we should require that theyre
+running. probably not. 5: yes".
+
+So (7.4): each container's block is shtetl's, whole, in
+`/etc/jail.conf.d/X.conf`; commands run by `jexec`, packages by
+`pkg -j`; `requires` asks only that each container is there, not that
+it runs; a name of digits only is refused. The host's resolv.conf goes
+into a container, as built for now, to be done by shtetl.conf's
+commands for containers; and shtetl.conf is to carry a command for
+systems adding `.include "/etc/jail.conf.d/*.conf";` to
+`/etc/jail.conf` (FreeBSD ships the directory and no jail.conf), so
+that rc.d/jail starts every container with `jail_enable` alone. Both
+wait on how shtetl.conf gives a command to one kind of recipe only.
 
 ### 2026-10-14 (Q-AB: shtetl-recipes by default)
 

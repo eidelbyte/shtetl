@@ -1,18 +1,20 @@
 /*
  * shtetl create X --on F (planning.md 7.4).
  *
- * Decided here, beyond the plan (PROPOSAL): the jail's block is shtetl's,
- * written whole to /etc/jail.conf.d/X.conf, the directory FreeBSD's own
- * rc.d/jail reads a jail's file from; it holds what parasa's jails
- * held (rc's start and stop, exec.clean, mount.devfs, devfs_ruleset 4,
- * the host's network inherited, which a jail lacks by default), then
- * the recipe's jailconf. The jail is started with jail -f and -c, and
- * rc.conf is left alone. Commands run by jexec X /bin/sh -e -c, the
- * packages by pkg -j X. The host's resolv.conf is copied in where the
- * container has none, and kept: the jail resolves names with it.
- * requires names containers that must be there; one container mounting
- * another's data is later work. A name of digits only is refused, which
- * jail(8) would take for a jail's id.
+ * Decided here, beyond the plan (ruled 2026-10-14): the jail's block
+ * is shtetl's, written whole to /etc/jail.conf.d/X.conf, the directory
+ * FreeBSD's own rc.d/jail reads a jail's file from; it holds what
+ * parasa's jails held (rc's start and stop, exec.clean, mount.devfs,
+ * devfs_ruleset 4, the host's network inherited, which a jail lacks by
+ * default), then the recipe's jailconf. The jail is started with
+ * jail -f and -c, and rc.conf is left alone. Commands run by jexec X
+ * /bin/sh -e -c, the packages by pkg -j X. The host's resolv.conf is
+ * copied in where the container has none, and kept: the jail resolves
+ * names with it (for now: it is to be done by shtetl.conf's commands
+ * for containers). requires names containers that must be there, not
+ * that they run; one container mounting another's data is later work.
+ * A name of digits only is refused, which jail(8) would take for a
+ * jail's id.
  */
 
 #include <sys/stat.h>
