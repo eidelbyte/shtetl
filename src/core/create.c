@@ -32,6 +32,7 @@
 #include "core/cascade.h"
 #include "core/create.h"
 #include "core/err.h"
+#include "core/jail.h"
 #include "core/run.h"
 #include "core/save.h"
 #include "core/spaces.h"
@@ -609,77 +610,23 @@ cr_datasets_run(struct cr *c)
 	return (0);
 }
 
-/* The jailconf pieces, joined, each line a tab in; "" for none. */
-static char *
-cr_jailconf(const struct sh_cplan *p)
-{
-	const struct sh_node *t;
-	const char *v, *l, *nl;
-	size_t i, len, n;
-	char *s;
-
-	t = sh_obj_get(p->cp_recipe.sr_merged, "jailconf");
-	len = 1;
-	for (i = 0; t != NULL && i < t->sn_obj.ob_n; i++)
-		len += 2 * strlen(t->sn_obj.ob_v[i].pr_val->sn_str) + 2;
-	if ((s = calloc(1, len)) == NULL)
-		return (NULL);
-	n = 0;
-	for (i = 0; t != NULL && i < t->sn_obj.ob_n; i++) {
-		v = t->sn_obj.ob_v[i].pr_val->sn_str;
-		for (l = v; *l != '\0'; l = nl) {
-			if ((nl = strchr(l, '\n')) != NULL)
-				nl++;
-			else
-				nl = l + strlen(l);
-			if (nl - l == 1 && *l == '\n')
-				continue;
-			n += (size_t)snprintf(s + n, len - n, "\t%.*s%s",
-			    (int)(nl - l), l, nl[-1] == '\n' ? "" : "\n");
-		}
-	}
-	return (s);
-}
-
 /* The jail's block written, the jail started (7.4 step 5). */
 static int
 cr_jail(struct cr *c)
 {
 	struct sh_cplan *p = c->c_p;
-	char dir[1024], *conf, *slash;
+	char dir[1024], *slash;
 	const char *w[6];
-	FILE *f;
-	int bad;
 
 	(void) snprintf(dir, sizeof (dir), "%s", p->cp_jailfile);
 	if ((slash = strrchr(dir, '/')) != NULL)
 		*slash = '\0';
 	if (cr_mkdirs(c, dir) != 0)
 		return (-1);
-	if ((conf = cr_jailconf(p)) == NULL) {
-		sh_err_nomem(c->c_err);
-		return (-1);
-	}
-	if ((f = fopen(p->cp_jailfile, "w")) == NULL) {
-		sh_errf(c->c_err, "%s: %s", p->cp_jailfile, strerror(errno));
-		free(conf);
-		return (-1);
-	}
 	c->c_written = 1;
-	(void) fprintf(f, "# written by shtetl for the container %s; the "
-	    "recipe's jailconf\n# is where to change it\n%s {\n"
-	    "\tpath = \"%s\";\n\thost.hostname = \"%s\";\n"
-	    "\texec.start = \"/bin/sh /etc/rc\";\n"
-	    "\texec.stop = \"/bin/sh /etc/rc.shutdown jail\";\n"
-	    "\texec.clean;\n\tmount.devfs;\n\tdevfs_ruleset = 4;\n"
-	    "\tip4 = inherit;\n\tip6 = inherit;\n%s}\n", p->cp_name,
-	    p->cp_name, c->c_path, p->cp_name, conf);
-	free(conf);
-	bad = ferror(f);
-	if (fclose(f) != 0 || bad) {
-		sh_errf(c->c_err, "%s: %s", p->cp_jailfile, strerror(errno));
+	if (sh_jail_write(p->cp_jailfile, p->cp_name, p->cp_name, c->c_path,
+	    p->cp_recipe.sr_merged, c->c_err) != 0)
 		return (-1);
-	}
 	w[0] = c->c_t->tl_jail;
 	w[1] = "-f";
 	w[2] = p->cp_jailfile;
