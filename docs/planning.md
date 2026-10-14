@@ -675,6 +675,13 @@ Each is one of:
 - a quoted date(1) `-v` interval (`"7d"`, `"6m"`, `"1y"`): what is
   younger; `retention` is enforced from cron by `shtetl prune`.
 
+Whatever shtetl runs on a schedule, prune and anything the TUI
+schedules, it runs from cron, not periodic(8) (ruled 2026-10-14): one
+file of shtetl's, written whole from its own settings and never read
+back, in `/usr/local/etc/cron.d/shtetl` (PROPOSAL), which FreeBSD's
+cron reads with `/etc/cron.d` and reloads when it changes; each line
+runs shtetl by its full path, as root.
+
 Quote the interval: unquoted, UCL reads `6m` as 6000000 and `30d` as a
 time in seconds. shtetl reads the string with date(1) units (y, m, w,
 d, H, M, S).
@@ -1635,6 +1642,14 @@ below that change the plan are folded into the sections named.
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-14 (scheduling: cron)
+
+Told that periodic(8) runs from cron, FreeBSD's housekeeping (ZFS
+scrub and trim among it) its daily, weekly and monthly scripts, and
+that cron alone keeps a schedule of one's own: "well lets just use
+cron then instead of pulling in periodic". So (6.3): what shtetl runs
+on a schedule it runs from cron.
 
 ### 2026-10-14 (the jails)
 
