@@ -199,3 +199,16 @@ jail running and named, the command's file, the first save mirrored
 as a clone of zlake's box; the jail stopped and started from its
 block; create again refused; a second save, both mirrored. Owed: the
 box run. tracker: m4-create testing.
+
+## The box: M4 tested
+
+run.sh at 8fa7022 (57e132d): 115 ok, 0 failed. build.sh at 8fa7022
+(build 10, f271e2d): 100 ok, 0 failed: M8's beams; X9, shbweb created
+on box, its jail started, the command run in it, the first save
+mirrored as clones of zlake's box, the jail stopped and started from
+its block, create again refused for it exists; S9, the second save,
+mirrored incrementally; B13, shtetl-recipes cloned from GitHub by
+default. On the way: runs 4 and 5 (Z16, the send's refusals over
+libzfs: the target's newest, then the fake's order) and build 9 (a
+non-clone's origin "-"). tracker: m4-zfs, m4-beam, m4-save, m4-create
+tested.

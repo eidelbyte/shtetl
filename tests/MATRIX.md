@@ -374,7 +374,7 @@ snapshots}; ZFS refusing.
 | Z8 | inherit: the local value gone, the inherited one back | covered: check_zfs.c |
 | Z9 | unmount after mount | covered: check_zfs.c |
 | Z10 | each call refused when ZFS refuses, with ZFS's reason, in the same words over libzfs and the fake | covered: check_zfs.c; the words over libzfs, Z11 |
-| Z11 | the same cells against libzfs on real pools, each refusal by its words | box: tests/box/zcheck.c, run by tests/box/run.sh; make check links it against the stub and runs its cells over the fake (tests/box/zcheck-fake.c). Box run 1: Z8's cell wrong (3b50a35), refusals in errno words; run 2 (c46e87c): 89 ok, 0 failed; run 3 (dc2be99, Z12 and Z13 too): 95 ok, 0 failed; M4's Z14 - Z19 with them, across the two pools (box_zcheck POOL/DATASET OTHER/DATASET); run 4 (f04c6e7, dc592a7): 111 ok, 3 failed, all of them Z16's newest-snapshot refusal, which ZFS's receive does not make (Z16); run 5 (18b78bf, 0904925): 111 ok, 3 failed, Z16's base that is no earlier, said as the newest refusal: the real send's checks now go in the fake's order; run 6 (4c30413, 00912eb): 114 ok, 0 failed |
+| Z11 | the same cells against libzfs on real pools, each refusal by its words | box: tests/box/zcheck.c, run by tests/box/run.sh; make check links it against the stub and runs its cells over the fake (tests/box/zcheck-fake.c). Box run 1: Z8's cell wrong (3b50a35), refusals in errno words; run 2 (c46e87c): 89 ok, 0 failed; run 3 (dc2be99, Z12 and Z13 too): 95 ok, 0 failed; M4's Z14 - Z19 with them, across the two pools (box_zcheck POOL/DATASET OTHER/DATASET); run 4 (f04c6e7, dc592a7): 111 ok, 3 failed, all of them Z16's newest-snapshot refusal, which ZFS's receive does not make (Z16); run 5 (18b78bf, 0904925): 111 ok, 3 failed, Z16's base that is no earlier, said as the newest refusal: the real send's checks now go in the fake's order; run 6 (4c30413, 00912eb): 114 ok, 0 failed; run 7 (8fa7022, 57e132d): 115 ok, 0 failed |
 | Z12 | a mountpoint set or inherited moves mounts as zfs set does: the dataset and those taking their mountpoint from it unmounted, then mounted where it now says if they were mounted or canmount is on; canmount off, none or legacy, unmounted. A set mounts what was not | covered: check_zfs.c; box: zcheck.c, run 3 green (the first real build failed on it, F11) |
 | Z13 | mount: mounted at its mountpoint already, nothing done; mounted elsewhere, no mountpoint, canmount off: refused | covered: check_zfs.c; box: zcheck.c, all but mounted elsewhere (deferred: only zfs set -u makes one, which the interface does not do) |
 | Z14 | a clone (M4): of a snapshot, its properties set from its birth, its origin read back, a filesystem that is no clone's "-" (the box's build 9 met it: libzfs has no value to give, which zfs get shows as "-"); refused: no such snapshot, no parent, the name taken | covered: check_zfs.c; box: zcheck.c |
@@ -525,7 +525,7 @@ received, one failing}.
 | M5 | 6.2: the version's shtetl:* copied onto each received snapshot, nothing else of it; a zrun snapshot without shtetl:kind, an interrupted copy, copied again from zlake first | covered: check_beam.c |
 | M6 | a send failing part way: what this beam received destroyed, the first beam's whole tree, a later one's new snapshots; zrun as it was | covered: check_beam.c |
 | M7 | the command line: beam with no foundation, two, an unknown option, --version with none; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
-| M8 | for real: box beamed after its build, then again after its update, the run root in the build pool | box: tests/box/build.sh |
+| M8 | for real: box beamed after its build, then again after its update, the run root in the build pool | box: tests/box/build.sh, build 10 (f271e2d, at 8fa7022) green |
 
 # Family S: a container's save, and its zlake mirror (M4; planning.md 7.5, 6.2, 7.10; src/core/save.c, src/core/edit.c)
 
@@ -552,7 +552,7 @@ newest save, given by create, neither}.
 | S6 | a mirror failing part way: the save stays on zrun, said; the next save brings every dataset's mirror up to it, each from its own newest | covered: check_save.c |
 | S7 | the message from an editor, as git commit takes one: $VISUAL, $EDITOR or vi, on a file with a comment saying what it is for; lines beginning # left out, trailing blank lines too; empty refused; the editor failing refused | covered: check_save.c |
 | S8 | the command line: save with no container, two, an unknown option, -m with no message; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
-| S9 | for real: a container cloned from box on zrun saved twice, the mirror a clone of zlake's box and then incremental | box: tests/box/build.sh |
+| S9 | for real: a container cloned from box on zrun saved twice, the mirror a clone of zlake's box and then incremental | box: tests/box/build.sh, build 10 (f271e2d, at 8fa7022) green |
 
 # Family X: a new container (M4; planning.md 7.4; src/core/create.c)
 
@@ -581,4 +581,4 @@ own run already}; resolv.conf {there, not}; a failure {at each step}.
 | X6 | the first save: shtetl:config the create's config snapshot, the message -m's or "create X on F@v", mirrored into zlake | covered: check_create.c |
 | X7 | a failure at each step undone: the jail stopped, its block removed, X's datasets destroyed, the config snapshot kept; a failure of the save's mirror after the save leaves X created, said | covered: check_create.c |
 | X8 | the command line: create with no container, two, no --on, an unknown option; the portable shtetl refuses for want of ZFS | covered: run-cli.sh |
-| X9 | for real: a container on box created on the box, its jail started and stopped, saved again (family S's S9 with it) | box: tests/box/build.sh |
+| X9 | for real: a container on box created on the box, its jail started and stopped, saved again (family S's S9 with it) | box: tests/box/build.sh, build 9 (a460f91) failed on a non-clone's origin (Z14), build 10 (f271e2d, at 8fa7022) green |
