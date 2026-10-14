@@ -329,7 +329,7 @@
     ],
     "provides": "Rebases started, continued, aborted and answered, over the real tool or the fake.",
     "estimated_size": "large",
-    "completed": "not-started"
+    "completed": "testing"
   },
   "m5-update": {
     "description": "shtetl update X [--to V] [-y] (planning.md 7.6, 7.6.2, 6.1): the checks; X stopped; the from-save; F mounted; each dataset replayed into X-staging, parents first (step 1 the clone form, placed, steps 2 and on the dataset form with --allow-unrelated --base the previous save, update.depth saves), placeholders cloned from the target, X's own datasets cloned from the from-save; shtetl:* on the replayed snapshots; X-staging snapshotted as the version, its jail written and started, saved (save widened for an own dataset's clone, S10). Paused at a conflicts gate with no terminal (exit 3, PROPOSAL), --continue and --abort. Verify: MATRIX families U, S10; the box.",

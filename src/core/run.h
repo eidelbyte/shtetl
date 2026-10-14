@@ -52,4 +52,10 @@ struct sh_run {
  */
 int sh_run(struct sh_run *r, struct sh_err *e);
 
+/*
+ * The file to exec for NAME into PATH: NAME itself when it has a '/',
+ * else the first executable NAME on SH_RUN_PATH. 0, or -1 for none.
+ */
+int sh_run_find(const char *name, char *path, size_t len);
+
 #endif	/* SH_RUN_H */

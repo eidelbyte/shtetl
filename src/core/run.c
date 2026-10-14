@@ -89,12 +89,8 @@ ru_signame(int sig, char *buf, size_t len)
 	return (buf);
 }
 
-/*
- * The file to exec for NAME: NAME itself when it has a '/', else the
- * first executable NAME on SH_RUN_PATH. 0, or -1 if there is none.
- */
-static int
-ru_find(const char *name, char *path, size_t len)
+int
+sh_run_find(const char *name, char *path, size_t len)
 {
 	const char *p, *end;
 
@@ -342,7 +338,7 @@ sh_run(struct sh_run *r, struct sh_err *e)
 	r->ru_status = 0;
 	r->ru_signal = 0;
 	(void) memset(&rr, 0, sizeof (rr));
-	if (ru_find(name, path, sizeof (path)) != 0) {
+	if (sh_run_find(name, path, sizeof (path)) != 0) {
 		sh_errf(e, "%s: not found on %s", name, SH_RUN_PATH);
 		return (-1);
 	}

@@ -77,7 +77,7 @@ CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o \
 	$(BUILD)/cascade.o $(BUILD)/show.o $(BUILD)/run.o $(BUILD)/spaces.o \
 	$(BUILD)/boot.o $(BUILD)/version.o $(BUILD)/build.o $(BUILD)/patch.o \
 	$(BUILD)/beam.o $(BUILD)/save.o $(BUILD)/edit.o $(BUILD)/zwalk.o \
-	$(BUILD)/create.o
+	$(BUILD)/create.o $(BUILD)/rebase.o
 # src/core/zfs.h has three implementations, picked at the link: the
 # portable shtetl gets src/core/zstub.c, which refuses every call; the
 # FreeBSD one gets src/fbsd/zfs.c, over libzfs; the unit tests get
@@ -85,7 +85,7 @@ CORE_OBJS = $(BUILD)/err.o $(BUILD)/tree.o $(BUILD)/parse.o \
 ZFS_OBJS_portable = $(BUILD)/zstub.o
 ZFS_OBJS_freebsd = $(BUILD)/fbsd_zfs.o
 ZFS_OBJS = $(ZFS_OBJS_$(FLAVOR))
-TEST_OBJS = $(BUILD)/zfake.o
+TEST_OBJS = $(BUILD)/zfake.o $(BUILD)/rbfake.o
 # tests/box/zcheck.c's objects besides the ZFS it checks. make check
 # links it against the stub, so a missing one shows on the mac, and
 # runs its cells over the fake (tests/box/zcheck-fake.c).
@@ -93,7 +93,8 @@ BOX_OBJS = $(BUILD)/err.o $(BUILD)/tree.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS) $(ZFS_OBJS) $(UCL_OBJS)
 TESTS = check_parse check_schema check_site check_cascade check_show \
 	check_run check_spaces check_boot check_version check_zfs \
-	check_build check_patch check_beam check_save check_create
+	check_build check_patch check_beam check_save check_create \
+	check_rebase
 
 all: build shtetl
 
@@ -180,6 +181,9 @@ $(BUILD)/create.o: src/core/create.c src/core/create.h src/core/beam.h \
 	src/core/save.h src/core/spaces.h src/core/tree.h src/core/version.h \
 	src/core/zfs.h src/core/zwalk.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/create.c
+$(BUILD)/rebase.o: src/core/rebase.c src/core/rebase.h src/core/err.h \
+	src/core/run.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/rebase.c
 $(BUILD)/zwalk.o: src/core/zwalk.c src/core/zwalk.h src/core/err.h \
 	src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/zwalk.c
@@ -197,6 +201,9 @@ $(BUILD)/box_zcheck: tests/box/zcheck.c $(BOX_OBJS) $(ZFS_OBJS)
 	    $(LDFLAGS)
 $(BUILD)/zfake.o: tests/zfake.c tests/zfake.h src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ tests/zfake.c
+$(BUILD)/rbfake.o: tests/rbfake.c tests/rbfake.h src/core/rebase.h \
+	src/core/zfs.h src/core/err.h
+	$(CC) $(CFLAGS) -Isrc -c -o $@ tests/rbfake.c
 $(BUILD)/zcheck_main.o: tests/box/zcheck.c src/core/zfs.h src/core/err.h
 	$(CC) $(CFLAGS) -Dmain=zcheck_main -c -o $@ tests/box/zcheck.c
 
@@ -255,11 +262,11 @@ doc: shtetl
 	fi
 
 box: build $(BUILD)/box_zcheck $(BUILD)/zcheck_main.o $(BOX_OBJS) \
-	$(TEST_OBJS)
+	$(BUILD)/zfake.o
 	@echo "ok   box_zcheck links"
 	@$(CC) $(CFLAGS) -Itests -o $(BUILD)/zcheck_fake \
 	    tests/box/zcheck-fake.c $(BUILD)/zcheck_main.o $(BOX_OBJS) \
-	    $(TEST_OBJS) $(LDFLAGS) || exit 1; \
+	    $(BUILD)/zfake.o $(LDFLAGS) || exit 1; \
 	out=$$(./$(BUILD)/zcheck_fake 2>&1) || { echo "$$out"; \
 	    echo "FAIL zcheck over the fake"; exit 1; }; \
 	echo "ok   zcheck over the fake ($$(echo "$$out" | grep -c '^ok ')" \
