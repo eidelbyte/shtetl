@@ -1561,8 +1561,22 @@ The same as containers, except:
   uses), and come back to outer space to cut over or abandon.
 
 Outer space is a root-on-RAM system reached with `reboot -r` (ruled
-2026-10-09; the user's doc on it is pending). A shutdown hook was
-considered and declined.
+2026-10-09). A shutdown hook was considered and declined. The user's
+protocol (2026-10-15, 14):
+
+    mdconfig -a -t swap -s 6G -u md0
+    zpool create zram md0
+    zfs create zram/root
+    zfs send -v zrhizome/root@03-11-2024 | zfs recv -v zram/root/default
+    kenv vfs.root.mountfrom='zfs:zram/root/default'
+    reboot -r
+
+    boot_single="YES"
+
+A swap-backed memory disk is made a pool, zram; a root is sent into
+it; the kernel is told to take it as root, and `reboot -r` reroots
+into it without a reboot, leaving the disks' pools free to be worked
+on. What shtetl builds on this is M6's (15: Q-AE - Q-AG).
 
 A system's commands (PROPOSAL, for M6): run once, when S is created,
 its external commands first, on the host with S's root in
@@ -1798,6 +1812,13 @@ below that change the plan are folded into the sections named.
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-15 (outer space)
+
+The doc 7.11 waited on: "Here's the simple outerspace protocol", a
+root sent into a pool on a swap-backed memory disk and rerooted into
+with `reboot -r`, `boot_single="YES"` beside it. Recorded in 7.11 as
+given; what it leaves open for M6 is in 15 (Q-AE - Q-AG).
 
 ### 2026-10-15 (Q-Y, Q-Z, Q-U, Q-W: as built)
 
@@ -2279,6 +2300,19 @@ So (5.4, 5.5):
   `install -C`.
 
 ## 15. Open questions
+
+M6's, from the outer-space protocol (7.11):
+
+- **Q-AE, single-user.** Where `boot_single="YES"` goes: set with
+  kenv before `reboot -r`, so that the RAM root comes up single-user,
+  or in the RAM root's own loader.conf or rc.conf; and whether shtetl
+  then runs from that single-user shell.
+- **Q-AF, which root.** The protocol sends the host's own root
+  (`zrhizome/root@03-11-2024`). For shtetl, outer space could be the
+  system's own root as it stands, a foundation's version, or a root
+  kept for the purpose.
+- **Q-AG, its size and names.** Whether the memory disk's 6G, md0 and
+  the names zram and zram/root/default are fixed, or settings.
 
 Q-AC is ruled (14, 2026-10-12), and with it the default; so is
 Q-AD, the default's edges.
