@@ -100,7 +100,8 @@ void sh_boot_show(FILE *out, const struct sh_bplan *p);
  * The plan carried out, in order: pools, the roots' properties, their
  * layout, mounts, the config root's clone, and shtetl:space on every
  * root last; each step said on OUT as it is done. -1 at the first
- * failure, with no root marked.
+ * failure, with no root marked. A clone that fails is not one: the
+ * config root is left empty, with no recipes, and said so.
  */
 int sh_boot_apply(struct sh_zfs *z, const struct sh_bplan *p, FILE *out,
     struct sh_err *e);

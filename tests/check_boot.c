@@ -8,6 +8,7 @@
 
 #include <sys/stat.h>
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <string.h>
@@ -357,6 +358,26 @@ test_settings(void)
 	sh_site_free(&site);
 }
 
+/* Whether the directory PATH holds nothing. */
+static int
+emptydir(const char *path)
+{
+	struct dirent *de;
+	DIR *d;
+	int n;
+
+	if ((d = opendir(path)) == NULL)
+		return (0);
+	n = 0;
+	while ((de = readdir(d)) != NULL) {
+		if (strcmp(de->d_name, ".") != 0 &&
+		    strcmp(de->d_name, "..") != 0)
+			n++;
+	}
+	(void) closedir(d);
+	return (n == 0);
+}
+
 /* B13: the recipes, cloned into the config root. */
 static void
 test_clone(void)
@@ -411,7 +432,7 @@ test_clone(void)
 	CHECK(zfake_last_snapshot() == NULL);
 	CHECK(has(out, "is not empty: not cloned into\n"));
 
-	/* a clone that fails: nothing marked */
+	/* a clone that fails: the root left empty, every root marked */
 	(void) snprintf(cmd, sizeof (cmd), "rm -rf '%s'; mkdir '%s'", confdir,
 	    confdir);
 	CHECK(system(cmd) == 0);
@@ -421,11 +442,14 @@ test_clone(void)
 	req.br_recipes = scratch_path("no-such-repo");
 	CHECK(plan(NULL) == 0);
 	cap_reset(&c);
-	CHECK(apply() == -1);
-	CHECK(cap_has(&c, "tank/zconfig: cloning "));
-	CHECK(cap_has(&c, " failed; no root marked"));
-	CHECK(is(prop("tank/zconfig", SH_SPACE_PROP, NULL), "-"));
-	CHECK(is(prop("tank/shtetl", SH_SPACE_PROP, NULL), "-"));
+	CHECK(apply() == 0);
+	CHECK(has(out, " failed: tank/zconfig left empty, with no "
+	    "recipes\n"));
+	CHECK(strncmp(zfake_last_rollback(), "tank/zconfig@bootstrap-",
+	    23) == 0);
+	CHECK(emptydir(confdir));
+	CHECK(is(prop("tank/zconfig", SH_SPACE_PROP, NULL), "config"));
+	CHECK(is(prop("tank/shtetl", SH_SPACE_PROP, NULL), "lake"));
 	CHECK(dup2(saved, STDERR_FILENO) != -1);
 	(void) close(saved);
 }

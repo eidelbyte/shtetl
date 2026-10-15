@@ -151,7 +151,9 @@ As built (M2, `src/core/boot.c`):
   shtetl-recipes, https://github.com/eidelbyte/shtetl-recipes.git
   (ruled 2026-10-14, Q-AB). A config root with anything in it is not
   cloned into, which is how a site bootstraps without them. A failed
-  clone marks no root (PROPOSAL).
+  clone takes the config root back to that snapshot, empty, says so,
+  and bootstrap carries on: a config root with no recipes (ruled
+  2026-10-15).
 - A pool imported with an altroot shows mountpoints below it; the
   layout already there is read below the altroot.
 

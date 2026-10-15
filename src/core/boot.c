@@ -633,7 +633,9 @@ bx_empty(const char *dir)
 /*
  * git clone URL into the config root's directory, after a snapshot of
  * it. git asks nothing of the terminal (GIT_TERMINAL_PROMPT=0): a
- * clone that needs credentials fails rather than waits.
+ * clone that needs credentials fails rather than waits. A clone that
+ * fails takes the root back to the snapshot, empty, and bootstrap
+ * carries on: a config root with no recipes (ruled 2026-10-15).
  */
 static int
 bx_clone(struct sh_zfs *z, const struct sh_broot *rt, const char *url,
@@ -692,9 +694,12 @@ bx_clone(struct sh_zfs *z, const struct sh_broot *rt, const char *url,
 	free(u);
 	free(d);
 	if (rc != 0) {
-		sh_errf(e, "%s: cloning %s failed; no root marked", rt->rt_ds,
-		    url);
-		return (-1);
+		if (sh_zfs_rollback(z, rt->rt_ds, strchr(snap, '@') + 1,
+		    e) != 0)
+			return (-1);
+		(void) fprintf(out, "cloning %s failed: %s left empty, with "
+		    "no recipes\n", url, rt->rt_ds);
+		return (0);
 	}
 	(void) fprintf(out, "cloned %s into %s\n", url, rt->rt_dir);
 	return (0);
