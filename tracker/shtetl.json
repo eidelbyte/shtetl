@@ -492,6 +492,6 @@
     ],
     "provides": "Updates that stop only for a real conflict.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing"
   }
 }
