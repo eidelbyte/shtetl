@@ -253,8 +253,8 @@ sh_patch_left(const char *dir, char *const *files, struct sh_err *e)
 	return (0);
 }
 
-const char *const sh_pout_name[] = { "applied", "already", "skipped",
-	"fixed" };
+const char *const sh_pout_name[SH_PO_N] = { "applied", "already",
+	"skipped", "fixed", "merged" };
 
 /* S quoted for UCL, to F. */
 static void
@@ -358,12 +358,12 @@ sh_pause_read(const char *path, struct sh_pause *pz, struct sh_err *e)
 	pz->pz_at = (size_t)at->sn_int;
 	for (i = 0; i < pz->pz_at; i++) {
 		v = out->sn_arr.ar_v[i];
-		for (j = 0; j < 4; j++) {
+		for (j = 0; j < SH_PO_N; j++) {
 			if (v->sn_type == SH_STR &&
 			    strcmp(v->sn_str, sh_pout_name[j]) == 0)
 				break;
 		}
-		if (j == 4)
+		if (j == SH_PO_N)
 			goto bad;
 		pz->pz_out[i] = (unsigned char)j;
 	}

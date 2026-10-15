@@ -53,7 +53,9 @@ enum sh_pout {
 	SH_PO_APPLIED,	/* applied as it is */
 	SH_PO_ALREADY,	/* already in the tree: its reverse applied */
 	SH_PO_SKIPPED,	/* left out by hand, --skip */
-	SH_PO_FIXED	/* fixed by hand, --continue */
+	SH_PO_FIXED,	/* fixed by hand, --continue */
+	SH_PO_MERGED,	/* merged three ways without conflict */
+	SH_PO_N
 };
 
 extern const char *const sh_pout_name[];

@@ -1381,30 +1381,33 @@ test_pause(void)
 	/* fixed: X4 it is; then 3-l1 merges without conflict */
 	(void) scratch_write("ptree/m.c",
 	    "l1\nl2\nl3\nX4\nl5\nl6\nl7\nl8\nl9\nl10\nl11\nl12\n");
-	CHECK(resume(SH_BV_CONTINUE, NULL) == 1);
+	CHECK(resume(SH_BV_CONTINUE, NULL) == 0);
 	(void) snprintf(text, sizeof (text), "patch 2-x4.patch from "
 	    "patches/pause: fixed by hand; the fix: %s/generic/fixed/1/"
 	    "2-x4.patch\n", runbase);
 	CHECK(strstr(ran, text) != NULL);
-	CHECK(strstr(ran, "patch 3-l1.patch from patches/pause: does not "
-	    "apply; merged three ways without conflict, to be looked "
-	    "over\n") != NULL);
+	/* a clean three-way merge goes on, no one asked */
+	CHECK(strstr(ran, "patch 3-l1.patch from patches/pause: merged "
+	    "three ways without conflict\n") != NULL);
 	(void) snprintf(path, sizeof (path), "%s/generic/fixed/1/2-x4.patch",
 	    runbase);
 	CHECK(strstr(slurp(path), "-L4\n+X4\n") != NULL);
 	CHECK(strstr(slurp(path), "diff --git a/m.c b/m.c\n") != NULL);
-	CHECK(resume(SH_BV_CONTINUE, NULL) == 0);
 	CHECK(strstr(ran, "built " F "@" VERSION "\n") != NULL);
 	CHECK(is(slurp(scratch_path("seen-m.c")),
 	    "L1\nl2\nl3\nX4\nl5\nl6\nl7\nl8\nl9\nl10\nl11\nl12\n"));
 	/* P14: the record, and the fixes kept in the obj cache */
 	CHECK(is(prop(F "@" VERSION, "shtetl:patches", NULL),
-	    "patches/pause: 2-x4.patch fixed, 3-l1.patch fixed"));
+	    "patches/pause: 2-x4.patch fixed, 3-l1.patch merged"));
 	/* a resumed build's REVISION asked again, recorded */
 	CHECK(is(prop(F "@" VERSION, "shtetl:revision", NULL), "15.1"));
-	(void) snprintf(text, sizeof (text), "obj/patches/%s/1/3-l1.patch",
+	/* the fix kept; a merge is no fix */
+	(void) snprintf(text, sizeof (text), "obj/patches/%s/1/2-x4.patch",
 	    VERSION);
 	CHECK(inrun(text));
+	(void) snprintf(text, sizeof (text), "obj/patches/%s/1/3-l1.patch",
+	    VERSION);
+	CHECK(!inrun(text));
 	/* P15: the end */
 	CHECK(!inrun(SH_BUILD_PAUSED));
 	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "-"));

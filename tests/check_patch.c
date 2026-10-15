@@ -230,9 +230,16 @@ test_pause(void)
 	CHECK(cap_has(&c, "bad2.conf: not a pause record"));
 	(void) scratch_write("bad3.conf", "config = \"x\"; version = \"v\";\n"
 	    "commit = \"c\"; message = \"\"; base = \"b\"; at = 1;\n"
-	    "outcomes = [ \"merged\" ]; fetched = [];\n");
+	    "outcomes = [ \"patched\" ]; fetched = [];\n");
 	(void) snprintf(path, sizeof (path), "%s", scratch_path("bad3.conf"));
 	CHECK(sh_pause_read(path, &b, &c.c_err) == -1);
+	/* merged, a clean three-way merge's outcome, read back */
+	(void) scratch_write("merged.conf", "config = \"x\"; version = "
+	    "\"v\";\ncommit = \"c\"; message = \"\"; base = \"b\"; "
+	    "at = 1;\noutcomes = [ \"merged\" ]; fetched = [];\n");
+	(void) snprintf(path, sizeof (path), "%s", scratch_path("merged.conf"));
+	CHECK(sh_pause_read(path, &b, &c.c_err) == 0 &&
+	    b.pz_out[0] == SH_PO_MERGED);
 	CHECK(sh_pause_read(scratch_path("none.conf"), &b, &c.c_err) == -1);
 }
 

@@ -1339,10 +1339,12 @@ fb_apply(struct fb *b, const char *a1, const char *a2, const char *patch)
 
 /*
  * 7.1.1 steps 2 - 4, from the patch FROM on: @shtetl-patch-0 first,
- * then each patch after a snapshot of its own, applied, or skipped as
- * already in when its reverse applies.
+ * then each patch after a snapshot of its own, applied, skipped as
+ * already in when its reverse applies, or merged three ways when that
+ * leaves no conflict.
  */
 static int fb_pause(struct fb *b, size_t i);
+static int fb_tree(struct fb *b, char *id, size_t len);
 
 static int
 fb_patches(struct fb *b, size_t from)
@@ -1377,7 +1379,16 @@ fb_patches(struct fb *b, size_t from)
 			(void) fprintf(b->fb_out, "patch %s from %s: already "
 			    "in, skipped\n", pa->pa_name, loc);
 		} else {
-			return (fb_pause(b, i));
+			/* the tree before the merge, a fix's base */
+			if (fb_tree(b, b->fb_pz.pz_base,
+			    sizeof (b->fb_pz.pz_base)) != 0)
+				return (-1);
+			if (fb_apply(b, "--3way", NULL, pa->pa_path) != 0)
+				return (fb_pause(b, i));
+			/* no conflict: no one need look (ruled 2026-10-15) */
+			b->fb_pz.pz_out[i] = SH_PO_MERGED;
+			(void) fprintf(b->fb_out, "patch %s from %s: merged "
+			    "three ways without conflict\n", pa->pa_name, loc);
 		}
 	}
 	return (0);
@@ -1448,10 +1459,11 @@ fb_touched(struct fb *b, const char *patch)
 }
 
 /*
- * The patch I does not apply (7.1.1, the pause): the tree as it is
- * noted as the base of the fix; the patch merged three ways, or,
- * where that leaves no conflict marker and did not merge, applied
- * with --reject; the record written; what to do said. 1, paused.
+ * The patch I does not apply and its three-way merge did not go
+ * through clean (7.1.1, the pause; the tree before it already noted
+ * as the base of the fix): its conflict markers left, or, where it
+ * left none and did not merge, the patch applied with --reject; the
+ * record written; what to do said. 1, paused.
  */
 static int
 fb_pause(struct fb *b, size_t i)
@@ -1464,12 +1476,10 @@ fb_pause(struct fb *b, size_t i)
 
 	loc = sh_obj_get(p->fp_recipe.sr_merged, "patches")->
 	    sn_obj.ob_v[pa->pa_src].pr_key;
-	if (fb_tree(b, b->fb_pz.pz_base, sizeof (b->fb_pz.pz_base)) != 0 ||
-	    (files = fb_touched(b, pa->pa_path)) == NULL)
+	if ((files = fb_touched(b, pa->pa_path)) == NULL)
 		return (-1);
-	if (fb_apply(b, "--3way", NULL, pa->pa_path) == 0) {
-		how = "merged three ways without conflict, to be looked over";
-	} else if (sh_patch_left(p->fp_srcdir, files, NULL) == 1) {
+	/* the three-way merge tried already, its base taken before it */
+	if (sh_patch_left(p->fp_srcdir, files, NULL) == 1) {
 		how = "merged three ways, conflict markers left";
 	} else {
 		(void) fb_apply(b, "--reject", NULL, pa->pa_path);

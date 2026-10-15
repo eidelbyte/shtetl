@@ -899,11 +899,13 @@ As built (M3, `src/core/patch.c`, `src/core/build.c`):
 - Natural order: runs of digits compare as numbers, the rest byte by
   byte, names equal so far by their bytes. Only regular files ending
   `.patch` at the top count; hidden files are left out.
-- The pause: the tree is staged (`git add -A`) and written as a git
-  tree, the base of the fix; then `git apply --3way`, or, where that
-  leaves no conflict marker and did not merge, `git apply --reject`.
-  A merge without conflict pauses all the same, for a person to look
-  over: nothing merges unseen (PROPOSAL). The record is
+- A patch that does not apply, nor in reverse: the tree is staged
+  (`git add -A`) and written as a git tree, then `git apply --3way`.
+  A merge without conflict goes on, said, and is recorded as merged
+  (ruled 2026-10-15: "a clean 3-way should just continue"). Otherwise
+  the build pauses, the tree written being the base of the fix: the
+  conflict markers left, or, where the merge left none and did not
+  merge, `git apply --reject`'s .rej files. The record is
   `<run dir>/paused.conf`, UCL read with shtetl's own parse (ruled
   2026-10-15, to hold the recipe merged whole, its imports inlined:
   not built yet); shtetl exits 3 (ruled 2026-10-15). A build while
@@ -929,7 +931,7 @@ As built (M3, `src/core/patch.c`, `src/core/build.c`):
   The log stays, as it does after any build (7.1 as built), where the
   plan above said the run directory goes.
 - `shtetl:patches` (ruled 2026-10-15): `<location>[@<commit>][: <name>
-  <already|skipped|fixed>, ...]`, the sources joined by `; `; not set
+  <already|skipped|fixed|merged>, ...]`, the sources joined by `; `; not set
   when the recipe has no patches.
 
 ### 7.2 Update foundation F
