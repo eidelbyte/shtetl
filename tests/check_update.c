@@ -822,12 +822,31 @@ krun(void)
 	f = open_memstream(&ran, &len);
 	CHECK(f != NULL);
 	cap_reset(&c);
-	rc = sh_cutover_run(z, &kp, &s, &fake, NOON, f, &c.c_err);
+	cap_reset(&wc);
+	rc = sh_cutover_run(z, &kp, &s, &fake, NOON, f, &c.c_err,
+	    &wc.c_err);
 	CHECK(fclose(f) == 0);
 	return (rc);
 }
 
-static void test_cutover_again(void);
+#define	ASIDE	RX "-" V1
+
+static void test_cutover_back(void);
+
+/* The plan as the person confirming it reads it, into RAN. */
+static void
+kshow(void)
+{
+	size_t len;
+	FILE *f;
+
+	free(ran);
+	ran = NULL;
+	f = open_memstream(&ran, &len);
+	CHECK(f != NULL);
+	sh_cutover_show(f, &kp);
+	CHECK(fclose(f) == 0);
+}
 
 /* Whether a snapshot of DS carries SH_UPDATE_MARK, its name said. */
 static int
@@ -854,10 +873,8 @@ static void
 test_cutover(void)
 {
 	static const char *const gate[] = { "/etc/rc.conf", NULL };
-	const char *stop, *save;
+	const char *stop, *save, *aside, *rename;
 	char path[1300];
-	size_t len;
-	FILE *f;
 
 	settings(NULL);
 	/* K1 */
@@ -875,27 +892,32 @@ test_cutover(void)
 	CHECK(update(SH_UV_NEW, 0) == 0);
 	zfake_write(RX "/var", 4096);
 	CHECK(kplan("x", 0) == 0);
-	CHECK(kp.kp_wrote == 4096 && kp.kp_nown == 1);
+	CHECK(kp.kp_wrote == 4096 && kp.kp_nown == 1 && kp.kp_nlown == 1);
 	CHECK(is(kp.kp_own[0], RXS "/www") && is(kp.kp_from, S3));
-	ran = NULL;
-	f = open_memstream(&ran, &len);
-	CHECK(f != NULL);
-	sh_cutover_show(f, &kp);
-	CHECK(fclose(f) == 0);
+	CHECK(is(kp.kp_aside, ASIDE) && is(kp.kp_archive, ARCH));
+	kshow();
 	CHECK(strstr(ran, "  x was written to since its last save " S3
 	    ", 4096 bytes: var 4096\n  a final save of x, for its "
-	    "archive\n") != NULL);
-	CHECK(strstr(ran, "  x-staging stopped; promoted: " RXS "/www\n") !=
-	    NULL);
-	free(ran);
-	ran = NULL;
+	    "archive\n  x stopped, renamed " ASIDE ", its previous root\n"
+	    "  x-staging stopped, renamed " RX ", its block x's\n") != NULL);
+	CHECK(strstr(ran, "  x started and saved\n  last, the prune: "
+	    "promoted " RX "/www; " ASIDE " destroyed\n  in zlake: promoted "
+	    LX "/www off the archive\n") != NULL);
 	/* the replayed from-save carries the mark, as x's does */
 	CHECK(is(prop(RXS "@" S3, SH_UPDATE_MARK), V2));
 	CHECK(krun() == 0);
 	if (c.c_err.se_count != 0)
 		printf("%s", cap_text(&c));
+	CHECK(wc.c_err.se_count == 0);
+	/* x aside, x-staging renamed x, x started and saved, then pruned */
+	aside = strstr(ran, "renamed " RX " " ASIDE "\n");
+	rename = strstr(ran, "renamed " RXS " " RX "\n");
+	save = strstr(ran, "saved " RX "@" S5 "\n");
+	stop = strstr(ran, "destroyed " ASIDE "\n");
+	CHECK(aside != NULL && rename != NULL && save != NULL &&
+	    stop != NULL && aside < rename && rename < save && save < stop);
 	/* zrun: the staging tree is x, its own clone promoted */
-	CHECK(!zfake_exists(RXS));
+	CHECK(!zfake_exists(RXS) && !zfake_exists(ASIDE));
 	CHECK(is(prop(RX, "origin"), RF "@" V2));
 	CHECK(is(prop(RX "@" V2, "shtetl:kind"), "version"));
 	CHECK(is(prop(RX "/www", "origin"), "-"));
@@ -921,9 +943,9 @@ test_cutover(void)
 	CHECK(is(prop(RX "@" S5, "shtetl:commit"), "cutover to " V2));
 	CHECK(there(LX "@" S5) && there(LX "/www@" S5));
 	CHECK(strstr(ran, "cut over x\n") != NULL);
-	/* the last step: the marks off, on zrun and in zlake */
+	/* the marks off, on zrun and in zlake */
 	CHECK(!marked(RX) && !marked(LX));
-	/* done: nothing to carry on */
+	/* done: nothing more to cut over or abandon */
 	CHECK(kplan("x", 0) == -1);
 	CHECK(cap_has(&c, "no x-staging: no update of x to cut over"));
 	CHECK(kplan("x", 1) == -1);
@@ -946,16 +968,25 @@ test_cutover(void)
 	CHECK(stop != NULL && save != NULL && stop < save);
 	CHECK(is(prop(ARCH "@" S4, "shtetl:commit"), "written during the "
 	    "soak of x-staging"));
-	/* K4: abandon */
+	/* K4: abandon, the staging tree destroyed last */
 	world(1);
 	CHECK(update(SH_UV_NEW, 0) == 0);
 	CHECK(kplan("containers/x", 1) == 0);
+	kshow();
+	CHECK(is(ran, "abandon x-staging, the update of x to @" V2 "\n"
+	    "  x-staging stopped, its block removed\n  x started\n"
+	    "  last, x-staging destroyed on zrun and in zlake\n"));
 	CHECK(krun() == 0);
+	CHECK(wc.c_err.se_count == 0);
+	stop = strstr(ran, "started the jail x\n");
+	save = strstr(ran, "destroyed " RXS "\n");
+	CHECK(stop != NULL && save != NULL && stop < save);
 	CHECK(!zfake_exists(RXS) && !zfake_exists(LXS));
 	CHECK(runs("x") && !runs("x-staging"));
 	(void) snprintf(path, sizeof (path), "%s/x-staging.conf", jaildir);
 	CHECK(access(path, F_OK) != 0);
 	CHECK(is(prop(RX, "origin"), RF "@" V1));
+	CHECK(!marked(RX));
 	CHECK(strstr(ran, "abandoned x-staging\n") != NULL);
 	/* no mirror in zlake: a cutover refused */
 	world(1);
@@ -969,25 +1000,46 @@ test_cutover(void)
 	zfake_fs(ARCH);
 	CHECK(kplan("x", 0) == -1);
 	CHECK(cap_has(&c, ARCH ": an archive of x on that version exists"));
+	/* the previous root's name taken: refused */
+	world(1);
+	CHECK(update(SH_UV_NEW, 0) == 0);
+	zfake_fs(ASIDE);
+	CHECK(kplan("x", 0) == -1);
+	CHECK(cap_has(&c, ASIDE ": the name of x's previous root is taken"));
 	/* K5, K8, K9 */
-	test_cutover_again();
+	test_cutover_back();
 }
 
 /*
- * x cut over after a run stopped by the failure of WHAT, its NTH call,
- * or a failing jail start (WHAT NULL): the run said so, a second run
- * took up from where it stopped (SHOW said in its plan), and the end is
- * the whole run's.
+ * K5: x's cutover failing at the NTH call of WHAT, or at x's jail's
+ * start (WHAT NULL, x-staging's stopped beforehand so that putting it
+ * back does not meet the same), x running (XRUNS) or not and written
+ * to (WROTE) or not: put back whole, the trees, jails, blocks and marks
+ * as they were; and run again, cut over.
  */
 static void
-again(const char *what, int nth, const char *show)
+back(const char *what, int nth, int xruns, int wrote)
 {
-	char path[1300];
-	size_t len;
-	FILE *f;
+	char xconf[1300], sconf[1300], xblk[4096], sblk[4096];
+	int sruns, xm, sm;
 
 	world(1);
 	CHECK(update(SH_UV_NEW, 0) == 0);
+	if (xruns)
+		(void) scratch_write("running/x", "");
+	else
+		(void) unlink(scratch_path("running/x"));
+	if (what == NULL)
+		(void) unlink(scratch_path("running/x-staging"));
+	if (wrote)
+		zfake_write(RX "/var", 2048);
+	(void) snprintf(xconf, sizeof (xconf), "%s/x.conf", jaildir);
+	(void) snprintf(sconf, sizeof (sconf), "%s/x-staging.conf", jaildir);
+	(void) snprintf(xblk, sizeof (xblk), "%s", slurp(xconf));
+	(void) snprintf(sblk, sizeof (sblk), "%s", slurp(sconf));
+	sruns = runs("x-staging");
+	xm = is(prop(RX, "mounted"), "yes");
+	sm = is(prop(RXS, "mounted"), "yes");
 	CHECK(kplan("x", 0) == 0);
 	if (what != NULL)
 		zfake_fail_nth(what, nth);
@@ -995,133 +1047,98 @@ again(const char *what, int nth, const char *show)
 		(void) scratch_write("jailfails", "");
 	CHECK(krun() == -1);
 	(void) unlink(scratch_path("jailfails"));
-	CHECK(cap_has(&c, "cutover of x stopped part way: shtetl cutover x "
-	    "carries it on"));
-	if (kplan("x", 0) != 0) {
+	if (!cap_has(&c, "cutover of x failed and was put back")) {
 		printf("%s: %d: %s", what != NULL ? what : "jail", nth,
 		    cap_text(&c));
 		CHECK(0);
-		return;
 	}
-	free(ran);
-	ran = NULL;
-	f = open_memstream(&ran, &len);
-	CHECK(f != NULL);
-	sh_cutover_show(f, &kp);
-	CHECK(fclose(f) == 0);
-	if (strstr(ran, show) == NULL) {
-		printf("%s: %d: no \"%s\" in:\n%s", what != NULL ? what :
-		    "jail", nth, show, ran);
-		CHECK(0);
-	}
-	CHECK(krun() == 0);
-	if (c.c_err.se_count != 0)
-		printf("%s", cap_text(&c));
-	CHECK(!zfake_exists(RXS) && !zfake_exists(LXS));
-	CHECK(is(prop(RX, "origin"), RF "@" V2));
-	CHECK(is(prop(RX "/www", "origin"), "-"));
+	/* zrun's trees, mounted as they were */
+	CHECK(!zfake_exists(ASIDE));
+	CHECK(is(prop(RX, "origin"), RF "@" V1));
+	CHECK(is(prop(RXS, "origin"), RF "@" V2));
+	CHECK(is(prop(RXS "/www", "origin"), RX "/www@" S3));
+	CHECK(is(prop(RX, "mounted"), "yes") == xm);
+	CHECK(is(prop(RXS, "mounted"), "yes") == sm);
+	/* zlake's */
+	CHECK(!zfake_exists(ARCH));
+	CHECK(is(prop(LX, "origin"), LF "@" V1));
+	CHECK(is(prop(LXS, "origin"), LF "@" V2));
+	/* the jails, their blocks, the marks */
+	CHECK(runs("x") == xruns && runs("x-staging") == sruns);
+	CHECK(is(slurp(xconf), xblk));
+	CHECK(is(slurp(sconf), sblk));
+	CHECK(is(prop(RX "@" S3, SH_UPDATE_MARK), V2));
+	CHECK(is(prop(RXS "@" S3, SH_UPDATE_MARK), V2));
+	/* run again, from the start */
+	CHECK(kplan("x", 0) == 0 && krun() == 0);
+	CHECK(!zfake_exists(RXS) && !zfake_exists(ASIDE));
 	CHECK(zfake_exists(ARCH) && is(prop(LX, "origin"), LF "@" V2));
-	CHECK(runs("x") && !runs("x-staging"));
-	(void) snprintf(path, sizeof (path), "%s/x-staging.conf", jaildir);
-	CHECK(access(path, F_OK) != 0);
-	/* one save at its end, however many runs it took */
-	CHECK(is(prop(RX "@" S5, "shtetl:commit"), "cutover to " V2));
-	CHECK(!there(RX "@" S6));
+	CHECK(is(prop(RX, "origin"), RF "@" V2) && runs("x"));
+	CHECK(is(prop(RX "/www", "origin"), "-"));
 	CHECK(!marked(RX) && !marked(LX));
-	CHECK(kplan("x", 0) == -1);
-}
-
-/* The tree DS unmounted and destroyed, as a stopped abandon leaves it. */
-static int
-gone(const char *ds)
-{
-	char **all;
-	size_t n;
-
-	CHECK((all = sh_zw_new(&c.c_err)) != NULL);
-	CHECK(sh_zw_add(&all, ds) == 0 && sh_zw_walk(z, ds, &all,
-	    &c.c_err) == 0);
-	for (n = 0; all[n] != NULL; n++)
-		;
-	while (n > 0)
-		(void) sh_zfs_unmount(z, all[--n], &c.c_err);
-	sh_zw_free(all);
-	return (sh_zw_destroy(z, ds, &c.c_err) == 0);
 }
 
 /*
- * K5, K8, K9: cutover and abandon stopped part way and taken up, and
- * what the plan refuses on beforehand.
+ * K8: an abandon failing, put back; its destroys failing, done all the
+ * same; refused on what would keep the staging tree.
  */
 static void
-test_cutover_again(void)
+test_abandon(void)
 {
-	static const struct sh_zprop kind = { "shtetl:kind", "save" };
-	const char *clash[] = { RXS "/www@" S1 };
-	char path[1300];
+	char sconf[1300], sblk[4096];
 
-	/* K5: a cutover stopped at each step, run again */
-	again("rename", 1, "cutover of x to x-staging, @" V2 ", taken up "
-	    "where it stopped\n  x-staging stopped; promoted: none\n  " RXS
-	    " renamed " RX "\n");
-	again("rename", 2, "taken up where it stopped\n  in zlake: " LX
-	    " archived as " ARCH ", " LXS " renamed " LX "\n");
-	again("rename", 3, "taken up where it stopped\n  in zlake: " LXS
-	    " renamed " LX "\n");
-	again("promote", 1, "x-staging stopped; promoted: " RXS "/www\n  "
-	    RX " destroyed on zrun\n");
-	again("promote", 2, "taken up where it stopped\n");
-	again("destroy", 1, "x-staging stopped; promoted: none\n  " RX
-	    " destroyed on zrun\n");
-	again(NULL, 0, "taken up where it stopped\n  x started and "
-	    "saved\n");
-	again("snapshot", 1, "taken up where it stopped\n");
-	again("inherit", 1, "taken up where it stopped\n");
-	/* K8: an abandon refused once a cutover has promoted */
+	/* x's start failing: x-staging's block and the mark back */
 	world(1);
 	CHECK(update(SH_UV_NEW, 0) == 0);
-	CHECK(kplan("x", 0) == 0);
-	zfake_fail("destroy");
-	CHECK(krun() == -1);
-	CHECK(zfake_exists(RX) && is(prop(RX "/www", "origin"), RXS "/www@"
-	    S3));
-	CHECK(kplan("x", 1) == -1);
-	CHECK(cap_has(&c, "a cutover of x is under way: shtetl cutover x "
-	    "carries it on"));
-	zfake_fail("rename");
-	CHECK(kplan("x", 0) == 0 && krun() == -1);
-	CHECK(!zfake_exists(RX));
-	CHECK(kplan("x", 1) == -1);
-	CHECK(cap_has(&c, "a cutover of x is under way: shtetl cutover x "
-	    "carries it on"));
-	CHECK(kplan("x", 0) == 0 && krun() == 0);
-	/* an abandon stopped: the jail, then zlake's mirror left */
-	world(1);
-	CHECK(update(SH_UV_NEW, 0) == 0);
+	(void) unlink(scratch_path("running/x"));
+	(void) unlink(scratch_path("running/x-staging"));
+	(void) snprintf(sconf, sizeof (sconf), "%s/x-staging.conf", jaildir);
+	(void) snprintf(sblk, sizeof (sblk), "%s", slurp(sconf));
+	CHECK(strstr(sblk, "x-staging {") != NULL);
 	CHECK(kplan("x", 1) == 0);
 	(void) scratch_write("jailfails", "");
 	CHECK(krun() == -1);
 	(void) unlink(scratch_path("jailfails"));
-	CHECK(cap_has(&c, "abandon of x stopped part way: shtetl abandon x "
-	    "carries it on"));
-	CHECK(!zfake_exists(RXS) && !runs("x"));
-	CHECK(kplan("x", 0) == -1);
-	CHECK(cap_has(&c, "no x-staging: no update of x to cut over"));
-	CHECK(kplan("x", 1) == 0 && kp.kp_resumed);
-	CHECK(krun() == 0 && runs("x"));
+	CHECK(cap_has(&c, "abandon of x failed and was put back"));
+	CHECK(zfake_exists(RXS) && zfake_exists(LXS) && !runs("x"));
+	CHECK(is(slurp(sconf), sblk));
+	CHECK(is(prop(RX "@" S3, SH_UPDATE_MARK), V2));
+	CHECK(kplan("x", 1) == 0 && krun() == 0);
+	CHECK(!zfake_exists(RXS) && !zfake_exists(LXS) && runs("x"));
 	CHECK(!marked(RX));
-	CHECK(kplan("x", 1) == -1);
+	/* the staging tree's destroy failing: abandoned, it left */
 	world(1);
 	CHECK(update(SH_UV_NEW, 0) == 0);
-	(void) snprintf(path, sizeof (path), "%s/x-staging.conf", jaildir);
-	(void) unlink(path);
-	(void) unlink(scratch_path("running/x-staging"));
-	CHECK(gone(RXS));
-	CHECK(kplan("x", 1) == 0 && kp.kp_resumed);
+	CHECK(kplan("x", 1) == 0);
+	zfake_fail("destroy");
 	CHECK(krun() == 0);
-	CHECK(!zfake_exists(LXS) && runs("x"));
-	CHECK(is(prop(RX, "origin"), RF "@" V1));
-	/* K9: what would keep the old tree, refused in the plan */
+	CHECK(cap_has(&wc, RXS " not destroyed: the update of x is "
+	    "abandoned, the staging tree left as it is"));
+	CHECK(c.c_err.se_count == 0);
+	CHECK(strstr(ran, "abandoned x-staging\n") != NULL);
+	CHECK(zfake_exists(RXS) && !zfake_exists(LXS) && runs("x"));
+	CHECK(!marked(RX));
+	/* refused: a hold on the staging tree */
+	world(1);
+	CHECK(update(SH_UV_NEW, 0) == 0);
+	zfake_hold(RXS "@" V2);
+	CHECK(kplan("x", 1) == -1);
+	CHECK(cap_has(&c, RXS "@" V2 " is held (zfs holds), which keeps it "
+	    "from being destroyed"));
+}
+
+/*
+ * K9: what the plan refuses on beforehand, and what only the prune
+ * meets: x cut over all the same, the previous root left whole and
+ * said.
+ */
+static void
+test_prune(void)
+{
+	static const struct sh_zprop kind = { "shtetl:kind", "save" };
+	const char *clash[] = { RXS "/www@" S1 };
+
+	/* a hold, and a clone outside: x cut over, its previous root left */
 	world(1);
 	CHECK(update(SH_UV_NEW, 0) == 0);
 	zfake_hold(RX "/var@" S1);
@@ -1131,17 +1148,56 @@ test_cutover_again(void)
 	/* the promote takes its origin along */
 	CHECK(sh_zfs_clone(z, RX "/www@" S2, "fast/run/containers/w", NULL,
 	    0, &c.c_err) == 0);
+	CHECK(kplan("x", 0) == 0);
+	CHECK(krun() == 0);
+	CHECK(c.c_err.se_count == 0);
+	CHECK(cap_has(&wc, ASIDE "/var@" S1 " is held (zfs holds), which "
+	    "keeps it from being destroyed"));
+	CHECK(!cap_has(&wc, "/www@" S1 " is held"));
+	CHECK(cap_has(&wc, "fast/run/containers/y is a clone of " ASIDE
+	    "/usr/local@" S2 ", which keeps it from being destroyed"));
+	CHECK(!cap_has(&wc, "fast/run/containers/w is a clone"));
+	CHECK(cap_has(&wc, ASIDE " not pruned: x is cut over, its previous "
+	    "root left as it is"));
+	CHECK(strstr(ran, "cut over x\n") != NULL);
+	CHECK(zfake_exists(ASIDE) && there(ASIDE "/var@" S1));
+	CHECK(is(prop(ASIDE, "mounted"), "yes"));
+	CHECK(is(prop(RX "/www", "origin"), "-") && there(RX "/www@" S1));
+	CHECK(is(prop(RX, "origin"), RF "@" V2) && runs("x"));
+	CHECK(!marked(RX));
+	/* only the hold the promote takes along: pruned */
+	world(1);
+	CHECK(update(SH_UV_NEW, 0) == 0);
+	zfake_hold(RX "/www@" S1);
+	CHECK(kplan("x", 0) == 0 && krun() == 0);
+	CHECK(wc.c_err.se_count == 0 && !zfake_exists(ASIDE));
+	CHECK(there(RX "/www@" S1));
+	/* the promote failing: left too */
+	world(1);
+	CHECK(update(SH_UV_NEW, 0) == 0);
+	CHECK(kplan("x", 0) == 0);
+	zfake_fail("promote");
+	CHECK(krun() == 0);
+	CHECK(cap_has(&wc, ASIDE " not pruned"));
+	CHECK(zfake_exists(ASIDE));
+	CHECK(is(prop(RX "/www", "origin"), ASIDE "/www@" S3));
+	/* zlake's promote failing: the archive not stood alone, said */
+	world(1);
+	CHECK(update(SH_UV_NEW, 0) == 0);
+	CHECK(kplan("x", 0) == 0);
+	zfake_fail_nth("promote", 2);
+	CHECK(krun() == 0);
+	CHECK(cap_has(&wc, LX " not promoted off the archive " ARCH));
+	CHECK(!cap_has(&wc, "not pruned"));
+	CHECK(!zfake_exists(ASIDE));
+	CHECK(is(prop(LX "/www", "origin"), ARCH "/www@" S3));
+	/* refused beforehand: a snapshot name a promote would meet */
+	world(1);
+	CHECK(update(SH_UV_NEW, 0) == 0);
 	CHECK(sh_zfs_snapshot(z, clash, 1, &kind, 1, &c.c_err) == 0);
 	CHECK(kplan("x", 0) == -1);
-	CHECK(cap_has(&c, RX "/var@" S1 " is held (zfs holds), which keeps "
-	    "it from being destroyed"));
-	CHECK(!cap_has(&c, RX "/www@" S1 " is held"));
-	CHECK(cap_has(&c, "fast/run/containers/y is a clone of " RX
-	    "/usr/local@" S2 ", which keeps it from being destroyed"));
-	CHECK(!cap_has(&c, "fast/run/containers/w is a clone"));
 	CHECK(cap_has(&c, RX "/www@" S1 ": " RXS "/www has a snapshot of "
 	    "that name, which a promote of it would meet"));
-	/* nothing done */
 	CHECK(zfake_exists(RXS) && runs("x-staging"));
 	/* and in zlake: the clash, and the archive's name taken */
 	world(1);
@@ -1153,13 +1209,50 @@ test_cutover_again(void)
 	CHECK(cap_has(&c, LX "/www@" S3 ": " LXS "/www has a snapshot of "
 	    "that name, which a promote of it would meet"));
 	CHECK(cap_has(&c, ARCH ": an archive of x on that version exists"));
-	/* and an abandon, on a hold on the staging tree */
+}
+
+/* K5, K8, K9. */
+static void
+test_cutover_back(void)
+{
+	/* K5: a failure at each step that changes something */
+	back("sync", 1, 0, 0);		/* x's writes read again */
+	back("snapshot", 1, 1, 1);	/* its final save; x started again */
+	back("rename", 1, 1, 1);	/* x aside, after the final save */
+	back("rename", 2, 0, 0);	/* x-staging renamed x */
+	back("rename", 3, 1, 0);	/* in zlake: x archived */
+	back("rename", 4, 0, 0);	/* the staging mirror renamed x */
+	back("inherit", 1, 0, 0);	/* the mark off */
+	back(NULL, 0, 0, 0);		/* x's jail started */
+	back("snapshot", 2, 0, 1);	/* the closing save */
+	/* putting back stopped part way: x-staging's jail would not start */
 	world(1);
 	CHECK(update(SH_UV_NEW, 0) == 0);
-	zfake_hold(RXS "@" V2);
-	CHECK(kplan("x", 1) == -1);
-	CHECK(cap_has(&c, RXS "@" V2 " is held (zfs holds), which keeps it "
-	    "from being destroyed"));
+	CHECK(runs("x-staging"));
+	CHECK(kplan("x", 0) == 0);
+	(void) scratch_write("jailfails", "");
+	CHECK(krun() == -1);
+	(void) unlink(scratch_path("jailfails"));
+	CHECK(cap_has(&c, "not put back: starting the jail x-staging"));
+	CHECK(cap_has(&c, "cutover of x failed, and putting it back stopped "
+	    "part way"));
+	CHECK(zfake_exists(RXS) && !zfake_exists(ASIDE) && !zfake_exists(ARCH));
+	CHECK(!runs("x-staging") && !runs("x"));
+	CHECK(is(prop(RXS "@" S3, SH_UPDATE_MARK), V2));
+	/* the closing save's mirror failing: cut over, the mirror behind */
+	world(1);
+	CHECK(update(SH_UV_NEW, 0) == 0);
+	CHECK(kplan("x", 0) == 0);
+	zfake_fail("send");
+	CHECK(krun() == 0);
+	CHECK(c.c_err.se_count == 0);
+	CHECK(cap_has(&wc, "@" S5 " is saved; its mirror into zlake failed, "
+	    "and the next save brings it up to date"));
+	CHECK(strstr(ran, "cut over x\n") != NULL);
+	CHECK(there(RX "@" S5) && !there(LX "@" S5) && !zfake_exists(ASIDE));
+	/* K8, K9 */
+	test_abandon();
+	test_prune();
 }
 
 /* U7: a rebase refused, or failed part way: undone. */

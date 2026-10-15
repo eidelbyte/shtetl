@@ -657,19 +657,23 @@ a failure {refused, failed part way, after a gate}.
 # Family K: cutover and abandon (M5; planning.md 7.9, 7.10; src/core/cutover.c)
 
 A cutover needs an update done, so its tests are check_update.c's,
-after its own.
+after its own. Dimensions (reworked 2026-10-15, m6-cutover): the step
+that fails, each that changes something; X running or not, written to
+or not; putting back failing; what keeps the prune from going through
+(a hold, an outside clone, a promote failing, on zrun or in zlake); the
+closing save's mirror failing.
 
 | cell | scenario | disposition |
 |------|----------|-------------|
 | K1 | refused: no container X; no X-staging; an update of X paused | covered: check_update.c test_cutover |
-| K2 | cutover: X's written@ its newest save, each dataset; above zero said and asked; at the run X's jail stopped first and written@ read again, after a sync, so a write after the plan is saved too, a final save of X when above zero; X-staging's jail stopped; its own clones promoted; the old X destroyed on zrun; X-staging renamed X; the jail's block X's again, its path X's; X started; saved | covered: check_update.c test_cutover |
-| K3 | cutover's zlake: the staging mirror's own clones promoted, the old X moved to archive/containers/X-<its version before the update>, the staging mirror renamed X, before the save that mirrors the rest | covered: check_update.c test_cutover |
-| K4 | abandon: X-staging's jail stopped and its block removed; X-staging destroyed on zrun and in zlake; X started | covered: check_update.c test_cutover |
-| K5 | a cutover stopped at each step (the zrun rename, the archive's, the staging mirror's; either promote; the destroy; X's jail start; the save; the unmark) says to run it again; run again, its plan says where it takes up, and it ends as a whole run does, with one save | covered: check_update.c test_cutover_again |
+| K2 | cutover: X's written@ its newest save, each dataset; above zero said and asked; at the run X's jail stopped first and written@ read again, after a sync, so a write after the plan is saved too, a final save of X when above zero; X-staging's jail stopped; X renamed aside as X-<its version>, its previous root, and X-staging renamed X; X-staging's block removed, X's written again, its path X's; the mark off; X started; saved; in that order, the prune after | covered: check_update.c test_cutover |
+| K3 | cutover's zlake: the old X moved to archive/containers/X-<its version before the update>, the staging mirror renamed X, before the save that mirrors the rest; in the prune, the renamed mirror's own clones promoted off the archive | covered: check_update.c test_cutover |
+| K4 | abandon: X-staging's jail stopped and its block removed; the mark off; X started; then, last, X-staging destroyed on zrun and in zlake | covered: check_update.c test_cutover |
+| K5 | a cutover failing at each step that changes something (x's written@ read again; its final save; each of the four renames; the mark off; X's jail start; the closing save), with X running or not and written to or not: every step before it put back, last first, so the trees, their mounts, the jails, both blocks and the marks are as they were, said; run again from the start, cut over. Putting back failing (X-staging's jail would not start again): what is not put back said, the rest put back. The closing save made on zrun with its mirror failing: cut over, the save's own warning | covered: check_update.c test_cutover_back |
 | K6 | the command line: cutover and abandon with no container, two, an unknown option | covered: run-cli.sh |
-| K7 | for real: the updated container cut over on the box, its archive in zlake; and an abandon | box: tests/box/build.sh |
-| K8 | abandon once a cutover has promoted, or destroyed X: refused, the cutover to carry on; an abandon stopped at X's jail start, or with the staging mirror left in zlake, taken up; done, nothing to take up | covered: check_update.c test_cutover_again |
-| K9 | refused in the plan, nothing done: a hold on a snapshot of the old X, a clone of one outside it, a staging snapshot name a promote would meet (zrun, zlake), the archive's name taken; a hold or clone the promote takes along not refused; an abandon on a hold on the staging tree | covered: check_update.c test_cutover_again |
+| K7 | for real: the updated container cut over on the box, its archive in zlake, its previous root pruned with no warning, its own datasets promoted off it; and an abandon | box: tests/box/build.sh |
+| K8 | abandon failing (X's jail start): X-staging's block and the mark put back, said; run again, abandoned; its destroy failing: abandoned all the same, the staging tree left, a warning; refused on a hold on the staging tree | covered: check_update.c test_abandon |
+| K9 | refused in the plan, nothing done: a staging snapshot name a promote would meet (zrun, zlake), the archive's name taken, the previous root's name taken; met only by the prune, x cut over all the same and warned: a hold on a snapshot of the old X, a clone of one outside it, the previous root left whole and mounted; a hold or clone the promote takes along, pruned; the promote failing; zlake's promote failing, the archive not stood alone | covered: check_update.c test_prune |
 
 # Family N: the config root's snapshots (M5; planning.md 7.1, 7.4, 7.6; src/core/cfgsnap.c)
 

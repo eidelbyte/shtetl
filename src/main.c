@@ -771,7 +771,7 @@ cutover_or_abandon(struct sh_ctx *ctx, int argc, char **argv, int abandon)
 			    "not confirmed" : "not confirmed: no terminal, use "
 			    "-y");
 		else if (sh_cutover_run(ctx->sc_zfs, plan, &ctx->sc_spaces,
-		    &sh_build_tools, time(NULL), stdout, &e) == 0)
+		    &sh_build_tools, time(NULL), stdout, &e, &w) == 0)
 			rc = out_done();
 	}
 	if (plan != NULL)

@@ -106,3 +106,84 @@ line in the update log, W8), and shbab gets an edit to the very line
 the update takes out, which still pauses and is answered onto before
 the abandon. The box needs zfs_rebase 69d8223 or later installed.
 
+## Cutover and abandon, put back on failure (m6-cutover)
+
+Ruled 2026-10-15: no longer special resumable verbs; "simplify", and
+"pruning is the last step of cutover". This overturns 2026-10-14's
+cutover that read where it stood from the trees and carried on when
+run again (7c71389).
+
+What was built (src/core/cutover.c, rewritten). The run is a straight
+sequence. Each step that changes something takes a note first (struct
+kc_undo: a rename, a jail stopped or started, a file's bytes, a mark
+taken off), and a step that fails, or finds nothing to do, takes its
+note back. The cutover, in order:
+
+1. X's jail stopped, and its final save if it wrote since its newest
+   save.
+2. X-staging's jail stopped.
+3. X renamed aside as X-<its version>, its previous root.
+4. X-staging renamed X.
+5. X-staging's block removed and X's written for the new X.
+6. In zlake, X archived and the staging mirror renamed X.
+7. The mark taken off.
+8. X started, and its closing save.
+
+A failure anywhere in that sequence puts every noted step back, last
+first (kc_back), and the run says "cutover of x failed and was put
+back". If putting back fails too, it stops there and says each step
+not put back. The prune follows, and only warns (into the new W sink
+of sh_cutover_run). The new X's clones of the previous root's datasets
+are promoted off it. The previous root is then destroyed, unless
+kp_destroyable finds a hold or an outside clone, in which case nothing
+is destroyed and the root is left whole. In zlake, the renamed
+mirror's clones are promoted off the archive. An abandon is the same
+shape: X-staging stopped, its block removed, the mark off and X
+started are all noted, and X-staging's destroys come last and only
+warn.
+
+Decisions beyond the plan:
+
+- The closing save is the one step that can half-succeed: made on
+  zrun, its mirror into zlake failing. That is a save's own exception
+  (7: the next save brings the mirror up to date), so the cutover
+  counts it done. The save runs into a memory sink (kc_close), and its
+  messages go to W when the zrun snapshot is there, to E otherwise. A
+  final save that half-succeeds still fails the cutover: the point of
+  that save is that the archive holds X's writes.
+- Gone with the resuming: the plan's refusal on a hold or an outside
+  clone of the old X (only the prune meets those now, so the cutover
+  still goes through); kp_promoted, kp_stopped, kc_saved; the
+  abandon's refusal once a cutover has promoted; kp_resumed. The
+  refusal on a snapshot name a promote would meet stays in the plan,
+  so the prune does not fail on it, and so does the archive's name.
+  New: the refusal on the previous root's name taken.
+- The previous root is a sibling on zrun, containers/X-<version>, as
+  X-staging is. A previous root the prune left behind is not taken up
+  by anything yet: M7's prune and retention are where it belongs.
+- The undo restores both jail blocks byte for byte, rather than
+  writing them again from the recipe, which may have changed since X
+  was created.
+
+Verification: check_update.c, K1 - K4 updated, and K5, K8, K9 new
+(test_cutover_back, test_abandon, test_prune):
+
+- K5: a failure at each changing step, with X running or not and
+  written or not, puts back the trees, their mounts, both jails, both
+  blocks byte for byte and both marks; run again, it cuts over. Also
+  covered: putting back stopped part way, and the closing save's
+  mirror failing.
+- K8: an abandon put back, and its destroy failing.
+- K9: the plan's refusals, and what only the prune meets (hold,
+  outside clone, either promote failing).
+
+Fourteen mutations caught (no put-back; a stop not noted; bytes not
+kept or not written back; a mark not noted; renames not put back; the
+prune destroying past a hold; no prune; mirror lag counted a failure;
+zlake's promote skipped; no abandon destroys; the previous root's name
+unchecked; X-staging's block left; put-back not stopping at its first
+failure). make check (1642 checks in check_update), the gate, xcheck.
+
+The box: build.sh's K7 now also checks that shbup's previous root is
+gone, with no warning, and that none of its datasets is a clone of it.
+The box run is owed.

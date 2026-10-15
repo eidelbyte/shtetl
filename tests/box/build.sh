@@ -501,6 +501,11 @@ EOF
 	    2>/dev/null)" "$P/shtetl/archive/containers/shbup-$_v"
 	check K7 "zlake's shbup on box's newest" "$(prop $_lu origin)" \
 	    "$P/shtetl/foundations/box@$_v2-pkg"
+	check K7 "the previous root, renamed aside, pruned last, no warning" \
+	    "$(zfs list -H -o name $_u-$_v 2>/dev/null)$(grep -c \
+	    'warning' "$T/err")" 0
+	check K7 "shbup's own datasets promoted off it" \
+	    "$(zfs list -H -o origin -r $_u | grep -c "^$_u-")" 0
 	# an abandon, after a conflict -m cannot merge: the line box's
 	# update takes out, changed here, paused at and answered onto
 	sht create -y -m "the first" shbab --on box --version "$_v"

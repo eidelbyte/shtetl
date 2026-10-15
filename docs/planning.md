@@ -1506,7 +1506,7 @@ Destroying the old tree is the user's decision, made after the soak.
 `shtetl abandon X`: stop X-staging; destroy it and its zlake mirror;
 start X.
 
-As built (M5, `src/core/cutover.c`; to be made simpler and no longer
+As built (M5, `src/core/cutover.c`; made simpler and no longer
 carried on when run again, ruled 2026-10-15, 12.1 m6-cutover):
 
     shtetl cutover [-y] X
@@ -1521,46 +1521,47 @@ carried on when run again, ruled 2026-10-15, 12.1 m6-cutover):
   first, if it runs, and reads it again: above zero, whatever the plan
   saw, a final save of X before anything else, which its archive
   keeps, so nothing written after the plan is lost with the old tree.
-  X-staging's jail stopped; its clones of X's datasets promoted; X
-  unmounted and destroyed; X-staging renamed X, its block removed and
-  X's written again with the new path. In zlake the
-  staging mirror's clones of X's promoted,
-  X moved to `archive/containers/X-<X's version before the update>`
-  (ruled 2026-10-14; a cutover is refused while that name is taken),
-  the staging mirror renamed X. X started and saved, the save mirrored
-  onto the renamed mirror. The archive's snapshots are the old X's
-  saves as they were mirrored, named `save-<date>-<time>`; the
-  version is in its name and its origin.
-  The last step takes `shtetl:update` off X's snapshots: the replayed
-  from-save carries it from X's, and while it does the cutover is not
-  done.
-- Every step asks ZFS first whether it is done, and a cutover stopped
-  part way says to run it again, which carries on from there (ruled
-  2026-10-14, 14). Where it stands is read from the trees: X-staging
-  there and X with it, from the start (X's written read only before
-  the promotes, which take its newest save along); X-staging there and
-  X gone, from the rename; X-staging gone from zrun and X's newest
-  version snapshot the one its marked from-save names, from zlake's
-  half. zlake's half likewise: the old mirror archived while it and the
-  staging mirror are both there, the staging mirror renamed while it
-  is. Jails are started and stopped only when they are not already,
-  the blocks written again each run, and the closing save taken only
-  if X's newest save is not already it.
+  X-staging's jail stopped. X renamed aside as `X-<its version>`,
+  its previous root (a cutover is refused while that name is taken),
+  and X-staging renamed X; X-staging's block removed and X's written
+  again with the new path. In zlake X moved to
+  `archive/containers/X-<X's version before the update>` (ruled
+  2026-10-14; a cutover is refused while that name is taken), the
+  staging mirror renamed X. `shtetl:update` taken off X's snapshots
+  (the replayed from-save carries it from X's). X started and saved,
+  the save mirrored onto the renamed mirror. The archive's snapshots
+  are the old X's saves as they were mirrored; the version is in its
+  name and its origin.
+- Nothing makes those steps one, so each that changes something notes
+  how to put it back, and a step failing puts every step before it
+  back, last first: renames back, the jails stopped or started again,
+  both blocks as they were, the marks on again (ruled 2026-10-15, 12.1
+  m6-cutover). A failed cutover says so and is run again from the
+  start; if putting it back fails too, what is not put back is said.
+  The closing save made on zrun with its mirror failing is not a
+  failure: the next save brings the mirror up to date, as for any
+  save (7), and the cutover is done.
+- The prune is the last step, once X runs on the new tree: X's clones
+  of the previous root's datasets promoted off it (they take over the
+  snapshots up to their origin, P11), then the previous root destroyed
+  on zrun; in zlake, the renamed mirror's clones promoted off the
+  archive, so that the archive stands alone for `retention.archive`.
+  What would keep the previous root, a hold (`userrefs`) on one of its
+  snapshots or a clone of one outside it found by walking the run
+  root, is looked for first, and then nothing is destroyed: the
+  cutover is done and the previous root left whole, said as a
+  warning, as is a promote failing.
 - Refused in the plan, before anything changes, with every reason: a
-  hold (`userrefs`) on a snapshot of the old X, or a clone of one
-  outside it found by walking the run root, either of which would keep
-  the destroy from going through, unless the promotes take that
-  snapshot along; a snapshot of a staging dataset with the name of one
-  a promote of it would take over (`dsl_dataset_promote` refuses it),
-  on zrun and in zlake; the archive's name taken.
-- Abandon: X-staging's jail stopped and its block removed; X-staging
-  destroyed on zrun and its mirror in zlake; X started if it is not
-  running; the mark taken off X's from-save. Run again it carries on
-  too: X's from-save still marked and X not the staging tree renamed
-  is an abandon stopped part way. It is refused once a cutover has
-  begun promoting or has destroyed the old X, which only the cutover
-  can finish, and on a hold on X-staging's snapshots or a clone of one
-  outside it.
+  snapshot of a staging dataset with the name of one a promote of it
+  would take over (`dsl_dataset_promote` refuses it), on zrun and in
+  zlake; the previous root's name or the archive's taken.
+- Abandon: X-staging's jail stopped and its block removed; the mark
+  taken off X's from-save; X started if it is not running; then, last,
+  X-staging destroyed on zrun and its mirror in zlake. A failure
+  before the destroys is put back as a cutover's is; a destroy failing
+  leaves the abandon done and the staging tree as it is, said as a
+  warning. It is refused on a hold on X-staging's snapshots or a clone
+  of one outside it.
 
 ### 7.10 zlake mirrors zrun
 
