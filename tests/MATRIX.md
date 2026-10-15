@@ -660,7 +660,7 @@ after its own.
 | cell | scenario | disposition |
 |------|----------|-------------|
 | K1 | refused: no container X; no X-staging; an update of X paused | covered: check_update.c test_cutover |
-| K2 | cutover: X's written@ its newest save, each dataset; above zero said and asked, yes a final save of X; X-staging's jail stopped; its own clones promoted; the old X destroyed on zrun; X-staging renamed X; the jail's block X's again, its path X's; X started; saved | covered: check_update.c test_cutover |
+| K2 | cutover: X's written@ its newest save, each dataset; above zero said and asked; at the run X's jail stopped first and written@ read again, after a sync, so a write after the plan is saved too, a final save of X when above zero; X-staging's jail stopped; its own clones promoted; the old X destroyed on zrun; X-staging renamed X; the jail's block X's again, its path X's; X started; saved | covered: check_update.c test_cutover |
 | K3 | cutover's zlake: the staging mirror's own clones promoted, the old X moved to archive/containers/X-<its version before the update>, the staging mirror renamed X, before the save that mirrors the rest | covered: check_update.c test_cutover |
 | K4 | abandon: X-staging's jail stopped and its block removed; X-staging destroyed on zrun and in zlake; X started | covered: check_update.c test_cutover |
 | K5 | a cutover stopped at each step (the zrun rename, the archive's, the staging mirror's; either promote; the destroy; X's jail start; the save; the unmark) says to run it again; run again, its plan says where it takes up, and it ends as a whole run does, with one save | covered: check_update.c test_cutover_again |

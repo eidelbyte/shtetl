@@ -708,26 +708,49 @@ kc_tidy(struct kc *c)
 	(void) rmdir(dir);
 }
 
+/*
+ * X's final save, if it wrote since its newest save: read again with
+ * X's jail stopped and the pool synced, whatever the plan saw, so that
+ * nothing written after the plan goes with the old tree. Only before
+ * the promotes, which take the save it is measured from.
+ */
+static int
+kc_final(struct kc *c)
+{
+	struct sh_kplan *p = c->k_p;
+	char msg[SH_CUT_NAME * 2];
+	int r;
+
+	if (kc_stop(c, p->kp_jailfile, p->kp_name) != 0 ||
+	    (r = kp_promoted(c->k_z, p->kp_run, p->kp_stage, c->k_err)) < 0)
+		return (-1);
+	if (r == 1)
+		return (0);
+	p->kp_wrote = 0;
+	p->kp_nx = 0;
+	if (kp_written(c->k_z, p, c->k_err) != 0)
+		return (-1);
+	if (p->kp_wrote == 0)
+		return (0);
+	(void) snprintf(msg, sizeof (msg), "written during the soak of %s",
+	    p->kp_stagename);
+	return (kc_save(c, p->kp_name, msg));
+}
+
 /* On zrun, while the staging tree is there: it made X. */
 static int
 kc_zrun(struct kc *c)
 {
 	struct sh_kplan *p = c->k_p;
-	char msg[SH_CUT_NAME * 2];
 
 	if (!kc_there(c, p->kp_stage))
 		return (0);
-	if (p->kp_wrote > 0 && kc_there(c, p->kp_run)) {
-		(void) snprintf(msg, sizeof (msg), "written during the soak "
-		    "of %s", p->kp_stagename);
-		if (kc_save(c, p->kp_name, msg) != 0)
-			return (-1);
-	}
+	if (kc_there(c, p->kp_run) && kc_final(c) != 0)
+		return (-1);
 	if (kc_stop(c, p->kp_stagejail, p->kp_stagename) != 0 ||
 	    kc_promote(c, p->kp_own, p->kp_nown, p->kp_run) != 0)
 		return (-1);
-	if (kc_there(c, p->kp_run) && (kc_stop(c, p->kp_jailfile,
-	    p->kp_name) != 0 || kc_destroy(c, p->kp_run) != 0))
+	if (kc_there(c, p->kp_run) && kc_destroy(c, p->kp_run) != 0)
 		return (-1);
 	if (sh_zfs_rename(c->k_z, p->kp_stage, p->kp_run, c->k_err) != 0)
 		return (-1);

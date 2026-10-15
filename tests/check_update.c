@@ -814,6 +814,7 @@ static void
 test_cutover(void)
 {
 	static const char *const gate[] = { "/etc/rc.conf", NULL };
+	const char *stop, *save;
 	char path[1300];
 	size_t len;
 	FILE *f;
@@ -890,6 +891,21 @@ test_cutover(void)
 	/* the next update finds x on V2 */
 	CHECK(plan("x", NULL, SH_UV_NEW) == -1);
 	CHECK(cap_has(&c, "container x is on generic@" V2 " already"));
+	/*
+	 * K2: x started again and written to after the plan: stopped
+	 * first, its writes saved all the same
+	 */
+	world(1);
+	CHECK(update(SH_UV_NEW, 0) == 0);
+	CHECK(kplan("x", 0) == 0 && kp.kp_wrote == 0);
+	(void) scratch_write("running/x", "");
+	zfake_write(RX "/var", 2048);
+	CHECK(krun() == 0);
+	stop = strstr(ran, "stopped the jail x\n");
+	save = strstr(ran, "saved " RX "@" S4 "\n");
+	CHECK(stop != NULL && save != NULL && stop < save);
+	CHECK(is(prop(ARCH "@" S4, "shtetl:commit"), "written during the "
+	    "soak of x-staging"));
 	/* K4: abandon */
 	world(1);
 	CHECK(update(SH_UV_NEW, 0) == 0);

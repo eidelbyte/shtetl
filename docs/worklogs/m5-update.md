@@ -286,3 +286,20 @@ results log when an update, cutover or abandon goes wrong: the run's
 teardown deletes the file, so a failure would otherwise come back
 without the tool's words. Checked with sh -n and the gate; it runs
 with the trip.
+
+## The final save decided with X stopped (2026-10-15)
+
+Found while fixing the box's X9 (written@ read before a commit): the
+cutover decided its final save at plan time and stopped X only just
+before destroying it, so a write X made between the plan (or the
+confirmation) and that stop went with the old tree. kc_final, the
+run's first step on zrun: X's jail stopped if it runs, the pool
+synced, written@ its newest save read again, and a final save when
+anything was written, whatever the plan saw. Only before the promotes,
+which take the save it is measured from; a run taken up after them
+skips it, as the plan does.
+
+Verification: check_update K2 gains a cell, x started again and
+written to after the plan: stopped before the save, the save in the
+archive (1351 checks); three mutations caught (no stop, no save, the
+step skipped). make check, gate, xcheck. build.sh's K7 runs it.

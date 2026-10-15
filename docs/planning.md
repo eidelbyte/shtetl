@@ -1486,11 +1486,13 @@ As built (M5, `src/core/cutover.c`):
   (ruled 2026-10-14). A cutover is refused while X-staging has no
   mirror in zlake; a save of it makes one.
 - Cutover: X's `written@<its newest save>` read for every dataset,
-  after a sync of the run pool, and shown; above zero, a final save of
-  X before anything else, which its archive keeps. X-staging's jail
-  stopped; its clones of X's datasets promoted; X's jail stopped if it
-  runs; X unmounted and destroyed; X-staging renamed X, its block
-  removed and X's written again with the new path. In zlake the
+  after a sync of the run pool, and shown. The run stops X's jail
+  first, if it runs, and reads it again: above zero, whatever the plan
+  saw, a final save of X before anything else, which its archive
+  keeps, so nothing written after the plan is lost with the old tree.
+  X-staging's jail stopped; its clones of X's datasets promoted; X
+  unmounted and destroyed; X-staging renamed X, its block removed and
+  X's written again with the new path. In zlake the
   staging mirror's clones of X's promoted,
   X moved to `archive/containers/X-<X's version before the update>`
   (ruled 2026-10-14; a cutover is refused while that name is taken),

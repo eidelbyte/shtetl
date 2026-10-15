@@ -76,12 +76,12 @@ void sh_cutover_show(FILE *out, const struct sh_kplan *p);
 
 /*
  * The plan carried out at NOW, each step said on OUT (7.9). A cutover:
- * a final save of X if it wrote since its newest save; X-staging's
- * jail stopped; its clones of X's datasets promoted; X's jail stopped
- * if it runs, X destroyed on zrun; X-staging renamed X, its jail's
- * block X's; in zlake, the staging mirror's clones promoted, the old X
- * moved to the archive as X-<its version>, the staging mirror renamed
- * X; X started and saved, its replayed from-save unmarked. An abandon:
+ * X's jail stopped if it runs, and a final save of X if it wrote since
+ * its newest save, read again now; X-staging's jail stopped; its clones
+ * of X's datasets promoted; X destroyed on zrun; X-staging renamed X,
+ * its jail's block X's; in zlake, the staging mirror's clones promoted,
+ * the old X moved to the archive as X-<its version>, the staging mirror
+ * renamed X; X started and saved, its replayed from-save unmarked. An abandon:
  * X-staging's jail stopped, its block removed, X-staging destroyed on
  * zrun and in zlake, X started, its from-save unmarked. Every step
  * looks first whether it is done, so a run stopped part way is carried
