@@ -628,7 +628,10 @@ recipes that exist, and not the container itself.
 ### 6.1 Names
 
 Names are for people; shtetl reads `shtetl:kind` and other properties,
-never the name.
+never the name. To be replaced (ruled 2026-10-15, 12.1 m6-names) by
+`<object>@<foundation-ver>-<foundation-branch>-<date>-<bootstrap|pkg|save>`
+for every snapshot of every object, and `<date>-<three words>` for a
+config snapshot.
 
 | what | name | shtetl:kind |
 |------|------|-------------|
@@ -1492,7 +1495,8 @@ Destroying the old tree is the user's decision, made after the soak.
 `shtetl abandon X`: stop X-staging; destroy it and its zlake mirror;
 start X.
 
-As built (M5, `src/core/cutover.c`):
+As built (M5, `src/core/cutover.c`; to be made simpler and no longer
+carried on when run again, ruled 2026-10-15, 12.1 m6-cutover):
 
     shtetl cutover [-y] X
     shtetl abandon [-y] X
@@ -1565,7 +1569,9 @@ pruned by `retention.archive`.
 
 ### 7.11 Systems
 
-The same as containers, except:
+The same as containers, except (S updated into S-staging and cut over
+or abandoned with the same verbs, so that going back to the previous
+root is easy: ruled 2026-10-15):
 
 - deploy: `zfs set -u mountpoint=/ systems/S` and a one-shot boot;
   children mount at /var, /usr/local and so on by inheritance;
@@ -1730,6 +1736,27 @@ by the command line run over two configuration roots
 | M7 | restore, prune, archives | box |
 | M8 | TUI | mac + box |
 
+### 12.1 Before M6: the 2026-10-15 rework
+
+Ruled 2026-10-15 (14); each a tracker issue of M6 (tracker/shtetl.json),
+since systems are to start on it:
+
+- m6-names: one snapshot name for every object,
+  `<object>@<foundation-ver>-<foundation-branch>-<date>-<bootstrap|pkg|save>`,
+  and config snapshots `<date>-<three>-<little>-<words>` (6.1).
+- m6-recipe-file: each object's recipe, merged whole, a read-only file
+  under /var/db/shtetl in its own tree, so every snapshot carries it;
+  shtetl:config, shtetl:patches and shtetl:revision gone with it, and
+  the pause record holding it (6.2, 7.1.1).
+- m6-pkg-upgrade: `shtetl pkg-upgrade` of a container or a system,
+  shtetl:kind=pkg (7.2).
+- m6-build-root: the build root not snapshotted while patching; git
+  puts its tree back (7.1.1).
+- m6-cutover: cutover and abandon simpler, not carried on when run
+  again; systems through S-staging with the same verbs (7.9, 7.11).
+- m6-gate-merge: a conflict at an update's gate that merges three ways
+  clean goes on by itself (7.7).
+
 ## 13. Probes (M0): standalone tests before the design commits
 
 Each probe is a script on a throwaway pool on the box, written down
@@ -1829,6 +1856,51 @@ below that change the plan are folded into the sections named.
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-15 (names, the recipe file, a simpler cutover)
+
+Answering what was left of the proposals:
+
+    8. yes, a clean 3-way should just continue. And this should be
+    true of zfs_rebase too. If there's no conflicts in the 3way
+    merge, we should just continue on automatically.
+
+    19. / 9. / 12. yeah a var/db/shtetl file sounds good. it must be
+    read only though. this is much better than the properties
+    explosion
+
+    14. / 16. yes, we also need to add a shtetl pkg-upgrade C/S
+    option that also updates that. these should be shtetl:kind=pkg
+
+    we don't need to snapshot the build root while patching. that's
+    an all or nothing step. The build root is transient anyway,
+    right? we only keep the result root and the obj store.
+
+    our new standard snapshot naming should be
+    <system-name|container-name|foundation-name>@<foundation-ver>-
+    <foundation-branch>-<ISO-date-to-seconds>-[boostrap|pkg|save]
+    this way everything sorts nicely. config snaps should be
+    <ISO-date-to-seconds>-<three>-<little>-<words>.
+
+    We should actually adopt the -staging dataset for systems so
+    rolling back to a previous be is easy. we can use the same
+    cutover/abandon verbiage. I additionally no longer thing these
+    should be special resumable verbs. simplify.
+
+So: a foundation's patch merged three ways without conflict goes on
+(7.1.1, built); so does a conflict at an update's gate that merges
+three ways clean (7.7, to build). Each object carries its recipe,
+merged whole, as a read-only file under /var/db/shtetl, in place of
+shtetl:config, shtetl:patches and shtetl:revision and of the pause
+record's recipe (to build). `shtetl pkg-upgrade` takes a container or
+a system too, its snapshot shtetl:kind=pkg (to build). The build root
+is not snapshotted while patching (to build). Every snapshot is named
+<object>@<foundation-ver>-<foundation-branch>-<date to the second>-
+<bootstrap|pkg|save>, a config snapshot <date>-<three words> (to
+build). Systems update into S-staging and are cut over or abandoned
+as containers are; cutover and abandon are no longer carried on when
+run again, overturning 2026-10-14's "a cutover stopped part way",
+but made simpler (to build). The work is listed in 12.1.
 
 ### 2026-10-15 (the proposals, one by one)
 

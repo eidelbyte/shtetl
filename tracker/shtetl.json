@@ -394,5 +394,104 @@
     "estimated_size": "medium",
     "completed": "tested",
     "note": "2026-10-14: carried on when stopped part way (ruled, planning.md 14): every step asks ZFS whether it is done; the plan refuses on holds, outside clones, promote name clashes, the archive name; abandon refused once a cutover has promoted. MATRIX K5, K8, K9; check_update 1296 checks. Box owed (K7). 2026-10-15: box trip 2 green, run.sh 128/0 at d064a6e (Z21-Z24), build.sh 126/0 at 3950e6f (U9, W7, K7, N9, X9); trip 1 found X9 (written@ before a txg commit), fixed 7e776c5, 947f54e."
+  },
+  "m6-names": {
+    "description": "One snapshot name for every object, ruled 2026-10-15 (planning.md 14, 12.1): <object>@<foundation-ver>-<foundation-branch>-<date to the second>-<bootstrap|pkg|save>; config snapshots <date>-<three>-<little>-<words>. Replaces the version names (and their .N), -pkg and -pkg.N, save-<date>, bootstrap-<date>; the short sha leaves the name for the recipe file. Verify: every family that names a snapshot (V, F, P, M, S, X, U, K, N), the box.",
+    "requires": [],
+    "epic": "lifecycle",
+    "milestone": "M6",
+    "expected_changed_files": [
+      "src/core/version.c",
+      "src/core/build.c",
+      "src/core/save.c",
+      "src/core/create.c",
+      "src/core/update.c",
+      "src/core/cfgsnap.c",
+      "src/core/boot.c",
+      "tests/MATRIX.md",
+      "docs/planning.md"
+    ],
+    "provides": "Snapshot names that sort by foundation version, branch and time.",
+    "estimated_size": "large",
+    "completed": "not-started"
+  },
+  "m6-recipe-file": {
+    "description": "Each object's recipe, merged whole (imports inlined, as config show prints it), with a foundation's build record, a read-only file under /var/db/shtetl in the object's own tree, so every snapshot carries it; shtetl:config, shtetl:patches and shtetl:revision go, and the pause record holds the merged recipe. Ruled 2026-10-15 (planning.md 14, 12.1). Verify: create and update read the foundation's recipe from the file; families F, P, X, U.",
+    "requires": [],
+    "epic": "config",
+    "milestone": "M6",
+    "expected_changed_files": [
+      "src/core/build.c",
+      "src/core/patch.c",
+      "src/core/create.c",
+      "src/core/update.c",
+      "src/core/save.c",
+      "tests/MATRIX.md",
+      "docs/planning.md"
+    ],
+    "provides": "A snapshot that says, in itself, what recipe made it.",
+    "estimated_size": "large",
+    "completed": "not-started"
+  },
+  "m6-pkg-upgrade": {
+    "description": "shtetl pkg-upgrade of a container (and, with systems, a system): its packages upgraded, a snapshot of shtetl:kind=pkg. Ruled 2026-10-15 (planning.md 14, 12.1). Verify: a family of its own in tests/MATRIX.md; the box.",
+    "requires": [
+      "m6-names"
+    ],
+    "epic": "lifecycle",
+    "milestone": "M6",
+    "expected_changed_files": [
+      "src/core/build.c",
+      "src/main.c",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Packages upgraded on any object without a rebase.",
+    "estimated_size": "medium",
+    "completed": "not-started"
+  },
+  "m6-build-root": {
+    "description": "The build root not snapshotted while patching (shtetl-patch-N gone): git puts the checkout back for --skip and --abort and at the end, which also gives the files fresh times. Ruled 2026-10-15 (planning.md 14, 12.1). Verify: family P, the box's P17 and F27.",
+    "requires": [],
+    "epic": "build",
+    "milestone": "M6",
+    "expected_changed_files": [
+      "src/core/build.c",
+      "tests/check_build.c",
+      "tests/box/build.sh",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Patching without ZFS snapshots of the build root.",
+    "estimated_size": "medium",
+    "completed": "not-started"
+  },
+  "m6-cutover": {
+    "description": "cutover and abandon made simpler and no longer carried on when run again (overturning 2026-10-14); systems updated into S-staging and cut over or abandoned with the same verbs. Ruled 2026-10-15 (planning.md 14, 12.1). Verify: family K rewritten; the box's K7.",
+    "requires": [],
+    "epic": "lifecycle",
+    "milestone": "M6",
+    "expected_changed_files": [
+      "src/core/cutover.c",
+      "src/core/cutover.h",
+      "tests/check_update.c",
+      "tests/MATRIX.md",
+      "docs/planning.md"
+    ],
+    "provides": "A cutover any failure of which puts things back.",
+    "estimated_size": "medium",
+    "completed": "not-started"
+  },
+  "m6-gate-merge": {
+    "description": "A conflict at an update's gate that merges three ways without conflict goes on by itself, as a foundation's patch does. Ruled 2026-10-15 (planning.md 14, 12.1). Verify: family G; the box's U9.",
+    "requires": [],
+    "epic": "lifecycle",
+    "milestone": "M6",
+    "expected_changed_files": [
+      "src/core/update.c",
+      "tests/check_update.c",
+      "tests/MATRIX.md"
+    ],
+    "provides": "Updates that stop only for a real conflict.",
+    "estimated_size": "medium",
+    "completed": "not-started"
   }
 }
