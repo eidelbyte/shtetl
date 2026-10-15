@@ -21,6 +21,7 @@
 /* --continue's flags. */
 #define	SH_RB_NOMERGE	0x1	/* --no-merge: hold the gate */
 #define	SH_RB_PICK	0x2	/* -i: the picker, on the terminal */
+#define	SH_RB_MERGE	0x4	/* -m: clean three-way merges taken */
 
 /* One start. */
 struct sh_rbstart {
@@ -29,6 +30,7 @@ struct sh_rbstart {
 	const char	*rs_result;	/* the clone, or the pre-apply's name */
 	const char	*rs_base;	/* --allow-unrelated --base, or NULL */
 	const char	*rs_manifest;	/* -o: a path that is not there */
+	int		rs_merge;	/* -m, --merge-non-conflict */
 };
 
 /*

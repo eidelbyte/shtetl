@@ -488,15 +488,15 @@ test_run(void)
 	/* the replays, three saves each */
 	log = rbfake_log();
 	CHECK(strstr(log, "start --from " RX "@" S1 " --onto " RF "@" V2
-	    " --result " RXS "\n") != NULL);
+	    " --result " RXS " -m\n") != NULL);
 	CHECK(strstr(log, "start --from " RX "@" S2 " --onto " RXS
-	    " --result " S1 " --base\n  base " RX "@" S1 "\n") != NULL);
+	    " --result " S1 " --base -m\n  base " RX "@" S1 "\n") != NULL);
 	CHECK(strstr(log, "start --from " RX "@" S3 " --onto " RXS
-	    " --result " S2 " --base\n  base " RX "@" S2 "\n") != NULL);
+	    " --result " S2 " --base -m\n  base " RX "@" S2 "\n") != NULL);
 	CHECK(strstr(log, "start --from " RX "/var@" S1 " --onto " RF
-	    "/var@" V2 " --result " RXS "/var\n") != NULL);
-	CHECK(strstr(log, "--result " RXS "/usr\n") == NULL);
-	CHECK(strstr(log, "--result " RXS "/www\n") == NULL);
+	    "/var@" V2 " --result " RXS "/var -m\n") != NULL);
+	CHECK(strstr(log, "--result " RXS "/usr -m\n") == NULL);
+	CHECK(strstr(log, "--result " RXS "/www -m\n") == NULL);
 	/* each replayed save as X's, its name and shtetl:* */
 	CHECK(is(prop(RXS "@" S1, "shtetl:kind"), "save"));
 	CHECK(is(prop(RXS "@" S1, "shtetl:commit"), "first"));
@@ -552,7 +552,7 @@ test_run(void)
 	CHECK(update(SH_UV_NEW, 0) == 0);
 	CHECK(strstr(rbfake_log(), "--base") == NULL);
 	CHECK(strstr(rbfake_log(), "start --from " RX "@" S3 " --onto " RF
-	    "@" V2 " --result " RXS "\n") != NULL);
+	    "@" V2 " --result " RXS " -m\n") != NULL);
 	CHECK(is(prop(RXS "@" S3, "shtetl:commit"), "update to generic@" V2));
 	CHECK(!there(RXS "@" S1));
 	settings(NULL);
@@ -592,6 +592,46 @@ answer(const char *path, void *arg)
 }
 
 /* U6: a gate, paused and taken up; the picker; --abort. */
+/*
+ * G6: a conflict zfs_rebase merges three ways with no conflict goes on
+ * by itself (ruled 2026-10-15): -m at each start and --continue. A
+ * step whose every conflict merges does not stop; one with a conflict
+ * that does not merge pauses on that one alone, the merged one keep.
+ */
+static void
+test_gate_merge(void)
+{
+	static const char *const one[] = { "/etc/rc.conf", NULL };
+	static const char *const two[] = { "/etc/motd", "/etc/rc.conf",
+	    NULL };
+	struct sh_resolution r;
+	const char *res;
+
+	settings(NULL);
+	world(1);
+	rbfake_conflicts(RXS "/var", 2, one);
+	rbfake_merges(one);
+	CHECK(update(SH_UV_NEW, 0) == 0);
+	CHECK(strstr(ran, "paused") == NULL);
+	CHECK(strstr(rbfake_log(), "--result " S1 " --base -m\n") != NULL);
+	CHECK(runs("x-staging"));
+	world(1);
+	rbfake_conflicts(RXS "/var", 2, two);
+	rbfake_merges(one);
+	CHECK(update(SH_UV_NEW, 0) == 1);
+	CHECK(strstr(ran, "1 name unanswered") != NULL);
+	CHECK((res = rbfake_resolution(RXS "/var")) != NULL);
+	(void) memset(&r, 0, sizeof (r));
+	CHECK(sh_res_read(res, &r, &c.c_err) == 0);
+	CHECK(is(sh_res_find(&r, "/etc/rc.conf")->rl_choice, "keep"));
+	CHECK(is(sh_res_find(&r, "/etc/motd")->rl_choice, "-"));
+	sh_res_free(&r);
+	/* the rest by hand: on, the -m --continue passing it */
+	CHECK(answer(res, NULL) == 0);
+	CHECK(update(SH_UV_CONTINUE, 0) == 0);
+	CHECK(strstr(rbfake_log(), "continue " RXS "/var -m\n") != NULL);
+}
+
 static void
 test_gate(void)
 {
@@ -634,9 +674,9 @@ test_gate(void)
 	rbfake_conflicts(RXS, 1, gate);
 	rbfake_picker(answer, NULL);
 	CHECK(update(SH_UV_NEW, 1) == 0);
-	CHECK(strstr(rbfake_log(), "continue " RXS " --no-merge -i\n") !=
+	CHECK(strstr(rbfake_log(), "continue " RXS " -m --no-merge -i\n") !=
 	    NULL);
-	CHECK(strstr(rbfake_log(), "continue " RXS "\n") != NULL);
+	CHECK(strstr(rbfake_log(), "continue " RXS " -m\n") != NULL);
 	/* --abort: the rebase aborted, the tree gone, x running again */
 	world(1);
 	rbfake_conflicts(RXS "/usr/local", 3, gate);
@@ -1151,6 +1191,7 @@ main(void)
 	test_plan();
 	test_run();
 	test_gate();
+	test_gate_merge();
 	test_derivations();
 	test_failures();
 	test_cutover();

@@ -37,6 +37,7 @@ static int rf_nruns;
 static struct rf_set rf_sets[RF_MAX];
 static int rf_nsets;
 static int (*rf_pick)(const char *, void *);
+static const char *const *rf_merges;
 static void *rf_pickarg;
 static char *rf_log;
 static size_t rf_loglen;
@@ -68,6 +69,7 @@ rbfake_reset(void)
 	rf_nsets = 0;
 	rf_pick = NULL;
 	rf_pickarg = NULL;
+	rf_merges = NULL;
 	free(rf_log);
 	rf_log = NULL;
 	rf_loglen = 0;
@@ -82,6 +84,40 @@ rbfake_conflicts(const char *result, int step, const char *const *paths)
 	s->rs_step = step;
 	s->rs_paths = paths;
 	s->rs_rc = SH_RB_GATE;
+}
+
+void
+rbfake_merges(const char *const *paths)
+{
+	rf_merges = paths;
+}
+
+/*
+ * -m on the resolution at PATH: the lines rbfake_merges named answered
+ * keep, as the tool's headless merge answers them. The count left
+ * unanswered; -1 where the document will not read.
+ */
+static int
+rf_merge(const char *path, struct sh_err *e)
+{
+	struct sh_resolution res;
+	size_t n;
+	int left;
+
+	if (sh_res_read(path, &res, e) != 0) {
+		sh_res_free(&res);
+		return (-1);
+	}
+	for (n = 0; rf_merges != NULL && rf_merges[n] != NULL; n++)
+		;
+	if (n > 0 && sh_res_keep(&res, rf_merges, n) > 0 &&
+	    sh_res_write(path, &res, e) != 0) {
+		sh_res_free(&res);
+		return (-1);
+	}
+	left = (int)sh_res_unanswered(&res);
+	sh_res_free(&res);
+	return (left);
 }
 
 void
@@ -245,7 +281,8 @@ rf_start(const struct sh_rebaser *self, const struct sh_rbstart *s, int log,
 	(void) self;
 	(void) log;
 	rf_say("start --from %s --onto %s --result %s%s", s->rs_from,
-	    s->rs_onto, s->rs_result, s->rs_base != NULL ? " --base" : "");
+	    s->rs_onto, s->rs_result, s->rs_base != NULL ? (s->rs_merge ?
+	    " --base -m" : " --base") : (s->rs_merge ? " -m" : ""));
 	if (s->rs_base != NULL)
 		rf_say("  base %s%s%s%s", s->rs_base, "", "", "");
 	if ((z = rf_zfs()) == NULL)
@@ -298,6 +335,11 @@ rf_start(const struct sh_rebaser *self, const struct sh_rbstart *s, int log,
 	}
 	rf_resolution(r->rr_res, set->rs_paths);
 	(void) sh_zfs_set(z, ds, RF_PHASE, "conflicts", e);
+	/* -m: what merges clean answered; all of it, and the run goes on */
+	if (s->rs_merge && rf_merge(r->rr_res, e) == 0) {
+		(void) sh_zfs_inherit(z, ds, RF_PHASE, e);
+		return (SH_RB_DONE);
+	}
 	return (SH_RB_GATE);
 }
 
@@ -313,8 +355,9 @@ rf_continue(const struct sh_rebaser *self, const char *ident,
 
 	(void) self;
 	(void) log;
-	rf_say("continue %s%s%s%s", ident, flags & SH_RB_NOMERGE ?
-	    " --no-merge" : "", flags & SH_RB_PICK ? " -i" : "", "");
+	rf_say("continue %s%s%s%s", ident, flags & SH_RB_MERGE ? " -m" : "",
+	    flags & SH_RB_NOMERGE ? " --no-merge" : "", flags & SH_RB_PICK ?
+	    " -i" : "");
 	if ((z = rf_zfs()) == NULL)
 		return (-1);
 	if ((r = rf_find(ident)) == NULL || sh_zfs_get(z, ident, RF_PHASE,
@@ -322,6 +365,8 @@ rf_continue(const struct sh_rebaser *self, const char *ident,
 		sh_errf(e, "rbfake: %s: no rebase to move", ident);
 		return (SH_RB_REFUSED);
 	}
+	if ((flags & SH_RB_MERGE) && rf_merge(r->rr_res, e) < 0)
+		return (SH_RB_GATE);
 	if ((flags & SH_RB_PICK) && rf_pick != NULL)
 		(void) rf_pick(r->rr_res, rf_pickarg);
 	if (sh_res_read(r->rr_res, &res, e) != 0) {

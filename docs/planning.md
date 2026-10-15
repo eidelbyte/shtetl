@@ -1464,6 +1464,16 @@ As built (M5, `src/core/update.c`):
 - A derivation failing pauses the update at its gate (the step's
   rebase still open), and `--continue` runs it again (ruled
   2026-10-14).
+- A conflict whose three-way merge has no conflict goes on by itself
+  (ruled 2026-10-15, 14): zfs_rebase's `-m` (`--merge-non-conflict`,
+  tool 69d8223), which shtetl passes at every start and `--continue`,
+  runs the built-in picker headless at the gate before anything else
+  and answers `keep` every name whose text and attributes both merge
+  clean, the merge written into the result. A step whose every
+  conflict merges goes to done without stopping; what is left is
+  steps 1 - 4 above. A merged source is a source in the tree, so its
+  derivation runs as step 3 says. This is the built-in text driver
+  the paragraph on the headless future asked for, built.
 
 ### 7.8 Soak
 

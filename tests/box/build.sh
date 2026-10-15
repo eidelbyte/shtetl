@@ -9,9 +9,11 @@
 # and then incremental; X9 and S9, the container shbweb created on
 # box, its jail started, stopped and started again, saved again; and
 # U9, W7 and K7 (M5): shbup created on box's first version, saved
-# with an edit the update conflicts with, updated with the real
-# zfs_rebase (which must be installed on shtetl's PATH), paused at the
-# gate, answered by hand, taken up and cut over; shbab updated and
+# with an edit to a file the update also changes, far from its change,
+# updated with the real zfs_rebase (which must be installed on shtetl's
+# PATH; 69d8223 or later, for -m) and the edit merged three ways
+# without a stop (W8), then cut over; shbab given an edit that does
+# conflict, paused at the gate, answered by hand, taken up and
 # abandoned. Along the way N9: the config snapshot a failed build kept
 # recorded again by the next build, nothing having been written to the
 # config root, and a new one once a patch is.
@@ -383,7 +385,8 @@ updlog() {
 }
 
 # The update of $1 taken through every gate it pauses at, each answered
-# onto: RC its last exit; SEEN 1 if a gate's resolution named $2.
+# onto: RC its last exit; SEEN 1 if a gate's resolution held a line
+# matching $2.
 update_through() {
 	sht update -y "$1"
 	sed 's/^/    /' "$T/out"
@@ -440,7 +443,9 @@ EOF
 		return 0
 		;;
 	esac
-	# a history: an edit the update meets, then one it does not
+	# a history: an edit in a file the update changes too, but far
+	# from its change (box's update takes "shtetl-box two" out near
+	# the top), which -m merges three ways; then one it does not
 	echo "an admin's line" >>"$_um/usr/share/misc/bsd-family-tree"
 	echo hello >"$_um/srv/www/index.html"
 	sht save -m "the family tree edited" shbup
@@ -448,16 +453,22 @@ EOF
 	echo "another line" >>"$_um/etc/motd.template"
 	sht save -m "motd" shbup
 	check U9 "the third save" "$RC" 0
-	update_through shbup "bsd-family-tree conflict"
-	check U9 "paused at the family tree's conflict, answered onto" \
-	    "$SEEN" 1
+	update_through shbup "bsd-family-tree conflict [0-9]* -$"
+	check U9 "the family tree never unanswered at a gate: -m merged it" \
+	    "$SEEN" 0
 	check U9 "taken up, staged" "$RC" 0
 	check U9 "the staging tree on box's newest" "$(prop $_us origin)" \
 	    "$_rf@$_v2-pkg"
 	_usm=$(prop $_us mountpoint)
 	_ft=$_usm/usr/share/misc/bsd-family-tree
-	check U9 "the family tree onto's, the update's" \
-	    "$(grep -c "an admin's line" "$_ft")" 0
+	check U9 "the family tree merged: the admin's line kept" \
+	    "$(grep -c "an admin's line" "$_ft")" 1
+	check U9 "and the update's change in it" \
+	    "$(grep -c '^shtetl-box two$' "$_ft") $(grep -c \
+	    '^shtetl-box one$' "$_ft")" "0 1"
+	check W8 "zfs_rebase said what -m merged" "$(grep -q \
+	    '^zfs_rebase: --merge-non-conflict merged [1-9]' \
+	    /var/db/shtetl/update/shbup/update.log && echo yes)" yes
 	check U9 "the later edit replayed" \
 	    "$(grep -c '^another line$' "$_usm/etc/motd.template")" 1
 	check U9 "its own www cloned from the from-save" \
@@ -490,11 +501,24 @@ EOF
 	    2>/dev/null)" "$P/shtetl/archive/containers/shbup-$_v"
 	check K7 "zlake's shbup on box's newest" "$(prop $_lu origin)" \
 	    "$P/shtetl/foundations/box@$_v2-pkg"
-	# an abandon
+	# an abandon, after a conflict -m cannot merge: the line box's
+	# update takes out, changed here, paused at and answered onto
 	sht create -y -m "the first" shbab --on box --version "$_v"
 	check K7 "shbab created" "$RC" 0
-	update_through shbab "-"
+	_bm=$(prop $P/run/containers/shbab mountpoint)
+	sed 's/^shtetl-box two$/shtetl-box two, kept by an admin/' \
+	    "$_bm/usr/share/misc/bsd-family-tree" >"$T/ft" &&
+	    cat "$T/ft" >"$_bm/usr/share/misc/bsd-family-tree"
+	sht save -m "the family tree's own line edited" shbab
+	check K7 "shbab saved" "$RC" 0
+	update_through shbab "bsd-family-tree conflict [0-9]* -$"
+	check U9 "shbab paused at the family tree's conflict, answered onto" \
+	    "$SEEN" 1
 	check K7 "shbab updated" "$RC" 0
+	check U9 "the family tree onto's in shbab's staging tree" \
+	    "$(grep -c 'kept by an admin' \
+	    "$(prop $P/run/containers/shbab-staging \
+	    mountpoint)/usr/share/misc/bsd-family-tree")" 0
 	sht abandon -y shbab
 	if [ "$RC" != 0 ]; then
 		sed 's/^/    /' "$T/err"

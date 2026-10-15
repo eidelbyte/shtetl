@@ -204,6 +204,8 @@ zr_start(const struct sh_rebaser *self, const struct sh_rbstart *s, int log,
 	w[n++] = s->rs_result;
 	w[n++] = "-o";
 	w[n++] = s->rs_manifest;
+	if (s->rs_merge)
+		w[n++] = "-m";
 	w[n] = NULL;
 	return (rb_run(w, log, e));
 }
@@ -212,12 +214,14 @@ static int
 zr_continue(const struct sh_rebaser *self, const char *ident,
     unsigned flags, int log, struct sh_err *e)
 {
-	const char *w[6];
+	const char *w[8];
 	size_t n;
 
 	n = 0;
 	w[n++] = self->rb_tool;
 	w[n++] = "--continue";
+	if (flags & SH_RB_MERGE)
+		w[n++] = "-m";
 	if (flags & SH_RB_NOMERGE)
 		w[n++] = "--no-merge";
 	if (flags & SH_RB_PICK)

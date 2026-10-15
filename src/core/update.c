@@ -985,8 +985,8 @@ uq_gate(struct uq *c, size_t i, size_t k, const char *ident)
 	sh_res_free(&res);
 	if (left > 0 && c->c_tty) {
 		(void) fflush(c->c_out);
-		if (c->c_rb->rb_continue(c->c_rb, ident, SH_RB_NOMERGE |
-		    SH_RB_PICK, c->c_logfd, c->c_err) < 0)
+		if (c->c_rb->rb_continue(c->c_rb, ident, SH_RB_MERGE |
+		    SH_RB_NOMERGE | SH_RB_PICK, c->c_logfd, c->c_err) < 0)
 			return (-1);
 		if (sh_res_read(path, &res, c->c_err) != 0) {
 			sh_res_free(&res);
@@ -1029,7 +1029,8 @@ uq_gate(struct uq *c, size_t i, size_t k, const char *ident)
 		}
 		(void) fclose(f);
 	}
-	rc = c->c_rb->rb_continue(c->c_rb, ident, 0, c->c_logfd, c->c_err);
+	rc = c->c_rb->rb_continue(c->c_rb, ident, SH_RB_MERGE, c->c_logfd,
+	    c->c_err);
 	if (rc == SH_RB_DONE)
 		return (uq_owing(c, i, k, ident));
 	if (rc == SH_RB_GATE) {
@@ -1146,6 +1147,8 @@ uq_replay(struct uq *c, size_t i)
 		(void) unlink(man);
 		(void) unlink(res);
 		st.rs_manifest = man;
+		/* a conflict that merges three ways clean goes on (14) */
+		st.rs_merge = 1;
 		(void) fprintf(c->c_out, "rebase %s, step %zu of %zu: %s onto "
 		    "%s\n", stage, k, n, from, st.rs_onto);
 		rc = c->c_rb->rb_start(c->c_rb, &st, c->c_logfd, c->c_err);

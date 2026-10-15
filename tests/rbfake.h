@@ -6,7 +6,10 @@
  * at the gate with a resolution beside the manifest, in the tool's own
  * grammar, and the record on the result; --continue done once the
  * document is complete and --no-merge is not given; --abort taking the
- * rebase away. Every call is logged, one line each.
+ * rebase away; -m answering keep, at a start and a --continue, every
+ * unanswered conflict the test said merges clean, and a start whose
+ * every conflict does going on to done. Every call is logged, one
+ * line each.
  */
 
 #ifndef	SH_RBFAKE_H
@@ -25,6 +28,12 @@ void rbfake_reset(void);
  */
 void rbfake_conflicts(const char *result, int step,
     const char *const *paths);
+
+/*
+ * PATHS (NULL-ended, as the tree spells them) merge three ways with no
+ * conflict wherever they are a conflict: -m answers them keep.
+ */
+void rbfake_merges(const char *const *paths);
 
 /* The STEPth start of RESULT exits RC (2, refused; 3, failed). */
 void rbfake_exit(const char *result, int step, int rc);

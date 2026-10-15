@@ -112,6 +112,12 @@ test_real(void)
 	CHECK(real.rb_start(&real, &s, log, &c.c_err) == SH_RB_DONE);
 	CHECK(is(said(), "--allow-unrelated --base p/x@s1 --from p/x@s2 "
 	    "--onto p/xs --result s1 -o /run/m2"));
+	/* W8: -m, after -o */
+	s.rs_merge = 1;
+	CHECK(real.rb_start(&real, &s, log, &c.c_err) == SH_RB_DONE);
+	CHECK(is(said(), "--allow-unrelated --base p/x@s1 --from p/x@s2 "
+	    "--onto p/xs --result s1 -o /run/m2 -m"));
+	s.rs_merge = 0;
 	/* W2: every exit the tool gives, and one it does not */
 	exits("1");
 	CHECK(real.rb_start(&real, &s, log, &c.c_err) == SH_RB_GATE);
@@ -137,6 +143,13 @@ test_real(void)
 	CHECK(real.rb_continue(&real, "p/xs", SH_RB_NOMERGE | SH_RB_PICK, log,
 	    &c.c_err) == SH_RB_GATE);
 	CHECK(is(said(), "--continue --no-merge -i p/xs"));
+	/* W8: -m before the other two */
+	CHECK(real.rb_continue(&real, "p/xs", SH_RB_MERGE, log,
+	    &c.c_err) == SH_RB_GATE);
+	CHECK(is(said(), "--continue -m p/xs"));
+	CHECK(real.rb_continue(&real, "p/xs", SH_RB_MERGE | SH_RB_NOMERGE |
+	    SH_RB_PICK, log, &c.c_err) == SH_RB_GATE);
+	CHECK(is(said(), "--continue -m --no-merge -i p/xs"));
 	exits("0");
 	CHECK(real.rb_abort(&real, "p/xs", log, &c.c_err) == 0);
 	CHECK(is(said(), "--abort p/xs"));

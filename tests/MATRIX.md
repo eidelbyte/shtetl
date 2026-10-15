@@ -614,6 +614,7 @@ and drift lines, each choice, #unanswered right or wrong, malformed}.
 | W5 | the resolution answered: the lines of the paths given, still "-", answered keep; #unanswered recounted; every other byte as it was; written whole, a reader finding it as it was or as it is | covered: check_rebase.c |
 | W6 | the fake rebaser holds to the tool's contract over the fake ZFS: the clone form's result made unmounted, mountpoint none, readonly; the dataset form's pre-apply snapshot; a conflict left at the gate with its resolution; --continue and --abort | covered: check_rebase.c |
 | W7 | for real: the real tool, through an update on the box | box: tests/box/build.sh |
+| W8 | -m, --merge-non-conflict (zfs_rebase 69d8223): on a start's command after -o, and on a --continue's before --no-merge and -i, where the update asks for it (always: ruled 2026-10-15) | covered: check_rebase.c, check_update.c |
 
 # Family U: updating a container into staging (M5; planning.md 7.6, 7.6.2; src/core/update.c)
 
@@ -651,6 +652,7 @@ a failure {refused, failed part way, after a gate}.
 | G3 | the document complete: each noted derivation whose source is now in the tree (keep, onto, a hand merge, or never in conflict) run once per distinct command, in a chroot of the result's private mount; then --continue | covered: check_update.c |
 | G4 | a source answered from: its derivation run after done, in a chroot of the placed result, before the next step | covered: check_update.c |
 | G5 | a derivation failing: the update paused at the gate, said; --continue runs it again | covered: check_update.c |
+| G6 | a conflict whose three-way merge has no conflict goes on by itself (ruled 2026-10-15): the update passes -m at each start and --continue, so a step whose every conflict merges clean does not stop, and one with a conflict that does not pauses on that one alone, the merged ones answered keep | covered: check_update.c, over rbfake's merges |
 
 # Family K: cutover and abandon (M5; planning.md 7.9, 7.10; src/core/cutover.c)
 
