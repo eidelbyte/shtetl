@@ -478,7 +478,8 @@
     ],
     "provides": "A cutover any failure of which puts things back.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "Containers built in 037672a: put back on failure, the prune last (docs/worklogs/m5-rulings.md). Box owed: build.sh K7 with the previous root's prune. Systems take the same verbs with M6's system update."
   },
   "m6-gate-merge": {
     "description": "A conflict at an update's gate that merges three ways without conflict goes on by itself, as a foundation's patch does. Ruled 2026-10-15 (planning.md 14, 12.1). Verify: family G; the box's U9.",
