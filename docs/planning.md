@@ -104,7 +104,7 @@ As built (M2, `src/core/spaces.c`; `shtetl spaces` lists the roots):
 the walk is libzfs's, every imported pool's filesystems, a user
 property counted only where its source is the dataset itself. Refused:
 a value that names no space; two roots of a space; a root inside
-another root (PROPOSAL, Q-Y), since each root's layout is shtetl's
+another root (ruled 2026-10-15, Q-Y), since each root's layout is shtetl's
 own. A pool whose root will not open refuses the walk, naming it: a
 root missed could hide a second one. Without `-C`, the configuration
 is read from the config root's mountpoint, where it is mounted.
@@ -126,7 +126,7 @@ As built (M2, `src/core/boot.c`):
         [--build ds] [--recipes url] [-y]
 
 - The datasets must exist: the spaces are datasets the user has, and
-  bootstrap creates none of the roots (PROPOSAL, Q-Z). Each root's
+  bootstrap creates none of the roots (ruled 2026-10-15, Q-Z). Each root's
   whole skeleton (4.6, 4.7) is there once bootstrap is done: what is
   missing it makes, and what is there as shtetl makes it, it takes.
 - Everything is planned and checked before anything is done, and the
@@ -140,7 +140,7 @@ As built (M2, `src/core/boot.c`):
   root of a space, named or there already; a root inside or
   around another; a lake or run root with any child that is not
   shtetl's layout, so that what bootstrap sets reaches nothing of the
-  user's (PROPOSAL, Q-Z); layout there but not as shtetl makes it; a
+  user's (ruled 2026-10-15, Q-Z); layout there but not as shtetl makes it; a
   config or build root with no mountpoint.
 - Order: pools (autotrim), the roots' properties, the layout, mounts,
   the recipes clone, and `shtetl:space` on each root **last**. A
@@ -544,8 +544,8 @@ As built (`src/core/cascade.c`):
 
 - `import` is followed in every file, shtetl.conf's included: a
   file's imports merge before it, each file once, at the first place
-  it is reached, and a cycle is an error naming its files (PROPOSAL,
-  Q-U). A file shtetl.conf imports stays of the default when a
+  it is reached, and a cycle is an error naming its files (ruled
+  2026-10-15, Q-U). A file shtetl.conf imports stays of the default when a
   recipe imports it again.
 - `true` over an entry with fields leaves the fields.
 - shtetl.conf is checked whole, its settings too, wherever it is
@@ -613,7 +613,7 @@ every `N.x`: `=15` is any 15.x, `<=15` takes 15.x, `>15` begins at
 `"<15"`) is refused when the recipe is read, naming the two files.
 Names: a recipe's (and a `requires` entry, `update.suffix`) takes
 letters, digits, `-` and `_`, so that it is at once a dataset
-component, a jail name and a file name (PROPOSAL, Q-W); a dataset
+component, a jail name and a file name (ruled 2026-10-15, Q-W); a dataset
 path takes what ZFS names take (`valid_char`).
 
 Checked after the merge: a foundation has `src_branch`; every `ver`
@@ -1798,6 +1798,15 @@ below that change the plan are folded into the sections named.
 
 ## 14. Rulings
 
+### 2026-10-15 (Q-Y, Q-Z, Q-U, Q-W: as built)
+
+Told the four open questions M1 and M2 had built answers to -- nested
+roots refused, bootstrap taking only datasets that exist, imports of
+imports followed, recipe names without dots -- the user answered: "all
+four of those open planning items sound good to me." So (4.1, 4.2,
+5.5, 6.1) each stands as built, and section 15 holds no open
+question.
+
 ### 2026-10-14 (M5's proposals)
 
 Asked the update's seven particulars: "1. agree, if there's a conflict
@@ -2273,19 +2282,21 @@ So (5.4, 5.5):
 Q-AC is ruled (14, 2026-10-12), and with it the default; so is
 Q-AD, the default's edges.
 
-M1 and M2 decided these where the plan was silent; each is built as
-written and marked PROPOSAL where it lives. None blocks M3. Q-S, Q-T
-and Q-X are ruled (14, 2026-10-12), and Q-V is moot with drops gone.
+M1 and M2 decided these where the plan was silent. All are settled:
+Q-S, Q-T and Q-X ruled (14, 2026-10-12), Q-V moot with drops gone,
+and Q-Y, Q-Z, Q-U and Q-W ruled as built (14, 2026-10-15).
 
 M2's:
 
-- **Q-Y, nested roots.** Built: a root inside another root, of any
-  space, is refused, since each root's layout is shtetl's own.
-- **Q-Z, what bootstrap takes.** Built: only datasets that exist (it
-  creates no root), and a lake or run root only if it has no child
-  but shtetl's layout, so that the properties it sets on the root
-  reach nothing of the user's. The other reading: create a missing
-  root, and accept children, listing them as affected.
+- **Q-Y, nested roots.** RULED 2026-10-15 (14), as built: a root
+  inside another root, of any space, is refused, since each root's
+  layout is shtetl's own.
+- **Q-Z, what bootstrap takes.** RULED 2026-10-15 (14), as built:
+  only datasets that exist (it creates no root), and a lake or run
+  root only if it has no child but shtetl's layout, so that the
+  properties it sets on the root reach nothing of the user's. The
+  other reading was to create a missing root, and accept children,
+  listing them as affected.
 - **Q-AB, the recipes clone.** RULED 2026-10-14 (14): shtetl-recipes'
   URL is the default; `--recipes` names another.
 
@@ -2302,17 +2313,18 @@ M1's:
   are replaced by a nearer layer. The other reading: appended layer by
   layer, since 5.5 says jailconf is "appended to the jail's
   jail.conf block".
-- **Q-U, imports of imports.** Built: followed, each file merged
-  once, cycles refused, as 5.5's "recipes merged in before this file"
-  reads for every file.
+- **Q-U, imports of imports.** RULED 2026-10-15 (14), as built:
+  followed, each file merged once, cycles refused, as 5.5's "recipes
+  merged in before this file" reads for every file.
 - **Q-V, a drop of nothing.** Moot: there are no drops (14,
   2026-10-12). Built first: `x = false` where no lower layer
   gives `x` is an error, being a misspelling or a layer imported where
   it does not belong. The other reading: a no-op, so a fragment can
   say "never x" wherever it is imported.
-- **Q-W, names.** Built: a recipe's name takes letters, digits, `-`
-  and `_` only (no `.`), since it is a dataset component, a jail name
-  (where `.` means a child jail) and a file name at once.
+- **Q-W, names.** RULED 2026-10-15 (14), as built: a recipe's name
+  takes letters, digits, `-` and `_` only (no `.`), since it is a
+  dataset component, a jail name (where `.` means a child jail) and a
+  file name at once.
 - **Q-X, patch locations.** ACCEPTED 2026-10-12 for now (14), with
   the tracker issue patch-location-hosts. Built: with no scheme, a location whose
   first component has a `.` is a host and anything else a zconfig
