@@ -826,7 +826,7 @@ EOF
 
 	echo "== M8: box to zrun, its first version whole, its newest after"
 	_rf=$P/run/foundations/box
-	sht beam -y --version "$_v" box
+	sht beam --version "$_v" box
 	sed 's/^/    /' "$T/out"
 	check M8 "the first beam's exit" "$RC" 0
 	[ "$RC" = 0 ] || sed 's/^/    /' "$T/err"
@@ -842,7 +842,7 @@ EOF
 	check M8 "shtetl:* copied, the config too" \
 	    "$(prop "$_rf/var@$_v" shtetl:kind) $(prop "$_rf@$_v" shtetl:config)" \
 	    "version $(prop "$F@$_v" shtetl:config)"
-	sht beam -y box
+	sht beam box
 	sed 's/^/    /' "$T/out"
 	check M8 "the later beam's exit" "$RC" 0
 	[ "$RC" = 0 ] || sed 's/^/    /' "$T/err"
@@ -851,7 +851,7 @@ EOF
 	    "$_rf@$_v2-pkg"
 	check M8 "its kind pkg" "$(prop "$_rf/usr/local@$_v2-pkg" \
 	    shtetl:kind)" pkg
-	sht beam -y box
+	sht beam box
 	check M8 "beamed again: refused, on zrun already" "$RC" 1
 
 	container

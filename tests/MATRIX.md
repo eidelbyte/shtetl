@@ -525,7 +525,7 @@ received, one failing}.
 
 | cell | scenario | disposition |
 |------|----------|-------------|
-| M1 | the plan: F's newest version or -pkg by default, the one given otherwise; a first beam whole, a later one incremental from zrun's newest; shown | covered: check_beam.c |
+| M1 | the plan: F's newest version or -pkg by default, the one given otherwise; a first beam whole, a later one incremental from zrun's newest; shown by create's and update's plans, the command itself asking nothing (ruled 2026-10-15) | covered: check_beam.c, run-cli.sh |
 | M2 | refused: no lake or run root; a bad name; no such foundation; F with no version; the version given not one of F's; it on zrun already; zrun's newest newer than it; F's datasets not zrun's | covered: check_beam.c |
 | M3 | a first beam: each dataset of F whole, parents first, into the run root's foundations/F; readonly=on on F, its datasets inheriting it; canmount=noauto on each, off on a placeholder; the mountpoint inherited; nothing mounted | covered: check_beam.c |
 | M4 | a later beam: each dataset incremental from zrun's newest, the version received on each; zrun's earlier versions kept | covered: check_beam.c |

@@ -92,9 +92,9 @@ static const struct sh_cmd sh_cmds[] = {
 	    "packages upgraded in a chroot of it,\n    snapshotted as its "
 	    "last version's -pkg; shown first, done\n    once confirmed "
 	    "(-y confirms)", cmd_pkg_upgrade },
-	{ "beam", NULL, "[-y] [--version v] foundation", "a foundation's "
-	    "version, its newest by default,\n    sent to zrun; shown first, "
-	    "done once confirmed (-y confirms)", cmd_beam },
+	{ "beam", NULL, "[--version v] foundation", "a foundation's "
+	    "version, its newest by default,\n    sent to zrun, as create and "
+	    "update do when they need it", cmd_beam },
 	{ "save", NULL, "[-m msg] container", "the container saved, its "
 	    "message -m's or written in\n    $VISUAL or $EDITOR; mirrored "
 	    "into zlake", cmd_save },
@@ -796,7 +796,7 @@ cmd_abandon(struct sh_ctx *ctx, int argc, char **argv)
 
 /*
  * beam: a foundation's version brought to zrun (planning.md 7.3),
- * shown and confirmed.
+ * asking nothing.
  */
 static int
 cmd_beam(struct sh_ctx *ctx, int argc, char **argv)
@@ -804,14 +804,11 @@ cmd_beam(struct sh_ctx *ctx, int argc, char **argv)
 	struct sh_beam plan;
 	struct sh_err e;
 	const char *version, *target;
-	int i, yes, rc;
+	int i, rc;
 
-	yes = 0;
 	version = target = NULL;
 	for (i = 0; i < argc; i++) {
-		if (strcmp(argv[i], "-y") == 0) {
-			yes = 1;
-		} else if (strcmp(argv[i], "--version") == 0) {
+		if (strcmp(argv[i], "--version") == 0) {
 			if (i + 1 == argc)
 				return (die_usage("--version needs a version",
 				    ""));
@@ -829,19 +826,11 @@ cmd_beam(struct sh_ctx *ctx, int argc, char **argv)
 	sh_err_init(&e, stderr, "shtetl: ");
 	if (ctx_zfs(ctx, &e) != 0)
 		return (SH_EXIT_REFUSED);
+	/* not asked: a beam only brings what zlake has (ruled 2026-10-15) */
 	rc = SH_EXIT_REFUSED;
 	if (sh_beam_plan(ctx->sc_zfs, &ctx->sc_spaces, target, version, &plan,
-	    &e) == 0) {
-		sh_beam_show(stdout, &plan);
-		(void) fflush(stdout);
-		if (!sh_confirm(stdin, stdout, yes, isatty(STDIN_FILENO),
-		    "Beam as above?"))
-			sh_errf(&e, "%s", isatty(STDIN_FILENO) ?
-			    "not confirmed" : "not confirmed: no terminal, use "
-			    "-y");
-		else if (sh_beam_run(ctx->sc_zfs, &plan, stdout, &e) == 0)
-			rc = out_done();
-	}
+	    &e) == 0 && sh_beam_run(ctx->sc_zfs, &plan, stdout, &e) == 0)
+		rc = out_done();
 	return (rc);
 }
 

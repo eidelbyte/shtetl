@@ -1041,9 +1041,11 @@ mountpoint and refuses one that is not mounted (9).
 
 As built (M4, `src/core/beam.c`):
 
-    shtetl beam [-y] [--version v] F
+    shtetl beam [--version v] F
 
-- Shown and confirmed as a build is (PROPOSAL). The version is the
+- Not shown or confirmed: beaming is done when something is missing
+  on zrun, as create and update do it, and asks nothing (ruled
+  2026-10-15). The version is the
   one given, or F's newest snapshot that is a version or a `-pkg` of
   one (PROPOSAL): base and base-plus-packages are both versions to
   rebase onto (7.2).

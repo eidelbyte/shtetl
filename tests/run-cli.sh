@@ -107,6 +107,7 @@ t f32-nozfs pkg-upgrade generic
 t m7-none beam
 t m7-two beam generic gaming
 t m7-option beam --frob generic
+t m7-yes beam -y generic
 t m7-version beam generic --version
 t m7-nozfs beam generic
 
