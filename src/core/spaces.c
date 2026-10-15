@@ -1,9 +1,10 @@
 /*
  * Discovery (planning.md 4.1): one root to a space.
  *
- * Decided here, beyond the plan (PROPOSAL): a root may not sit inside
- * another root. Each root's layout is shtetl's own (4.4 - 4.7), and a
- * root inside it would be both a space and a part of another's.
+ * Decided here, beyond the plan (ruled 2026-10-15, Q-Y): a root may not
+ * sit inside another root. Each root's layout is shtetl's own (4.4 -
+ * 4.7), and a root inside it would be both a space and a part of
+ * another's.
  */
 
 #include <stdio.h>

@@ -18,14 +18,14 @@
  *
  * One root to a space: the layout of each is there once.
  *
- * Decided here (PROPOSAL): bootstrap uses datasets the user has and
- * creates none of the roots; it refuses a lake or run root with any
- * child that is not shtetl's layout, so that the properties it sets
- * on a root reach nothing of the user's. The recipes are cloned into
- * the config root only when it is empty, after a snapshot of it (4.4:
- * the config root is snapshotted before any git operation); the
- * command line gives shtetl-recipes' URL when --recipes does not name
- * another (ruled).
+ * Decided here (ruled 2026-10-15, Q-Z): bootstrap uses datasets the
+ * user has and creates none of the roots; it refuses a lake or run
+ * root with any child that is not shtetl's layout, so that the
+ * properties it sets on a root reach nothing of the user's. The
+ * recipes are cloned into the config root only when it is empty,
+ * after a snapshot of it (4.4: the config root is snapshotted before
+ * any git operation); the command line gives shtetl-recipes' URL when
+ * --recipes does not name another (ruled).
  */
 
 #include <sys/types.h>

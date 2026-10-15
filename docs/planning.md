@@ -803,7 +803,7 @@ sources stack, as everything does (5.4). A
 location with no scheme is https (`github.com/eidelbyte/freebsd-patches`
 is `https://github.com/eidelbyte/freebsd-patches`); a relative path is
 a directory in zconfig, which zconfig's snapshot (`shtetl:config`)
-already records. Told apart (M1, PROPOSAL, Q-X): a location whose
+already records. Told apart (M1; accepted 2026-10-12, Q-X): a location whose
 first component has a `.` is a host; an scp-style `git@host:path` is
 refused, to be written `ssh://...`. `patches` is a foundation key: it changes the src
 tree, and only a foundation builds one.
@@ -1443,7 +1443,8 @@ As built (M5, `src/core/update.c`):
   it is placed, before the next step; a paused or interrupted update
   pays what it owes first when taken up.
 - A derivation failing pauses the update at its gate (the step's
-  rebase still open), and `--continue` runs it again (PROPOSAL).
+  rebase still open), and `--continue` runs it again (ruled
+  2026-10-14).
 
 ### 7.8 Soak
 
