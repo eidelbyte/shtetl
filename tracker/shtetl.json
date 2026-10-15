@@ -307,7 +307,8 @@
     ],
     "provides": "Promote, rename and written@ for cutover and abandon.",
     "estimated_size": "small",
-    "completed": "testing"
+    "completed": "tested",
+    "note": "2026-10-15: box trip 2 green, run.sh 128/0 at d064a6e (Z21-Z24), build.sh 126/0 at 3950e6f (U9, W7, K7, N9, X9); trip 1 found X9 (written@ before a txg commit), fixed 7e776c5, 947f54e."
   },
   "m5-rebase": {
     "description": "zfs_rebase as shtetl runs it (planning.md 9, 7.6.1): src/core/rebase.c, an injected rebaser (start in the clone or dataset form, with --allow-unrelated --base for a replay step, -o the manifest in shtetl's run directory; --continue with --no-merge or -i on the terminal; --abort; exits 0 - 3), the real one running the tool, tests/rbfake.c acting on the fake ZFS; and the resolution document read and answered (v4-manifest.md 8: tree scoping, escapes, #unanswered recounted, written whole). Verify: MATRIX family W.",
@@ -329,7 +330,8 @@
     ],
     "provides": "Rebases started, continued, aborted and answered, over the real tool or the fake.",
     "estimated_size": "large",
-    "completed": "testing"
+    "completed": "tested",
+    "note": "2026-10-15: box trip 2 green, run.sh 128/0 at d064a6e (Z21-Z24), build.sh 126/0 at 3950e6f (U9, W7, K7, N9, X9); trip 1 found X9 (written@ before a txg commit), fixed 7e776c5, 947f54e."
   },
   "m5-update": {
     "description": "shtetl update X [--to V] [-y] (planning.md 7.6, 7.6.2, 6.1): the checks; X stopped; the from-save; F mounted; each dataset replayed into X-staging, parents first (step 1 the clone form, placed, steps 2 and on the dataset form with --allow-unrelated --base the previous save, update.depth saves), placeholders cloned from the target, X's own datasets cloned from the from-save; shtetl:* on the replayed snapshots; X-staging snapshotted as the version, its jail written and started, saved (save widened for an own dataset's clone, S10). Paused at a conflicts gate with no terminal (exit 3, PROPOSAL), --continue and --abort. Verify: MATRIX families U, S10; the box.",
@@ -353,7 +355,8 @@
     ],
     "provides": "A container updated onto a new foundation version in staging, its history kept.",
     "estimated_size": "large",
-    "completed": "testing"
+    "completed": "tested",
+    "note": "2026-10-15: box trip 2 green, run.sh 128/0 at d064a6e (Z21-Z24), build.sh 126/0 at 3950e6f (U9, W7, K7, N9, X9); trip 1 found X9 (written@ before a txg commit), fixed 7e776c5, 947f54e."
   },
   "m5-gate": {
     "description": "Conflicts and derivations, the text first (planning.md 7.7): at a gate, a conflicted derived path answered keep and its derivation noted; the picker on a terminal (--continue -i --no-merge); with the document complete, each noted derivation whose source is in the tree run once per command in a chroot of the result's private mount, then --continue; a source answered from: its derivation after done, in the placed result. Verify: MATRIX family G; the box.",
@@ -369,7 +372,8 @@
     ],
     "provides": "Updates whose conflicts are answered with derived files kept consistent.",
     "estimated_size": "medium",
-    "completed": "testing"
+    "completed": "tested",
+    "note": "2026-10-15: box trip 2 green, run.sh 128/0 at d064a6e (Z21-Z24), build.sh 126/0 at 3950e6f (U9, W7, K7, N9, X9); trip 1 found X9 (written@ before a txg commit), fixed 7e776c5, 947f54e."
   },
   "m5-cutover": {
     "description": "shtetl cutover X and shtetl abandon X (planning.md 7.9, 7.10): cutover asks about writes to X since its from-save (written@), promotes X-staging's own clones, destroys the old X on zrun, renames X-staging to X, its jail block with it, starts and saves X; in zlake the same promotes, the old X moved to archive/containers/X-<ISO-date>, the staging mirror renamed. abandon stops and destroys X-staging, on zrun and in zlake, and starts X. Verify: MATRIX family K; the box.",
@@ -388,7 +392,7 @@
     ],
     "provides": "An update finished or given up, X carrying on either way.",
     "estimated_size": "medium",
-    "completed": "testing",
-    "note": "2026-10-14: carried on when stopped part way (ruled, planning.md 14): every step asks ZFS whether it is done; the plan refuses on holds, outside clones, promote name clashes, the archive name; abandon refused once a cutover has promoted. MATRIX K5, K8, K9; check_update 1296 checks. Box owed (K7)."
+    "completed": "tested",
+    "note": "2026-10-14: carried on when stopped part way (ruled, planning.md 14): every step asks ZFS whether it is done; the plan refuses on holds, outside clones, promote name clashes, the archive name; abandon refused once a cutover has promoted. MATRIX K5, K8, K9; check_update 1296 checks. Box owed (K7). 2026-10-15: box trip 2 green, run.sh 128/0 at d064a6e (Z21-Z24), build.sh 126/0 at 3950e6f (U9, W7, K7, N9, X9); trip 1 found X9 (written@ before a txg commit), fixed 7e776c5, 947f54e."
   }
 }

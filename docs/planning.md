@@ -1693,7 +1693,7 @@ by the command line run over two configuration roots
 | M2 | discovery, bootstrap, property table; built 2026-10-11 (tests/MATRIX.md families R, D, B on the mac; tests/box/run.sh passes on the box, 2026-10-12) | box |
 | M3 | foundation build and update into zlake, patches and the pause included; pkg-upgrade; built 2026-10-13 (tests/MATRIX.md families V, Z, F, P on the mac; tests/box/run.sh and tests/box/build.sh pass on the box, a real releng/15.1 build, pause, update and pkg-upgrade among them, 2026-10-14; tracker/shtetl.json, docs/worklogs/m3-foundations.md) | box |
 | M4 | beam-down, new container, save with messages, the zlake mirror; built 2026-10-14 (tests/MATRIX.md families M, S, X and Z14 - Z20 on the mac; tests/box/run.sh and tests/box/build.sh pass on the box, a real container with its jail on a built foundation among them, 2026-10-14; tracker/shtetl.json, docs/worklogs/m4-zrun.md) | box |
-| M5 | update into staging, history replay, gate handling and derivations, cutover, abandon | box |
+| M5 | update into staging, history replay, gate handling and derivations, cutover, abandon; built 2026-10-14 (tests/MATRIX.md families W, U, G, K, N and Z21 - Z24 on the mac; tests/box/run.sh and tests/box/build.sh pass on the box, a real update through zfs_rebase paused at a conflict, answered and continued, then cut over and an abandon among them, 2026-10-15; tracker/shtetl.json, docs/worklogs/m5-update.md, docs/worklogs/m5-properties.md) | box |
 | M6 | systems: outer space, one-shot boot, update | box/VM |
 | M7 | restore, prune, archives | box |
 | M8 | TUI | mac + box |

@@ -303,3 +303,13 @@ Verification: check_update K2 gains a cell, x started again and
 written to after the plan: stopped before the save, the save in the
 archive (1351 checks); three mutations caught (no stop, no save, the
 step skipped). make check, gate, xcheck. build.sh's K7 runs it.
+
+## The box: M5 verified (2026-10-15)
+
+Trip 1 (tests/box/m5-trip.md): run.sh at 83c8e39, 126 ok, 0 failed;
+build.sh at cb1afc0, 125 ok, 1 failed, X9 (written@ read before a
+transaction group committed the container's recipe; fixed 7e776c5,
+with 947f54e beside it). Trip 2: run.sh at d064a6e, 128 ok, 0 failed
+(Z24 among them); build.sh at 3950e6f, 126 ok, 0 failed (U9, W7, K7,
+N9, X9). The five M5 issues are tested and planning.md 12 marks M5
+built.
