@@ -1,0 +1,469 @@
+shtetl box build 2026-10-15T08:32:50Z on KIDON, 15.1-RELEASE-p2, zfs-2.4.2-1-FreeBSD_g6330a45b0, shtetl 3950e6f, releng/15.1
+== the pool kept from the last run: /var/tmp/shtetl-boxbuild/shbbuild.img
+== the build root kept: its checkout, its files' times
+== bootstrap: lake, run, config, build
+# shtetl bootstrap -y --lake shbbuild/shtetl --run shbbuild/run --config shbbuild/zconfig --build shbbuild/zbuild -> 0
+ok   B10 bootstrap
+ok   B13 shtetl-recipes cloned by default, from GitHub
+ok   B13 its README there
+== box's obj cache for releng/15.1 kept: an incremental build
+== P17: patches made from releng/15.1's share/misc/bsd-family-tree
+== F13: a build that fails at the fetch, undone
+# shtetl build -y nope -> 1
+ok   F13 exit
+ok   F13 the refusal
+ok   F13 F's datasets gone
+ok   F13 the build root's mark cleared
+ok   F13 the config snapshot kept
+ok   N9 the config root atime=off, from bootstrap
+ok   F13 the obj cache kept, unmounted
+== P17: build box: a patch already in, one applied, one paused
+# shtetl build -y box -> 3
+    foundation box, new, from releng/15.1
+      version 15.1-releng-<day>-<commit>
+      + shbbuild/shtetl/foundations/box
+      + shbbuild/shtetl/foundations/box/tmp
+      + shbbuild/shtetl/foundations/box/var
+      + shbbuild/shtetl/foundations/box/usr  canmount=off
+      + shbbuild/shtetl/foundations/box/usr/local
+      checkout releng/15.1 in shbbuild/zbuild (/var/tmp/shtetl-boxbuild/alt/zbuild)
+      patches: file:///var/tmp/shtetl-boxbuild/p17/repo, patches/box
+      kernel GENERIC
+      src.conf from 1 file
+      make -j<hw.ncpu> buildworld buildkernel
+      install world, kernel and distribution (install -C)
+      external: mark
+      pkg: none
+      commands: motd
+      snapshot -r shbbuild/shtetl/foundations/box@<version>
+    made shbbuild/shtetl/foundations/box
+    made shbbuild/shtetl/foundations/box/tmp
+    made shbbuild/shtetl/foundations/box/var
+    made shbbuild/shtetl/foundations/box/usr
+    made shbbuild/shtetl/foundations/box/usr/local
+    checkout releng/15.1 at 893c7c99b60d
+    version 15.1-releng-2026-10-15-893c7c99b60d (REVISION 15.1)
+    fetched file:///var/tmp/shtetl-boxbuild/p17/repo at 46ebdd25e883
+    copied patches/box
+    3 patches from 2 sources
+    snapshot shbbuild/zbuild@shtetl-patch-0
+    patch 2-in.patch from file:///var/tmp/shtetl-boxbuild/p17/repo: already in, skipped
+    patch 1-one.patch from patches/box: applied
+    patch 3-two.patch from patches/box: does not apply; merged three ways, conflict markers left
+      the patch: /var/db/shtetl/build/box/patches/2/3-two.patch
+      in /var/tmp/shtetl-boxbuild/alt/zbuild: share/misc/bsd-family-tree
+    build of box paused; then one of:
+      shtetl build box --continue   the fix made, go on
+      shtetl build box --skip       the patch left out
+      shtetl build box --abort      nothing built, all undone
+ok   P17 the pause's exit
+ok   P17 already in, from the git source
+ok   P17 applied, from the directory
+ok   P17 paused, conflict markers left
+ok   P17 the record
+ok   P17 the build root's mark
+ok   P17 a snapshot before each patch, and the first
+ok   P17 the markers in the tree
+# shtetl build box --continue -> 1
+ok   P17 --continue refused while a marker is left
+ok   P17 naming it
+== F11, F19, P17: --continue, the build for real (hours)
+# shtetl build box --continue -> 0
+# 1 minutes
+    build of box, paused at patch 3-two.patch
+    patch 3-two.patch from patches/box: fixed by hand; the fix: /var/db/shtetl/build/box/fixed/2/3-two.patch
+    wrote /var/db/shtetl/build/box/BOX, /var/db/shtetl/build/box/src.conf
+    mounted shbbuild/shtetl/foundation-builds/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/obj, shbbuild/shtetl/foundations/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/root
+    kept 1 fix in /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/obj/patches/15.1-releng-2026-10-15-893c7c99b60d
+    make buildworld buildkernel (log /var/db/shtetl/build/box/build.log)
+    make installworld (log /var/db/shtetl/build/box/build.log)
+    make installkernel (log /var/db/shtetl/build/box/build.log)
+    kernel into shbbuild/shtetl/foundations/box: 0 kept, 1715 copied, 0 removed
+    make distribution (log /var/db/shtetl/build/box/build.log)
+    external mark, from foundation in shtetl.conf
+    commands motd, from foundations/box.conf
+    snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-15-893c7c99b60d
+    rolled back shbbuild/zbuild to @shtetl-patch-0
+    the time of now on 1 patched file, for the next build's make
+    built shbbuild/shtetl/foundations/box@15.1-releng-2026-10-15-893c7c99b60d
+ok   F11 exit
+# version 15.1-releng-2026-10-15-893c7c99b60d
+ok   F12 the version's name
+ok   F11 every dataset snapshotted
+ok   F11 shtetl:kind
+ok   F11 shtetl:config names the config snapshot
+ok   F11 no shtetl:config-guid
+ok   N9 nothing written to zconfig since F13: its snapshot
+ok   F17 shtetl:commit, the build's own
+ok   F11 the placeholder
+ok   F11 F unmounted
+ok   F11 its mountpoint back
+ok   F11 the obj cache unmounted
+ok   F11 the build root's mark cleared
+ok   P17 shtetl:patches
+ok   P17 the build root rolled back, its checkout clean
+ok   P17 every patch snapshot gone
+ok   P17 the fix written out
+ok   P17 the record gone
+== what was built, mounted for a look
+ok   F19 the world went into F (installworld)
+ok   F19 the kernel (installkernel)
+ok   F19 /etc (distribution)
+ok   F11 the command ran in F
+ok   P17 the patched tree built: both lines installed
+ok   F16 the kernel's ident, BOX
+ok   F11 usr/local is its own dataset
+ok   F11 the run's log kept
+== F27: box again, an update over it (the obj cache warm)
+# shtetl build -y box -> 0
+# 1 minutes
+    foundation box, an update of @15.1-releng-2026-10-15-893c7c99b60d, from releng/15.1
+      version 15.1-releng-<day>-<commit>
+      = shbbuild/shtetl/foundations/box
+      = shbbuild/shtetl/foundations/box/tmp
+      = shbbuild/shtetl/foundations/box/var
+      = shbbuild/shtetl/foundations/box/usr
+      = shbbuild/shtetl/foundations/box/usr/local
+      checkout releng/15.1 in shbbuild/zbuild (/var/tmp/shtetl-boxbuild/alt/zbuild)
+      patches: file:///var/tmp/shtetl-boxbuild/p17/repo, patches/box
+      kernel GENERIC
+      src.conf from 1 file
+      make -j<hw.ncpu> buildworld buildkernel
+      make delete-old delete-old-libs, then
+      install world, kernel and distribution (install -C)
+      installworld's backups removed
+      external: mark
+      pkg: none
+      commands: motd
+      snapshot -r shbbuild/shtetl/foundations/box@<version>
+    snapshot shbbuild/zconfig@ridge-falcon-orchid
+    checkout releng/15.1 at 893c7c99b60d
+    version 15.1-releng-2026-10-15-893c7c99b60d.2 (REVISION 15.1)
+    fetched file:///var/tmp/shtetl-boxbuild/p17/repo at 46ebdd25e883
+    copied patches/box
+    4 patches from 2 sources
+    snapshot shbbuild/zbuild@shtetl-patch-0
+    patch 2-in.patch from file:///var/tmp/shtetl-boxbuild/p17/repo: already in, skipped
+    patch 1-one.patch from patches/box: applied
+    patch 4-init.c.patch from patches/box: applied
+    patch 4-rtld.c.patch from patches/box: applied
+    wrote /var/db/shtetl/build/box/BOX, /var/db/shtetl/build/box/src.conf
+    mounted shbbuild/shtetl/foundation-builds/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/obj, shbbuild/shtetl/foundations/box at /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/root
+    make buildworld buildkernel (log /var/db/shtetl/build/box/build.log)
+    make delete-old delete-old-libs (log /var/db/shtetl/build/box/build.log)
+    make installworld (log /var/db/shtetl/build/box/build.log)
+    make installkernel (log /var/db/shtetl/build/box/build.log)
+    kernel into shbbuild/shtetl/foundations/box: 1715 kept, 0 copied, 0 removed
+    make distribution (log /var/db/shtetl/build/box/build.log)
+    removed installworld's backups: libexec/ld-elf.so.1.old, libexec/ld-elf32.so.1.old, sbin/init.bak
+    external mark, from foundation in shtetl.conf
+    commands motd, from foundations/box.conf
+    snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-15-893c7c99b60d.2
+    rolled back shbbuild/zbuild to @shtetl-patch-0
+    the time of now on 3 patched files, for the next build's make
+    built shbbuild/shtetl/foundations/box@15.1-releng-2026-10-15-893c7c99b60d.2
+ok   F27 exit
+ok   F27 the plan an update
+ok   F27 delete-old before the install
+ok   F27 installworld's backups removed: init's
+ok   F27 and rtld's
+ok   F27 the kernel synced into F
+# version 15.1-releng-2026-10-15-893c7c99b60d.2
+ok   F27 a new version, on the same datasets
+ok   N9 a patch written: a config snapshot of the update's
+ok   F27 two versions on each dataset
+ok   F27 the first kept
+ok   F27 no kernel.old
+ok   F27 no loader backup
+ok   F27 no ld-elf backup
+ok   F27 no init.bak
+ok   F27 an unchanged module keeps its object (aac.ko)
+ok   F27 the changed init installed
+ok   F27 the new tree installed: one patch line now
+ok   F27 the command ran again, over distribution's file
+== F33: pkg-upgrade box
+# shtetl pkg-upgrade -y box -> 0
+    foundation box, its packages upgraded, from @15.1-releng-2026-10-15-893c7c99b60d.2
+      mounted below /var/db/shtetl/build/box/root, with its datasets
+      pkg -c <root> upgrade -y
+      snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    pkg upgrade in /var/tmp/shtetl-boxbuild/alt/var/db/shtetl/build/box/root (log /var/db/shtetl/build/box/pkg.log)
+    snapshot -r shbbuild/shtetl/foundations/box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    upgraded shbbuild/shtetl/foundations/box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+ok   F33 exit
+ok   F33 the -pkg of the update's version
+ok   F33 shtetl:kind pkg, on every dataset
+ok   F33 the version's config carried over
+ok   F33 F unmounted, the mark cleared
+== M8: box to zrun, its first version whole, its newest after
+# shtetl beam -y --version 15.1-releng-2026-10-15-893c7c99b60d box -> 0
+    foundation box, @15.1-releng-2026-10-15-893c7c99b60d to zrun, whole
+      shbbuild/shtetl/foundations/box -> shbbuild/run/foundations/box
+      shbbuild/shtetl/foundations/box/tmp -> shbbuild/run/foundations/box/tmp
+      shbbuild/shtetl/foundations/box/var -> shbbuild/run/foundations/box/var
+      shbbuild/shtetl/foundations/box/usr -> shbbuild/run/foundations/box/usr  (placeholder)
+      shbbuild/shtetl/foundations/box/usr/local -> shbbuild/run/foundations/box/usr/local
+      readonly=on, canmount=noauto; a placeholder's canmount=off
+    received shbbuild/run/foundations/box@15.1-releng-2026-10-15-893c7c99b60d, whole
+    received shbbuild/run/foundations/box/tmp@15.1-releng-2026-10-15-893c7c99b60d, whole
+    received shbbuild/run/foundations/box/var@15.1-releng-2026-10-15-893c7c99b60d, whole
+    received shbbuild/run/foundations/box/usr@15.1-releng-2026-10-15-893c7c99b60d, whole
+    received shbbuild/run/foundations/box/usr/local@15.1-releng-2026-10-15-893c7c99b60d, whole
+    beamed box@15.1-releng-2026-10-15-893c7c99b60d to shbbuild/run/foundations/box
+ok   M8 the first beam's exit
+ok   M8 each dataset received
+ok   M8 readonly, inherited below
+ok   M8 canmount noauto, the placeholder's off
+ok   M8 nothing mounted
+ok   M8 shtetl:* copied, the config too
+# shtetl beam -y box -> 0
+    foundation box, @15.1-releng-2026-10-15-893c7c99b60d.2-pkg to zrun, from @15.1-releng-2026-10-15-893c7c99b60d
+      shbbuild/shtetl/foundations/box -> shbbuild/run/foundations/box
+      shbbuild/shtetl/foundations/box/tmp -> shbbuild/run/foundations/box/tmp
+      shbbuild/shtetl/foundations/box/var -> shbbuild/run/foundations/box/var
+      shbbuild/shtetl/foundations/box/usr -> shbbuild/run/foundations/box/usr  (placeholder)
+      shbbuild/shtetl/foundations/box/usr/local -> shbbuild/run/foundations/box/usr/local
+    received shbbuild/run/foundations/box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg, from its last
+    received shbbuild/run/foundations/box/tmp@15.1-releng-2026-10-15-893c7c99b60d.2-pkg, from its last
+    received shbbuild/run/foundations/box/var@15.1-releng-2026-10-15-893c7c99b60d.2-pkg, from its last
+    received shbbuild/run/foundations/box/usr@15.1-releng-2026-10-15-893c7c99b60d.2-pkg, from its last
+    received shbbuild/run/foundations/box/usr/local@15.1-releng-2026-10-15-893c7c99b60d.2-pkg, from its last
+    beamed box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg to shbbuild/run/foundations/box
+ok   M8 the later beam's exit
+ok   M8 the newest, the update's -pkg, from the first
+ok   M8 its kind pkg
+# shtetl beam -y box -> 1
+ok   M8 beamed again: refused, on zrun already
+== X9: the container shbweb on box, its jail; S9: saved again
+# shtetl create -y -m the first shbweb --on box -> 0
+    container shbweb, on box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+      + shbbuild/run/containers/shbweb  clone
+      + shbbuild/run/containers/shbweb/tmp  clone
+      + shbbuild/run/containers/shbweb/var  clone, compression=lz4
+      + shbbuild/run/containers/shbweb/usr  clone, canmount=off
+      + shbbuild/run/containers/shbweb/usr/local  clone
+      + shbbuild/run/containers/shbweb/srv  its own, canmount=off
+      + shbbuild/run/containers/shbweb/srv/www  its own
+      external: resolv (container in shtetl.conf)
+      jail: /etc/jail.conf.d/shbweb.conf
+      pkg: none
+      commands: hello (containers/shbweb.conf)
+      save, mirrored into zlake
+    snapshot shbbuild/zconfig@larch-melon-oak
+    cloned shbbuild/run/containers/shbweb
+    cloned shbbuild/run/containers/shbweb/tmp
+    cloned shbbuild/run/containers/shbweb/var
+    cloned shbbuild/run/containers/shbweb/usr
+    cloned shbbuild/run/containers/shbweb/usr/local
+    made shbbuild/run/containers/shbweb/srv
+    made shbbuild/run/containers/shbweb/srv/www
+    mounted shbbuild/run/containers/shbweb at /var/tmp/shtetl-boxbuild/alt/containers/shbweb
+    external resolv, from container in shtetl.conf
+    wrote /etc/jail.conf.d/shbweb.conf; started the jail shbweb
+    commands hello, from containers/shbweb.conf
+    saved shbbuild/run/containers/shbweb@save-2026-10-15-083526
+    mirrored shbbuild/shtetl/containers/shbweb@save-2026-10-15-083526, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbweb/var@save-2026-10-15-083526, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbweb/tmp@save-2026-10-15-083526, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbweb/srv@save-2026-10-15-083526, whole
+    mirrored shbbuild/shtetl/containers/shbweb/srv/www@save-2026-10-15-083526, whole
+    mirrored shbbuild/shtetl/containers/shbweb/usr@save-2026-10-15-083526, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbweb/usr/local@save-2026-10-15-083526, a clone of zlake's foundation
+    created shbweb on box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+ok   X9 create's exit
+ok   X9 box's datasets cloned at its newest, srv/www its own
+ok   X9 srv/www its own, srv a placeholder
+ok   X9 seven datasets
+ok   X9 the recipe's lz4 set on the clone, locally
+ok   X9 mounted, the placeholders not
+ok   X9 srv/www mounted, srv not
+ok   X9 writable: readonly is box's on zrun, not the clone's
+ok   X9 the jail's block, its path the mount
+ok   X9 the recipe's jailconf in it
+ok   X9 the jail running, its hostname its name
+ok   X9 the command ran in the jail
+ok   F35 box's external piece ran on the host, into box
+ok   X9 the host's resolv.conf put in, an external piece
+ok   X9 the first save: its kind, the create's config snapshot
+ok   X9 mirrored: a clone of zlake's box
+ok   X9 stopped by its block, devfs with it
+ok   X9 started again from its block
+# shtetl create -y shbweb --on box -> 1
+ok   X9 created again: refused
+ok   X9 for it exists
+# shtetl save -m the second shbweb -> 0
+    saved shbbuild/run/containers/shbweb@save-2026-10-15-083527
+    mirrored shbbuild/shtetl/containers/shbweb@save-2026-10-15-083527, from its last
+    mirrored shbbuild/shtetl/containers/shbweb/var@save-2026-10-15-083527, from its last
+    mirrored shbbuild/shtetl/containers/shbweb/tmp@save-2026-10-15-083527, from its last
+    mirrored shbbuild/shtetl/containers/shbweb/srv@save-2026-10-15-083527, from its last
+    mirrored shbbuild/shtetl/containers/shbweb/srv/www@save-2026-10-15-083527, from its last
+    mirrored shbbuild/shtetl/containers/shbweb/usr@save-2026-10-15-083527, from its last
+    mirrored shbbuild/shtetl/containers/shbweb/usr/local@save-2026-10-15-083527, from its last
+ok   S9 the second save's exit
+ok   S9 two saves on zrun
+ok   S9 both mirrored in zlake
+ok   S9 the second's message in zlake, its config carried
+ok   S9 srv/www's mirror whole, then from its first
+== U9, W7, K7: shbup on box's first version, updated, cut over
+ok   W7 zfs_rebase at /usr/local/sbin/zfs_rebase
+# shtetl create -y -m the first shbup --on box --version 15.1-releng-2026-10-15-893c7c99b60d -> 0
+ok   U9 created on box's first version
+# shtetl save -m the family tree edited shbup -> 0
+ok   U9 the second save
+# shtetl save -m motd shbup -> 0
+ok   U9 the third save
+# shtetl update -y shbup -> 3
+    container shbup, from box@15.1-releng-2026-10-15-893c7c99b60d to @15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+      shbup stopped; a save of it, "update to box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg"
+      + shbbuild/run/containers/shbup-staging  replayed
+      + shbbuild/run/containers/shbup-staging/usr  cloned from the target, canmount=off
+      + shbbuild/run/containers/shbup-staging/usr/local  replayed
+      + shbbuild/run/containers/shbup-staging/var  replayed
+      + shbbuild/run/containers/shbup-staging/tmp  replayed
+      + shbbuild/run/containers/shbup-staging/srv  cloned from the from-save, canmount=off
+      + shbbuild/run/containers/shbup-staging/srv/www  cloned from the from-save
+      saves replayed: save-2026-10-15-083527 save-2026-10-15-083528 save-2026-10-15-083528-2, then the from-save
+      shbup-staging started as shbup, saved
+    stopped the jail shbup
+    saved shbbuild/run/containers/shbup@save-2026-10-15-083528-3
+    mirrored shbbuild/shtetl/containers/shbup@save-2026-10-15-083528-3, from its last
+    mirrored shbbuild/shtetl/containers/shbup/usr@save-2026-10-15-083528-3, from its last
+    mirrored shbbuild/shtetl/containers/shbup/usr/local@save-2026-10-15-083528-3, from its last
+    mirrored shbbuild/shtetl/containers/shbup/var@save-2026-10-15-083528-3, from its last
+    mirrored shbbuild/shtetl/containers/shbup/tmp@save-2026-10-15-083528-3, from its last
+    mirrored shbbuild/shtetl/containers/shbup/srv@save-2026-10-15-083528-3, from its last
+    mirrored shbbuild/shtetl/containers/shbup/srv/www@save-2026-10-15-083528-3, from its last
+    rebase shbbuild/run/containers/shbup-staging, step 1 of 4: shbbuild/run/containers/shbup@save-2026-10-15-083527 onto shbbuild/run/foundations/box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    rebase shbbuild/run/containers/shbup-staging, step 2 of 4: shbbuild/run/containers/shbup@save-2026-10-15-083528 onto shbbuild/run/containers/shbup-staging
+    paused: shbbuild/run/containers/shbup-staging stopped at conflicts, step 2 of 4, 1 name unanswered: answer /var/db/shtetl/update/shbup/rebase/d0.2.manifest.resolution, then shtetl update --continue shbup (on a terminal it opens the picker)
+# shtetl update --continue shbup -> 0
+    rebase shbbuild/run/containers/shbup-staging, step 3 of 4: shbbuild/run/containers/shbup@save-2026-10-15-083528-2 onto shbbuild/run/containers/shbup-staging
+    rebase shbbuild/run/containers/shbup-staging, step 4 of 4: shbbuild/run/containers/shbup@save-2026-10-15-083528-3 onto shbbuild/run/containers/shbup-staging
+    replayed shbbuild/run/containers/shbup-staging, 4 saves
+    cloned shbbuild/run/containers/shbup-staging/usr from shbbuild/run/foundations/box/usr@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    rebase shbbuild/run/containers/shbup-staging/usr/local, step 1 of 4: shbbuild/run/containers/shbup/usr/local@save-2026-10-15-083527 onto shbbuild/run/foundations/box/usr/local@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    rebase shbbuild/run/containers/shbup-staging/usr/local, step 2 of 4: shbbuild/run/containers/shbup/usr/local@save-2026-10-15-083528 onto shbbuild/run/containers/shbup-staging/usr/local
+    rebase shbbuild/run/containers/shbup-staging/usr/local, step 3 of 4: shbbuild/run/containers/shbup/usr/local@save-2026-10-15-083528-2 onto shbbuild/run/containers/shbup-staging/usr/local
+    rebase shbbuild/run/containers/shbup-staging/usr/local, step 4 of 4: shbbuild/run/containers/shbup/usr/local@save-2026-10-15-083528-3 onto shbbuild/run/containers/shbup-staging/usr/local
+    replayed shbbuild/run/containers/shbup-staging/usr/local, 4 saves
+    rebase shbbuild/run/containers/shbup-staging/var, step 1 of 4: shbbuild/run/containers/shbup/var@save-2026-10-15-083527 onto shbbuild/run/foundations/box/var@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    rebase shbbuild/run/containers/shbup-staging/var, step 2 of 4: shbbuild/run/containers/shbup/var@save-2026-10-15-083528 onto shbbuild/run/containers/shbup-staging/var
+    rebase shbbuild/run/containers/shbup-staging/var, step 3 of 4: shbbuild/run/containers/shbup/var@save-2026-10-15-083528-2 onto shbbuild/run/containers/shbup-staging/var
+    rebase shbbuild/run/containers/shbup-staging/var, step 4 of 4: shbbuild/run/containers/shbup/var@save-2026-10-15-083528-3 onto shbbuild/run/containers/shbup-staging/var
+    replayed shbbuild/run/containers/shbup-staging/var, 4 saves
+    rebase shbbuild/run/containers/shbup-staging/tmp, step 1 of 4: shbbuild/run/containers/shbup/tmp@save-2026-10-15-083527 onto shbbuild/run/foundations/box/tmp@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    rebase shbbuild/run/containers/shbup-staging/tmp, step 2 of 4: shbbuild/run/containers/shbup/tmp@save-2026-10-15-083528 onto shbbuild/run/containers/shbup-staging/tmp
+    rebase shbbuild/run/containers/shbup-staging/tmp, step 3 of 4: shbbuild/run/containers/shbup/tmp@save-2026-10-15-083528-2 onto shbbuild/run/containers/shbup-staging/tmp
+    rebase shbbuild/run/containers/shbup-staging/tmp, step 4 of 4: shbbuild/run/containers/shbup/tmp@save-2026-10-15-083528-3 onto shbbuild/run/containers/shbup-staging/tmp
+    replayed shbbuild/run/containers/shbup-staging/tmp, 4 saves
+    cloned shbbuild/run/containers/shbup-staging/srv from shbbuild/run/containers/shbup/srv@save-2026-10-15-083528-3
+    cloned shbbuild/run/containers/shbup-staging/srv/www from shbbuild/run/containers/shbup/srv/www@save-2026-10-15-083528-3
+    snapshot shbbuild/run/containers/shbup-staging@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    wrote /etc/jail.conf.d/shbup-staging.conf
+    started the jail shbup-staging
+    saved shbbuild/run/containers/shbup-staging@save-2026-10-15-083539
+    mirrored shbbuild/shtetl/containers/shbup-staging@save-2026-10-15-083539, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbup-staging/usr@save-2026-10-15-083539, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbup-staging/usr/local@save-2026-10-15-083539, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbup-staging/var@save-2026-10-15-083539, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbup-staging/srv@save-2026-10-15-083539, a clone of zlake's container
+    mirrored shbbuild/shtetl/containers/shbup-staging/srv/www@save-2026-10-15-083539, a clone of zlake's container
+    mirrored shbbuild/shtetl/containers/shbup-staging/tmp@save-2026-10-15-083539, a clone of zlake's foundation
+    staged shbup-staging on box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg: shtetl cutover shbup, or abandon shbup
+ok   U9 paused at the family tree's conflict, answered onto
+ok   U9 taken up, staged
+ok   U9 the staging tree on box's newest
+ok   U9 the family tree onto's, the update's
+ok   U9 the later edit replayed
+ok   U9 its own www cloned from the from-save
+ok   U9 the saves replayed, their commits kept
+ok   U9 the staging tree's jail running
+ok   U9 x stopped meanwhile
+ok   W7 the tool's output in the update's log
+# shtetl cutover -y shbup -> 0
+    cutover of shbup to shbup-staging, @15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+      shbup-staging stopped; promoted: shbbuild/run/containers/shbup-staging/srv shbbuild/run/containers/shbup-staging/srv/www
+      shbbuild/run/containers/shbup destroyed on zrun
+      shbbuild/run/containers/shbup-staging renamed shbbuild/run/containers/shbup
+      in zlake: shbbuild/shtetl/containers/shbup archived as shbbuild/shtetl/archive/containers/shbup-15.1-releng-2026-10-15-893c7c99b60d, shbbuild/shtetl/containers/shbup-staging renamed shbbuild/shtetl/containers/shbup
+      shbup started and saved
+    stopped the jail shbup-staging
+    promoted shbbuild/run/containers/shbup-staging/srv
+    promoted shbbuild/run/containers/shbup-staging/srv/www
+    destroyed shbbuild/run/containers/shbup
+    renamed shbbuild/run/containers/shbup-staging shbbuild/run/containers/shbup
+    wrote /etc/jail.conf.d/shbup.conf
+    promoted shbbuild/shtetl/containers/shbup-staging/srv
+    promoted shbbuild/shtetl/containers/shbup-staging/srv/www
+    archived shbbuild/shtetl/containers/shbup as shbbuild/shtetl/archive/containers/shbup-15.1-releng-2026-10-15-893c7c99b60d
+    renamed shbbuild/shtetl/containers/shbup-staging shbbuild/shtetl/containers/shbup
+    started the jail shbup
+    saved shbbuild/run/containers/shbup@save-2026-10-15-083600
+    mirrored shbbuild/shtetl/containers/shbup@save-2026-10-15-083600, from its last
+    mirrored shbbuild/shtetl/containers/shbup/usr@save-2026-10-15-083600, from its last
+    mirrored shbbuild/shtetl/containers/shbup/usr/local@save-2026-10-15-083600, from its last
+    mirrored shbbuild/shtetl/containers/shbup/var@save-2026-10-15-083600, from its last
+    mirrored shbbuild/shtetl/containers/shbup/srv@save-2026-10-15-083600, from its last
+    mirrored shbbuild/shtetl/containers/shbup/srv/www@save-2026-10-15-083600, from its last
+    mirrored shbbuild/shtetl/containers/shbup/tmp@save-2026-10-15-083600, from its last
+    cut over shbup
+ok   K7 cutover's exit
+ok   K7 shbup on box's newest, the staging tree gone
+ok   K7 its jail running again
+ok   K7 the old tree archived in zlake, named for its version
+ok   K7 zlake's shbup on box's newest
+# shtetl create -y -m the first shbab --on box --version 15.1-releng-2026-10-15-893c7c99b60d -> 0
+ok   K7 shbab created
+# shtetl update -y shbab -> 0
+    container shbab, from box@15.1-releng-2026-10-15-893c7c99b60d to @15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+      shbab stopped; a save of it, "update to box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg"
+      + shbbuild/run/containers/shbab-staging  replayed
+      + shbbuild/run/containers/shbab-staging/usr  cloned from the target, canmount=off
+      + shbbuild/run/containers/shbab-staging/usr/local  replayed
+      + shbbuild/run/containers/shbab-staging/var  replayed
+      + shbbuild/run/containers/shbab-staging/tmp  replayed
+      + shbbuild/run/containers/shbab-staging/srv  cloned from the from-save, canmount=off
+      + shbbuild/run/containers/shbab-staging/srv/www  cloned from the from-save
+      saves replayed: save-2026-10-15-083600, then the from-save
+      shbab-staging started as shbab, saved
+    stopped the jail shbab
+    saved shbbuild/run/containers/shbab@save-2026-10-15-083601
+    mirrored shbbuild/shtetl/containers/shbab@save-2026-10-15-083601, from its last
+    mirrored shbbuild/shtetl/containers/shbab/usr@save-2026-10-15-083601, from its last
+    mirrored shbbuild/shtetl/containers/shbab/usr/local@save-2026-10-15-083601, from its last
+    mirrored shbbuild/shtetl/containers/shbab/var@save-2026-10-15-083601, from its last
+    mirrored shbbuild/shtetl/containers/shbab/tmp@save-2026-10-15-083601, from its last
+    mirrored shbbuild/shtetl/containers/shbab/srv@save-2026-10-15-083601, from its last
+    mirrored shbbuild/shtetl/containers/shbab/srv/www@save-2026-10-15-083601, from its last
+    rebase shbbuild/run/containers/shbab-staging, step 1 of 2: shbbuild/run/containers/shbab@save-2026-10-15-083600 onto shbbuild/run/foundations/box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    rebase shbbuild/run/containers/shbab-staging, step 2 of 2: shbbuild/run/containers/shbab@save-2026-10-15-083601 onto shbbuild/run/containers/shbab-staging
+    replayed shbbuild/run/containers/shbab-staging, 2 saves
+    cloned shbbuild/run/containers/shbab-staging/usr from shbbuild/run/foundations/box/usr@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    rebase shbbuild/run/containers/shbab-staging/usr/local, step 1 of 2: shbbuild/run/containers/shbab/usr/local@save-2026-10-15-083600 onto shbbuild/run/foundations/box/usr/local@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    rebase shbbuild/run/containers/shbab-staging/usr/local, step 2 of 2: shbbuild/run/containers/shbab/usr/local@save-2026-10-15-083601 onto shbbuild/run/containers/shbab-staging/usr/local
+    replayed shbbuild/run/containers/shbab-staging/usr/local, 2 saves
+    rebase shbbuild/run/containers/shbab-staging/var, step 1 of 2: shbbuild/run/containers/shbab/var@save-2026-10-15-083600 onto shbbuild/run/foundations/box/var@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    rebase shbbuild/run/containers/shbab-staging/var, step 2 of 2: shbbuild/run/containers/shbab/var@save-2026-10-15-083601 onto shbbuild/run/containers/shbab-staging/var
+    replayed shbbuild/run/containers/shbab-staging/var, 2 saves
+    rebase shbbuild/run/containers/shbab-staging/tmp, step 1 of 2: shbbuild/run/containers/shbab/tmp@save-2026-10-15-083600 onto shbbuild/run/foundations/box/tmp@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    rebase shbbuild/run/containers/shbab-staging/tmp, step 2 of 2: shbbuild/run/containers/shbab/tmp@save-2026-10-15-083601 onto shbbuild/run/containers/shbab-staging/tmp
+    replayed shbbuild/run/containers/shbab-staging/tmp, 2 saves
+    cloned shbbuild/run/containers/shbab-staging/srv from shbbuild/run/containers/shbab/srv@save-2026-10-15-083601
+    cloned shbbuild/run/containers/shbab-staging/srv/www from shbbuild/run/containers/shbab/srv/www@save-2026-10-15-083601
+    snapshot shbbuild/run/containers/shbab-staging@15.1-releng-2026-10-15-893c7c99b60d.2-pkg
+    wrote /etc/jail.conf.d/shbab-staging.conf
+    started the jail shbab-staging
+    saved shbbuild/run/containers/shbab-staging@save-2026-10-15-083601-2
+    mirrored shbbuild/shtetl/containers/shbab-staging@save-2026-10-15-083601-2, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbab-staging/usr@save-2026-10-15-083601-2, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbab-staging/usr/local@save-2026-10-15-083601-2, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbab-staging/var@save-2026-10-15-083601-2, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbab-staging/tmp@save-2026-10-15-083601-2, a clone of zlake's foundation
+    mirrored shbbuild/shtetl/containers/shbab-staging/srv@save-2026-10-15-083601-2, a clone of zlake's container
+    mirrored shbbuild/shtetl/containers/shbab-staging/srv/www@save-2026-10-15-083601-2, a clone of zlake's container
+    staged shbab-staging on box@15.1-releng-2026-10-15-893c7c99b60d.2-pkg: shtetl cutover shbab, or abandon shbab
+ok   K7 shbab updated
+# shtetl abandon -y shbab -> 0
+ok   K7 abandoned: the staging tree gone, shbab running, unchanged
+== 126 ok, 0 failed
