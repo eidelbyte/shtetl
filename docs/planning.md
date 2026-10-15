@@ -1742,20 +1742,26 @@ Ruled 2026-10-15 (14); each a tracker issue of M6 (tracker/shtetl.json),
 since systems are to start on it:
 
 - m6-names: one snapshot name for every object,
-  `<object>@<foundation-ver>-<foundation-branch>-<date>-<bootstrap|pkg|save>`,
-  and config snapshots `<date>-<three>-<little>-<words>` (6.1).
+  `<object>@<foundation-ver>-<foundation-branch>-<date>-<kind>`, the
+  date `2026-10-15T09_30_12Z`, the kind create, update, pkg or save
+  (bootstrap only for bootstrap's own); config snapshots
+  `<date>-<three>-<little>-<words>` (6.1).
 - m6-recipe-file: each object's recipe, merged whole, a read-only file
-  under /var/db/shtetl in its own tree, so every snapshot carries it;
+  under /var/db/shtetl in its own tree (immutable, schg), so every
+  snapshot carries it, the foundation's commit hash among it;
   shtetl:config, shtetl:patches and shtetl:revision gone with it, and
   the pause record holding it (6.2, 7.1.1).
 - m6-pkg-upgrade: `shtetl pkg-upgrade` of a container or a system,
-  shtetl:kind=pkg (7.2).
+  shtetl:kind=pkg, done while it runs (7.2).
 - m6-build-root: the build root not snapshotted while patching; git
   puts its tree back (7.1.1).
 - m6-cutover: cutover and abandon simpler, not carried on when run
-  again; systems through S-staging with the same verbs (7.9, 7.11).
-- m6-gate-merge: a conflict at an update's gate that merges three ways
-  clean goes on by itself (7.7).
+  again: X renamed aside as the previous root, X-staging renamed X,
+  started and saved, any failure putting every step back, the prune
+  last; systems through S-staging with the same verbs (7.9, 7.11).
+- m6-gate-merge: zfs_rebase's --merge-non-conflict (-m), a conflict
+  its three-way merge settles clean carried on by itself, passed by
+  shtetl's update (7.7).
 
 ## 13. Probes (M0): standalone tests before the design commits
 
@@ -1856,6 +1862,43 @@ below that change the plan are folded into the sections named.
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-15 (the rework's particulars)
+
+Asked six particulars of the rework (12.1), the user answered:
+
+    1. zfs_rebase already does diff3. It should be a quick surgical
+    change to plumb a new arg --merge-non-conflict (-m). Let's do it
+    there instead of including diff3 in yet another tool.
+    2. can we split out with dashes and use underscores for the
+    colons? this would ease the information on the eyes. No,
+    bootstrap should be reserved only for shtetl bootstrapping
+    actions. we can use create for creation of first foundation and
+    for creation of container / system. even though a foundation
+    updates via a rebuild, we should still call this -update, just
+    like containers and systems. this is for humans to understand. As
+    for 15.1-releng-date-type, yes, that's what I'm saying. Putting
+    the commit hash in the conf recipe file is ok.
+    3. yes this makes sense. schg is overkill but lets do it anyway
+    4. pruning is the last step of cutover, right? but yes this looks
+    good. I wish zfs offered us more atomicity here but I get why
+    they can't. My lake will be on a different pool
+    5. sounds good
+    6. why does a system need to do it from outer space? you can
+    update pkgs on a system while it's running.
+
+So: zfs_rebase gains --merge-non-conflict (-m), a conflict its
+three-way merge settles without conflict carried on by itself, and
+shtetl passes it (m6-gate-merge). Names: the date to the second with
+dashes and underscores for the colons, `2026-10-15T09_30_12Z`; the
+kinds in a name are create (a foundation's first build, a container's
+or a system's creation), update (a foundation's rebuild, a
+container's or a system's update), pkg and save, bootstrap only for
+bootstrap's own snapshot; `15.1-releng-<date>-<kind>`; the commit hash
+in the recipe file. The recipe file is made immutable (schg). The
+cutover: X renamed aside as the previous root, X-staging renamed X,
+started, saved, every step put back on a failure, and its last step
+the prune. pkg-upgrade of a system is done while it runs.
 
 ### 2026-10-15 (names, the recipe file, a simpler cutover)
 
