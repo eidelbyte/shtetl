@@ -1,7 +1,7 @@
 /*
  * A foundation's patches (planning.md 7.1.1): the pieces, each alone.
  *
- * Decided here, beyond the plan (PROPOSAL): a fix has left something
+ * Decided here, beyond the plan (ruled 2026-10-15): a fix has left something
  * while a file the patch touches holds a line beginning with seven of
  * <, | or > followed by a space or the line's end (git's markers;
  * ======= alone is too common in text to tell), or has a .rej beside

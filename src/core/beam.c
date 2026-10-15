@@ -4,11 +4,12 @@
  * from zrun's newest after, never with -p: the version's shtetl:* are
  * copied onto each received snapshot (6.2).
  *
- * Decided here, beyond the plan (PROPOSAL): the command, shown and
- * confirmed as a build is; with no version given, F's newest snapshot
- * that is a version or a -pkg of one; zrun takes versions forward
- * only, one on zrun already or older than zrun's newest refused; a
- * failure destroys what the beam received, so zrun is as it was.
+ * Decided here, beyond the plan (ruled 2026-10-15): the command asks
+ * nothing, beaming being done when something is missing on zrun; with
+ * no version given, F's newest snapshot that is a version or a -pkg of
+ * one; a failure destroys what the beam received, so zrun is as it
+ * was. Still a PROPOSAL: zrun takes versions forward only, one on zrun
+ * already or older than zrun's newest refused.
  */
 
 #include <stdio.h>

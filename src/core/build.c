@@ -1878,7 +1878,7 @@ fb_unpatch(struct fb *b)
 }
 
 /*
- * shtetl:patches (PROPOSAL): each source, with the commit it was
+ * shtetl:patches (ruled 2026-10-15): each source, with the commit it was
  * fetched at, and the patches of it not applied as they are, each with
  * what became of it: "src@commit: 2-x.patch already; patches/local".
  */

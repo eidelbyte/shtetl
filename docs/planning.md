@@ -232,10 +232,10 @@ file. The history of the site's files is zconfig's snapshots:
   `shtetl:config`, by name, so any build or save leads back to the
   exact recipes that produced it.
 
-Sharing a file (PROPOSAL): `shtetl share containers/nginx.conf` runs
-`git add -f` on it. A tracked file is no longer subject to
-`.gitignore`, so the shared `.gitignore` is never edited locally and
-never conflicts with upstream's.
+Sharing a file (ruled 2026-10-15; not built): `shtetl share
+containers/nginx.conf` runs `git add -f` on it. A tracked file is no
+longer subject to `.gitignore`, so the shared `.gitignore` is never
+edited locally and never conflicts with upstream's.
 
 Upstream ships `shtetl.conf` with the default recipe in it
 (`ver = ">=15.1"`, `kernconf = "GENERIC"`; 5.4), and the site
@@ -690,10 +690,10 @@ Each is one of:
 
 Whatever shtetl runs on a schedule, prune and anything the TUI
 schedules, it runs from cron, not periodic(8) (ruled 2026-10-14): one
-file of shtetl's, written whole from its own settings and never read
-back, in `/usr/local/etc/cron.d/shtetl` (PROPOSAL), which FreeBSD's
-cron reads with `/etc/cron.d` and reloads when it changes; each line
-runs shtetl by its full path, as root.
+file of shtetl's, written whole from its own settings and not read
+back for now, in `/usr/local/etc/cron.d/shtetl` (ruled 2026-10-15),
+which FreeBSD's cron reads with `/etc/cron.d` and reloads when it
+changes; each line runs shtetl by its full path, as root.
 
 Quote the interval: unquoted, UCL reads `6m` as 6000000 and `30d` as a
 time in seconds. shtetl reads the string with date(1) units (y, m, w,
@@ -709,6 +709,12 @@ its inputs), the newest save of a dataset, and on zrun the newest
 snapshot zlake also has (the next incremental's base).
 
 ## 7. Lifecycles
+
+A command that fails part way puts back what it changed, to the last
+stable state before it ran (ruled 2026-10-15: "this is just generally
+true"). Two are carried on instead: a cutover or abandon stopped part
+way, by running it again (7.9), and a save whose zlake mirror failed,
+by the next save (7.5).
 
 ### 7.1 Build a new foundation F
 
@@ -752,11 +758,13 @@ As built (M3, `src/core/build.c`; patches in 7.1.1; updates to come):
   "update F"; the version records its name in `shtetl:config`
   (ruled 2026-10-14, 14; its guid dropped).
 - One build at a time: `shtetl:build=F` on the build root while it
-  runs (PROPOSAL).
+  runs (ruled 2026-10-15). Since cron may start several at once, a run that
+  meets another under way is to wait its turn rather than fail
+  (ruled 2026-10-15; with scheduling, M7).
 - The obj cache is mounted at `<run dir>/obj` and F at
   `<run dir>/root`, its datasets below by inheritance, placeholders
   not, by setting the mountpoints for the build and inheriting them
-  back after (PROPOSAL). The run directory is
+  back after (ruled 2026-10-15). The run directory is
   `/var/db/shtetl/build/F`; it keeps the last build's log
   (`build.log`), the kernel config and src.conf.
 - The kernel config shtetl writes is `<run dir>/<F in capitals>`:
@@ -769,12 +777,11 @@ As built (M3, `src/core/build.c`; patches in 7.1.1; updates to come):
 - External commands (ruled 2026-10-14): each piece `sh -e -c` on the
   host, after the installs and before anything runs inside F, with
   `SHTETL_ROOT` (F's root as mounted), `SHTETL_NAME` (F) and
-  `SHTETL_KIND` (foundation) in its environment (PROPOSAL, the
-  environment).
+  `SHTETL_KIND` (foundation) in its environment (ruled 2026-10-15).
 - Packages: `pkg -c <root> install -y`, with devfs mounted in F and,
   where F has no resolv.conf, the host's copied in while pkg runs.
   Commands: each piece `chroot <root> /bin/sh -e -c`, in order
-  (PROPOSAL).
+  (ruled 2026-10-15).
 - The version is every dataset of F at once, with `shtetl:kind`,
   `shtetl:commit` (`-m`, or "build <branch> at <commit>") and
   `shtetl:config`.
@@ -897,16 +904,17 @@ As built (M3, `src/core/patch.c`, `src/core/build.c`):
   leaves no conflict marker and did not merge, `git apply --reject`.
   A merge without conflict pauses all the same, for a person to look
   over: nothing merges unseen (PROPOSAL). The record is
-  `<run dir>/paused.conf`, UCL read with shtetl's own parse (PROPOSAL);
-  shtetl exits 3 (PROPOSAL). A build while one is paused is refused,
-  saying so.
+  `<run dir>/paused.conf`, UCL read with shtetl's own parse (ruled
+  2026-10-15, to hold the recipe merged whole, its imports inlined:
+  not built yet); shtetl exits 3 (ruled 2026-10-15). A build while
+  one is paused is refused, saying so.
 - `--continue` and `--skip` read the record and the recipe from the
   config snapshot the build began with, `<config root>/.zfs/snapshot/
   <name>`, so a recipe changed meanwhile is not what gets built. A
   failure taking the pause up leaves it paused.
 - `--continue` is refused while a file the patch touches (`git apply
   --numstat`) holds a line of seven `<`, `|` or `>` and a space or its
-  end, or has a `.rej` beside it (PROPOSAL; `=======` alone is too
+  end, or has a `.rej` beside it (ruled 2026-10-15; `=======` alone is too
   common to tell). The fix is `git diff --binary` from the base to the
   tree, everything added (a stray file goes in with it), written to
   `<run dir>/fixed/<n>/<name>` and kept in the obj cache as
@@ -920,7 +928,7 @@ As built (M3, `src/core/patch.c`, `src/core/build.c`):
 - `--abort` needs no recipe: F's datasets are walked and destroyed.
   The log stays, as it does after any build (7.1 as built), where the
   plan above said the run directory goes.
-- `shtetl:patches` (PROPOSAL): `<location>[@<commit>][: <name>
+- `shtetl:patches` (ruled 2026-10-15): `<location>[@<commit>][: <name>
   <already|skipped|fixed>, ...]`, the sources joined by `; `; not set
   when the recipe has no patches.
 
@@ -997,7 +1005,7 @@ a version is an update; there with none, it is refused.
   `ld-elf*.so.1.old` and `init.bak` come about when the new binary
   differs, as on any update to a newer commit.
 - A failed update, and `--abort` of a paused one, roll every dataset
-  of F back to the last version (PROPOSAL): F is the foundation's
+  of F back to the last version (ruled 2026-10-15): F is the foundation's
   history, which an update never destroys. A paused build is an
   update when F has a version.
 
@@ -1047,7 +1055,7 @@ As built (M4, `src/core/beam.c`):
   on zrun, as create and update do it, and asks nothing (ruled
   2026-10-15). The version is the
   one given, or F's newest snapshot that is a version or a `-pkg` of
-  one (PROPOSAL): base and base-plus-packages are both versions to
+  one (ruled 2026-10-15): base and base-plus-packages are both versions to
   rebase onto (7.2).
 - Forward only (PROPOSAL): a version on zrun already, or older than
   zrun's newest, is refused; so are F's datasets not being zrun's.
@@ -1055,7 +1063,7 @@ As built (M4, `src/core/beam.c`):
   and `canmount=noauto` on each, `off` on a placeholder. Before a
   later beam, a zrun snapshot without `shtetl:kind` is given its zlake
   counterpart's `shtetl:*` again (6.2).
-- A send failing part way destroys what the beam received (PROPOSAL):
+- A send failing part way destroys what the beam received (ruled 2026-10-15):
   a first beam's whole tree, a later one's new snapshots.
 
 ### 7.4 New container X
@@ -1172,7 +1180,8 @@ As built (M4, `src/core/save.c`, `src/core/edit.c`):
   this).
 - A mirror that fails leaves the save taken and says so; the next
   save brings every dataset's mirror up to it, each from its own
-  newest mirrored save (PROPOSAL). Prune is M7's.
+  newest mirrored save (ruled 2026-10-15: eventual consistency). Prune is
+  M7's.
 
 ### 7.6 Update X onto F@v2 (into staging)
 
@@ -1575,14 +1584,16 @@ protocol (2026-10-15, 14):
     kenv vfs.root.mountfrom='zfs:zram/root/default'
     reboot -r
 
-    boot_single="YES"
-
 A swap-backed memory disk is made a pool, zram; a root is sent into
 it; the kernel is told to take it as root, and `reboot -r` reroots
 into it without a reboot, leaving the disks' pools free to be worked
-on. What shtetl builds on this is M6's (15: Q-AE - Q-AG).
+on. For shtetl (ruled 2026-10-15, Q-AE - Q-AG): the root sent is the
+system's current root, known to work, from which it updates to the
+newer one (a rescue foundation is a later possibility); the memory
+disk's size and the names are worked out as needed, not settings;
+the `boot_single="YES"` given with the protocol is not used.
 
-A system's commands (PROPOSAL, for M6): run once, when S is created,
+A system's commands (ruled 2026-10-15, for M6): run once, when S is created,
 its external commands first, on the host with S's root in
 `SHTETL_ROOT`, then its pkg and commands by `chroot` into S's datasets
 mounted below a run directory, before S ever boots: a system has no
@@ -1816,6 +1827,79 @@ below that change the plan are folded into the sections named.
 | P16 | The zrun foundation mounts read-only on demand and unmounts after; the placeholder is refused as a side (exit 2) and cloned instead. | 7.3, 9 as written |
 
 ## 14. Rulings
+
+### 2026-10-15 (the proposals, one by one)
+
+Given the plan's 21 PROPOSAL markers, numbered, the user answered:
+
+    1. we should still populate a root. it would act like a root with
+    no repos. that's fine.
+    2. sounds good
+    3. we may need to read it later. but yes.
+    4. marking by prop is ok, yes only one build at once is fine.
+    since cron might fire multiple at once, we need to enqueue
+    gracefully
+    5. makes sense that we need <run dir>/root because a foundation
+    dataset could be <run dir>/root/obj which we need to preserve
+    6. seems fine, i'm not sure if we need these environment
+    variables but i'll take them, sure
+    7. yes
+    8. patch? patches only occur to the foundation freebsd source
+    dir. If you mean a rebase, clean rebases (including resolved by
+    derivations) should just auto-pass and not wait for user check.
+    9. this needs to be the fully shaken version with all imports
+    inlined then
+    10. sure
+    11. absolutely, yes
+    12. sure. It's kind of ugly though. I wish we had a place to just
+    put the shaken conf file instead of sidecar-ing all this stuff
+    into zprops.
+    13. yes, why would it destroy it?
+    14. Like running pkg upgrade/update on the
+    foundation/container/system without rebasing the foundation? we
+    should talk about all our strings and sort them out. I think we
+    should get seconds in the date string and just rely on
+    shtetl:kind=pkg instead.
+    15. what does beam do? beaming should be automatic, not
+    interactive. the big interactive elements are create, destroy,
+    resolution of conflicts, update, cutover, and abandon. beaming
+    should be automatic dependency solving if something is missing
+    on zrun.
+    16. yes. let's talk again about why we have -pkg
+    17. why can't we beam down an old version if a container wants
+    it, for example?
+    18. yes, a failure should be rolled back to the last stable state
+    before a command. this is just generally true
+    19. I'm confused.
+    20. you mean it stays local until the zlake comes back and then
+    consistency is restored? good. eventual consistency is good.
+    21. correct.
+
+    Q-AE: sorry, it's scrap. don't use it unless it's useful
+    Q-AF: the current system root should be used, because we know it
+    works. from there we update to the newer root. We could also just
+    use some rescue foundation build, but let's not worry about that
+    complexity right now.
+    Q-AG: they should really be automatically calculated as required.
+
+So, where they live: a failed recipes clone leaves an empty config
+root and bootstrap carries on (4.2, built); `shtetl share` stands, not
+built (4.4); the cron file stands, perhaps read back later (6.3); one
+build at a time by `shtetl:build`, runs that meet one waiting their
+turn (7.1, to build with scheduling); the build's mounts, the external
+commands' environment, chroot for a foundation's commands, the pause's
+exit 3, `--continue` refused on a marker or `.rej`, `shtetl:patches`,
+an update's failure rolling F back, beam's default version and a
+failed send undone, a save's mirror catching up, a system's commands
+at its creation all stand; the pause record is to hold the recipe
+merged whole (7.1.1, not built); `shtetl beam` asks nothing (7.3,
+built); every command that fails puts back what it changed (7,
+"generally true"); outer space is made from the system's current
+root, sized and named as needed, without boot_single (7.11). Still to
+talk over: a patch merged cleanly three ways (8), `-pkg` and the
+names (14, 16), beaming an older version (17), a save's
+`shtetl:config` (19), and a file holding the merged recipe in place of
+properties (9, 12).
 
 ### 2026-10-15 (outer space)
 
@@ -2305,18 +2389,14 @@ So (5.4, 5.5):
 
 ## 15. Open questions
 
-M6's, from the outer-space protocol (7.11):
+M6's, from the outer-space protocol (7.11), all ruled 2026-10-15
+(14):
 
-- **Q-AE, single-user.** Where `boot_single="YES"` goes: set with
-  kenv before `reboot -r`, so that the RAM root comes up single-user,
-  or in the RAM root's own loader.conf or rc.conf; and whether shtetl
-  then runs from that single-user shell.
-- **Q-AF, which root.** The protocol sends the host's own root
-  (`zrhizome/root@03-11-2024`). For shtetl, outer space could be the
-  system's own root as it stands, a foundation's version, or a root
-  kept for the purpose.
-- **Q-AG, its size and names.** Whether the memory disk's 6G, md0 and
-  the names zram and zram/root/default are fixed, or settings.
+- **Q-AE, single-user.** `boot_single="YES"`: "it's scrap. don't use
+  it unless it's useful."
+- **Q-AF, which root.** The system's current root, known to work; a
+  rescue foundation build is a later possibility.
+- **Q-AG, its size and names.** Worked out as required, not settings.
 
 Q-AC is ruled (14, 2026-10-12), and with it the default; so is
 Q-AD, the default's edges.
