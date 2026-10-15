@@ -462,7 +462,7 @@
     ],
     "provides": "Patching without ZFS snapshots of the build root.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing"
   },
   "m6-cutover": {
     "description": "cutover and abandon made simpler and no longer carried on when run again (overturning 2026-10-14); systems updated into S-staging and cut over or abandoned with the same verbs. Ruled 2026-10-15 (planning.md 14, 12.1). Verify: family K rewritten; the box's K7.",
