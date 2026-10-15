@@ -53,3 +53,26 @@ to the end, 3-l1 merged; the record "2-x4.patch fixed, 3-l1.patch
 merged"; only 2-x4's fix kept; a mutation that pauses anyway caught);
 check_patch reads "merged" back and refuses an unknown word; make
 check, gate, xcheck. The box's P17 has no clean merge to show.
+
+## The build root without snapshots (m6-build-root)
+
+Ruled 2026-10-15: "we don't need to snapshot the build root while
+patching." The build root is not transient (it is the src checkout,
+kept so builds are incremental), but it is a git checkout, so git
+puts it back: fb_reset is git reset --hard and git clean -fd; at the
+end of a build, on a failure (FU_PATCHES) and on --abort (fb_unpatch);
+--skip resets and applies the patches before the skipped one again as
+the build left them (fb_reapply: as they are, --3way for a merged one,
+the kept fix for a fixed one). @shtetl-patch-N, fb_psnap and the
+retouch are gone: git writes every file a patch changed anew, so its
+time is now's, which is what the retouch did by hand after a ZFS
+rollback gave the old times back (box build 6).
+
+Verification: check_build P5, P10, P11, P15 (no build root snapshot,
+none rolled back to; a patched file's time now's after the build; the
+--skip, --abort and failure paths leave the checkout clean); four
+mutations caught (no reset, no clean, no reapply, no undo). The test
+hook no longer copies the build root. Box: build.sh's P17 counts no
+snapshot of the build root and finds the checkout clean, and its
+teardown resets a stopped build's checkout with git; owed with the
+next run.

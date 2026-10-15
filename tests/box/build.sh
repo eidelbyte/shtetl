@@ -114,10 +114,11 @@ teardown() {
 		zfs rename $OBJ $OBJKEEP || zfs destroy -r $OBJ
 	fi
 	if zfs list -H -o name $P/zbuild >/dev/null 2>&1; then
-		if zfs list -H -o name $P/zbuild@shtetl-patch-0 \
-		    >/dev/null 2>&1; then
-			zfs rollback -r $P/zbuild@shtetl-patch-0
-			zfs destroy $P/zbuild@shtetl-patch-0
+		# a stopped build's patches: the checkout put back
+		_src=$(zfs get -H -o value mountpoint $P/zbuild)
+		if [ -d "$_src/.git" ]; then
+			git -C "$_src" reset -q --hard
+			git -C "$_src" clean -fdq
 		fi
 		zfs inherit shtetl:space $P/zbuild
 		zfs inherit shtetl:build $P/zbuild
@@ -638,9 +639,9 @@ EOF
 	check P17 "the record" \
 	    "$([ -f "$RUNS/box/paused.conf" ] && echo yes)" yes
 	check P17 "the build root's mark" "$(prop $P/zbuild shtetl:build)" box
-	check P17 "a snapshot before each patch, and the first" \
-	    "$(zfs list -H -t snapshot -o name -r $P/zbuild |
-	    grep -c '@shtetl-patch-')" 4
+	check P17 "no snapshot of the build root" \
+	    "$(zfs list -H -t snapshot -o name -r $P/zbuild | wc -l |
+	    tr -d ' ')" 0
 	check P17 "the markers in the tree" \
 	    "$(grep -c '^<<<<<<< ' "$ALT/zbuild/$PF")" 1
 	sht build box --continue
@@ -699,11 +700,8 @@ EOF
 	_w="file://$_d/repo@$_in: 2-in.patch already;"
 	check P17 "shtetl:patches" "$(prop "$F/var@$_v" shtetl:patches)" \
 	    "$_w patches/box: 3-two.patch fixed"
-	check P17 "the build root rolled back, its checkout clean" \
+	check P17 "the build root's checkout put back, clean" \
 	    "$(git -C "$ALT/zbuild" status --porcelain | wc -l | tr -d ' ')" 0
-	check P17 "every patch snapshot gone" \
-	    "$(zfs list -H -t snapshot -o name -r $P/zbuild |
-	    grep -c '@shtetl-patch-')" 0
 	check P17 "the fix written out" \
 	    "$(grep -c '^+shtetl-box two' "$RUNS/box/fixed/2/3-two.patch")" 1
 	check P17 "the record gone" \

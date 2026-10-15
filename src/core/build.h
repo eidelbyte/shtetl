@@ -139,7 +139,7 @@ void sh_build_show(FILE *out, const struct sh_fplan *p);
  * directory. 0, or -1 with the reasons in E.
  *
  * With the recipe's patches (7.1.1): fetched, applied after the
- * checkout, the build root rolled back at the end, shtetl:patches on
+ * checkout, the checkout put back at the end, shtetl:patches on
  * the version. A patch that does not apply pauses the build: 1, with
  * what to do said on OUT, the record left in the run directory and
  * the build root as the patch left it. P's verb carries a paused

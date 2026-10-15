@@ -573,7 +573,7 @@ enum fu_kind {
 	FU_INHERIT,	/* a dataset's mountpoint set, inherited */
 	FU_UMOUNT,	/* a path mounted (devfs), unmounted */
 	FU_UNLINK,	/* a file put in F, removed */
-	FU_PATCHES,	/* the build root back to @shtetl-patch-0 */
+	FU_PATCHES,	/* the build root's checkout put back */
 	FU_ROLLBACK	/* an update's dataset back to the last version */
 };
 
@@ -585,7 +585,6 @@ struct fu {
 
 #define	FB_UNDO		(SH_BUILD_DS * 3 + 16)
 #define	FB_CAP		4096	/* what a captured program may print */
-#define	FB_PSNAP	"shtetl-patch-"	/* the build root's, per patch */
 
 /* One patch, in the order they are applied. */
 struct fb_pa {
@@ -616,7 +615,6 @@ struct fb {
 	struct sh_pause		fb_pz;		/* the patches, so far */
 	struct fb_pa		*fb_pa;
 	size_t			fb_npa;
-	size_t			fb_psnaps;	/* the last N taken */
 	const char		*fb_msg;	/* -m's, or NULL */
 	const char		*fb_dest;	/* DESTDIR if not F's */
 	char			fb_prec[SH_ZFS_VALMAX];	/* carried over */
@@ -638,7 +636,7 @@ fb_push(struct fb *b, enum fu_kind k, int fail, const char *what)
 static int fb_run(struct fb *b, const char *const *words,
     const char *const *env, size_t cap, char **outp, size_t *lenp,
     int quiet);
-static void fb_unpatch(struct fb *b);
+static int fb_unpatch(struct fb *b);
 static void fb_unrecord(struct fb *b);
 
 static int
@@ -692,7 +690,7 @@ fb_undo(struct fb *b, size_t mark, int failed)
 				    strerror(errno));
 			break;
 		case FU_PATCHES:
-			fb_unpatch(b);
+			(void) fb_unpatch(b);
 			break;
 		case FU_ROLLBACK:
 			if (sh_zfs_rollback(b->fb_z, u->fu_what,
@@ -1301,21 +1299,6 @@ fb_fetch(struct fb *b, int fetch)
 	return (0);
 }
 
-/* The build root's @shtetl-patch-N. */
-static int
-fb_psnap(struct fb *b, size_t n)
-{
-	char name[SH_BUILD_NAME + 32];
-	const char *one = name;
-
-	(void) snprintf(name, sizeof (name), "%s@" FB_PSNAP "%zu",
-	    b->fb_p->fp_src, n);
-	if (sh_zfs_snapshot(b->fb_z, &one, 1, NULL, 0, b->fb_err) != 0)
-		return (-1);
-	b->fb_psnaps = n;
-	return (0);
-}
-
 /* git -C <the checkout> apply ARGS... PATCH: 0 when it applied. */
 static int
 fb_apply(struct fb *b, const char *a1, const char *a2, const char *patch)
@@ -1338,10 +1321,10 @@ fb_apply(struct fb *b, const char *a1, const char *a2, const char *patch)
 }
 
 /*
- * 7.1.1 steps 2 - 4, from the patch FROM on: @shtetl-patch-0 first,
- * then each patch after a snapshot of its own, applied, skipped as
- * already in when its reverse applies, or merged three ways when that
- * leaves no conflict.
+ * 7.1.1 steps 2 - 4, from the patch FROM on: each patch applied,
+ * skipped as already in when its reverse applies, or merged three ways
+ * when that leaves no conflict. No snapshot of the build root: git
+ * puts its checkout back (fb_reset; ruled 2026-10-15).
  */
 static int fb_pause(struct fb *b, size_t i);
 static int fb_tree(struct fb *b, char *id, size_t len);
@@ -1358,18 +1341,11 @@ fb_patches(struct fb *b, size_t from)
 	if (b->fb_npa == 0)
 		return (0);
 	srcs = sh_obj_get(p->fp_recipe.sr_merged, "patches");
-	if (from == 0) {
-		if (fb_psnap(b, 0) != 0)
-			return (-1);
+	if (from == 0)
 		fb_push(b, FU_PATCHES, 0, p->fp_src);
-		(void) fprintf(b->fb_out, "snapshot %s@" FB_PSNAP "0\n",
-		    p->fp_src);
-	}
 	for (i = from; i < b->fb_npa; i++) {
 		pa = &b->fb_pa[i];
 		loc = srcs->sn_obj.ob_v[pa->pa_src].pr_key;
-		if (fb_psnap(b, i + 1) != 0)
-			return (-1);
 		if (fb_apply(b, NULL, NULL, pa->pa_path) == 0) {
 			b->fb_pz.pz_out[i] = SH_PO_APPLIED;
 			(void) fprintf(b->fb_out, "patch %s from %s: applied\n",
@@ -1515,6 +1491,63 @@ fb_pause(struct fb *b, size_t i)
 }
 
 /*
+ * The build root's checkout put back at its commit (git reset --hard,
+ * git clean -fd): every patch's change gone, and the files a patch
+ * changed written anew, so their times are now's, newer than the
+ * objects the obj cache built from them patched, and the next build's
+ * make, which goes by times, builds them again.
+ */
+static int
+fb_reset(struct fb *b)
+{
+	char line[8];
+
+	if (fb_git1(b, "reset", "-q", "--hard", line, sizeof (line)) != 0 ||
+	    fb_git1(b, "clean", "-fdq", NULL, line, sizeof (line)) != 0)
+		return (-1);
+	return (0);
+}
+
+/*
+ * The first N patches applied again on the checkout put back, each as
+ * the run left it: as it is, merged three ways, or by its fix by hand.
+ */
+static int
+fb_reapply(struct fb *b, size_t n)
+{
+	char fix[SH_BUILD_PATH * 2];
+	struct fb_pa *pa;
+	size_t i;
+	int r;
+
+	for (i = 0; i < n; i++) {
+		pa = &b->fb_pa[i];
+		switch (b->fb_pz.pz_out[i]) {
+		case SH_PO_APPLIED:
+			r = fb_apply(b, NULL, NULL, pa->pa_path);
+			break;
+		case SH_PO_MERGED:
+			r = fb_apply(b, "--3way", NULL, pa->pa_path);
+			break;
+		case SH_PO_FIXED:
+			(void) snprintf(fix, sizeof (fix), "%s/fixed/%zu/%s",
+			    b->fb_p->fp_rundir, pa->pa_src + 1, pa->pa_name);
+			r = fb_apply(b, NULL, NULL, fix);
+			break;
+		default:
+			r = 0;
+			break;
+		}
+		if (r != 0) {
+			sh_errf(b->fb_err, "patch %s: does not apply again",
+			    pa->pa_name);
+			return (-1);
+		}
+	}
+	return (0);
+}
+
+/*
  * --continue: the fix checked, nothing left by the patch's merge; the
  * fix written out as the tree's difference from the base, a patch to
  * replace the source's (fixed/<source>/<name>). Not 0 when refused.
@@ -1587,7 +1620,7 @@ fb_resume(struct fb *b)
 {
 	struct sh_fplan *p = b->fb_p;
 	struct sh_pause *pz = &p->fp_pause;
-	char snap[SH_BUILD_NAME + 32], val[SH_ZFS_VALMAX];
+	char val[SH_ZFS_VALMAX];
 	long major, minor;
 	size_t i, at;
 
@@ -1620,14 +1653,13 @@ fb_resume(struct fb *b)
 		return (-1);
 	}
 	b->fb_pz.pz_nsrc = pz->pz_nsrc;
-	b->fb_psnaps = at + 1;
 	fb_push(b, FU_PATCHES, 0, p->fp_src);
 	(void) fprintf(b->fb_out, "build of %s, paused at patch %s\n",
 	    p->fp_name, b->fb_pa[at].pa_name);
 	if (p->fp_verb == SH_BV_CONTINUE)
 		return (fb_fixed(b));
-	(void) snprintf(snap, sizeof (snap), FB_PSNAP "%zu", at + 1);
-	if (sh_zfs_rollback(b->fb_z, p->fp_src, snap, b->fb_err) != 0)
+	/* the checkout put back, the patches before this one again */
+	if (fb_reset(b) != 0 || fb_reapply(b, at) != 0)
 		return (-1);
 	b->fb_pz.pz_out[at] = SH_PO_SKIPPED;
 	(void) fprintf(b->fb_out, "patch %s from %s: left out\n",
@@ -1707,7 +1739,7 @@ fb_rollbackf(struct fb *b, const char *ds, const char *snap)
 }
 
 /*
- * --abort: the build root back to @shtetl-patch-0, a new F's datasets
+ * --abort: the build root's checkout put back, a new F's datasets
  * destroyed or an update's rolled back to the last version, the mark
  * cleared, the record and the fetched patches gone; the log and the
  * config snapshot stay.
@@ -1720,10 +1752,7 @@ fb_abort(struct fb *b)
 
 	(void) snprintf(b->fb_log, sizeof (b->fb_log), "%s/build.log",
 	    p->fp_rundir);
-	b->fb_psnaps = p->fp_pause.pz_at + 1;
-	/* every patch snapshot gone, or the rollback failed and said so */
-	fb_unpatch(b);
-	if (b->fb_psnaps != 0 || (p->fp_update ?
+	if (fb_unpatch(b) != 0 || (p->fp_update ?
 	    fb_rollbackf(b, p->fp_ds, p->fp_last) :
 	    fb_destroyf(b, p->fp_ds)) != 0 ||
 	    sh_zfs_inherit(b->fb_z, p->fp_src, SH_BUILD_PROP,
@@ -1790,101 +1819,15 @@ fb_unrecord(struct fb *b)
 		sh_errf(b->fb_err, "%s: %s", path, strerror(errno));
 }
 
-/* The files the patch PATCH touches, each added to *ALL once. */
+/* 7.1.1 step 5: the build root's checkout put back (fb_reset), said. */
 static int
-fb_retouch1(struct fb *b, const char *patch, char ***all)
-{
-	char **files;
-	size_t i, j;
-	int r;
-
-	if ((files = fb_touched(b, patch)) == NULL)
-		return (-1);
-	r = 0;
-	for (i = 0; r == 0 && files[i] != NULL; i++) {
-		for (j = 0; (*all)[j] != NULL &&
-		    strcmp((*all)[j], files[i]) != 0; j++)
-			;
-		if ((*all)[j] == NULL && fb_kid(all, files[i]) != 0) {
-			sh_err_nomem(b->fb_err);
-			r = -1;
-		}
-	}
-	sh_patch_list_free(files);
-	return (r);
-}
-
-/*
- * The files the first TAKEN patches touched, and a fix by hand did,
- * given the time of now once the build root is rolled back: the
- * rollback gives them back their times from before the patches,
- * older than the objects the obj cache built from them, so the next
- * build's make, which goes by times, would take those as up to date,
- * a patch since dropped still in them.
- */
-static void
-fb_retouch(struct fb *b, size_t taken)
-{
-	char fix[SH_BUILD_PATH * 2], path[SH_BUILD_PATH * 2], **all;
-	struct fb_pa *pa;
-	size_t i, n;
-
-	if (b->fb_pa == NULL || (all = calloc(1, sizeof (*all))) == NULL)
-		return;
-	for (i = 0; i < taken && i < b->fb_npa; i++) {
-		pa = &b->fb_pa[i];
-		if (fb_retouch1(b, pa->pa_path, &all) != 0)
-			break;
-		if (b->fb_pz.pz_out[i] != SH_PO_FIXED)
-			continue;
-		(void) snprintf(fix, sizeof (fix), "%s/fixed/%zu/%s",
-		    b->fb_p->fp_rundir, pa->pa_src + 1, pa->pa_name);
-		if (fb_retouch1(b, fix, &all) != 0)
-			break;
-	}
-	for (i = n = 0; all[i] != NULL; i++) {
-		(void) snprintf(path, sizeof (path), "%s/%s",
-		    b->fb_p->fp_srcdir, all[i]);
-		if (utimensat(AT_FDCWD, path, NULL, AT_SYMLINK_NOFOLLOW) == 0)
-			n++;
-		else if (errno != ENOENT)
-			sh_errf(b->fb_err, "%s: %s", path, strerror(errno));
-		free(all[i]);
-	}
-	free(all);
-	if (n > 0)
-		(void) fprintf(b->fb_out, "the time of now on %zu patched "
-		    "file%s, for the next build's make\n", n, n == 1 ? "" :
-		    "s");
-}
-
-/*
- * 7.1.1 step 5: the patch snapshots destroyed newest first, the build
- * root rolled back to @shtetl-patch-0, and that destroyed too; the
- * files the patches touched given the time of now.
- */
-static void
 fb_unpatch(struct fb *b)
 {
-	struct sh_fplan *p = b->fb_p;
-	char name[SH_BUILD_NAME + 32];
-	size_t n;
-
-	for (n = b->fb_psnaps; n > 0; n--) {
-		(void) snprintf(name, sizeof (name), "%s@" FB_PSNAP "%zu",
-		    p->fp_src, n);
-		if (sh_zfs_destroy(b->fb_z, name, b->fb_err) != 0)
-			return;
-	}
-	if (sh_zfs_rollback(b->fb_z, p->fp_src, FB_PSNAP "0",
-	    b->fb_err) != 0)
-		return;
-	(void) snprintf(name, sizeof (name), "%s@" FB_PSNAP "0", p->fp_src);
-	(void) sh_zfs_destroy(b->fb_z, name, b->fb_err);
-	(void) fprintf(b->fb_out, "rolled back %s to @" FB_PSNAP "0\n",
-	    p->fp_src);
-	fb_retouch(b, b->fb_psnaps);
-	b->fb_psnaps = 0;
+	if (fb_reset(b) != 0)
+		return (-1);
+	(void) fprintf(b->fb_out, "reset %s's checkout to its commit\n",
+	    b->fb_p->fp_src);
+	return (0);
 }
 
 /*

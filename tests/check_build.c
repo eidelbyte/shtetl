@@ -1002,11 +1002,12 @@ said(const char *cmd)
 	return (line);
 }
 
-static char tree[1200], snaps[1200], pgit[1200];
+static char tree[1200], pgit[1200];
 
 /*
- * The fake's snapshots, rollbacks and destroys of the build root's
- * snapshots carried out on the tree: copies of it in snaps.
+ * The fake's snapshots of the config root carried out on its tree:
+ * the files where a resumed build reads them. The build root is not
+ * snapshotted: git puts its checkout back.
  */
 static void
 treehook(const char *op, const char *name, void *arg)
@@ -1022,17 +1023,7 @@ treehook(const char *op, const char *name, void *arg)
 		    "rm -rf %s/.zfs/snapshot/%s && "
 		    "mv %s.snap %s/.zfs/snapshot/%s", root, root, root, root,
 		    root, root, at + 1, root, root, at + 1);
-		return;
 	}
-	if (strncmp(name, "tank/zbuild@", 12) != 0 || at == NULL)
-		return;
-	if (strcmp(op, "snapshot") == 0)
-		sh("rm -rf %s/%s && mkdir -p %s && cp -Rp %s %s/%s", snaps,
-		    at + 1, snaps, tree, snaps, at + 1);
-	else if (strcmp(op, "rollback") == 0)
-		sh("rm -rf %s && cp -Rp %s/%s %s", tree, snaps, at + 1, tree);
-	else
-		sh("rm -rf %s/%s", snaps, at + 1);
 }
 
 #define	GIT	"git -c user.name=t -c user.email=t@t " \
@@ -1068,9 +1059,8 @@ patchworld(void)
 	runworld();
 	fakes("15.1");
 	(void) snprintf(tree, sizeof (tree), "%s", scratch_path("ptree"));
-	(void) snprintf(snaps, sizeof (snaps), "%s", scratch_path("psnaps"));
 	(void) snprintf(pgit, sizeof (pgit), "%s", scratch_path("pgit"));
-	sh("rm -rf %s %s %s", tree, snaps, pgit);
+	sh("rm -rf %s %s", tree, pgit);
 	(void) snprintf(body, sizeof (body), "%s/sys/conf/newvers.sh", tree);
 	sh("mkdir -p %s/sys/conf && cp %s %s", tree,
 	    scratch_path("src/sys/conf/newvers.sh"), body);
@@ -1160,11 +1150,10 @@ test_patches(void)
 	{
 		char l1[1400], l2[1400], l3[1400], l4[1400];
 		const char *const steps[] = { l1, "copied patches/local\n",
-		    "4 patches from 2 sources\n",
-		    "snapshot tank/zbuild@shtetl-patch-0\n", l2, l3, l4,
+		    "4 patches from 2 sources\n", l2, l3, l4,
 		    "patch 1-d.patch from patches/local: applied\n",
 		    "make buildworld", "snapshot -r " F "@" VERSION "\n",
-		    "rolled back tank/zbuild to @shtetl-patch-0\n",
+		    "reset tank/zbuild's checkout to its commit\n",
 		    "built " F "@" VERSION "\n", NULL };
 
 		(void) snprintf(l1, sizeof (l1), "fetched %s at %.12s\n", url,
@@ -1185,23 +1174,19 @@ test_patches(void)
 	(void) snprintf(text, sizeof (text), "%s/c.c", tree);
 	CHECK(access(text, F_OK) != 0);
 	/*
-	 * P15: the patched files given the time of now, not the old ones
-	 * the rollback gave back; c.c, made by a patch, gone with it
+	 * P15: a.c, which a patch changed, written anew by the reset, its
+	 * time now's and not the year 2000's it had, so the next build's
+	 * make builds it again; c.c, made by a patch, gone with it
 	 */
-	CHECK(strstr(ran, "rolled back tank/zbuild to @shtetl-patch-0\n"
-	    "the time of now on 2 patched files, for the next build's "
-	    "make\n") != NULL);
 	(void) snprintf(text, sizeof (text), "%s/a.c", tree);
 	CHECK(stat(text, &st) == 0 && st.st_mtime > time(NULL) - 3600);
-	(void) snprintf(text, sizeof (text), "%s/b.c", tree);
-	CHECK(stat(text, &st) == 0 && st.st_mtime > time(NULL) - 3600);
-	/* P5, P15: every patch snapshot gone, the rollback to the first */
-	CHECK(is(zfake_last_rollback(), "tank/zbuild@shtetl-patch-0"));
+	/* P5: no snapshot of the build root, none rolled back to */
 	for (len = 0; len <= 4; len++) {
 		(void) snprintf(snap, sizeof (snap),
 		    "tank/zbuild@shtetl-patch-%zu", len);
 		CHECK(!zfake_snapshot(snap));
 	}
+	CHECK(zfake_last_rollback() == NULL);
 	/* P3: the list fixed in the run directory */
 	(void) snprintf(text, sizeof (text), "%s/generic/patches/1/15.1/"
 	    "10-b.patch", runbase);
@@ -1259,8 +1244,8 @@ test_patches(void)
 	(void) scratch_write("fail/make-buildworld", "");
 	CHECK(build(NULL) == -1);
 	(void) unlink(scratch_path("fail/make-buildworld"));
-	CHECK(is(zfake_last_rollback(), "tank/zbuild@shtetl-patch-0"));
-	CHECK(!zfake_snapshot("tank/zbuild@shtetl-patch-1"));
+	CHECK(strstr(ran, "reset tank/zbuild's checkout to its commit\n") !=
+	    NULL);
 	(void) snprintf(text, sizeof (text), "%s/a.c", tree);
 	CHECK(is(slurp(text), base_a));
 	CHECK(!zfake_exists(F));
@@ -1269,7 +1254,7 @@ test_patches(void)
 	patchworld();
 	config("pi", generic);
 	CHECK(build(NULL) == 0);
-	CHECK(strstr(ran, "shtetl-patch") == NULL);
+	CHECK(strstr(ran, "checkout to its commit") == NULL);
 	CHECK(is(prop(F "@" VERSION, "shtetl:patches", NULL), "-"));
 	zfake_hook(NULL, NULL);
 }
@@ -1366,7 +1351,6 @@ test_pause(void)
 	CHECK(inrun(SH_BUILD_PAUSED));
 	CHECK(is(prop("tank/zbuild", "shtetl:build", NULL), "generic"));
 	CHECK(zfake_exists(F));
-	CHECK(zfake_snapshot("tank/zbuild@shtetl-patch-2"));
 	(void) snprintf(path, sizeof (path), "%s/m.c", tree);
 	CHECK(strstr(slurp(path), "<<<<<<<") != NULL);
 	/* P12: a build while one is paused */
@@ -1443,7 +1427,6 @@ test_pause(void)
 	CHECK(resume(SH_BV_CONTINUE, NULL) == -1);
 	CHECK(cap_has(&c, "build of generic still paused"));
 	CHECK(inrun(SH_BUILD_PAUSED) && zfake_exists(F));
-	CHECK(zfake_snapshot("tank/zbuild@shtetl-patch-2"));
 	CHECK(resume(SH_BV_ABORT, NULL) == 0);
 	CHECK(strstr(ran, "build of generic given up, nothing built\n") !=
 	    NULL);

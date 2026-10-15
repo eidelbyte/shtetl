@@ -837,18 +837,18 @@ its place (5.4).
    build's run directory (`/var/db/shtetl/build/F`), and its commit
    noted. The list of patches is fixed there, so a resumed build
    applies exactly what it started with.
-2. Snapshot the src root after the checkout (`@shtetl-patch-0`). Each
-   patch N is applied with `git apply`, after a snapshot of its own
-   (`@shtetl-patch-N`).
+2. Each patch is applied with `git apply`. The src root is not
+   snapshotted (ruled 2026-10-15): it is a git checkout, and git puts
+   it back.
 3. A patch that applies cleanly: on to the next. A patch whose reverse
    applies cleanly (`git apply -R --check`) is already in the tree,
    typically merged upstream since it was written: skipped, and the
    build says so.
 4. Anything else pauses the build (below).
-5. When the build is done (step 8) or abandoned, the src root is
-   rolled back to `@shtetl-patch-0` and the patch snapshots destroyed,
-   so the checkout is clean for the next build. The fetched sources
-   were brought in before the snapshot, so nothing is fetched twice.
+5. When the build is done (step 8), fails or is abandoned, the
+   checkout is put back at its commit (`git reset --hard`, `git clean
+   -fd`), clean for the next build. The fetched sources live in the
+   run directory, so nothing is fetched twice.
 
 **The pause.** shtetl applies the failing patch as far as it can:
 `git apply --3way`, which merges against the patch's base blobs and
@@ -867,15 +867,16 @@ The person fixes the tree, then:
   in the files the patch touches and no `.rej` file in the tree. The
   patch counts as applied by hand, and the build goes on with the next
   patch, then builds. The person's fix is written out as a replacement
-  patch (`<run dir>/<name>.fixed`: the tree's difference from
-  `@shtetl-patch-N` to the fixed tree), ready to commit to the patch
+  patch (`<run dir>/<name>.fixed`: the tree's difference from the
+  tree before the patch to the fixed tree), ready to commit to the patch
   source. A fix made only in the tree lasts only for this build; the
   next update applies the source's patch again and pauses again.
-- `shtetl build F --skip`: the tree goes back to `@shtetl-patch-N`,
-  the patch is left out, and the build goes on.
-- `shtetl build F --abort`: the src root goes back to
-  `@shtetl-patch-0` and the run directory is removed; nothing was
-  built.
+- `shtetl build F --skip`: the checkout is put back and the patches
+  before this one applied again as the build left them (as they are,
+  merged, or by their fix), the patch is left out, and the build goes
+  on.
+- `shtetl build F --abort`: the checkout is put back and the run
+  directory is removed; nothing was built.
 
 A fix made in the patch source itself: `--abort`, then build again, and
 the fetch takes the new patch.
@@ -924,12 +925,12 @@ As built (M3, `src/core/patch.c`, `src/core/build.c`):
   tree, everything added (a stray file goes in with it), written to
   `<run dir>/fixed/<n>/<name>` and kept in the obj cache as
   `patches/<version>/<n>/<name>`.
-- After the rollback to `@shtetl-patch-0`, every file the build's
-  patches touched, and a fix by hand did, is given the time of now:
-  the rollback gives back their times from before the patches, older
-  than the objects the obj cache built from them, and the next build's
-  make, going by times, would take those as up to date, a patch since
-  dropped still in them (box build 6).
+- The checkout put back, every file a patch changed is written anew
+  by git, its time now's: newer than the objects the obj cache built
+  from it patched, so the next build's make, going by times, builds
+  it again. (A ZFS rollback, as built first, gave back the times from
+  before the patches, and make took the patched objects as up to
+  date: box build 6.)
 - `--abort` needs no recipe: F's datasets are walked and destroyed.
   The log stays, as it does after any build (7.1 as built), where the
   plan above said the run directory goes.
