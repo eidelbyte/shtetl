@@ -969,6 +969,29 @@ sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
 	return (-1);
 }
 
+/* lzc_sync, force off: zpool sync without -f, as libzfs's does it. */
+int
+sh_zfs_sync(struct sh_zfs *z, const char *pool, struct sh_err *e)
+{
+	nvlist_t *nv = NULL;
+	int r;
+
+	(void) z;
+	if (nvlist_alloc(&nv, NV_UNIQUE_NAME, 0) != 0 ||
+	    nvlist_add_boolean_value(nv, "force", B_FALSE) != 0) {
+		nvlist_free(nv);
+		sh_err_nomem(e);
+		return (-1);
+	}
+	r = lzc_sync(pool, nv, NULL);
+	nvlist_free(nv);
+	if (r == ENOENT)
+		sh_errf(e, "%s: no such pool", pool);
+	else if (r != 0)
+		sh_errf(e, "%s: %s", pool, strerror(r));
+	return (r != 0 ? -1 : 0);
+}
+
 /* A user property set on the dataset itself: its source its name. */
 int
 sh_zfs_userprops(struct sh_zfs *z, const char *name,

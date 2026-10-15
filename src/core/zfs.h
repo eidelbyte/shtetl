@@ -57,7 +57,8 @@ int sh_zfs_local(struct sh_zfs *z, const char *prop,
  * A property DS has no value of, a user property unset or a native
  * one that is not DS's (the origin of a filesystem that is no clone),
  * is "-", from nowhere, as zfs get shows it. "written@SNAP" is the
- * bytes DS has written since its snapshot SNAP, a number, from nowhere;
+ * bytes DS has written since its snapshot SNAP, a number, from nowhere,
+ * as far as a transaction group has committed them (sh_zfs_sync);
  * refused when DS has no such snapshot. 1, and nothing reported, when
  * there is no DS.
  */
@@ -175,6 +176,15 @@ int sh_zfs_promote(struct sh_zfs *z, const char *ds, struct sh_err *e);
  */
 int sh_zfs_rename(struct sh_zfs *z, const char *from, const char *to,
     struct sh_err *e);
+
+/*
+ * Every write to POOL so far committed, as zpool sync does (lzc_sync,
+ * a transaction group synced). written@ counts a write only once one
+ * has: within seconds on its own, at once when a change to the pool
+ * (a snapshot, a property set, a rename) comes after it, and here.
+ * Refused: no such pool.
+ */
+int sh_zfs_sync(struct sh_zfs *z, const char *pool, struct sh_err *e);
 
 /*
  * The user properties set on NAME itself, a snapshot or a filesystem,

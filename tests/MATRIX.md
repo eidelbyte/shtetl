@@ -388,7 +388,8 @@ snapshots}; ZFS refusing.
 | Z20 | a mounted filesystem not destroyed: refused for its mount, before its snapshots, as its mount holds it (dsl_destroy_head_check_impl's long holds); unmounted, destroyed. An undo that skips an unmount fails here over the fake, not first on the box | covered: check_zfs.c; box: zcheck.c |
 | Z21 | promote (M5): a clone promoted takes its origin's snapshots up to the origin, the old dataset a clone of it after; refused: no such filesystem, not a clone | covered: check_zfs.c; box: zcheck.c |
 | Z22 | rename (M5): a filesystem and everything below it to a new name in the same pool, its mounts following its inherited mountpoint; refused: no such filesystem, the new name taken, its parent missing | covered: check_zfs.c; box: zcheck.c |
-| Z23 | written@SNAP (M5): what a filesystem wrote since its snapshot SNAP, a number, 0 when nothing was | covered: check_zfs.c; box: zcheck.c |
+| Z23 | written@SNAP (M5): what a filesystem wrote since its snapshot SNAP, a number, 0 when nothing was; a write counted once a transaction group commits it (the box waits for one) | covered: check_zfs.c; box: zcheck.c |
+| Z24 | sync (M5): the pool's writes committed (lzc_sync), so written@ counts a write made a moment before at once; a change to the pool (a property set) commits them too, as one committing on its own does; refused: no such pool, a dataset's name | covered: check_zfs.c; box: zcheck.c |
 
 # Family F: building a foundation (M3; planning.md 7.1; src/core/build.c)
 
@@ -679,10 +680,10 @@ the first drawn name is taken; ZFS refusing a step.
 |------|----------|-------------|
 | N1 | no config snapshot yet: one taken, named by draw 0 of the time, shtetl:kind config, shtetl:commit what took it, said | covered: check_cfgsnap.c |
 | N2 | one there, nothing written since: it is recorded, nothing taken, nothing said | covered: check_cfgsnap.c |
-| N3 | written since: a new one taken; with several, only the newest counts (written since an older one, not the newest: the newest recorded) | covered: check_cfgsnap.c |
+| N3 | written since: a new one taken; with several, only the newest counts (written since an older one, not the newest: the newest recorded); written@ read after a sync of the pool, so a write no transaction group has committed yet counts | covered: check_cfgsnap.c, check_create.c |
 | N4 | a snapshot of another kind on the root newer than the newest config snapshot (a person's, bootstrap's): passed over, written@ measured from the config one | covered: check_cfgsnap.c |
 | N5 | draw 0's name taken (the same second): draw 1; every draw taken: refused, nothing taken | covered: check_cfgsnap.c |
 | N6 | the names: three different words of the list, lowercase letters joined by dashes; the same time and draw the same name; different draws different names | covered: check_cfgsnap.c |
 | N7 | ZFS refusing the listing, the written@ read, the snapshot: refused, nothing recorded | covered: check_cfgsnap.c |
-| N8 | the commands: a build records one (a second build with nothing changed records the same, after a change a new one); a create right after the build records the build's; an update with nothing changed records the one there, after a change a new one | covered: check_build.c, check_create.c, check_update.c |
+| N8 | the commands: a build records one (a second build with nothing changed records the same, after a change a new one); a create right after the build records the build's; an update with nothing changed records the one there, after a change a new one; a recipe written just before a create, nothing committed since (the box's X9 of 2026-10-15), its own | covered: check_build.c, check_create.c, check_update.c |
 | N9 | for real: bootstrap leaves the config root atime=off, so shtetl reading the recipes writes nothing and a second build with no change records the first one's; a recipe written in between, a new one | box: tests/box/build.sh |

@@ -10,11 +10,12 @@
 #include "zfake.h"
 
 int zcheck_main(int argc, char **argv);
-extern int (*zcheck_write)(const char *ds);
+extern int (*zcheck_put)(const char *ds);
+extern void (*zcheck_tick)(void);
 
-/* Z23's write, the fake's: 64 KiB written@ counts. */
+/* Z23's and Z24's write, the fake's: 64 KiB, not yet committed. */
 static int
-fake_write(const char *ds)
+fake_put(const char *ds)
 {
 	zfake_write(ds, 65536);
 	return (0);
@@ -32,6 +33,7 @@ main(void)
 	zfake_fs("tank/zc");
 	zfake_pool("fast");
 	zfake_fs("fast/zc2");
-	zcheck_write = fake_write;
+	zcheck_put = fake_put;
+	zcheck_tick = zfake_txg_sync;
 	return (zcheck_main(3, argv));
 }

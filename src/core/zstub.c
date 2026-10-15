@@ -184,6 +184,15 @@ sh_zfs_rename(struct sh_zfs *z, const char *from, const char *to,
 }
 
 int
+sh_zfs_sync(struct sh_zfs *z, const char *pool, struct sh_err *e)
+{
+	(void) z;
+	(void) pool;
+	sh_errf(e, "%s", ZS_NONE);
+	return (-1);
+}
+
+int
 sh_zfs_clone(struct sh_zfs *z, const char *origin, const char *ds,
     const struct sh_zprop *props, size_t nprops, struct sh_err *e)
 {

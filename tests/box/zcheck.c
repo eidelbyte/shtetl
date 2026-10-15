@@ -146,35 +146,57 @@ refused(const char *id, const char *what, int rc, const char *rel,
 }
 
 /*
- * Z23's write: 64 KiB into a file at DS's mountpoint, waited for until
- * written@SNAP counts it (a transaction group commits it), up to 30 s;
- * zcheck-fake.c sets ZCHECK_WRITE to the fake's own.
+ * 64 KiB into the file NAME at DS's mountpoint, not waited for;
+ * zcheck-fake.c sets zcheck_put to the fake's own write.
  */
-int (*zcheck_write)(const char *ds);
+int (*zcheck_put)(const char *ds);
 
 static int
-zc_write(const char *ds, const char *snap)
+zc_put(const char *ds, const char *name)
 {
-	char path[1024], prop[300], buf[4096];
+	char path[1024], buf[4096];
 	FILE *f;
 	int i;
 
-	if (zcheck_write != NULL)
-		return (zcheck_write(ds));
-	(void) snprintf(path, sizeof (path), "%s/zcheck-written",
-	    get(ds, "mountpoint", NULL));
+	if (zcheck_put != NULL)
+		return (zcheck_put(ds));
+	(void) snprintf(path, sizeof (path), "%s/%s",
+	    get(ds, "mountpoint", NULL), name);
 	(void) memset(buf, 'z', sizeof (buf));
 	if ((f = fopen(path, "w")) == NULL)
 		return (-1);
 	for (i = 0; i < 16; i++)
 		(void) fwrite(buf, 1, sizeof (buf), f);
-	if (fclose(f) != 0)
+	return (fclose(f) != 0 ? -1 : 0);
+}
+
+/*
+ * A second passing, in which ZFS commits a transaction group of its
+ * own accord (zfs_txg_timeout); zcheck-fake.c sets zcheck_tick to the
+ * fake's.
+ */
+void (*zcheck_tick)(void);
+
+/*
+ * Z23's write: zc_put, waited for until written@SNAP counts it (a
+ * transaction group commits it), up to 30 s.
+ */
+static int
+zc_write(const char *ds, const char *snap)
+{
+	char prop[300];
+	int i;
+
+	if (zc_put(ds, "zcheck-written") != 0)
 		return (-1);
 	(void) snprintf(prop, sizeof (prop), "written@%s", snap);
 	for (i = 0; i < 30; i++) {
 		if (strcmp(get(ds, prop, NULL), "0") != 0)
 			return (0);
-		(void) sleep(1);
+		if (zcheck_tick != NULL)
+			zcheck_tick();
+		else
+			(void) sleep(1);
 	}
 	return (-1);
 }
@@ -207,7 +229,8 @@ main(int argc, char **argv)
 	static const struct sh_zprop zstd = { "compression", "zstd" };
 	const char *v1[3], *v2[3], *bad[2];
 	char t1[64], name[512], g3[512], tn[512], want[640];
-	const char *sv1, *sv2, *sv3, *xs1, *ms, *pa;
+	const char *sv1, *sv2, *sv3, *xs1, *ms, *pa, *pb;
+	char pool[256];
 	enum sh_zsrc src;
 	int rc;
 
@@ -507,7 +530,7 @@ main(int argc, char **argv)
 	    strcmp(get(name, "shtetl:kind", &src), "version") == 0 &&
 	    src == SH_ZSRC_LOCAL);
 
-	/* Z21 - Z23: promote, rename, written@; p, its clone q */
+	/* Z21 - Z24: promote, rename, written@, sync; p, its clone q */
 	(void) snprintf(name, sizeof (name), "%s@a", at("p"));
 	pa = strdup(name);
 	cell("Z21", "a clone of p@a",
@@ -543,6 +566,18 @@ main(int argc, char **argv)
 	refused("Z23", "no such snapshot", sh_zfs_get(z, at("r"),
 	    "written@nope", t1, sizeof (t1), NULL, ask()), "r@nope",
 	    "no such snapshot");
+	/* Z24: a sync of the pool, and a write is counted at once */
+	(void) snprintf(name, sizeof (name), "%s@b", at("r"));
+	pb = strdup(name);
+	(void) snprintf(pool, sizeof (pool), "%.*s",
+	    (int)strcspn(at("r"), "/"), at("r"));
+	cell("Z24", "a write counted at once after the pool's sync",
+	    sh_zfs_snapshot(z, &pb, 1, NULL, 0, &e) == 0 &&
+	    zc_put(at("r"), "zcheck-synced") == 0 &&
+	    sh_zfs_sync(z, pool, &e) == 0 &&
+	    strtoul(get(at("r"), "written@b", NULL), NULL, 10) > 0);
+	refusedn("Z24", "no such pool", sh_zfs_sync(z, "shtetl-zcheck-nope",
+	    ask()), "shtetl-zcheck-nope", "no such pool");
 
 	/* Z10, Z19: each refusal above in the fake's words */
 	cell("Z10", "every refusal above said why, as the fake does",

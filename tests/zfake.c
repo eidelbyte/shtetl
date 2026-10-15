@@ -58,6 +58,8 @@ static int zf_n;
 static struct zf_snap zf_snaps[ZF_SNAPS];	/* oldest first */
 static int zf_nsnaps;
 static unsigned long zf_txg;
+/* the last transaction committed: written@ counts writes up to it */
+static unsigned long zf_synced;
 static char zf_rolled[ZF_NAME];		/* the last rollback, ds@snap */
 static void (*zf_hook)(const char *, const char *, void *);
 static void *zf_hookarg;
@@ -132,6 +134,16 @@ zf_put(struct zf_prop *p, int *n, const char *name, const char *val)
 		(*n)++;
 }
 
+/*
+ * A transaction group synced: the writes so far committed. ZFS runs
+ * each change to a pool as a sync task, which commits them on its way.
+ */
+static void
+zf_commit(void)
+{
+	zf_synced = zf_txg;
+}
+
 /* Whether a call of WHAT is the one set to fail; it fails once. */
 static int
 zf_fails(const char *what, struct sh_err *e)
@@ -155,6 +167,7 @@ zfake_reset(void)
 	(void) memset(zf_snaps, 0, sizeof (zf_snaps));
 	zf_nsnaps = 0;
 	zf_txg = 1;
+	zf_synced = 1;
 	zf_rolled[0] = '\0';
 	zf_failing[0] = '\0';
 	zf_hook = NULL;
@@ -408,6 +421,7 @@ sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
 	(void) z;
 	if (zf_fails("snapshot", e))
 		return (-1);
+	zf_commit();
 	if (n == 0 || zf_nsnaps + (int)n > ZF_SNAPS) {
 		sh_errf(e, "zfake: no snapshot, or too many");
 		return (-1);
@@ -473,6 +487,7 @@ sh_zfs_rollback(struct sh_zfs *z, const char *ds, const char *snap,
 	(void) z;
 	if (zf_fails("rollback", e))
 		return (-1);
+	zf_commit();
 	if (zf_find(ds) == NULL) {
 		sh_errf(e, "zfake: %s: no such filesystem", ds);
 		return (-1);
@@ -504,6 +519,7 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 	(void) z;
 	if (zf_fails("destroy", e))
 		return (-1);
+	zf_commit();
 	if ((s = zf_snap(name)) != NULL) {
 		/* dsl_destroy_snapshot_check_impl: EEXIST cloned, EBUSY held */
 		if (s->zs_holds > 0) {
@@ -565,6 +581,7 @@ sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
 	(void) z;
 	if (zf_fails("inherit", e))
 		return (-1);
+	zf_commit();
 	/* a snapshot's user property, its own no longer */
 	if (strchr(ds, '@') != NULL) {
 		if ((sp = zf_snap(ds)) == NULL) {
@@ -599,6 +616,7 @@ sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 	(void) z;
 	if (zf_fails("unmount", e))
 		return (-1);
+	zf_commit();
 	if (zf_find(ds) == NULL) {
 		sh_errf(e, "zfake: %s: no such filesystem", ds);
 		return (-1);
@@ -647,6 +665,7 @@ sh_zfs_clone(struct sh_zfs *z, const char *origin, const char *ds,
 	(void) z;
 	if (zf_fails("clone", e))
 		return (-1);
+	zf_commit();
 	if (zf_snap(origin) == NULL) {
 		sh_errf(e, "zfake: %s: no such snapshot", origin);
 		return (-1);
@@ -783,6 +802,26 @@ zfake_hold(const char *snap)
 }
 
 void
+zfake_txg_sync(void)
+{
+	zf_commit();
+}
+
+int
+sh_zfs_sync(struct sh_zfs *z, const char *pool, struct sh_err *e)
+{
+	(void) z;
+	if (zf_fails("sync", e))
+		return (-1);
+	if (strchr(pool, '/') != NULL || zf_find(pool) == NULL) {
+		sh_errf(e, "zfake: %s: no such pool", pool);
+		return (-1);
+	}
+	zf_commit();
+	return (0);
+}
+
+void
 zfake_write(const char *ds, unsigned long bytes)
 {
 	struct zf_ds *d;
@@ -823,6 +862,7 @@ sh_zfs_promote(struct sh_zfs *z, const char *ds, struct sh_err *e)
 	(void) z;
 	if (zf_fails("promote", e))
 		return (-1);
+	zf_commit();
 	if ((d = zf_find(ds)) == NULL) {
 		sh_errf(e, "zfake: %s: no such filesystem", ds);
 		return (-1);
@@ -889,6 +929,7 @@ sh_zfs_rename(struct sh_zfs *z, const char *from, const char *to,
 	(void) z;
 	if (zf_fails("rename", e))
 		return (-1);
+	zf_commit();
 	if (zf_find(from) == NULL) {
 		sh_errf(e, "zfake: %s: no such filesystem", from);
 		return (-1);
@@ -1061,7 +1102,8 @@ zf_get(const char *ds, const char *prop, char *val, size_t len,
 			return (-1);
 		}
 		for (i = 0, w = 0; i < d->zd_nw; i++) {
-			if (d->zd_wtxg[i] > sn->zs_txg)
+			if (d->zd_wtxg[i] > sn->zs_txg &&
+			    d->zd_wtxg[i] <= zf_synced)
 				w += d->zd_wbytes[i];
 		}
 		(void) snprintf(val, len, "%lu", w);
@@ -1214,6 +1256,7 @@ sh_zfs_create(struct sh_zfs *z, const char *ds,
 	(void) z;
 	if (zf_fails("create", e))
 		return (-1);
+	zf_commit();
 	if (zf_find(ds) != NULL) {
 		sh_errf(e, "zfake: %s: already there", ds);
 		return (-1);
@@ -1237,6 +1280,7 @@ sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
 	(void) z;
 	if (zf_fails("set", e))
 		return (-1);
+	zf_commit();
 	if (strchr(ds, '@') != NULL) {
 		if ((s = zf_snap(ds)) == NULL) {
 			sh_errf(e, "zfake: %s: no such snapshot", ds);
@@ -1289,6 +1333,7 @@ sh_zpool_set(struct sh_zfs *z, const char *pool, const char *prop,
 	(void) z;
 	if (zf_fails("pool_set", e))
 		return (-1);
+	zf_commit();
 	if ((d = zf_find(pool)) == NULL || strchr(pool, '/') != NULL) {
 		sh_errf(e, "zfake: no pool %s", pool);
 		return (-1);

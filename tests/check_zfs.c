@@ -520,10 +520,27 @@ test_m5(void)
 	/* Z23: what was written since a snapshot, a number */
 	CHECK(is(get("tank/w", "written@s1", NULL), "0"));
 	zfake_write("tank/w", 2048);
+	/* Z24: counted once a transaction group commits it */
+	CHECK(is(get("tank/w", "written@s1", NULL), "0"));
+	cap_reset(&c);
+	CHECK(sh_zfs_sync(z, "tank", &c.c_err) == 0);
 	CHECK(is(get("tank/w", "written@s1", NULL), "2048"));
 	CHECK(is(get("tank/w", "written@v1", NULL), "2048"));
 	CHECK(is(get("tank/w", "written@nope", NULL), "(refused)"));
 	CHECK(cap_has(&c, "tank/w@nope: no such snapshot"));
+	/* a change to the pool commits what came before it; so does time */
+	zfake_write("tank/w", 1024);
+	CHECK(sh_zfs_set(z, "tank/f", "user:x", "y", &c.c_err) == 0);
+	CHECK(is(get("tank/w", "written@s1", NULL), "3072"));
+	zfake_write("tank/w", 1024);
+	zfake_txg_sync();
+	CHECK(is(get("tank/w", "written@s1", NULL), "4096"));
+	cap_reset(&c);
+	CHECK(sh_zfs_sync(z, "nope", &c.c_err) == -1);
+	CHECK(cap_has(&c, "nope: no such pool"));
+	cap_reset(&c);
+	CHECK(sh_zfs_sync(z, "tank/w", &c.c_err) == -1);
+	CHECK(cap_has(&c, "tank/w: no such pool"));
 }
 
 int

@@ -151,6 +151,18 @@ readings:
 - Z21 - Z23: the libzfs layer for promote, rename or written@; the
   got and wanted say which way it went.
 
+## The second run (after 2026-10-15's)
+
+The first run: run.sh at 83c8e39, 126 ok, 0 failed; build.sh, 125 ok,
+1 failed, X9: the create recorded the last build's config snapshot,
+written@ having been read before a transaction group committed the
+container's recipe. Fixed by a sync of the pool before every written@
+read. Again, from step 2 (zfs_rebase stays installed):
+
+    cd ~/shtetl && git pull && make freebsd
+    sudo sh tests/box/run.sh        # Z24 new, two more cells
+    sudo sh tests/box/build.sh      # X9 again
+
 ## What the box does not cover
 
 - A cutover or abandon stopped part way and run again (K5, K8, K9):

@@ -4,8 +4,10 @@
  *
  * Decided here, beyond the plan (ruled 2026-10-14): a build, create or
  * update records the config root's newest shtetl:kind config snapshot
- * when ZFS says nothing was written to the root since it (written@),
- * and takes one otherwise. Its name is three words drawn from a hash
+ * when ZFS says nothing was written to the root since it (written@,
+ * read after a sync of the pool: a recipe written a moment before is
+ * not counted until a transaction group commits it), and takes one
+ * otherwise. Its name is three words drawn from a hash
  * of the time and a try count, so a run is repeatable and a name taken
  * is passed over; its shtetl:commit says what took it.
  */
@@ -118,6 +120,7 @@ sh_cfgsnap(struct sh_zfs *z, const char *root, const char *msg,
     time_t now, char *snap, size_t len, FILE *out, struct sh_err *e)
 {
 	char last[SH_CFGSNAP_NAME], words[SH_CFGSNAP_NAME];
+	char pool[SH_CFGSNAP_NAME];
 	char val[SH_ZFS_VALMAX], prop[SH_CFGSNAP_NAME + 16];
 	struct sh_zprop zp[2];
 	const char *one;
@@ -127,8 +130,12 @@ sh_cfgsnap(struct sh_zfs *z, const char *root, const char *msg,
 	if (cs_last(z, root, last, sizeof (last), e) != 0)
 		return (-1);
 	if (last[0] != '\0') {
+		/* a recipe written a moment ago, committed so it counts */
+		(void) snprintf(pool, sizeof (pool), "%.*s",
+		    (int)strcspn(root, "/"), root);
 		(void) snprintf(prop, sizeof (prop), "written@%s", last);
-		if (sh_zfs_get(z, root, prop, val, sizeof (val), NULL, e) != 0)
+		if (sh_zfs_sync(z, pool, e) != 0 ||
+		    sh_zfs_get(z, root, prop, val, sizeof (val), NULL, e) != 0)
 			return (-1);
 		if (strcmp(val, "0") == 0) {
 			(void) snprintf(snap, len, "%s@%s", root, last);

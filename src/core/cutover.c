@@ -344,7 +344,8 @@ kp_lake(struct sh_zfs *z, const struct sh_spaces *s, struct sh_kplan *p,
 static int
 kp_written(struct sh_zfs *z, struct sh_kplan *p, struct sh_err *e)
 {
-	char val[SH_ZFS_VALMAX], prop[SH_CUT_NAME + 16], **all;
+	char val[SH_ZFS_VALMAX], prop[SH_CUT_NAME + 16], pool[SH_CUT_NAME];
+	char **all;
 	size_t i, n;
 	int r;
 
@@ -353,7 +354,11 @@ kp_written(struct sh_zfs *z, struct sh_kplan *p, struct sh_err *e)
 		return (-1);
 	if (p->kp_last[0] == '\0')
 		return (0);
-	if (kp_tree(z, p->kp_run, &all, e) != 0)
+	/* what X wrote a moment ago committed, so that written@ counts it */
+	(void) snprintf(pool, sizeof (pool), "%.*s",
+	    (int)strcspn(p->kp_run, "/"), p->kp_run);
+	if (sh_zfs_sync(z, pool, e) != 0 || kp_tree(z, p->kp_run, &all,
+	    e) != 0)
 		return (-1);
 	n = strlen(p->kp_run);
 	(void) snprintf(prop, sizeof (prop), "written@%s", p->kp_last);

@@ -41,8 +41,14 @@ int zfake_snapshot(const char *name);
 /* A hold on the snapshot SNAP: userrefs counts it, destroy refuses. */
 void zfake_hold(const char *snap);
 
-/* BYTES written to DS now, which written@ counts after its snapshots. */
+/*
+ * BYTES written to DS now, which written@ counts after its snapshots
+ * once a transaction group commits them: sh_zfs_sync, any change to a
+ * pool (each a sync task), or zfake_txg_sync, one committing on its own
+ * as ZFS's do within seconds.
+ */
 void zfake_write(const char *ds, unsigned long bytes);
+void zfake_txg_sync(void);
 const char *zfake_last_snapshot(void);
 const char *zfake_last_rollback(void);
 

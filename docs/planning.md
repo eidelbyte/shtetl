@@ -221,9 +221,10 @@ file. The history of the site's files is zconfig's snapshots:
 
 - shtetl snapshots the config root before any change it makes there
   and before any git operation; a build, create or update takes one
-  only when the root was written to since the newest (`written@`),
-  named three words, `shtetl:commit` saying what took it (ruled
-  2026-10-14, 14; src/core/cfgsnap.c);
+  only when the root was written to since the newest (`written@`,
+  after a sync of the pool, `lzc_sync`), named three words,
+  `shtetl:commit` saying what took it (ruled 2026-10-14, 14;
+  src/core/cfgsnap.c);
 - every snapshot shtetl takes anywhere (a foundation version, a save,
   an update's result) records the config snapshot it was made with in
   `shtetl:config`, by name, so any build or save leads back to the
@@ -1484,12 +1485,13 @@ As built (M5, `src/core/cutover.c`):
   short): `shtetl update --continue` or `--abort` settles it first
   (ruled 2026-10-14). A cutover is refused while X-staging has no
   mirror in zlake; a save of it makes one.
-- Cutover: X's `written@<its newest save>` read for every dataset and
-  shown; above zero, a final save of X before anything else, which its
-  archive keeps. X-staging's jail stopped; its clones of X's datasets
-  promoted; X's jail stopped if it runs; X unmounted and destroyed;
-  X-staging renamed X, its block removed and X's written again with
-  the new path. In zlake the staging mirror's clones of X's promoted,
+- Cutover: X's `written@<its newest save>` read for every dataset,
+  after a sync of the run pool, and shown; above zero, a final save of
+  X before anything else, which its archive keeps. X-staging's jail
+  stopped; its clones of X's datasets promoted; X's jail stopped if it
+  runs; X unmounted and destroyed; X-staging renamed X, its block
+  removed and X's written again with the new path. In zlake the
+  staging mirror's clones of X's promoted,
   X moved to `archive/containers/X-<X's version before the update>`
   (ruled 2026-10-14; a cutover is refused while that name is taken),
   the staging mirror renamed X. X started and saved, the save mirrored

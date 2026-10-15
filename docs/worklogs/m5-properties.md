@@ -80,3 +80,37 @@ off on the config root; P17's build records F13's failed build's
 snapshot, nothing having been written; F27's after the patch edit a
 new one, "update box") and X9 checks the create's snapshot by its
 message; owed with the next run.
+
+## written@ read after a sync (box X9, 2026-10-15)
+
+The box's M5 trip (build.sh at cb1afc0, 125 ok, 1 failed) failed X9:
+the container's first save recorded F27's config snapshot ("update
+box") where a new one was wanted. build.sh writes the container's
+recipe and runs shtetl create at once; written@ counts a write only
+when a transaction group commits it (zcheck's Z23 already waited up
+to 30 s for that), and create asks before anything has. A build passed
+N9 only because it sets shtetl:build on the build root first, a sync
+task, which commits the writes before it.
+
+- sh_zfs_sync (zfs.h): lzc_sync with force off, as zpool sync does
+  (zfs_ioc_pool_sync, txg_wait_synced). The stub refuses; the fake
+  commits.
+- The fake now keeps zfake_write's bytes out of written@ until a
+  commit: sh_zfs_sync, any change to a pool (snapshot, set, inherit,
+  create, clone, destroy, rename, promote, rollback, unmount,
+  pool_set, each a sync task in ZFS), or zfake_txg_sync, one
+  committing on its own. A missing sync is now a failing test, not a
+  box surprise.
+- sh_cfgsnap and the cutover plan's written@ (kp_written) sync the
+  pool first. The cutover's is the same bug: a write X made a moment
+  before the plan would have been missed and its final save skipped.
+- zcheck: Z23's write split into zc_put (no wait) and the 30 s wait,
+  with seams for the fake (zcheck_put, zcheck_tick); Z24 new: a write
+  counted at once after the pool's sync, and no such pool refused.
+
+Verification: check_zfs Z23 shows the lag and Z24 the sync, a property
+set and a commit on its own; check_create reproduces X9 (a recipe
+written just before create, nothing between) and takes its own
+snapshot; three mutations caught (cfgsnap's sync by check_create, the
+cutover's by K2, the fake's commit by check_zfs). make check (zcheck
+over the fake 77 cells), gate, xcheck. The box owes Z24 and X9 again.

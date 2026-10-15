@@ -585,6 +585,16 @@ test_run(void)
 	CHECK(create("x", NULL) == 0);
 	CHECK(strstr(ran, "snapshot tank/zconfig@") == NULL);
 	CHECK(is(prop(RX "@" S1, "shtetl:config"), BCFG));
+	/*
+	 * the recipe written just before, no transaction group committed
+	 * since (box X9): counted all the same, its own snapshot
+	 */
+	unwritten = 1;
+	world(1, 1);
+	unwritten = 0;
+	zfake_write("tank/zconfig", 512);
+	CHECK(create("x", NULL) == 0 && strstr(ran, xsaid) != NULL);
+	CHECK(is(prop(RX "@" S1, "shtetl:config"), xcfg));
 }
 
 /* Whether nothing of x is left but the config snapshot. */
