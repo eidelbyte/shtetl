@@ -157,7 +157,9 @@ The first run: run.sh at 83c8e39, 126 ok, 0 failed; build.sh, 125 ok,
 1 failed, X9: the create recorded the last build's config snapshot,
 written@ having been read before a transaction group committed the
 container's recipe. Fixed by a sync of the pool before every written@
-read. Again, from step 2 (zfs_rebase stays installed):
+read (7e776c5); and the cutover now stops X before deciding its final
+save (947f54e). Again, at 947f54e or later, whose sha each log's
+header must show, from step 2 (zfs_rebase stays installed):
 
     cd ~/shtetl && git pull && make freebsd
     sudo sh tests/box/run.sh        # Z24 new, two more cells
