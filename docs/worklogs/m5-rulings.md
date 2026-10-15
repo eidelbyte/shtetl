@@ -35,3 +35,21 @@ outputs that print the usage re-recorded, beam's two lines the only
 change; docs/configuration.md's usage example re-recorded; build.sh's
 three beams without -y; make check, gate, xcheck. The box owes M8
 with the next build.sh run.
+
+## A clean three-way merge of a patch goes on (a1bda78)
+
+Ruled 2026-10-15: "a clean 3-way should just continue." The three-way
+merge moved from fb_pause into the patch loop: a patch that does not
+apply, nor in reverse, has the tree written as a git tree (the base
+a fix would need) and is merged with git apply --3way; with no
+conflict the build goes on, saying "merged three ways without
+conflict", and the patch's outcome is the new SH_PO_MERGED ("merged"
+in shtetl:patches and the pause record). A merge is not a fix, so
+nothing is kept for it in the obj cache's patches. Conflict markers,
+or a merge that cannot happen (--reject), pause as before.
+
+Verification: check_build P9 (the --continue after the hand fix runs
+to the end, 3-l1 merged; the record "2-x4.patch fixed, 3-l1.patch
+merged"; only 2-x4's fix kept; a mutation that pauses anyway caught);
+check_patch reads "merged" back and refuses an unknown word; make
+check, gate, xcheck. The box's P17 has no clean merge to show.
