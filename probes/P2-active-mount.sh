@@ -66,6 +66,14 @@ probe() {
 	m zfs create -o mountpoint=/containers $RUN/containers
 	C=$(dir $RUN/containers)
 	RC=$(realpath "$C")
+	# The jail is made and removed from its block, as shtetl's are from
+	# /etc/jail.conf.d: jail -r undoes mount.devfs only for a jail its
+	# configuration names (usr.sbin/jail/jail.c), and box run 1 left
+	# devfs mounted when the jail came from the command line.
+	m zfs create -o mountpoint=/w $RUN/w
+	JC=$(dir $RUN/w)/H.conf
+	printf '%s {\n\tpath = "%s";\n\tmount.devfs;\n\tpersist;\n}\n' \
+	    $J "$C/H" >"$JC"
 	version v1
 	version v2
 
@@ -82,7 +90,7 @@ probe() {
 	check P2.2 "v1 at" "$(where $RUN/containers/v1)" "$C/H"
 	check P2.2 "v1/var at" "$(where $RUN/containers/v1/var)" "$C/H/var"
 
-	m jail -c name=$J path="$C/H" mount.devfs persist
+	m jail -f "$JC" -c $J
 	check P2.3 "inside" "$(inside)" "v1 v1"
 	check P2.3 "devfs at" "$(devfs_at)" "$RC/H/dev"
 
@@ -91,7 +99,7 @@ probe() {
 	    "$C/v2"
 	check P2.4 "v1 still at" "$(where $RUN/containers/v1)" "$C/H"
 
-	m jail -r $J
+	m jail -f "$JC" -r $J
 	check P2.5 "devfs after jail -r" "$(devfs_at)" ""
 	umount_tree $RUN/containers/v1
 	m zfs inherit mountpoint $RUN/containers/v1
@@ -103,10 +111,10 @@ probe() {
 	check P2.5 "v2/var at" "$(where $RUN/containers/v2/var)" "$C/H/var"
 	check P2.5 "v1's mountpoint" "$(dir $RUN/containers/v1)" "$C/v1"
 
-	m jail -c name=$J path="$C/H" mount.devfs persist
+	m jail -f "$JC" -c $J
 	check P2.6 "inside, started again" "$(inside)" "v2 v2"
 	check P2.6 "v1 mounted at" "$(where $RUN/containers/v1)" no
-	m jail -r $J
+	m jail -f "$JC" -r $J
 
 	m zfs set mountpoint=/containers/H $RUN/containers/v1
 	x zfs mount $RUN/containers/v1
