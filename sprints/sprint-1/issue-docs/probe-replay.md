@@ -55,3 +55,10 @@ Did not run: KIDON's /usr/local/sbin/zfs_rebase answers `unknown
 option "-m"`, so it predates 69d8223. GitHub's main is 69d8223, so a
 pull, make freebsd and install of zfs_rebase_tool on the box is the
 next step; then a rerun.
+
+## Box run 2
+
+KIDON, 2026-10-19, at 422bf9c (results 7e9be07).
+Again not run: /usr/local/sbin/zfs_rebase still refuses -m. A build
+that has it prints [--merge-non-conflict] in its usage:
+`zfs_rebase 2>&1 | grep merge-non-conflict`.

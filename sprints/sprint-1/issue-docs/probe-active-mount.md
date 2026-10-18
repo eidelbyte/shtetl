@@ -62,3 +62,14 @@ param=value at all). Fixed in b7c72e3: the probe writes the jail's
 block to a file and uses jail -f for -c and -r, which is how shtetl
 will make its jails, from /etc/jail.conf.d. Plan 7.3 now says so.
 Rerun owed.
+
+## Box run 2
+
+KIDON, 2026-10-19, at 422bf9c (results 7e9be07).
+P2.1 - P2.7, 13 of 13 ok with the jail made from its block. Answers:
+setting the mountpoint of a version mounted at its own path moves it
+and its var to /containers/H by itself (P2.5), so the swap needs no
+mount of its own after the set; a second dataset mounts over the same
+path with exit 0, both stacked (P2.7), so keeping one version mounted
+is shtetl's, and the swap unmounts the old one first. Plan 7.3 says
+both. Tested.

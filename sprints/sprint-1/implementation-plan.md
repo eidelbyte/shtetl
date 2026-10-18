@@ -2,8 +2,8 @@
 
 Status: plan of record, 2026-10-19. Opened by the author's message of
 2026-10-18, ruled by their answers to fourteen questions the same day
-and to three of four more the next; all are quoted in section 18.
-Nothing is built yet but the M0 probes, whose first box run is in
+and to four more the next; all are quoted in section 18, and nothing
+is open. Nothing is built yet but the M0 probes, whose box runs are in
 section 14.1. What waits on the author is in open-questions.md beside
 this file. A point marked PROPOSAL is a decision made where the
 rulings are silent and is not yet confirmed.
@@ -54,8 +54,8 @@ follows:
    owner's.
 4. Two triggers and no more. A foundation rolls by its schedule or by
    hand; a house rolls when a new version of its foundation reaches
-   zrun, or by hand (ruled). A schedule is a timer sending the
-   message a person could send.
+   zrun, or by hand (ruled). The foundation's schedule is the only
+   schedule (ruled), a timer sending the message a person could send.
 5. Nothing blocks on the network. Beaming is convergence that resumes
    where it stopped.
 6. Facts come from their binary source; names are for people.
@@ -265,6 +265,13 @@ rolls through every foundation version that reaches zrun, in order
 newer than the active version's origin that the house's ver allows,
 so the queue survives any restart.
 
+`shtetl freeze H` pins a house to the version it is on: it takes no
+foundation versions until the person rolls it (ruled). PROPOSAL: a
+freeze is a stall the person sets, `shtetl:stall` with the reason
+"frozen", so it needs nothing of its own: it survives a restart, shows
+in `shtetl status`, and `shtetl roll H` lifts it as it lifts any stall
+(7.4).
+
 One sequence for both kinds of house:
 
 1. stop the house (7.3);
@@ -324,7 +331,12 @@ new version's to /containers/<house>. At each start the host writes
 recipe, read from its create or update snapshot (section 5), and never
 reads it back. The jail is made and removed from that block: jail -r
 undoes mount.devfs, and its other removal steps, only for a jail its
-configuration names (usr.sbin/jail/jail.c; box run 1, 14.1).
+configuration names (usr.sbin/jail/jail.c; box run 1, 14.1). Setting
+the new version's mountpoint while it is mounted at its own path moves
+it and its children to /containers/<house> (libzfs remounts them; box
+run 2, P2.5). ZFS mounts a second dataset over the same path without a
+word (P2.7), so keeping one version mounted is shtetl's to do: the
+swap unmounts the old one first.
 
 Systems (PROPOSAL, probes P3, P4). A system's versions are boot
 environments under zrun/systems: each version's root has
@@ -351,7 +363,7 @@ the property. A conflict is a stall like any other failure. An
 automatic roll never waits on a person; a roll the person starts with
 `shtetl roll H` is attended, and at a conflict it waits for them, with
 zfs_rebase's picker open in their terminal and the house down while
-they answer (ruled).
+they answer (ruled). `shtetl freeze H` sets a stall by hand (7.2).
 
 Without the property, a house whose roll failed would find its
 foundation still newer and roll straight into the same failure.
@@ -424,7 +436,7 @@ last clone is gone.
 | actor | one per | reads when it starts | takes | tells |
 |-------|---------|----------------------|-------|-------|
 | foundation | foundation recipe | its newest snapshot; written@ since it; `shtetl:stall` | roll, pkg | version, stall |
-| house | house | its versions by `shtetl:house`, the newest complete one; the foundation versions on zrun newer than its origin; `shtetl:stall` | roll, save, pkg | snapshot, stall |
+| house | house | its versions by `shtetl:house`, the newest complete one; the foundation versions on zrun newer than its origin; `shtetl:stall` | roll, save, pkg, freeze | snapshot, stall |
 | beam | pair of spaces | both spaces' snapshots; resume tokens | converge | arrived |
 | builder | host | nothing | a turn | turn over |
 | clock | host | the schedules in the shaken recipes and shtetl.conf | nothing | the messages above, on time |
@@ -523,7 +535,7 @@ Not carried: everything in the first column of section 11.
 | M2 | shake: the language carried and trimmed, the remotes; a shaken recipe made and injected |
 | M3 | foundations: a real build in zlake on the box, a stall and a restart, pkg, the builder |
 | M4 | beam and prune: both directions, resume after a cut, the counts, pruning that waits for the beam |
-| M5 | containers: create, save, pkg, the roll on a foundation's arrival, the swap, a stall; a real jail rolled across two foundation versions on the box |
+| M5 | containers: create, save, pkg, the roll on a foundation's arrival, the swap, a stall, freeze; a real jail rolled across two foundation versions on the box |
 | M6 | systems: outer space, boot environments, a roll through a reboot, on a VM |
 | M7 | status and syslog, the notifier's interface, the clock |
 
@@ -595,6 +607,20 @@ failed. FreeBSD 15.1-RELEASE-p2, zfs-2.4.2.
 The harness itself worked end to end: the summary, the cleanup after
 P2's failed setup (its devfs mount taken away before the pools), and
 the send.
+
+Box run 2, KIDON, 2026-10-19, at 422bf9c (results 7e9be07), P2 and P6:
+13 ok, 2 failed.
+
+- P2, 13 of 13, with the jail made from its block: jail -r takes
+  devfs away; the swap leaves v1 unmounted with its own mountpoint and
+  v2 with its var at /containers/H, and the jail started again runs on
+  v2. Answers: setting a mounted version's mountpoint moves it and its
+  children there by itself (P2.5); a second dataset mounts over the
+  same path with exit 0, both stacked (P2.7). 7.1 and 7.3 stand, and
+  7.3 says the swap unmounts the old version first.
+- P6 again did not run: /usr/local/sbin/zfs_rebase still refuses -m.
+  `zfs_rebase 2>&1 | grep merge-non-conflict` prints the usage line of
+  a build that has it.
 
 
 ## 15. Verification
@@ -797,3 +823,17 @@ daemon exits, and nothing restarts it by itself (10). Each recipe
 repository is a directory of zconfig of its own, and one recipe name
 in two of them is refused (4). Question 2, whether a house may hold a
 foundation version that has arrived, is asked again in plainer words.
+
+### 2026-10-19 (the last of the four)
+
+Asked again whether a house may hold a foundation version that has
+arrived, the author answered:
+
+    Yes, a foundation schedule is the only one. Freeze is a command
+    that can be used to pin a house to an update. That's all we build
+    for now.
+
+So: the foundation's schedule is the only schedule, and a house rolls
+as soon as its foundation's version arrives. `shtetl freeze H` pins a
+house where it is, and it is the one control a house has over its
+rolls (7.2).
