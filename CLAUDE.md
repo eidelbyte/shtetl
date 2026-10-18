@@ -49,14 +49,31 @@ write interfaces that make them disappear.
   with that git identity, no Co-authored line. Messages
   `area: what changed`, 72 columns.
 - ASCII only, in code and in docs.
-- C is kernel-style: cstyle.pl, -Wall -Wextra -Werror. Rules for any
-  other language are written here when one is chosen.
 - Error messages are short and declarative ("pkgs: invalid key"). No
   explanation of the design, no ruling dates, no "no longer
   supported": a removed key is an invalid key.
 - A TUI hands the terminal back as it found it on every way out.
 - Docs are local files in this repository. Never publish them to
   claude.ai.
+
+## C
+
+The author: "we need to be very careful about the advantage of error
+checking vs over-verbosity. Clean C doesn't have to be verbose, but
+verbose C is painful."
+
+- Kernel style: cstyle.pl, -std=c99 -Wall -Wextra -Werror
+  -Wcast-qual.
+- Check what can fail where it fails, once. A caller does not check
+  again what its callee checked, and nothing tests an invariant the
+  pipeline already guarantees.
+- A function that holds resources has one way out: a single cleanup
+  label, not a free and a close on every branch.
+- An error is said once, where it is understood, as a short
+  declarative message; the layers above pass it on and do not
+  rephrase it.
+- A helper that only renames a call, or wraps a single use, is a line
+  to justify.
 
 ## Planning
 

@@ -3,14 +3,14 @@
     "project": "shtetl",
     "sprint": 1,
     "created": "2026-10-18",
-    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors over ZFS. A foundation is one dataset whose rolls are snapshots; a house rolls onto each new foundation version into a new dataset named for it, and switches to it when stopped; a failed patch or rebase stalls that one object; zlake converges to zrun; old versions are pruned by count. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file) or tools/tracker.py --file sprints/sprint-1/shtetl-sprint-1.json <cmd>. STATE 2026-10-18: draft for ruling. The issues of M0 are written; those of M1 to M7 are written at the M0 ruling (rulings-1), since their files depend on the runtime chosen.",
+    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-18: the fourteen questions ruled; M0's probes written, their box and VM runs owed; the issues of M1 to M7 are written at rulings-1.",
     "planning_docs": [
       "sprints/sprint-1/implementation-plan.md",
       "sprints/sprint-1/open-questions.md"
     ],
     "first_history": "branch main (4c0f2c7): its docs/planning.md rulings and probe results are evidence; its code is not carried except the configuration language (plan section 12)",
     "coding_guidelines": "CLAUDE.md at repo root",
-    "terminology": "house = a container or a system; version = one dataset of a house, cloned from one foundation version; live = the version a house runs from; ready = rolled and not yet live; roll = a foundation's next build, or a house's saves replayed onto a newer foundation version into a new version; switch = stop, final save, catch up, switch the link or bootfs, start; stall = an object that stopped rolling and told the person; shake = merge a recipe's layers into the shaken recipe, injected read-only into what it built; beam = zlake converging to zrun; owner = the space where a dataset is written.",
+    "terminology": "house = a container or a system; version = one dataset of a house, cloned from one foundation version; active = the version a house runs from, its newest complete one and the only one mounted; roll = a foundation's next build, or a house's move onto the next version of its foundation; swap = the one act that makes a house's new version active; stall = a roll that failed, the object rolling no more until a person restarts it; shake = merge a recipe's layers into the shaken recipe, injected read-only into what it built; remote = a named place shtetl reaches, a git repository or the lake; beam = a dataset's copy converging to its owner's; owner = the space where a dataset is written.",
     "epics": [
       "design",
       "probes",
@@ -25,14 +25,14 @@
       "housekeeping"
     ],
     "milestones": {
-      "M0": "the probes and the spike have run on the box, open-questions.md is answered, and the runtime is chosen",
-      "M1": "skeleton: the runtime's tree, its gate and make check; the ZFS boundary with its fake; the daemon, an actor that starts from ZFS after a crash, and the command's socket",
-      "M2": "shake: the configuration language carried and trimmed; a shaken recipe made and injected",
-      "M3": "foundations: a real roll on the box, a stall and a retry, pkg, the builder",
-      "M4": "containers: create, save, pkg, roll, switch, stall and resolve; a real jail rolled across two foundation versions on the box",
-      "M5": "beam and prune: convergence, resume after a cut, the counts, a restore as a test",
-      "M6": "systems: outer space, boot environments, a switch through a reboot, on a VM",
-      "M7": "the clock and the notifier"
+      "M0": "the probes have run on the box and the VM, and the plan holds their results",
+      "M1": "the skeleton: the C tree, its gate and make check; the ZFS layer with its fake; the daemon's loop, an actor that starts from ZFS after a crash, and the command over the socket",
+      "M2": "shake: the language carried and trimmed, the remotes; a shaken recipe made and injected",
+      "M3": "foundations: a real build in zlake on the box, a stall and a restart, pkg, the builder",
+      "M4": "beam and prune: both directions, resume after a cut, the counts, pruning that waits for the beam",
+      "M5": "containers: create, save, pkg, the roll on a foundation's arrival, the swap, a stall; a real jail rolled across two foundation versions on the box",
+      "M6": "systems: outer space, boot environments, a roll through a reboot, on a VM",
+      "M7": "status and syslog, the notifier's interface, the clock"
     },
     "worklogs": "sprints/sprint-1/issue-docs/<key>.md, written when the code lands. See the Worklogs section of CLAUDE.md."
   },
@@ -223,7 +223,7 @@
     "note": "2026-10-18: written after spike-port's first box run, since it starts that release in outer space."
   },
   "rulings-1": {
-    "description": "The M0 ruling: the author's answers to open-questions.md and the choice of runtime, quoted in plan section 18 in their words and folded into sections 2 to 17 (each PROPOSAL marker settled one way or the other); the probes' and the spike's results folded in where they confirm or overturn a section; CLAUDE.md given the chosen language's rules if it is not C; the issues of M1 to M7 written into this file with requires, files and verification. Verify: the author reads the folded plan and says go.",
+    "description": "The M0 ruling. The author's answers to the fourteen questions are in (plan section 18, 2026-10-18); what is left: the probes' results folded into the plan where they confirm or overturn a section (each PROPOSAL marker settled one way or the other), the answers to the four questions now in open-questions.md, and the issues of M1 to M7 written into this file with requires, files and verification, in C. Verify: the author reads the folded plan and says go.",
     "requires": [
       "probe-resume",
       "probe-live-link",
@@ -242,8 +242,9 @@
       "sprints/sprint-1/shtetl-sprint-1.json",
       "CLAUDE.md"
     ],
-    "provides": "A ruled plan, a chosen runtime and the issues of M1 to M7.",
+    "provides": "A ruled plan and the issues of M1 to M7.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "not-started",
+    "note": "2026-10-18: the fourteen answers ruled (plan 18); four new questions in open-questions.md."
   }
 }
