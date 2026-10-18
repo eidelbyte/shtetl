@@ -1,28 +1,26 @@
-# title: a house rolled while live, caught up at the switch
+# title: a house's saves replayed onto the next foundation version
 # pools: run
 # needs: zfs_rebase
 #
-# Plan 7.2 and 7.3. A roll replays onto the new version the live
-# version's saves it does not have yet, one zfs_rebase a save: the
-# first the clone form onto the new foundation version, each later one
-# the dataset form with --allow-unrelated, --base the previous save,
-# and the pre-apply snapshot named for that previous save. Run while
-# the house is live it stops at the newest save; the switch's catch-up
-# is the same replay again after the final save, so no step's
-# snapshot is ever taken twice.
+# Plan 7.2 step 3, the house stopped: the active version's saves
+# replayed onto the next foundation version into a new version, one
+# zfs_rebase a save -- the first the clone form onto the foundation
+# version, each later one the dataset form with --allow-unrelated,
+# --base the previous save and the pre-apply snapshot named for it --
+# and then the update snapshot, taken last.
 #
-# f@1 -> f@2 changes /etc/motd, /bin/tool, adds /share/new. The live
-# version h1 saves s1 (rc.conf line, etc/app.conf), s2 (rm share/a,
-# etc/b), s3 (/etc/motd, against f@2's) and, after the roll, s4 (rc.conf
-# line, etc/app.conf changed and chmod 600).
+# f@1 -> f@2 changes /etc/motd and /bin/tool and adds /share/new. The
+# active version h1 has saves s1 (an rc.conf line, etc/app.conf), s2
+# (rm share/a, etc/b), s3 (/etc/motd, against f@2's) and s4, the final
+# save (an rc.conf line, etc/app.conf changed and chmod 600).
 #
-#   P6.1  step 1, the clone form onto f@2, goes through
+#   P6.1  step 1, the clone form onto f@2, and step 2, the first
+#         dataset form, go through
 #   P6.2  step 3 stops at the conflict over /etc/motd
 #   P6.3  answered from, --continue goes through
-#   P6.4  the live version written all through steps 2 and 3 (answer:
-#         the writes counted), every step's outcome as without
-#   P6.5  the catch-up of s4 goes through; h2 holds s1 s2 s3 and no
-#         snapshot of a name twice
+#   P6.4  step 4 goes through, and the new version holds s1 s2 s3 and
+#         then the update snapshot, no name twice
+#   P6.5  answer: the seconds the replay took, the house down for them
 #   P6.6  the same saves as one rebase, h1@s4 onto f@2 (motd answered
 #         from), goes through
 #   P6.7  the stepwise result equals the one rebase: type, mode,
@@ -49,9 +47,7 @@ place() {	# DS DIR: a clone form result put where it belongs
 	[ "$(prop mounted "$1")" = yes ] || m zfs mount "$1"
 }
 
-save() {	# NAME
-	m zfs snapshot $RUN/h1@"$1"
-}
+save() { m zfs snapshot $RUN/h1@"$1"; }
 
 spec() {	# DIR KEYWORDS: mtree's spec of DIR, its header comments out
 	mtree -c -n -k "$2" -p "$1" | grep -v '^#'
@@ -85,37 +81,26 @@ probe() {
 	save s2
 	printf 'Welcome to the house\n' >"$H/etc/motd"
 	save s3
+	printf 'late="YES"\n' >>"$H/etc/rc.conf"
+	printf 'app 2\n' >"$H/etc/app.conf"
+	m chmod 600 "$H/etc/app.conf"
+	save s4
 
 	printf 'Welcome to FreeBSD 2\n' >"$F/etc/motd"
 	dd if=/dev/random of="$F/bin/tool" bs=64k count=1 2>/dev/null
 	printf 'new\n' >"$F/share/new"
 	m zfs snapshot $RUN/f@2
 
+	t0=$(date +%s)
 	zr -m -o "$W/r1" --from $RUN/h1@s1 --onto $RUN/f@2 --result $RUN/h2
 	check P6.1 "step 1, clone form" "$RC" 0
 	place $RUN/h2 /h2
-
-	: >"$W/writing"
-	(
-		i=0
-		while [ -e "$W/writing" ]; do
-			echo "$i" >>"$H/busy"
-			i=$((i + 1))
-		done
-		echo "$i" >"$W/writes"
-	) &
 	zr -m -o "$W/r2" -u -b $RUN/h1@s1 --from $RUN/h1@s2 \
 	    --onto $RUN/h2 --result s1
-	rc2=$RC
+	check P6.1 "step 2, dataset form" "$RC" 0
 	zr -m -o "$W/r3" -u -b $RUN/h1@s2 --from $RUN/h1@s3 \
 	    --onto $RUN/h2 --result s2
-	rc3=$RC
-	rm "$W/writing"
-	wait
-	answer P6.4 "writes to the live version during steps 2 and 3" \
-	    "$(cat "$W/writes")"
-	check P6.4 "step 2, with the live version written" "$rc2" 0
-	check P6.2 "step 3 stops at its conflict" "$rc3" 1
+	check P6.2 "step 3 stops at its conflict" "$RC" 1
 	check P6.2 "conflicted names" \
 	    "$(sed -n 's/^#names //p' "$W/r3.resolution")" 1
 	check P6.2 "the conflict is etc/motd" "$(grep -c \
@@ -123,17 +108,14 @@ probe() {
 	from_all "$W/r3.resolution"
 	zr --continue $RUN/h2@s2
 	check P6.3 "answered from, --continue" "$RC" 0
-
-	printf 'late="YES"\n' >>"$H/etc/rc.conf"
-	printf 'app 2\n' >"$H/etc/app.conf"
-	m chmod 600 "$H/etc/app.conf"
-	save s4
 	zr -m -o "$W/r4" -u -b $RUN/h1@s3 --from $RUN/h1@s4 \
 	    --onto $RUN/h2 --result s3
-	check P6.5 "the catch-up of s4" "$RC" 0
-	check P6.5 "h2's snapshots" "$(zfs list -H -t snapshot -o name \
-	    -s createtxg -d 1 $RUN/h2 | sed 's/.*@//' | tr '\n' ' ')" \
-	    "s1 s2 s3 "
+	check P6.4 "step 4" "$RC" 0
+	m zfs snapshot -r $RUN/h2@update
+	answer P6.5 "the replay, four saves" "$(($(date +%s) - t0)) seconds"
+	check P6.4 "the new version's snapshots" "$(zfs list -H -t snapshot \
+	    -o name -s createtxg -d 1 $RUN/h2 | sed 's/.*@//' | tr '\n' ' ')" \
+	    "s1 s2 s3 update "
 
 	zr -m -o "$W/r5" --from $RUN/h1@s4 --onto $RUN/f@2 --result $RUN/h3
 	if [ "$RC" = 1 ]; then

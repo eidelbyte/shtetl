@@ -138,20 +138,20 @@
     "completed": "code",
     "note": "2026-10-18 3209a81: P5.1-P5.8 written; found the lake's one receive rule (send from the guid the lake holds, receive -o origin=), plan 8.1 in 554b00c. Box run owed. Worklog issue-docs/probe-house-data.md."
   },
-  "probe-roll-live": {
-    "description": "P6: a house version with three saves of real edits (files added, changed, removed, and one edit that conflicts with the foundation's change and is answered); replayed onto a newer foundation version into a new dataset with zfs_rebase as plan 7.2 step 2 says, while the live version takes a fourth save; the fourth caught up as 7.3 step 3 says; the result compared, tree and attributes, with a replay of all four done at once while nothing ran. Needs zfs_rebase with -m (69d8223 or later) installed on the box. Verify: the probe's cells green on the box.",
+  "probe-replay": {
+    "description": "P6 (plan 7.2 step 3; ruled 2026-10-18, answers 9 and 14): a stopped house version with four saves of real edits (files added, changed, removed, a mode change, and one edit that conflicts with the foundation's change and is answered from) replayed with zfs_rebase onto a newer foundation version into a new version, one rebase a save, the pre-apply snapshots named for the previous saves and the update snapshot taken last; the replay timed; the result held equal, tree and attributes, to one rebase of the final save onto the same foundation version. Needs zfs_rebase with -m (69d8223 or later) installed on the box. Verify: the probe's cells green on the box.",
     "requires": [
       "probe-harness"
     ],
     "epic": "probes",
     "milestone": "M0",
     "expected_changed_files": [
-      "probes/P6-roll-live.sh"
+      "probes/P6-replay.sh"
     ],
-    "provides": "Evidence for sections 7.2 and 7.3: rolling while live and catching up at the switch gives the same tree as rolling while stopped.",
+    "provides": "Evidence for plan 7.2: a house's roll replays its saves stepwise to the same content as one rebase, names no snapshot twice, and takes the time P6.5 records.",
     "estimated_size": "medium",
     "completed": "code",
-    "note": "2026-10-18 d414712: P6.1-P6.9 written; compares with one squashed rebase of the final save and writes the live version throughout, stricter than the description above. Found the roll and the catch-up are one replay (plan 7.2/7.3 in 554b00c). Box run owed, needs zfs_rebase -m installed. Worklog issue-docs/probe-roll-live.md."
+    "note": "2026-10-18 d414712: P6.1-P6.9 written; compares with one squashed rebase of the final save and writes the live version throughout, stricter than the description above. Found the roll and the catch-up are one replay (plan 7.2/7.3 in 554b00c). Box run owed, needs zfs_rebase -m installed. Worklog issue-docs/probe-roll-live.md. 2026-10-18: rewritten as probe-replay after answers 9 and 14 (no roll while live, no switch, no catch-up)."
   },
   "probe-boot-envs": {
     "description": "P3, on a FreeBSD 15.1 VM with root on ZFS that the author provides: two system versions under a systems dataset of the boot pool, each with var and usr/local children, roots mountpoint=/ canmount=noauto; bootfs set to one, rebooted, then the other; each boots with its own children mounted (rc.d/zfsbe) and none of the other's; the loader's boot environment menu lists both and boots either by hand; bectl list shows them. Verify: the probe's cells green on the VM, its reboots driven by the probe across runs.",
@@ -191,7 +191,7 @@
       "probe-resume",
       "probe-active-mount",
       "probe-house-data",
-      "probe-roll-live",
+      "probe-replay",
       "probe-boot-envs",
       "probe-outer-space"
     ],
