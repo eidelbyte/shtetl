@@ -19,7 +19,7 @@ TOP=$(dirname "$PD")
 
 hdr() { sed -n "s/^# $1: //p" "$2" | head -1; }
 
-probe_file() {	# P1 -> probes/P1-*.sh, S1 -> probes/S1-*.sh
+probe_file() {	# P1 -> probes/P1-*.sh
 	for _f in "$PD/$1"-*.sh; do
 		[ -f "$_f" ] && echo "$_f" && return 0
 	done
@@ -30,7 +30,7 @@ FILES=
 while [ $# -gt 0 ]; do
 	case $1 in
 	--list)
-		for f in "$PD"/[PS][0-9]*-*.sh; do
+		for f in "$PD"/P[0-9]*-*.sh; do
 			[ -f "$f" ] || continue
 			printf '%-3s %-10s %s\n' "$(basename "$f" | cut -d- -f1)" \
 			    "$(hdr needs "$f")" "$(hdr title "$f")"
@@ -42,7 +42,7 @@ while [ $# -gt 0 ]; do
 		pools_down
 		exit 0
 		;;
-	[PS][0-9]*)
+	P[0-9]*)
 		f=$(probe_file "$1") || { echo "run.sh: no probe $1"; exit 2; }
 		FILES="$FILES $f"
 		;;
@@ -63,7 +63,7 @@ for p in $RUN $LAKE; do
 	fi
 done
 if [ -z "$FILES" ]; then
-	for f in "$PD"/[PS][0-9]*-*.sh; do
+	for f in "$PD"/P[0-9]*-*.sh; do
 		[ -f "$f" ] || continue
 		[ "$(hdr needs "$f")" = vm ] || FILES="$FILES $f"
 	done
@@ -97,12 +97,6 @@ for f in $FILES; do
 			continue
 		fi
 		;;
-	elixir)
-		if ! command -v mix >/dev/null 2>&1; then
-			note "skipped: needs elixir (pkg install elixir)"
-			continue
-		fi
-		;;
 	vm)
 		if [ "${SCRATCH_VM:-no}" != yes ]; then
 			note "skipped: a VM probe; SCRATCH_VM=yes on a scratch VM"
@@ -124,8 +118,8 @@ for f in $FILES; do
 	echo >>"$SUMMARY"
 done
 
-ok=$(grep -c '^[PS][0-9]* ok ' "$SUMMARY")
-failed=$(grep -c '^[PS][0-9]* failed' "$SUMMARY")
+ok=$(grep -c '^P[0-9]* ok ' "$SUMMARY")
+failed=$(grep -c '^P[0-9]* failed' "$SUMMARY")
 echo "== $ok ok, $failed failed" | tee -a "$SUMMARY"
 send "$OUT" "$ok ok, $failed failed"
 [ "$failed" = 0 ]

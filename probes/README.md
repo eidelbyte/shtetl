@@ -47,8 +47,6 @@ keeps it local.
 | - | ZFS and the base system only |
 | zfs_rebase | zfs_rebase with -m (tool 69d8223 or later), on PATH or as ZFS_REBASE |
 | vm | a scratch VM with root on ZFS; changes bootfs and reboots; runs only when named, with SCRATCH_VM=yes |
-| elixir | Erlang and Elixir (pkg install elixir) and /usr/src: the runtime spike, spike/README.md |
-
 ## The VM probes
 
 P3 and P4 change the boot pool's bootfs and reboot, so they want a
