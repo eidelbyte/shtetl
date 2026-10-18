@@ -408,7 +408,10 @@ once its last clone is gone.
 
 Everything else is a process an actor runs and watches: zfs_rebase,
 make, git, pkg, jail. ZFS itself is reached through one boundary
-(section 10).
+(section 10). A step that takes long, a build or a rebase, is such a
+child, and the actor answers messages while it waits, its state
+naming the step under way: an actor that did the step itself would
+answer nothing for an hour (the spike, spike/README.md).
 
 A roll found under way when the actor starts is continued: a
 zfs_rebase run open at its conflicts gate is a stall (7.5), one open

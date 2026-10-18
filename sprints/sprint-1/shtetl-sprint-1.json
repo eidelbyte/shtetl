@@ -202,7 +202,8 @@
     ],
     "provides": "The numbers and the experience section 10's choice is made from.",
     "estimated_size": "large",
-    "completed": "not-started"
+    "completed": "code",
+    "note": "2026-10-18 fccf203: port, release and probes/S1-runtime.sh written; zport.c compile-checked on the mac (mac OpenZFS headers, stub ei.h); the Elixir never compiled (no Erlang on the mac). Box run owed: pkg install elixir; sudo sh probes/run.sh S1. Worklog issue-docs/spike-port.md."
   },
   "spike-outer-space": {
     "description": "S2: the S1 release started by rc on P4's memory-disk root, finding its toy foundation's state on the disk pool and finishing a roll there before the real reboot. Measured: its start time on the memory disk. Verify: the cells green on the VM; the numbers in spike/README.md.",
@@ -218,7 +219,8 @@
     ],
     "provides": "Evidence that the chosen runtime can carry a system's switch through outer space.",
     "estimated_size": "small",
-    "completed": "not-started"
+    "completed": "not-started",
+    "note": "2026-10-18: written after spike-port's first box run, since it starts that release in outer space."
   },
   "rulings-1": {
     "description": "The M0 ruling: the author's answers to open-questions.md and the choice of runtime, quoted in plan section 18 in their words and folded into sections 2 to 17 (each PROPOSAL marker settled one way or the other); the probes' and the spike's results folded in where they confirm or overturn a section; CLAUDE.md given the chosen language's rules if it is not C; the issues of M1 to M7 written into this file with requires, files and verification. Verify: the author reads the folded plan and says go.",
