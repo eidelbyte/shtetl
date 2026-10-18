@@ -47,3 +47,11 @@ installed.
 ## Commits
 
 d414712 (the roll while live), 83c3634 (rewritten)
+
+## Box run 1
+
+KIDON, 2026-10-19, at 68bc7f8 (results 1c23d85).
+Did not run: KIDON's /usr/local/sbin/zfs_rebase answers `unknown
+option "-m"`, so it predates 69d8223. GitHub's main is 69d8223, so a
+pull, make freebsd and install of zfs_rebase_tool on the box is the
+next step; then a rerun.

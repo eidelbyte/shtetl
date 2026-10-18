@@ -74,6 +74,9 @@ verbose C is painful."
   rephrase it.
 - A helper that only renames a call, or wraps a single use, is a line
   to justify.
+- Allocation is not checked at its calls. shtetl's own few allocators
+  log a failure to syslog and exit; nothing restarts the daemon (the
+  author: "This will just never happen. If it does, syslog and die").
 
 ## Planning
 

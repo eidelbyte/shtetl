@@ -1,75 +1,36 @@
 # Sprint 1: open questions
 
-The first fourteen were answered on 2026-10-18 and are ruled in
-implementation-plan.md section 18. These four came out of the
-answers. Each stands alone: what it is about, the choice, and a
-recommendation.
+Eighteen were asked on 2026-10-18 and seventeen are ruled
+(implementation-plan.md section 18). One is left, asked again in
+plainer words.
 
-## 1. How does the person answer a house's conflict?
+## May a house wait before rolling onto a foundation version that has arrived?
 
-When a house's roll meets a conflict that does not merge three ways
-clean, the house stalls: the new version is destroyed, the house is
-started again on its last working version, and it waits (ruled). The
-conflict is still there for the next roll to meet, and someone has to
-answer it.
+As the plan stands, the moment a new version of a foundation reaches
+zrun, every house on that foundation rolls onto it. For a container
+that means a short stop and start. For a system it means two reboots,
+into outer space and then for real, because a system's roll is done
+with the machine stopped.
 
-The choice: the person restarts the roll with `shtetl roll H`, the
-house is stopped and replayed again, and when the roll reaches the
-conflict it waits for that person, opening zfs_rebase's picker in
-their terminal, with the house down while they answer; or the stalled
-roll's conflict is kept open while the house runs, and answered at
-leisure, which then needs the house's newer saves caught up at the
-next stop, the switch you ruled out.
-
-Recommendation: the first. An automatic roll never waits on a person,
-it stalls; a roll the person starts by hand is attended, so it waits
-for them at a conflict. One sequence, and only who started it differs.
-
-## 2. Can a house hold a foundation version that has arrived?
+An example. Foundation `generic` is rebuilt by its schedule every
+night at 03:00, and its new version reaches zrun at about 03:40. At
+03:40 every container on `generic` stops and starts again, and KIDON,
+a system on `generic`, reboots twice, with nobody having asked for it
+that night.
 
 Your first message said updates "can be scheduled or manual"; your
-answers say houses roll automatically through every foundation version
-that reaches zrun. A system's roll reboots it, so a system on a
-foundation that a schedule rebuilds at 03:00 reboots soon after.
+answers said houses roll automatically. This is the one place the two
+could pull apart, so the question is which you want:
 
-The choice: the cascade is always immediate, and the schedule lives on
-the foundation alone (it builds by its schedule or by hand, and its
-houses follow at once); or a house may also say when it takes an
-arrival (at once, in a window, or by hand only), a second gate.
+- the foundation's schedule is the only one. A house rolls as soon as
+  its foundation's version arrives. A system that must not reboot by
+  surprise sits on a foundation that is rebuilt by hand, or one
+  scheduled at an hour when a reboot is fine;
+- or each house may also say when it rolls, at once, in a window of
+  its own ("Sundays at 04:00"), or only when someone runs `shtetl
+  roll`, and an arrived foundation version waits for it.
 
-Recommendation: the foundation alone, which keeps two triggers and no
-more. A system that must not reboot unasked sits on a foundation that
-rolls only by hand.
-
-## 3. Does the daemon abort when memory runs out?
-
-Most of the checks that make C verbose are for allocation failing:
-every malloc, strdup and nvlist_alloc and the cleanup behind each.
-The daemon is crash-only (plan ground rule 1): started again by
-daemon(8), every actor reads where it stands from ZFS.
-
-The choice: allocation failure aborts the daemon, through a few
-allocators of our own that never return NULL, as libnvpair's fnvlist
-functions already do; or every allocation is checked and unwound at
-its call.
-
-Recommendation: abort. A daemon that cannot allocate cannot do its
-work anyway, the restart is the recovery the design already has, and
-every function loses its most common error path. Errors the system can
-really give, a refused zfs call or a failed child, are still checked
-where they happen.
-
-## 4. Where do several recipe repositories live in zconfig?
-
-zconfig holds the recipes of several repositories (ruled), for
-instance the upstream shtetl-recipes and the site's own. On main it
-was one repository whose clone was zconfig itself.
-
-The choice: each repository cloned into its own directory of zconfig,
-named for its remote, beside shtetl.conf at zconfig's top; or the
-repositories merged into one tree.
-
-Recommendation: a directory each. A recipe is found by its name across
-them, and one name in two repositories is refused, as a redefinition
-is in the language; shtetl.conf, the remotes in it, stays the site's
-own at the top.
+Recommendation: the first. It keeps two triggers, the foundation's
+and a person's; a house's own window would be a third, and the queue
+of arrived versions would have to wait on a clock as well as on the
+house being idle.

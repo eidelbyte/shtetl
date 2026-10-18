@@ -1,9 +1,10 @@
 # Sprint 1: houses that roll
 
-Status: plan of record, 2026-10-18. Opened by the author's message of
-2026-10-18 and ruled the same day by their answers to fourteen
-questions; both are quoted in section 18. Nothing is built yet but the
-M0 probes. What waits on the author is in open-questions.md beside
+Status: plan of record, 2026-10-19. Opened by the author's message of
+2026-10-18, ruled by their answers to fourteen questions the same day
+and to three of four more the next; all are quoted in section 18.
+Nothing is built yet but the M0 probes, whose first box run is in
+section 14.1. What waits on the author is in open-questions.md beside
 this file. A point marked PROPOSAL is a decision made where the
 rulings are silent and is not yet confirmed.
 
@@ -90,9 +91,13 @@ by its `shtetl:space` property.
 - zconfig: the recipes and the remotes, nothing else (ruled). It is a
   ZFS dataset; the person may snapshot it, shtetl never does (ruled).
   The remotes (ruled): the FreeBSD src remote, the patch repositories,
-  the recipe repositories (several; open question 4), and the lake
-  remote, which is ZFS, not git: where zlake is when it is on another
-  host.
+  the recipe repositories, and the lake remote, which is ZFS, not git:
+  where zlake is when it is on another host. Each recipe repository is
+  cloned into a directory of zconfig of its own, named for its remote;
+  a recipe is found by its name across them, and one name in two
+  repositories is refused, as a redefinition is in the language
+  (ruled). shtetl.conf, the remotes in it, stays the site's own at
+  zconfig's top.
 - zbuild: the FreeBSD src checkout.
 - zlake: where foundations are built and owned, their obj caches, and
   the copy of every house version beamed from zrun, kept deeper than
@@ -317,8 +322,9 @@ version and puts its mountpoint back to its own path, then sets the
 new version's to /containers/<house>. At each start the host writes
 /etc/jail.conf.d/<house>.conf whole from the active version's shaken
 recipe, read from its create or update snapshot (section 5), and never
-reads it back. jail -r unmounts the jail's devfs before the swap,
-since jail(8) finds path/dev through the path it was given.
+reads it back. The jail is made and removed from that block: jail -r
+undoes mount.devfs, and its other removal steps, only for a jail its
+configuration names (usr.sbin/jail/jail.c; box run 1, 14.1).
 
 Systems (PROPOSAL, probes P3, P4). A system's versions are boot
 environments under zrun/systems: each version's root has
@@ -341,8 +347,11 @@ step and the reason, on a foundation's dataset or on a house's active
 version. A stalled object does not roll, neither on its schedule nor
 when its foundation moves (ruled): it waits at its last working
 version until the person restarts it with `shtetl roll`, which clears
-the property. A conflict is a stall like any other failure; how the
-person answers it is open question 1.
+the property. A conflict is a stall like any other failure. An
+automatic roll never waits on a person; a roll the person starts with
+`shtetl roll H` is attended, and at a conflict it waits for them, with
+zfs_rebase's picker open in their terminal and the house down while
+they answer (ruled).
 
 Without the property, a house whose roll failed would find its
 foundation still newer and roll straight into the same failure.
@@ -440,16 +449,18 @@ act a person runs is a message, and so is every scheduled one.
 One process, one kqueue loop. An actor is a struct with its state and
 a queue of messages, taking one at a time. Children are watched with
 EVFILT_PROC, the command's socket with EVFILT_READ, timers with
-EVFILT_TIMER. Supervision is the whole process: daemon(8) -r starts it
-again, and every actor reads where it stands from ZFS. ZFS is reached
-through one layer over libzfs and libzfs_core, with a fake beside it
-for the mac, as on main.
+EVFILT_TIMER. Nothing restarts the daemon by itself (ruled): what
+would kill it would kill it again. Started again by a person, it finds
+every actor where ZFS says it stands. ZFS is reached through one layer
+over libzfs and libzfs_core, with a fake beside it for the mac, as on
+main.
 
 The author on the C (ruled): "we need to be very careful about the
 advantage of error checking vs over-verbosity. Clean C doesn't have to
 be verbose, but verbose C is painful." CLAUDE.md says what that means
-for the code; allocation failure, the most verbose of all checks, is
-open question 3.
+for the code. Allocation, the most verbose of all checks, is not
+checked at its calls: shtetl's own few allocators log a failure to
+syslog and exit (ruled).
 
 Elixir was looked at and found viable, and set aside for one language.
 
@@ -554,6 +565,36 @@ header, are its matrix.
 
 Then the ruling: the probes' results folded into this plan, and the
 issues of M1 to M7 written.
+
+### 14.1 Results
+
+Box run 1, KIDON, 2026-10-19, at 68bc7f8 (results 1c23d85): 31 ok, 4
+failed. FreeBSD 15.1-RELEASE-p2, zfs-2.4.2.
+
+- P1, 14 of 14: a full stream, an incremental and a clone stream,
+  each cut part way, resume from their tokens with the source's
+  guids; a fresh incremental is refused while a token stands; a token
+  whose source snapshot is gone does not resume, and receive -A takes
+  it away. 8.1 stands.
+- P5, 10 of 10: the house's own data cloned from the final save,
+  promoted, the old version destroyed, through two rolls; the lake
+  follows by the guid rule with -o origin= before the promote and
+  after it. 7.1 and 8.1 stand.
+- P2, 8 ok before the failure: canmount=noauto versions stay
+  unmounted through an export and import; setting a noauto dataset's
+  mountpoint does not mount it; two versions mount side by side at
+  their own paths. P2.5 failed on the probe, not the model: its jail
+  was made from the command line, and jail -r undoes mount.devfs only
+  for a jail its configuration names. The probe now makes and removes
+  the jail from its block (b7c72e3), which is how 7.3 says shtetl
+  does it; a rerun is owed.
+- P6 did not run: the box's zfs_rebase predates -m. GitHub's main
+  (69d8223) has it; a rerun is owed after installing it.
+- P3 and P4 wait on a VM.
+
+The harness itself worked end to end: the summary, the cleanup after
+P2's failed setup (its devfs mount taken away before the pools), and
+the send.
 
 
 ## 15. Verification
@@ -734,3 +775,25 @@ stop to start. Stalls show in shtetl status and syslog, and the
 notifier is a pluggable interface left to the end. Pruning waits for
 the beam. shtetl is a daemon, written in C, without verbosity. A
 changed house recipe is picked up by the house's next roll.
+
+### 2026-10-19 (three of four more)
+
+Asked four questions that the fourteen answers raised (open-questions.md),
+the author answered, with box run 1 pushed:
+
+    probe pushed.
+
+    1. Correct
+    2. What does this actually mean?
+    3. This will just never happen. If it does, syslog and die. Don't
+    reboot because literally why would this happen. in the case it
+    does, then it'll just happen again. This is paranoid behavior.
+    4. yep.
+
+So: an automatic roll never waits on a person and stalls at a
+conflict; a roll started by hand is attended and waits for its person
+at the picker (7.4). Allocation failure is logged to syslog and the
+daemon exits, and nothing restarts it by itself (10). Each recipe
+repository is a directory of zconfig of its own, and one recipe name
+in two of them is refused (4). Question 2, whether a house may hold a
+foundation version that has arrived, is asked again in plainer words.

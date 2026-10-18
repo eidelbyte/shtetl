@@ -26,3 +26,9 @@ sh -n, dash -n. Box run owed.
 ## Commits
 
 3209a81 (probe), 554b00c (plan 8.1)
+
+## Box run 1
+
+KIDON, 2026-10-19, at 68bc7f8 (results 1c23d85).
+P5.1 - P5.8, 10 of 10 ok: the guid rule with -o origin= works before
+the run's promote and after it. Tested.

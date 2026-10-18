@@ -44,3 +44,21 @@ sh -n, dash -n. Box run owed.
 ## Commits
 
 d6d8a22 (the symlink probe), 5011677 (rewritten)
+
+## Box run 1
+
+KIDON, 2026-10-19, at 68bc7f8 (results 1c23d85).
+P2.1 - P2.4 ok: canmount=noauto versions stay unmounted through an
+export and import; setting a noauto dataset's mountpoint does not
+mount it (P2.2's answer: no); two versions mount side by side at their
+own paths.
+
+P2.5 failed: devfs still mounted at H/dev after jail -r, and v1 could
+not be unmounted under it, which ended the probe. The probe's fault,
+not the model's: the jail was made from parameters on the command
+line, and jail -r loads the configuration file and undoes mount.devfs
+only for a jail it names (usr.sbin/jail/jail.c; -r takes no
+param=value at all). Fixed in b7c72e3: the probe writes the jail's
+block to a file and uses jail -f for -c and -r, which is how shtetl
+will make its jails, from /etc/jail.conf.d. Plan 7.3 now says so.
+Rerun owed.

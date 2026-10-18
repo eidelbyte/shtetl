@@ -47,3 +47,11 @@ header and `== 0 ok, 0 failed` and leaving no pool or disk.
 ## Commit
 
 d0cd4e0
+
+## Box run 1
+
+KIDON, 2026-10-19, at 68bc7f8 (results 1c23d85).
+The whole harness on the box: the summary, the cleanup after a probe's
+failed setup (P2 left a devfs mount under the altroot, which
+pools_down took away before destroying the pools, and P5 then ran on
+fresh pools), and the send as the person behind sudo. Tested.
