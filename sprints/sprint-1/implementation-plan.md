@@ -72,7 +72,7 @@ below follows:
 | live | the version a house runs from |
 | roll | for a foundation, build its next version; for a house, replay its saves onto a newer foundation version into a new version |
 | ready | a house version rolled and not yet live |
-| switch | make the ready version live: stop, catch up, switch, start |
+| switch | make the ready version live: stop, replay the final save, snapshot, switch, start |
 | stall | a roll or switch that could not finish; the actor stops rolling and tells the person |
 | shake | merge a recipe's layers into one whole recipe |
 | shaken recipe | the result, injected read-only into what it built |
@@ -163,7 +163,7 @@ file, but it can rename the directory holding it, so nothing the
 host does reads a file a jail could have written. What the host
 needs from a house's shaken recipe it reads from the version's create
 or update snapshot, found by `shtetl:kind`, which shtetl took before
-the version ever ran (7.2 step 5).
+the version ever ran (7.3 step 5).
 
 
 ## 6. Foundations
@@ -212,38 +212,43 @@ polls.
 
 A house is the set of its versions, each carrying `shtetl:house`.
 One is live. Each version's snapshots are linear: the saves its roll
-replayed (none for a new house), its create or update snapshot, and,
-once it is live, its saves and pkg upgrades. A ready version takes no
+replayed but the last (none for a new house), its create or update
+snapshot, which holds the last replayed save, and, once it is live,
+its saves and pkg upgrades. A version that is not live takes no
 saves of its own.
 
 Datasets a house has and its foundation does not (a recipe's `www`)
 are the house's data. On a new version they are clones of the live
-version's at the switch's final save (7.3 step 4), and they are
-promoted when the old version is pruned (8.2). PROPOSAL, probe P5.
+version's at the switch's final save (7.3 step 6), and they are
+promoted when the old version is pruned (8.2). Probe P5.
 
 ### 7.2 The roll
 
-A house rolls when its foundation has a version newer than the live
-version's origin that the house's ver allows, and no roll of the
-house is in flight (open question 8):
+A roll replays onto a new version the live version's saves that the
+new version does not have yet, working from the house's recipe shaken
+on the target's foundation.conf (section 5). For each dataset that
+came from the foundation, parent first, it runs one zfs_rebase a
+save, as many saves as roll.depth allows. This is main's history
+replay, ruled 2026-10-09: the first step a clone form rebase onto the
+target, each later step a dataset form rebase with --allow-unrelated,
+--base the previous original save, and its pre-apply snapshot named
+for that save; -m always, so a conflict that merges three ways clean
+goes on. A canmount=off placeholder is cloned, not replayed.
+Derivations: derived files answered keep and regenerated at the gate,
+as on main.
 
-1. Shake the house's recipe on the target's foundation.conf.
-2. For each dataset that came from the foundation, parent first:
-   replay the live version's saves, as many as roll.depth allows,
-   onto the target into the new version. This is main's history
-   replay, ruled 2026-10-09: the first step a clone form rebase, each
-   later step a dataset form rebase with --allow-unrelated and the
-   previous original save as --base; -m always, so a conflict that
-   merges three ways clean goes on. A canmount=off placeholder is
-   cloned, not replayed.
-3. Derivations: derived files answered keep and regenerated at the
-   gate, as on main.
-4. What the recipe gained since the live version was made: packages
-   installed, command pieces that never ran run once (PROPOSAL, open
-   question 14).
-5. house.conf injected; snapshot
-   `<version>@<fver>-<fbranch>-<date>-update`.
-6. The version is ready.
+Where a roll stands is read from ZFS, never recorded: the new version
+exists once step 1 is done, and each later step leaves a snapshot
+named for the save before it, so the saves the new version holds are
+counted. Run again, a roll does only the steps not done.
+
+A house starts rolling when its foundation has a version newer than
+the live version's origin that the house's ver allows, and the house
+has no newer version yet (open question 8). It rolls while live,
+after each save, up to the newest; a version caught up with the live
+version's newest save is ready. Its newest replayed save is not
+snapshotted by hand: the switch's replay of the final save takes it
+as its pre-apply snapshot, so no name is ever taken twice (probe P6).
 
 The live version runs and saves throughout. A conflict stalls the
 roll at zfs_rebase's gate (7.5); the live version is untouched
@@ -255,16 +260,25 @@ By schedule or by hand, one sequence for both kinds:
 
 1. stop the house (7.4);
 2. the final save, on the live version;
-3. catch up: replay onto the ready version the saves taken since its
-   roll -- usually only the final save -- as 7.2 step 2 does;
-4. the house's own datasets cloned from the final save;
-5. switch: the link or bootfs names the ready version, one atomic act;
-6. start the house: whatever is live.
+3. the roll once more: the final save replayed, so the new version
+   holds every save;
+4. what the recipe gained since the live version was made: packages
+   installed, command pieces that never ran run once (PROPOSAL, open
+   question 14);
+5. house.conf injected; snapshot
+   `<version>@<fver>-<fbranch>-<date>-update`, the snapshot the host
+   reads the house's recipe from, taken before the version ever ran;
+6. the house's own datasets cloned from the final save;
+7. switch: the link or bootfs names the new version, one atomic act;
+8. start the house: whatever is live.
 
-A failure in steps 2 to 4 leaves step 5 undone, so step 6 starts the
+The house is down from step 1 to step 8: usually one replayed save
+and two snapshots, and packages only when the recipe gained some.
+
+A failure in steps 2 to 6 leaves step 7 undone, so step 8 starts the
 version that was live, and the house stalls (open question 9). Steps
-2 to 4 write only into the ready version and a snapshot of the live
-one, so nothing needs putting back. Step 6 runs on every way out.
+2 to 6 write only into the new version and a snapshot of the live
+one, so nothing needs putting back. Step 8 runs on every way out.
 
 After the switch: the prune (8.2), then the next roll if a newer
 foundation version is there.
@@ -305,7 +319,8 @@ A stall is a state of the actor, kept in ZFS like every other, and a
 stalled object rolls again only when a person says so. There are two
 kinds:
 
-- A conflict. A house's roll, or a switch's catch-up, stops at
+- A conflict. A house's roll, the switch's replay of the final save
+  included, stops at
   zfs_rebase's conflicts gate, and the open run is the stall:
   zfs_rebase is durable, so it is still there after any restart.
   `shtetl resolve H` opens the picker (zfs_rebase -c -i), and the
@@ -331,9 +346,15 @@ Every stall goes to the notifier (section 9, open question 10).
 
 zlake converges to zrun. In origin order -- a foundation version
 before any house version cloned from it, a dataset's snapshots oldest
-first -- every snapshot the lake should hold and lacks is sent:
-incrementally from the newest snapshot both have, or as a clone
-stream from the lake's copy of the origin. No send -p; the
+first -- every snapshot the lake should hold and lacks is sent, by one
+rule found by guid: from the newest snapshot of the dataset's history
+whose guid the lake already holds, wherever that is on the lake. A
+dataset the lake has gets an incremental; a dataset new to the lake is
+received as a clone of the lake's snapshot of that guid (`zfs receive
+-o origin=`), sent from the run's snapshot of it wherever a promote
+has moved it, so the run's prune (8.2) coming before the beam or after
+it makes no difference (probe P5); a dataset with no such guid, a
+foundation's first version, gets a full stream. No send -p; the
 `shtetl:*` properties are copied after each receive (ruled
 2026-10-11).
 
@@ -388,11 +409,11 @@ Everything else is a process an actor runs and watches: zfs_rebase,
 make, git, pkg, jail. ZFS itself is reached through one boundary
 (section 10).
 
-A roll found under way at start is continued, since zfs_rebase is
-durable. A half-made house version with no open run, left by a
-crash, is destroyed, and the house rolls again unless `shtetl:stall`
-is set. So each act is either continued or redone from what ZFS
-shows, and none needs a record of its own.
+A roll found under way when the actor starts is continued: a
+zfs_rebase run open at its conflicts gate is a stall (7.5), one open
+anywhere else is taken on with --continue, and otherwise the roll
+replays what the new version is missing (7.2). A crash loses nothing
+a roll did, and no act needs a record of its own.
 
 shtetl runs as a daemon, started by rc. The `shtetl` command sends
 the daemon a message over a local socket and prints the reply. Every
