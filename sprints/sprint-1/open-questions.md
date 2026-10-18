@@ -93,8 +93,8 @@ created, and holds the root, so switching it under a running jail
 changes nothing until the next start (checked in
 sys/kern/kern_jail.c; probe P2 on the box). The jail block in
 /etc/jail.conf.d is written whole at every start, from the shaken
-recipe in the live version's first snapshot, so it never needs
-switching. A system's live version is the pool's bootfs, already one
+recipe in the live version's create or update snapshot, taken before
+the version ever ran, so it never needs switching. A system's live version is the pool's bootfs, already one
 act. (Plan section 7.4.)
 
 ## 7. When a foundation fails to build, does it pause or start over?
@@ -195,17 +195,18 @@ Recommendation: Elixir, if you are willing to read it; otherwise C,
 and the design does not change. The spike runs either way, so your
 answer can wait for its numbers.
 
-## 14. What does a roll do when a house's recipe changed?
+## 14. What does a move to a new version do when a house's recipe changed?
 
 A house's recipe in zconfig may have gained a package or a command
 since its live version was made. The roll replays what the house has;
 on main, an update never ran pkg or commands again.
 
-The choice: the roll ignores the change until a new house is made, or
-the roll adds what the new recipe adds.
+The choice: ignore the change until a new house is made, or add what
+the new recipe adds when the house moves to its new version.
 
-Recommendation: the roll adds it, after the replay and before the
-version's snapshot: packages the recipe added are installed, and
-command pieces that never ran run once. Nothing is removed, since the
-language cannot remove. The version's house.conf then says what is
-true of it.
+Recommendation: add it, at the switch, with the house stopped: after
+the final save is replayed and before the version's update snapshot,
+packages the recipe added are installed and command pieces that never
+ran run once. Nothing is removed, since the language cannot remove.
+The version's house.conf then says what is true of it. (Plan section
+7.3 step 4.)
