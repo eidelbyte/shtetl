@@ -48,6 +48,23 @@ keeps it local.
 | zfs_rebase | zfs_rebase with -m (tool 69d8223 or later), on PATH or as ZFS_REBASE |
 | vm | a scratch VM with root on ZFS; changes bootfs and reboots; runs only when named, with SCRATCH_VM=yes |
 
+## The VM probes
+
+P3 and P4 change the boot pool's bootfs and reboot, so they want a
+scratch FreeBSD 15.1 VM with root on ZFS (the installer's layout), at
+least twice the root's size in RAM and swap for P4's memory disk, and
+this checkout under /home (outside the boot environment, or a stage's
+results would stay behind in it) with credentials to push. Each is
+run again after each reboot it asks for and finds its stage from ZFS:
+
+    sudo SCRATCH_VM=yes sh probes/run.sh P3    four runs, three reboots
+    sudo SCRATCH_VM=yes sh probes/run.sh P4    three runs; the first
+                                               reboot is `reboot -r`
+
+If P4's second run finds nothing recorded from outer space, the rc
+script could not reach the disk pool there; what it printed is on
+the console.
+
 ## Writing one
 
 A probe is P<n>-<name>.sh with a header

@@ -63,6 +63,19 @@ prop() { zfs get -H -o value "$1" "$2"; }
 # The directory a dataset is mounted at, altroot included.
 dir() { prop mountpoint "$1"; }
 
+# ---- a VM's boot ------------------------------------------------------
+
+# The dataset mounted at /: the boot environment running now.
+booted() { mount -p | awk '$2 == "/" { print $1; exit }'; }
+
+# A VM probe's results must outlive the boot environment it ran in, so
+# the checkout may not be inside it.
+outside_be() {
+	_fs=$(df "$TOP" | awk 'NR == 2 { print $1 }')
+	[ "$_fs" != "$(booted)" ] ||
+	    die "the checkout is in the boot environment; clone it under /home"
+}
+
 # ---- pools -----------------------------------------------------------
 
 pool_make() {	# NAME [SIZE]
