@@ -108,20 +108,20 @@
     "completed": "code",
     "note": "2026-10-18 57e8ed7: P1.1-P1.10 written; box run owed. Worklog issue-docs/probe-resume.md."
   },
-  "probe-live-link": {
-    "description": "P2: a jail created with path=/containers/H where H is a symlink to v1 (a dataset mounted at /containers/v1, a minimal tree enough to run /bin/sh); the link switched to v2 with rename(2) while the jail runs; the jail stays on v1 (a file written inside lands in v1; jls -n path shows v1's path); jail -r, then jail -c, lands in v2; mount.devfs mounts under the resolved path and jail -r unmounts it; jexec works throughout. Verify: the probe's cells green on the box.",
+  "probe-active-mount": {
+    "description": "P2 (plan 7.1, 7.3; ruled 2026-10-18, answer 6): two versions of a container H, each a root and a var child, every dataset canmount=noauto; neither mounted after the pool is exported and imported, as at a boot; the active one's root given the mountpoint /containers/H and its tree mounted there, a jail with devfs on it; the next version mounted at its own path beside it, as during a roll; the swap with the jail stopped (the old one's mountpoint put back, the new one's set); the jail started again on the new one; what ZFS does with a second version mounted over the path, recorded. Verify: the probe's cells green on the box.",
     "requires": [
       "probe-harness"
     ],
     "epic": "probes",
     "milestone": "M0",
     "expected_changed_files": [
-      "probes/P2-live-link.sh"
+      "probes/P2-active-mount.sh"
     ],
-    "provides": "Evidence for section 7.4 and open question 6: a container's switch is one rename of a link.",
+    "provides": "Evidence for plan 7.1 and 7.3: a container's active version is the one mounted at its path, and a roll swaps it.",
     "estimated_size": "small",
     "completed": "code",
-    "note": "2026-10-18 d6d8a22: P2.1-P2.7 written; P2.7 records devfs left when the link moves under a running jail. Box run owed. Worklog issue-docs/probe-live-link.md."
+    "note": "2026-10-18 d6d8a22: P2.1-P2.7 written; P2.7 records devfs left when the link moves under a running jail. Box run owed. Worklog issue-docs/probe-live-link.md. 2026-10-18: rewritten as probe-active-mount after answer 6 (one version mounted, the mount swapped); the symlink is gone."
   },
   "probe-house-data": {
     "description": "P5: a house's own dataset v1/www with three saves; v2/www cloned from v1/www@final; v2/www promoted; v1 destroyed whole; v2/www holds v1/www's saves and its contents; a lake copy of v1/www converged before the promote and of v2/www after it, incrementally where ZFS allows and with whatever it needs where it does not (recorded either way). Verify: the probe's cells green on the box.",
@@ -189,7 +189,7 @@
     "description": "The M0 ruling. The author's answers to the fourteen questions are in (plan section 18, 2026-10-18); what is left: the probes' results folded into the plan where they confirm or overturn a section (each PROPOSAL marker settled one way or the other), the answers to the four questions now in open-questions.md, and the issues of M1 to M7 written into this file with requires, files and verification, in C. Verify: the author reads the folded plan and says go.",
     "requires": [
       "probe-resume",
-      "probe-live-link",
+      "probe-active-mount",
       "probe-house-data",
       "probe-roll-live",
       "probe-boot-envs",
