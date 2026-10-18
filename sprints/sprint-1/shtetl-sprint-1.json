@@ -74,7 +74,8 @@
     ],
     "provides": "A tree, its rules and a tracker that every later issue lands into.",
     "estimated_size": "small",
-    "completed": "code"
+    "completed": "tested",
+    "note": "Landed 2026-10-18: 0d4f276 rules and license, 408a682 tracker, 880c162 plan, questions, tracker JSON and README. Verified: tracker list/show, schema fields and requires, ASCII. Worklog: issue-docs/new-history.md."
   },
   "probe-harness": {
     "description": "The box harness for M0's probes, after main's probes/ (972314c) and tests/box/send.sh (90f58e7), written fresh: sudo sh probes/run.sh [P1 ...] runs the named probes (all by default) on throwaway pools over swap-backed memory disks, refuses to start if a pool of its names exists, and destroys only what it made. Every check prints ok or failed with its probe and cell; the log opens with the shtetl commit it ran at and ends with '== N ok, M failed'. The box commits the log under probes/results/<host>-<time>/ and pushes it (su to SUDO_USER, pull --rebase, push; SEND=no keeps it local). Verify: sh -n on the mac; on the box, run.sh with no probe prints the header and '== 0 ok, 0 failed', and leaves no pool or memory disk behind.",
