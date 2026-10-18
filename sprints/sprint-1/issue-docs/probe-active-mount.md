@@ -41,6 +41,6 @@ a roll; the swap with the jail stopped; the jail started again.
 
 sh -n, dash -n. Box run owed.
 
-## Commit
+## Commits
 
-see the commit that renamed this file
+d6d8a22 (the symlink probe), 5011677 (rewritten)

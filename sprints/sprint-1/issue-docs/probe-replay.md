@@ -44,6 +44,6 @@ the times as an answer).
 sh -n, dash -n. Box run owed, with zfs_rebase -m (69d8223 or later)
 installed.
 
-## Commit
+## Commits
 
-see the closing commit's worklog note
+d414712 (the roll while live), 83c3634 (rewritten)
