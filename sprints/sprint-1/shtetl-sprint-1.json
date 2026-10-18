@@ -167,7 +167,8 @@
     ],
     "provides": "Evidence for section 7.4: a system's versions are boot environments and its switch is bootfs.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "code",
+    "note": "2026-10-18 3b62deb: P3.1-P3.7, four runs over three reboots, stage from ZFS; version children canmount=noauto (zfsbe before zfs mount -a). VM run owed. Worklog issue-docs/probe-boot-envs.md."
   },
   "probe-outer-space": {
     "description": "P4, on the P3 VM: the outer space protocol as ruled 2026-10-15 (a swap-backed memory disk made a pool, the current root sent into it, vfs.root.mountfrom set, reboot -r); an rc script in the sent root that, finding / on the memory pool, snapshots a dataset of the disk pool, sets bootfs to the other version and reboots for real; the machine comes up on the new bootfs. Records how long the send and the reroot take and how large the memory disk had to be. Verify: the probe's cells green on the VM.",
@@ -182,7 +183,8 @@
     ],
     "provides": "Evidence for section 7.4: a system stops into outer space, switches there, and comes back on the new version.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "code",
+    "note": "2026-10-18 720760e: P4.1-P4.8, three runs; outer space reports through s2probe:* properties on the disk pool; stage 1 always starts over. VM run owed. Worklog issue-docs/probe-outer-space.md."
   },
   "spike-port": {
     "description": "S1 (plan section 14): an Elixir release built on FreeBSD 15.1 from lang/elixir, holding a supervisor and a gen_statem that rolls a toy foundation (write a file, snapshot, clone the snapshot, send it to a second md pool) through a C port: one process speaking the external term format over stdin and stdout with erl_interface's ei, calling libzfs_core (lzc_snapshot, lzc_clone, lzc_send, lzc_receive) and returning nvlist facts as terms, no text. The actor is killed at each step and started again, and finds where it stood from ZFS alone. Measured and written in spike/README.md: the release's size on disk, resident memory idle, start time, the port's round trip. Verify: the spike's cells green on the box. Its code stays in spike/ until the ruling decides its fate.",

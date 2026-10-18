@@ -302,8 +302,9 @@ alone; the jail block follows it at the next start.
 
 Systems (PROPOSAL, probes P3, P4). A system's versions are boot
 environments under zrun/systems: each version's root has
-`mountpoint=/` and `canmount=noauto`, and rc.d/zfsbe mounts the booted
-one's children. The switch is `zpool set bootfs`, and the loader can
+`mountpoint=/`, and its root and children `canmount=noauto`, so that
+zfs mount -a never takes another version's; rc.d/zfsbe, which runs
+before it, mounts the booted one's children. The switch is `zpool set bootfs`, and the loader can
 boot any kept version by hand. Stop is the outer space protocol
 (ruled 2026-10-15): a memory disk made a pool, the system's current
 root sent into it, `vfs.root.mountfrom` pointed at it, `reboot -r`.
