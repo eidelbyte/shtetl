@@ -5,6 +5,9 @@
  * person. One rule puts every foundation there, whatever the crash
  * left: a rollback to the newest snapshot changes nothing where
  * nothing was written, and a dataset with no snapshot holds no version.
+ *
+ * Each foundation is its own allocation, held by pointer: a roll holds
+ * its foundation while a first roll adds another to the list.
  */
 
 #include <stdlib.h>
@@ -13,6 +16,7 @@
 #include "core/err.h"
 #include "core/foundation.h"
 #include "core/mem.h"
+#include "core/roll.h"
 #include "core/zfs.h"
 
 /* Names a walk found. */
@@ -47,13 +51,9 @@ last(void *arg, const char *snap)
 	return (0);
 }
 
-/*
- * DS and everything below it put where an idle foundation is,
- * children first, since a filesystem with one mounted inside it will
- * not unmount and one with children will not be destroyed.
- */
-static int
-idle(struct sh_zfs *z, const char *ds, struct sh_err *e)
+/* Children first: one with a filesystem mounted inside will not unmount. */
+int
+sh_foundation_idle(struct sh_zfs *z, const char *ds, struct sh_err *e)
 {
 	struct names kids = { NULL, 0 };
 	char newest[256] = "";
@@ -62,7 +62,7 @@ idle(struct sh_zfs *z, const char *ds, struct sh_err *e)
 
 	r = sh_zfs_children(z, ds, collect, &kids, e);
 	for (i = 0; r == 0 && i < kids.n_n; i++)
-		r = idle(z, kids.n_v[i], e);
+		r = sh_foundation_idle(z, kids.n_v[i], e);
 	names_free(&kids);
 	if (r != 0 || sh_zfs_unmount(z, ds, e) != 0 ||
 	    sh_zfs_snapshots(z, ds, last, newest, e) != 0)
@@ -88,7 +88,7 @@ start(struct sh_zfs *z, struct sh_foundation *f, struct sh_err *e)
 	fp = sh_memstream(&buf, &len);
 	sh_err_init(&fe, fp, "");
 	if ((r = sh_zfs_snapshots(z, f->f_ds, last, newest, &fe)) == 0)
-		r = idle(z, f->f_ds, &fe);
+		r = sh_foundation_idle(z, f->f_ds, &fe);
 	if (r == 0 && newest[0] == '\0') {
 		sh_errf(e, "foundation %s: a first build undone", f->f_name);
 		free(f->f_name);
@@ -112,16 +112,26 @@ start(struct sh_zfs *z, struct sh_foundation *f, struct sh_err *e)
 static int
 by_name(const void *a, const void *b)
 {
-	return (strcmp(((const struct sh_foundation *)a)->f_name,
-	    ((const struct sh_foundation *)b)->f_name));
+	return (strcmp((*(struct sh_foundation *const *)a)->f_name,
+	    (*(struct sh_foundation *const *)b)->f_name));
+}
+
+static void
+foundation_free(struct sh_foundation *f)
+{
+	free(f->f_name);
+	free(f->f_ds);
+	free(f->f_newest);
+	free(f->f_stall);
+	free(f);
 }
 
 int
 sh_foundations_start(struct sh_zfs *z, const char *root,
-    struct sh_foundation **fp, size_t *np, struct sh_err *e)
+    struct sh_foundation ***fp, size_t *np, struct sh_err *e)
 {
 	struct names heads = { NULL, 0 };
-	struct sh_foundation *f;
+	struct sh_foundation **v, *f;
 	size_t i, n = 0;
 
 	*fp = NULL;
@@ -130,44 +140,78 @@ sh_foundations_start(struct sh_zfs *z, const char *root,
 		names_free(&heads);
 		return (-1);
 	}
-	f = sh_calloc(heads.n_n + 1, sizeof (*f));
+	v = sh_calloc(heads.n_n + 1, sizeof (*v));
 	for (i = 0; i < heads.n_n; i++) {
-		f[n].f_ds = sh_strdup(heads.n_v[i]);
-		f[n].f_name = sh_strdup(strrchr(heads.n_v[i], '/') + 1);
-		start(z, &f[n], e);
-		if (f[n].f_name != NULL)
-			n++;
+		f = sh_calloc(1, sizeof (*f));
+		f->f_ds = sh_strdup(heads.n_v[i]);
+		f->f_name = sh_strdup(strrchr(heads.n_v[i], '/') + 1);
+		start(z, f, e);
+		if (f->f_name != NULL)
+			v[n++] = f;
 		else
-			free(f[n].f_ds);
+			foundation_free(f);
 	}
 	names_free(&heads);
-	qsort(f, n, sizeof (*f), by_name);
-	*fp = f;
+	qsort(v, n, sizeof (*v), by_name);
+	*fp = v;
 	*np = n;
 	return (0);
 }
 
 void
-sh_foundations_free(struct sh_foundation *f, size_t n)
+sh_foundations_free(struct sh_foundation **f, size_t n)
 {
 	size_t i;
 
-	for (i = 0; i < n; i++) {
-		free(f[i].f_name);
-		free(f[i].f_ds);
-		free(f[i].f_newest);
-		free(f[i].f_stall);
-	}
+	for (i = 0; i < n; i++)
+		foundation_free(f[i]);
 	free(f);
+}
+
+struct sh_foundation *
+sh_foundation_find(struct sh_foundation ***fp, size_t *np,
+    const char *root, const char *name)
+{
+	struct sh_foundation *f;
+	size_t i, n;
+	int c = 1;
+
+	for (i = 0; i < *np && (c = strcmp((*fp)[i]->f_name, name)) < 0; i++)
+		;
+	if (c == 0)
+		return ((*fp)[i]);
+	f = sh_calloc(1, sizeof (*f));
+	f->f_name = sh_strdup(name);
+	n = strlen(root) + strlen(name) + 2;
+	f->f_ds = sh_calloc(1, n);
+	(void) snprintf(f->f_ds, n, "%s/%s", root, name);
+	*fp = sh_realloc(*fp, (*np + 1) * sizeof (**fp));
+	(void) memmove(*fp + i + 1, *fp + i, (*np - i) * sizeof (**fp));
+	(*fp)[i] = f;
+	(*np)++;
+	return (f);
 }
 
 void
 sh_foundation_status(const struct sh_foundation *f, FILE *out)
 {
-	if (f->f_state == SH_F_STALLED)
+	switch (f->f_state) {
+	case SH_F_IDLE:
+		/* a first roll that failed leaves no version, and no line */
+		if (f->f_newest != NULL)
+			(void) fprintf(out, "foundation %s idle %s\n",
+			    f->f_name, f->f_newest);
+		break;
+	case SH_F_WAITING:
+		(void) fprintf(out, "foundation %s waiting\n", f->f_name);
+		break;
+	case SH_F_ROLLING:
+		(void) fprintf(out, "foundation %s rolling %s\n", f->f_name,
+		    sh_roll_step(f->f_roll));
+		break;
+	case SH_F_STALLED:
 		(void) fprintf(out, "foundation %s stalled %s\n", f->f_name,
 		    f->f_stall);
-	else
-		(void) fprintf(out, "foundation %s idle %s\n", f->f_name,
-		    f->f_newest);
+		break;
+	}
 }

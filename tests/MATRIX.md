@@ -528,3 +528,41 @@ applying}; a remote source {fetched, not reachable, its dir missing}.
 | GR2 | one missing from zconfig | cloned into its directory | tests/check_src.c |
 | GR3 | one there, behind its remote | no step; its head as it was | tests/check_src.c |
 | GR4 | one whose remote is not there | "NAME: clone: exited 128" | tests/check_src.c |
+
+## Family F: a foundation's roll (m3-roll)
+
+Dimensions: the foundation {no version: a first roll; a version: an
+update; stalled}; the ask {idle, waiting, rolling, stalled}; where the
+roll ends {well; failing at the recipe, the ver before or after the
+checkout, a patch, the version, the snapshot}; the recipe's datasets
+{none, a child under a parent it does not give}; the daemon stopped
+while a child runs, then the actor started again. The rolls run over
+the fake ZFS with git real, on tests/src-fixture.sh's repositories;
+what a roll fails with is read from the error sink, "foundation F:
+STEP: why". Mutations caught: no stall set (F5); nothing put back
+(F5); the head not unmounted (F1); every version of kind create
+(F2); a placeholder with canmount on (F1); no zbuild reset (F5); no
+ver held to the branch (F7) or to REVISION (F8); a roll asked twice
+(F3); a stall not cleared (F4); the default's properties alone (F1);
+the commit not the src's (F1).
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| F1 | a first roll ending well | F made with the site's properties, lake's over default's; usr a placeholder, canmount off; usr/local; var with its atime; every dataset snapshotted at once, <ver>-<date>-create, shtetl:kind create and shtetl:commit the src commit; foundation.conf in the head, the record over the shaken recipe; F idle at it, unmounted; the builder free | tests/check_roll.c |
+| F2 | an update ending well | a new version, -update, kind update | tests/check_roll.c |
+| F3 | asked while it rolls | "F: rolling" | tests/check_roll.c |
+| F4 | asked while stalled | the stall inherited away; it rolls | tests/check_roll.c |
+| F5 | an update failing at a patch | what the roll wrote gone; shtetl:stall and status say the step and why; zbuild reset; the builder free | tests/check_roll.c |
+| F6 | a first roll failing | its datasets destroyed; no status line, no stall | tests/check_roll.c |
+| F7 | ver refused by src_branch | "recipe: FILE: ver: releng/15.1 is not >=16"; nothing made | tests/check_roll.c |
+| F8 | ver refused by the checkout's REVISION | "version: FILE: ver: 15.1 is not >=16" | tests/check_roll.c |
+| F9 | a checkout with no newvers.sh | "version: sys/conf/newvers.sh: No such file or directory" | tests/check_roll.c |
+| F10 | stopped while a child runs, an update; started again | F at its newest version, what the roll wrote gone, no stall; then it rolls | tests/check_roll.c |
+| F11 | stopped while a child runs, a first roll; started again | no foundation | tests/check_roll.c |
+| F12 | the snapshot refused | rolled back, stalled "snapshot: why" | tests/check_roll.c |
+| F13 | a second foundation asked while one rolls | "waiting" in status; it rolls when the first's turn is given back | tests/check_roll.c |
+| F14 | status while it rolls | "foundation F rolling STEP" | tests/check_roll.c |
+| F15 | a recipe that is not there | "recipe: ..."; nothing made | tests/check_roll.c |
+| F16 | shtetl roll over the socket: a bad name, a space missing, no argument | "NAME: invalid name: why", "no build space", the usage | tests/check_daemon.c |
+| F17 | the rc script starting the daemon, git found under service(8) | a roll's git runs | deferred: rc and a real roll are the box's; m3-box |
+| F18 | foundation.conf schg, a roll over libzfs | as F1, on ZFS | deferred: m3-box |

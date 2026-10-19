@@ -16,7 +16,11 @@
 #ifndef	SH_SRC_H
 #define	SH_SRC_H
 
+#include <stddef.h>
+#include <stdio.h>
+
 #include "core/cascade.h"
+#include "core/err.h"
 #include "core/job.h"
 #include "core/site.h"
 
@@ -46,6 +50,22 @@ void sh_src_reset(struct sh_job *j, const char *build);
  */
 void sh_src_recipes(struct sh_job *j, const char *config,
     const struct sh_site *site);
+
+/*
+ * The commit the repository REPO fetched last, the first object id of
+ * its FETCH_HEAD, which git writes as it ends a fetch, into OID: 0, or
+ * -1 with "REPO: no commit fetched" said to E.
+ */
+int sh_src_commit(const char *repo, char *oid, size_t len,
+    struct sh_err *e);
+
+/*
+ * What S's roll was fetched, as lines of comment for foundation.conf
+ * (plan 5): the src branch at its commit and from where, then each
+ * patch source, at its commit where it has one. 0, or -1 as
+ * sh_src_commit.
+ */
+int sh_src_record(FILE *out, const struct sh_src *s, struct sh_err *e);
 
 /*
  * A remote as git takes it, allocated: a URL as written, a host and a

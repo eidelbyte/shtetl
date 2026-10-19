@@ -13,7 +13,7 @@
 
 static struct sh_zfs *z;
 static struct cap c;
-static struct sh_foundation *f;
+static struct sh_foundation **f;
 static size_t n;
 
 /* REL below the foundations, with a mountpoint when MP is not NULL. */
@@ -104,7 +104,7 @@ line(size_t i)
 	FILE *o;
 
 	CHECK((o = fmemopen(buf, sizeof (buf), "w")) != NULL);
-	sh_foundation_status(&f[i], o);
+	sh_foundation_status(f[i], o);
 	(void) fclose(o);
 	return (buf);
 }
@@ -125,8 +125,8 @@ main(void)
 	snap("generic", "v1");
 	snap("generic", "v2");
 	CHECK(start() == 0 && n == 1);
-	CHECK(strcmp(f[0].f_name, "generic") == 0 &&
-	    f[0].f_state == SH_F_IDLE && strcmp(f[0].f_newest, "v2") == 0);
+	CHECK(strcmp(f[0]->f_name, "generic") == 0 &&
+	    f[0]->f_state == SH_F_IDLE && strcmp(f[0]->f_newest, "v2") == 0);
 	CHECK(strcmp(line(0), "foundation generic idle v2\n") == 0);
 	CHECK(strcmp(cap_text(&c), "") == 0);
 
@@ -137,7 +137,7 @@ main(void)
 	CHECK(zfake_put(at("generic"), "a") == 0);
 	snap("generic", "v1");
 	CHECK(zfake_put(at("generic"), "b") == 0);
-	CHECK(start() == 0 && n == 1 && f[0].f_state == SH_F_IDLE);
+	CHECK(start() == 0 && n == 1 && f[0]->f_state == SH_F_IDLE);
 	CHECK(mounted("generic") == 0);
 	mount("generic");
 	CHECK(zfake_has(at("generic"), "a") == 1 &&
@@ -160,7 +160,7 @@ main(void)
 	mk("generic", NULL);
 	snap("generic", "v1");
 	mk("generic/usr", NULL);
-	CHECK(start() == 0 && n == 1 && f[0].f_state == SH_F_IDLE);
+	CHECK(start() == 0 && n == 1 && f[0]->f_state == SH_F_IDLE);
 	CHECK(there("generic") && !there("generic/usr"));
 
 	/*
@@ -175,7 +175,7 @@ main(void)
 	mount("generic");
 	mount("generic/usr");
 	CHECK(zfake_put(at("generic/usr"), "late") == 0);
-	CHECK(start() == 0 && n == 1 && f[0].f_state == SH_F_IDLE);
+	CHECK(start() == 0 && n == 1 && f[0]->f_state == SH_F_IDLE);
 	CHECK(mounted("generic") == 0 && mounted("generic/usr") == 0);
 	mount("generic");
 	mount("generic/usr");
@@ -186,9 +186,9 @@ main(void)
 	CHECK(sh_zfs_create(z, at("generic"), &stall, 1, &c.c_err) == 0);
 	snap("generic", "v1");
 	CHECK(start() == 0 && n == 1);
-	CHECK(f[0].f_state == SH_F_STALLED &&
-	    strcmp(f[0].f_stall, "build: make exited 2") == 0 &&
-	    strcmp(f[0].f_newest, "v1") == 0);
+	CHECK(f[0]->f_state == SH_F_STALLED &&
+	    strcmp(f[0]->f_stall, "build: make exited 2") == 0 &&
+	    strcmp(f[0]->f_newest, "v1") == 0);
 	CHECK(strcmp(line(0),
 	    "foundation generic stalled build: make exited 2\n") == 0);
 
@@ -203,9 +203,9 @@ main(void)
 	snap("b", "v1");
 	zfake_fail("rollback");
 	CHECK(start() == 0 && n == 2);
-	CHECK(f[0].f_state == SH_F_STALLED &&
-	    strcmp(f[0].f_stall, "zfake: rollback failed as asked") == 0);
-	CHECK(f[1].f_state == SH_F_IDLE);
+	CHECK(f[0]->f_state == SH_F_STALLED &&
+	    strcmp(f[0]->f_stall, "zfake: rollback failed as asked") == 0);
+	CHECK(f[1]->f_state == SH_F_IDLE);
 	CHECK(cap_has(&c, "foundation a: zfake: rollback failed as asked"));
 
 	/* A8: several: by name, whatever order ZFS walks them in */
@@ -217,8 +217,8 @@ main(void)
 	mk("mm", NULL);
 	snap("mm", "v1");
 	CHECK(start() == 0 && n == 3);
-	CHECK(strcmp(f[0].f_name, "aa") == 0 &&
-	    strcmp(f[1].f_name, "mm") == 0 && strcmp(f[2].f_name, "zz") == 0);
+	CHECK(strcmp(f[0]->f_name, "aa") == 0 &&
+	    strcmp(f[1]->f_name, "mm") == 0 && strcmp(f[2]->f_name, "zz") == 0);
 
 	/* A9: the foundations' walk refused: no start */
 	fresh();

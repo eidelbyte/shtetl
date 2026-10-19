@@ -16,6 +16,10 @@ rcvar=shtetl_enable
 load_rc_config $name
 : ${shtetl_enable:=NO}
 
+# git, and the other programs a roll runs from packages, are
+# /usr/local's, which rc's PATH and service(8)'s leave out
+export PATH="${PATH}:/usr/local/sbin:/usr/local/bin"
+
 pidfile=/var/run/shtetl.pid
 procname=/usr/local/sbin/shtetl
 command=/usr/sbin/daemon

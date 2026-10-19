@@ -17,9 +17,17 @@ while [ $i -le 30 ]; do
 done > up/a.c
 echo 0 > up/seq
 echo '*.o' > up/.gitignore
+mkdir -p up/sys/conf
+printf '%s\n' '#!/bin/sh' 'TYPE="FreeBSD"' 'REVISION="15.1"' \
+    'BRANCH=${BRANCH_OVERRIDE:-RELEASE}' > up/sys/conf/newvers.sh
 git -C up add -A
 git -C up commit -q -m A
 git -C up branch releng/15.1
+# stable/14: a tree with no newvers.sh
+git -C up checkout -q -b stable/14
+git -C up rm -q sys/conf/newvers.sh
+git -C up commit -q -m 'no newvers.sh'
+git -C up checkout -q main
 
 # The patches, made against A in a clone of it, so their bases are
 # blobs up has; seq's chain each on the last, a base up never has.
@@ -107,7 +115,8 @@ cp p/s1.patch c1/patches/conflict/d.patch
 cp p/bogus.patch c1/patches/bogus/
 printf '%s\n' 'remotes {' "    src = \"file://$S/up\";" \
     "    recipes { site = \"file://$S/siterepo\";" \
-    "        other = \"file://$S/otherrepo\"; }" '}' > c1/shtetl.conf
+    "        other = \"file://$S/otherrepo\"; }" '}' \
+    'properties { lake { compression = "zstd-9"; } }' > c1/shtetl.conf
 f() {
 	n=$1
 	shift
@@ -123,6 +132,15 @@ f f8 'patches { "patches/bogus" {} }'
 f f9 "patches { \"file://$S/nope\" {} }"
 f f10 "patches { \"file://$S/pa\" { dir = \"nodir\"; } }"
 printf '%s\n' 'src_branch = "releng/9.9";' > c1/foundations/f11.conf
+
+# The rolls of tests/check_roll.c: r1 with datasets, a placeholder
+# among them; r2 a conflict; r3 and r4 a ver refused before and after
+# the checkout; r5 a tree with no REVISION.
+f r1 'datasets { "usr/local" {} var { atime = true; } }'
+f r2 'patches { "patches/conflict" {} }'
+f r3 'ver = ">=16";'
+printf '%s\n' 'src_branch = "main";' 'ver = ">=16";' > c1/foundations/r4.conf
+printf '%s\n' 'src_branch = "stable/14";' > c1/foundations/r5.conf
 
 # c2: shtetl.conf's foundation block gives a directory, at the top.
 mkdir -p c2/foundations c2/patches/top

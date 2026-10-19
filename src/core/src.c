@@ -257,6 +257,65 @@ sh_src_steps(struct sh_job *j, struct sh_src *s)
 	sh_job_call(j, "patches", src_patches, s);
 }
 
+int
+sh_src_commit(const char *repo, char *oid, size_t len, struct sh_err *e)
+{
+	char buf[128], *path;
+	size_t n = 0, i;
+	FILE *f;
+
+	path = sh_root_path(repo, ".git/FETCH_HEAD");
+	if ((f = fopen(path, "r")) != NULL) {
+		n = fread(buf, 1, sizeof (buf), f);
+		(void) fclose(f);
+	}
+	free(path);
+	for (i = 0; i < n && i + 1 < len && (src_digit(buf[i]) ||
+	    (buf[i] >= 'a' && buf[i] <= 'f')); i++)
+		oid[i] = buf[i];
+	oid[i] = '\0';
+	/* sha1's 40 digits, sha256's 64 */
+	if (i < 40) {
+		sh_errf(e, "%s: no commit fetched", repo);
+		return (-1);
+	}
+	return (0);
+}
+
+int
+sh_src_record(FILE *out, const struct sh_src *s, struct sh_err *e)
+{
+	const struct sh_node *srcs;
+	const struct sh_pair *pr;
+	char oid[72], *repo, *url;
+	size_t k;
+	int r;
+
+	repo = sh_root_path(s->sc_build, "src");
+	url = sh_src_url(sh_obj_get(sh_obj_get(s->sc_site->ss_merged,
+	    "remotes"), "src")->sn_str);
+	if ((r = sh_src_commit(repo, oid, sizeof (oid), e)) == 0)
+		(void) fprintf(out, "# src %s at %s, from %s\n",
+		    sh_obj_get(s->sc_recipe->sr_merged, "src_branch")->sn_str,
+		    oid, url);
+	free(url);
+	free(repo);
+	srcs = sh_obj_get(s->sc_recipe->sr_merged, "patches");
+	for (k = 0; r == 0 && srcs != NULL && k < srcs->sn_obj.ob_n; k++) {
+		pr = &srcs->sn_obj.ob_v[k];
+		if (src_local(pr->pr_key)) {
+			(void) fprintf(out, "# patches %s\n", pr->pr_key);
+			continue;
+		}
+		repo = src_clone(s, k);
+		if ((r = sh_src_commit(repo, oid, sizeof (oid), e)) == 0)
+			(void) fprintf(out, "# patches %s at %s\n", pr->pr_key,
+			    oid);
+		free(repo);
+	}
+	return (r);
+}
+
 void
 sh_src_recipes(struct sh_job *j, const char *config,
     const struct sh_site *site)

@@ -5,6 +5,8 @@
  * a parent is made before its children, as ZFS requires.
  */
 
+#include <sys/stat.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -559,6 +561,28 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 	return (0);
 }
 
+/*
+ * The directories of the mountpoint MP made, as zfs mount makes them,
+ * so a test may write a file into a filesystem the fake mounted. One
+ * that cannot be made is left: its writer says so.
+ */
+static void
+zf_mkdirs(const char *mp)
+{
+	char buf[ZF_NAME];
+	size_t i;
+
+	(void) snprintf(buf, sizeof (buf), "%s", mp);
+	for (i = 1; buf[i] != '\0'; i++) {
+		if (buf[i] == '/') {
+			buf[i] = '\0';
+			(void) mkdir(buf, 0755);
+			buf[i] = '/';
+		}
+	}
+	(void) mkdir(buf, 0755);
+}
+
 int
 sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 {
@@ -589,6 +613,7 @@ sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 		return (-1);
 	}
 	(void) snprintf(d->zo_at, ZF_NAME, "%s", mp);
+	zf_mkdirs(mp);
 	return (0);
 }
 

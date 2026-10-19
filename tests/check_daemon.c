@@ -24,6 +24,7 @@
 
 static const char usage[] =
 	"usage: shtetl daemon\n"
+	"       shtetl roll FOUNDATION\n"
 	"       shtetl show [RECIPE]\n"
 	"       shtetl status\n";
 
@@ -59,7 +60,7 @@ up(void)
 	CHECK((pid = fork()) >= 0);
 	if (pid == 0) {
 		sh_err_init(&e, stderr, "daemon: ");
-		_exit(sh_daemon_run(sk, sockp, z, &e) != 0);
+		_exit(sh_daemon_run(sk, sockp, z, stderr, &e) != 0);
 	}
 	(void) close(sk);
 	(void) close(lk);
@@ -154,6 +155,9 @@ main(void)
 	char *web[] = { "show", "containers/web" };
 	char *broken[] = { "show", "containers/broken" };
 	char *two[] = { "show", "containers/web", "x" };
+	char *roll[] = { "roll" };
+	char *rollbad[] = { "roll", "bad/name" };
+	char *rollgen[] = { "roll", "generic" };
 	char *big;
 	char buf[64], wantpid[32], zconfig[1024];
 	size_t len;
@@ -312,6 +316,15 @@ main(void)
 	/* D22: two recipes: the usage, 2 */
 	CHECK(sht(3, two) == 2 && strcmp(ebuf, usage) == 0);
 
+	/* F16: roll with no foundation, a bad name, no build space */
+	CHECK(sht(1, roll) == 2 && strcmp(ebuf, usage) == 0);
+	CHECK(sht(2, rollbad) == 1 && strncmp(ebuf, "shtetl: bad/name: "
+	    "invalid name: ", sizeof ("shtetl: bad/name: invalid name: ") -
+	    1) == 0);
+	CHECK(sht(2, rollgen) == 1 &&
+	    strcmp(ebuf, "shtetl: no build space\n") == 0);
+	CHECK(status() == 0 && strcmp(obuf, want) == 0);
+
 	/* D10: SIGTERM: exit 0, the socket gone */
 	CHECK(down() == 0);
 	CHECK(stat(sockp, &st) != 0);
@@ -342,7 +355,7 @@ main(void)
 	CHECK(sh_zfs_create(z, "fast/lake", &lake, 1, &c.c_err) == 0);
 	cap_reset(&c);
 	CHECK(sh_daemon_listen(lockp, sockp, &lk, &sk, &c.c_err) == 0);
-	CHECK(sh_daemon_run(sk, sockp, z, &c.c_err) == -1);
+	CHECK(sh_daemon_run(sk, sockp, z, stderr, &c.c_err) == -1);
 	CHECK(cap_has(&c, "two lake roots: fast/lake and tank/lake"));
 	CHECK(stat(sockp, &st) != 0);
 	(void) close(sk);

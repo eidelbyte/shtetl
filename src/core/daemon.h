@@ -28,10 +28,11 @@ int sh_daemon_listen(const char *lock, const char *sock, int *lk, int *sk,
 
 /*
  * The daemon, on SK, listening at SOCK: the spaces found and their
- * skeleton made, then the loop until SIGTERM or SIGINT, and the socket
- * removed. What it has to say goes to E. -1 when it never started.
+ * skeleton made, then the loop until SIGTERM or SIGINT, every roll
+ * stopped, and the socket removed. What its children write goes to
+ * LOG, what it has to say to E. -1 when it never started.
  */
-int sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
+int sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, FILE *log,
     struct sh_err *e);
 
 /*

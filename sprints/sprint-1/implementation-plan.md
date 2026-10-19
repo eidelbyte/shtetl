@@ -205,6 +205,14 @@ The roll, in order:
 7. snapshot `F@<ver>-<branch>-<date>-<create|update>`, with
    `shtetl:kind` and `shtetl:commit`.
 
+As built (m3-roll): the head is made and mounted before step 1, after
+the recipe is read, so a roll that fails or stops anywhere finds it
+to put back; a first roll makes the foundation's dataset with the
+site's lake properties and the recipe's datasets, a parent the recipe
+does not give a placeholder, canmount off. The version's name comes
+from src_branch, and for main from REVISION; ver is held to the
+branch before the checkout and to REVISION after it.
+
 The beam then carries the version to zrun (8.1), and its arrival there
 is what the foundation's houses roll on (7.2).
 

@@ -22,17 +22,22 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "core/builder.h"
 #include "core/daemon.h"
 #include "core/err.h"
 #include "core/foundation.h"
+#include "core/job.h"
 #include "core/mem.h"
+#include "core/roll.h"
 #include "core/show.h"
 #include "core/spaces.h"
+#include "core/syntax.h"
 #include "core/wire.h"
 #include "core/zfs.h"
 
 /* One person's command, from its request to the last of its reply. */
 struct conn {
+	enum sh_ev	c_ev;		/* SH_EV_CONN, first, for the udata */
 	int		c_fd;
 	struct sh_buf	c_in;
 	struct sh_buf	c_out;
@@ -43,15 +48,36 @@ struct daemon {
 	int			d_kq;
 	struct sh_zfs		*d_zfs;
 	struct sh_spaces	d_sp;
-	struct sh_foundation	*d_found;
+	char			*d_froot;	/* <lake>/foundations */
+	struct sh_foundation	**d_found;
 	size_t			d_nfound;
+	struct sh_builder	d_builder;
+	struct sh_rollenv	d_env;
 	struct conn		*d_conns;
 };
 
 static const char usage[] =
 	"usage: shtetl daemon\n"
+	"       shtetl roll FOUNDATION\n"
 	"       shtetl show [RECIPE]\n"
 	"       shtetl status\n";
+
+/* Where the space SP's root is mounted, into PATH: 0, or -1 said to E. */
+static int
+mounted(struct daemon *d, enum sh_space sp, char *path, size_t len,
+    struct sh_err *e)
+{
+	const char *root = d->d_sp.ss_root[sp];
+	int r;
+
+	if (root == NULL) {
+		sh_errf(e, "no %s space", sh_space_name(sp));
+		return (-1);
+	}
+	if ((r = sh_zfs_mounted(d->d_zfs, root, path, len, e)) == 0)
+		sh_errf(e, "%s: not mounted", root);
+	return (r == 1 ? 0 : -1);
+}
 
 /* shtetl status */
 static int
@@ -73,8 +99,41 @@ act_status(struct daemon *d, int argc, char **argv, FILE *out,
 			    d->d_sp.ss_root[i]);
 	}
 	for (f = 0; f < d->d_nfound; f++)
-		sh_foundation_status(&d->d_found[f], out);
+		sh_foundation_status(d->d_found[f], out);
 	return (0);
+}
+
+/*
+ * shtetl roll FOUNDATION: the roll asked for, the reply at once; the
+ * roll is the daemon's, and status shows it.
+ */
+static int
+act_roll(struct daemon *d, int argc, char **argv, FILE *out,
+    struct sh_err *e)
+{
+	struct sh_foundation *f;
+	char config[1024], build[1024];
+	const char *why;
+
+	(void) out;
+	if (argc != 2) {
+		(void) fputs(usage, e->se_out);
+		return (2);
+	}
+	if ((why = sh_syn_name(argv[1])) != NULL) {
+		sh_errf(e, "%s: invalid name: %s", argv[1], why);
+		return (1);
+	}
+	if (d->d_froot == NULL) {
+		sh_errf(e, "no lake space");
+		return (1);
+	}
+	if (mounted(d, SH_SP_CONFIG, config, sizeof (config), e) != 0 ||
+	    mounted(d, SH_SP_BUILD, build, sizeof (build), e) != 0)
+		return (1);
+	f = sh_foundation_find(&d->d_found, &d->d_nfound, d->d_froot,
+	    argv[1]);
+	return (sh_roll_ask(f, &d->d_env, config, build, e) != 0);
 }
 
 /* shtetl show [RECIPE]: read from zconfig, where its root is mounted */
@@ -82,24 +141,14 @@ static int
 act_show(struct daemon *d, int argc, char **argv, FILE *out,
     struct sh_err *e)
 {
-	const char *cfg = d->d_sp.ss_root[SH_SP_CONFIG];
 	char root[1024];
-	int r;
 
 	if (argc > 2) {
 		(void) fputs(usage, e->se_out);
 		return (2);
 	}
-	if (cfg == NULL) {
-		sh_errf(e, "no config space");
+	if (mounted(d, SH_SP_CONFIG, root, sizeof (root), e) != 0)
 		return (1);
-	}
-	if ((r = sh_zfs_mounted(d->d_zfs, cfg, root, sizeof (root), e)) !=
-	    1) {
-		if (r == 0)
-			sh_errf(e, "%s: not mounted", cfg);
-		return (1);
-	}
 	return (sh_show(root, argc == 2 ? argv[1] : NULL, out, e->se_out));
 }
 
@@ -108,6 +157,7 @@ static const struct {
 	int		(*a_fn)(struct daemon *, int, char **, FILE *,
 			    struct sh_err *);
 } acts[] = {
+	{ "roll", act_roll },
 	{ "show", act_show },
 	{ "status", act_status }
 };
@@ -194,6 +244,7 @@ accepted(struct daemon *d, int sk)
 	(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
 	(void) fcntl(fd, F_SETFL, O_NONBLOCK);
 	c = sh_calloc(1, sizeof (*c));
+	c->c_ev = SH_EV_CONN;
 	c->c_fd = fd;
 	c->c_next = d->d_conns;
 	d->d_conns = c;
@@ -307,30 +358,42 @@ fail:
 }
 
 int
-sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, struct sh_err *e)
+sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, FILE *log,
+    struct sh_err *e)
 {
 	struct daemon d;
-	struct kevent ev[16];
-	char root[512];
-	int i, n, done = 0, r = -1;
+	struct kevent ev[3];
+	size_t f, n;
+	int done = 0, r = -1;
+	void *u;
 
 	(void) memset(&d, 0, sizeof (d));
 	d.d_zfs = z;
 	d.d_kq = -1;
+	sh_builder_init(&d.d_builder);
 	if (sh_spaces_find(z, &d.d_sp, e) != 0 ||
 	    sh_spaces_skeleton(z, &d.d_sp, e) != 0)
 		goto out;
 	if (d.d_sp.ss_root[SH_SP_LAKE] != NULL) {
-		(void) snprintf(root, sizeof (root), "%s/foundations",
+		n = strlen(d.d_sp.ss_root[SH_SP_LAKE]) +
+		    sizeof ("/foundations");
+		d.d_froot = sh_calloc(1, n);
+		(void) snprintf(d.d_froot, n, "%s/foundations",
 		    d.d_sp.ss_root[SH_SP_LAKE]);
-		if (sh_foundations_start(z, root, &d.d_found, &d.d_nfound,
-		    e) != 0)
+		if (sh_foundations_start(z, d.d_froot, &d.d_found,
+		    &d.d_nfound, e) != 0)
 			goto out;
 	}
 	if ((d.d_kq = kqueue()) < 0) {
 		sh_errf(e, "kqueue: %s", strerror(errno));
 		goto out;
 	}
+	d.d_env.re_z = z;
+	d.d_env.re_builder = &d.d_builder;
+	d.d_env.re_kq = d.d_kq;
+	d.d_env.re_log = log;
+	d.d_env.re_err = e;
+	d.d_env.re_flags = SF_IMMUTABLE;
 	/* a signal kqueue watches is recorded even while it is ignored */
 	(void) signal(SIGTERM, SIG_IGN);
 	(void) signal(SIGINT, SIG_IGN);
@@ -343,31 +406,41 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, struct sh_err *e)
 		goto out;
 	}
 	r = 0;
+	/*
+	 * One event at a time: an event that ends a job or a connection
+	 * frees it, and no other already taken can name it then.
+	 */
 	while (!done) {
-		if ((n = kevent(d.d_kq, NULL, 0, ev, 16, NULL)) < 0 &&
-		    errno != EINTR) {
+		if (kevent(d.d_kq, NULL, 0, ev, 1, NULL) != 1) {
+			if (errno == EINTR)
+				continue;
 			sh_errf(e, "kevent: %s", strerror(errno));
 			r = -1;
 			break;
 		}
-		for (i = 0; i < n; i++) {
-			if (ev[i].filter == EVFILT_SIGNAL)
-				done = 1;
-			else if (ev[i].udata == NULL)
-				accepted(&d, sk);
-			else if (ev[i].filter == EVFILT_READ)
-				readable(&d, ev[i].udata);
-			else
-				writable(&d, ev[i].udata);
-		}
+		u = ev[0].udata;
+		if (ev[0].filter == EVFILT_SIGNAL)
+			done = 1;
+		else if (u == NULL)
+			accepted(&d, sk);
+		else if (*(enum sh_ev *)u == SH_EV_JOB)
+			sh_job_event(u, d.d_kq, &ev[0]);
+		else if (ev[0].filter == EVFILT_READ)
+			readable(&d, u);
+		else
+			writable(&d, u);
 	}
 out:
 	while (d.d_conns != NULL)
 		hang_up(&d, d.d_conns);
+	/* what a stopped roll leaves, the next start puts back */
+	for (f = 0; f < d.d_nfound; f++)
+		sh_roll_stop(d.d_found[f]);
 	if (d.d_kq >= 0)
 		(void) close(d.d_kq);
 	(void) unlink(sock);
 	sh_foundations_free(d.d_found, d.d_nfound);
+	free(d.d_froot);
 	sh_spaces_free(&d.d_sp);
 	return (r);
 }
