@@ -120,19 +120,22 @@ job_read(struct sh_job *j)
 {
 	struct sh_buf *b = &j->j_line;
 	char buf[4096];
-	const char *nl;
+	const char *p, *nl;
 	ssize_t n;
-	size_t len;
+	size_t len, left;
 
 	while ((n = read(j->j_fd, buf, sizeof (buf))) > 0) {
 		sh_buf_add(b, buf, (size_t)n);
-		while (b->b_off < b->b_len &&
-		    ((nl = memchr(b->b_data + b->b_off, '\n',
-		    b->b_len - b->b_off)) != NULL ||
-		    b->b_len - b->b_off >= JOB_LINE)) {
-			len = nl != NULL ? (size_t)(nl - (b->b_data + b->b_off)) :
-			    JOB_LINE;
-			job_line(j, b->b_data + b->b_off, len);
+		for (;;) {
+			p = b->b_data + b->b_off;
+			left = b->b_len - b->b_off;
+			if ((nl = memchr(p, '\n', left)) != NULL)
+				len = (size_t)(nl - p);
+			else if (left >= JOB_LINE)
+				len = JOB_LINE;
+			else
+				break;
+			job_line(j, p, len);
 			b->b_off += len + (nl != NULL);
 		}
 		(void) memmove(b->b_data, b->b_data + b->b_off,

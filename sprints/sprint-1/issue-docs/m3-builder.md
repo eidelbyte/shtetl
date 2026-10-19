@@ -71,5 +71,6 @@
 
 ## Commit
 
-The commit after 59d5573, "job: steps, watched children, and the
-builder's turns".
+4d85567, "job: steps, watched children, and the builder's turns". It
+went out with one line of job.c past 80 columns (the gate's failure
+was hidden by a pipe); the next commit rewrites that loop to fit.
