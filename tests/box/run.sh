@@ -1,8 +1,9 @@
 #!/bin/sh
-# tests/box/run.sh -- shtetl's cells on the box, on throwaway pools made
-# as the probes make theirs (probes/lib.sh): family Z over libzfs
-# (build/box_zcheck), and a daemon (./shtetl) started over what a crash
-# left, family A.
+# tests/box/run.sh -- shtetl's cells on the box: make check-freebsd, the
+# unit tests on this libc and the textproc/libucl port; then, on
+# throwaway pools made as the probes make theirs (probes/lib.sh),
+# family Z over libzfs (build/box_zcheck), and a daemon (./shtetl)
+# started over what a crash left, family A.
 #
 #   make freebsd && sudo sh tests/box/run.sh
 #   sudo sh tests/box/run.sh --clean     what a crash left
@@ -25,7 +26,8 @@ case ${1:-} in
 	exit 0
 	;;
 *)
-	sed -n '7,8p' "$BD/run.sh" | sed 's/^# //'
+	echo "usage: make freebsd && sudo sh tests/box/run.sh"
+	echo "       sudo sh tests/box/run.sh --clean"
 	exit 2
 	;;
 esac
@@ -111,6 +113,14 @@ trap 'pools_down; exit 130' INT TERM
 	    "box on $(hostname -s) $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "host: $(uname -rm)"
 	echo "zfs: $(zfs version 2>/dev/null | tr '\n' ' ')"
+	echo
+	# as the person behind sudo, so the build stays theirs
+	echo "make check-freebsd: the unit tests, on this libc and libucl"
+	if [ -n "${SUDO_USER:-}" ]; then
+		su "$SUDO_USER" -c "make -C '$TOP' check-freebsd"
+	else
+		make -C "$TOP" check-freebsd
+	fi
 	echo
 	echo "family Z, over libzfs"
 	if pool_make $RUN && zfs create $RUN/zc; then

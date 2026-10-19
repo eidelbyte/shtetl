@@ -18,6 +18,9 @@ keeps it local.
 
 What runs:
 
+- make check-freebsd, as the person behind sudo: every unit test on
+  this libc and the textproc/libucl port, each program an ok or FAIL
+  line of the log.
 - family Z (tests/MATRIX.md): build/box_zcheck, tests/zcells.c's
   cells over libzfs, the same cells make check runs over the fake.
 - family A: ./shtetl daemon started over a lake pool holding what a
