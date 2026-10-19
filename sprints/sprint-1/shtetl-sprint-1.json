@@ -3,7 +3,7 @@
     "project": "shtetl",
     "sprint": 1,
     "created": "2026-10-18",
-    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 and M2 tested (box run 3, 73 of 73); next M3, m3-builder.",
+    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 and M2 tested (box run 3, 73 of 73); M3 under way: m3-builder and m3-src built (2026-10-20); m3-roll split into m3-roll, m3-install and m3-commands.",
     "planning_docs": [
       "sprints/sprint-1/implementation-plan.md",
       "sprints/sprint-1/open-questions.md"
@@ -452,7 +452,7 @@
     "note": "2026-10-20: built; GS1-GS9, GP1-GP15, GR1-GR4 on the mac with git 2.50 over file:// remotes, mutations caught, no leaks of ours, gate, xcheck. zbuild = src/ + patches/N (plan 4 amended); no retouch code (git reset --hard rewrites patched files); one git apply --3way per patch (already-in merges clean). Owed: GS10 (real src fetch) in m3-box; check_src under make check-freebsd on the box. Worklog issue-docs/m3-src.md."
   },
   "m3-roll": {
-    "description": "Roll steps 3 to 7 (plan 6) and the stall (7.4). buildworld and buildkernel over the foundation's obj cache (<lake>/foundation-builds/F); into the head, mounted for the roll: delete-old before installworld, the kernel installed into a scratch directory of the obj cache and synced with install -C semantics, distribution, installworld's backups removed (all carried from main as knowledge); pkg, commands-external, commands; foundation.conf injected with the src commit and the patches; snapshot -r F@<ver>-<branch>-<date>-<create|update> with shtetl:kind and shtetl:commit. A first roll creates the foundation's datasets from its recipe. Any failure rolls every dataset back to its newest snapshot (or destroys a first roll's), resets zbuild, sets shtetl:stall (the step and the reason) and logs it. `shtetl roll F` clears a stall and asks the builder for a turn; a roll of a foundation already rolling is refused. Kill tests at each step, the actor started again landing where family A says. Verify: make check with make and git faked as children; the box in m3-box.",
+    "description": "The roll's frame (plan 6, 7.4, 9), with the steps of m3-src; m3-install and m3-commands add theirs between the patches and the inject. `shtetl roll F` (F a foundation recipe, with a dataset or not yet): a stall cleared (shtetl:stall inherited), a roll of a foundation already rolling or waiting refused, a turn asked of the builder; the reply at once, the roll the daemon's. The daemon runs jobs: a kevent's udata told apart by enum sh_ev, every job stopped on SIGTERM; the rc script gives the daemon /usr/local's PATH. A first roll creates the foundation's datasets from its recipe (datasets, properties). The version named from the checkout's REVISION and src_branch (plan 4, 6: 15.1-releng, 15-stable, 16-current), checked against ver; foundation.conf injected with the src commit and the patch sources; snapshot -r F@<ver>-<branch>-<date>-<create|update> with shtetl:kind and shtetl:commit, the head unmounted. Any failure rolls every dataset back to its newest snapshot (or destroys a first roll's), resets zbuild (sh_src_reset), sets shtetl:stall (the step and the reason) and logs it. Kill tests: the job stopped at each step, the actor started again landing where family A says. Verify: make check over the fake ZFS with git real (m3-src's fixture); the box in m3-box.",
     "requires": [
       "m3-src"
     ],
@@ -461,24 +461,65 @@
     "expected_changed_files": [
       "src/core/foundation.h",
       "src/core/foundation.c",
-      "src/core/install.h",
-      "src/core/install.c",
+      "src/core/roll.h",
+      "src/core/roll.c",
+      "src/core/daemon.c",
       "src/core/zfs.h",
       "src/fbsd/zfs.c",
       "tests/zfake.c",
-      "tests/check_foundation.c",
+      "tests/zcells.c",
+      "tests/check_roll.c",
+      "tests/MATRIX.md",
+      "etc/rc.d/shtetl",
+      "Makefile"
+    ],
+    "provides": "A foundation rolls by hand through its src and patches to an injected, snapshotted version, or rolls back and stalls; shtetl roll F restarts a stalled one.",
+    "estimated_size": "large",
+    "completed": "not-started",
+    "note": "2026-10-20 (from m3-src): rc's and service(8)'s PATH lack /usr/local/bin, so the daemon's git children exit 127 under rc; give etc/rc.d/shtetl the PATH when the daemon first runs a job. foundation.conf needs the src and patch-source commits: read them from git without parsing its words where possible. On failure run sh_src_reset. 2026-10-20: split; the build and install moved to m3-install, pkg and the commands to m3-commands, so each lands with its own worklog."
+  },
+  "m3-install": {
+    "description": "Roll steps 3 and 4 (plan 6), added to m3-roll's frame: buildworld and buildkernel over the foundation's obj cache (<lake>/foundation-builds/F, made by the skeleton's walk when missing, mounted for the roll), make_jobs or the CPUs, the src.conf and kernel config shtetl writes (buildopts, kernconf); into the head: delete-old before installworld on an update, installworld with install -C, the kernel installed into a scratch directory of the obj cache and synced with install -C semantics (what the new kernel has not removed), distribution, installworld's backups removed (all carried from main as knowledge). MAKEOBJDIRPREFIX is make's environment only. Verify: make check with make faked as a child; the box in m3-box.",
+    "requires": [
+      "m3-roll"
+    ],
+    "epic": "foundations",
+    "milestone": "M3",
+    "expected_changed_files": [
+      "src/core/install.h",
+      "src/core/install.c",
+      "src/core/roll.c",
+      "tests/check_install.c",
       "tests/MATRIX.md",
       "Makefile"
     ],
-    "provides": "A foundation rolls by hand: built, installed, injected and snapshotted, or rolled back and stalled; shtetl roll F restarts a stalled one.",
+    "provides": "A roll that builds and installs a world and a kernel into the head.",
     "estimated_size": "large",
-    "completed": "not-started",
-    "note": "2026-10-20 (from m3-src): rc's and service(8)'s PATH lack /usr/local/bin, so the daemon's git children exit 127 under rc; give etc/rc.d/shtetl the PATH when the daemon first runs a job. foundation.conf needs the src and patch-source commits: read them from git without parsing its words where possible. On failure run sh_src_reset."
+    "completed": "not-started"
+  },
+  "m3-commands": {
+    "description": "Roll step 5 (plan 6): pkg, commands-external and commands, added to m3-roll's frame after m3-install's steps. pkg and commands in a chroot of the head with devfs mounted, and the host's resolv.conf for pkg where the head has none, each undone at the step's end and after a failure; commands-external on the host, given the head's path. Carried from main as knowledge (its fb_chroot). Verify: make check with the programs faked as children; the box in m3-box.",
+    "requires": [
+      "m3-install"
+    ],
+    "epic": "foundations",
+    "milestone": "M3",
+    "expected_changed_files": [
+      "src/core/commands.h",
+      "src/core/commands.c",
+      "src/core/roll.c",
+      "tests/check_commands.c",
+      "tests/MATRIX.md",
+      "Makefile"
+    ],
+    "provides": "A roll that installs the recipe's packages and runs its commands.",
+    "estimated_size": "medium",
+    "completed": "not-started"
   },
   "m3-pkg": {
     "description": "A foundation's package upgrade (plan 6): pkg upgrade in the head, foundation.conf injected again, a snapshot of kind pkg; no src, no build, no commands. A failure rolls back and stalls as any roll. Verify: make check; the box in m3-box.",
     "requires": [
-      "m3-roll"
+      "m3-commands"
     ],
     "epic": "foundations",
     "milestone": "M3",
