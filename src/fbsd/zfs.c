@@ -307,12 +307,19 @@ struct zz_snaps {
 	int	zs_stop;
 };
 
+/*
+ * zfs_iter_snapshots_sorted_v2 (lib/libzfs/libzfs_iter.c) calls this
+ * for every snapshot whatever it returns, so once FN has stopped the
+ * walk, the rest are only closed (box run 1, Z6).
+ */
 static int
 zz_snap(zfs_handle_t *zhp, void *arg)
 {
 	struct zz_snaps *w = arg;
 
-	w->zs_stop = w->zs_fn(w->zs_arg, strchr(zfs_get_name(zhp), '@') + 1);
+	if (w->zs_stop == 0)
+		w->zs_stop = w->zs_fn(w->zs_arg,
+		    strchr(zfs_get_name(zhp), '@') + 1);
 	zfs_close(zhp);
 	return (w->zs_stop != 0 ? -1 : 0);
 }

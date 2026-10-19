@@ -95,3 +95,15 @@ hold none: a test would pass over the fake and fail on the box. The
 fake now answers 1 as the real layer does, Z2 has the cell, and
 zfake_local gives tests what the fake holds on a filesystem. The fix
 is its own commit, since 0486a19 was pushed.
+
+## Box run 1
+
+KIDON, 2026-10-20, at 48050c7 (results 7b6513e): family Z 46 of 47.
+Z6 "the walk stopped, FN's value returned" failed: libzfs's
+zfs_iter_snapshots_sorted_v2 calls the callback for every snapshot
+whatever it returns (it ORs the returns), so the second call wrote
+FN's 0 over its 7, the walk saw both snapshots, and the layer reported
+libzfs's last, stale, description. main's zz_snap had the guard; it was
+lost in the trim. Back, with the reason in its comment, in its own
+commit (0486a19 is pushed). The fake stops at once, which is what the
+layer now does too. A rerun of Z6 is owed.
