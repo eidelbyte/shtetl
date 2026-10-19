@@ -298,7 +298,8 @@
     ],
     "provides": "shtetl daemon: one kqueue loop holding the actors, a lock against a second daemon, and the shtetl command, which sends its arguments over the socket and prints the reply.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-10-20: built; D1-D17 over the fake (256 KiB request/reply, a reader that does not read), live leaks check after 600 commands, xcheck, gate. No peer check: the socket's mode is the rule. Owed: D18, the rc script on the box by hand (tests/box/README.md). Worklog issue-docs/m1-daemon.md."
   },
   "m1-foundation-start": {
     "description": "The first actor (plan 6, 9): one foundation actor for each filesystem under <lake>/foundations, started with the daemon. Starting, it puts the foundation where an idle one is: every dataset of its tree rolled back to its newest snapshot (a no-op when nothing was written), a dataset with no snapshot destroyed (what a crashed first build leaves), the head unmounted. So a crash part way is not a failure and leaves no stall. shtetl:stall on the head makes it stalled, showing the property's text. `shtetl status` prints one line per actor: its kind, its name, idle or stalled, and its newest version or the stall. Matrix family A (actor starts): fresh, written since the newest, no snapshot at all, a child with none, mounted, stalled. Verify: make check; the box run of tests/box/run.sh starts a daemon on md pools after a written head and reads status.",

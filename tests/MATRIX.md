@@ -25,6 +25,8 @@ syslog and ends the process with 1 (plan 10).
 | M4 | sh_realloc | refuses | "out of memory" logged, exit 1 | tests/check_mem.c (SIZE_MAX) |
 | M5 | sh_strdup | gives | the copy | tests/check_mem.c |
 | M6 | sh_strdup | refuses | as M2 | deferred: no string can be made long enough to fail it; the path is M2's, through the same function |
+| M7 | sh_memstream | gives | a stream into the buffer | tests/check_daemon.c (every reply) |
+| M8 | sh_memstream | refuses | as M2 | deferred as M6: the path is M2's |
 
 ## Family Z: the ZFS layer (m1-zfs)
 
@@ -119,3 +121,38 @@ there or not, its making refused or not.
 On the box, discovery and the skeleton run inside the daemon's start,
 which m1-foundation-start's box cells exercise; the ZFS calls under
 them are family Z's.
+
+## Family D: the daemon and the command (m1-daemon)
+
+Dimensions: the daemon's start (the lock free or held, the socket's
+path empty or holding something, the spaces found or refused); a
+request (a verb, none, an unknown one, too many words, whole or in
+pieces, larger than a socket takes, something that is no request);
+the client (reads its reply, leaves before it, says nothing, reads
+slowly); the end (SIGTERM, no daemon at all). A daemon is forked
+over the fake on a socket listened on before the fork.
+
+| cell | what happens | expected | disposition |
+|------|--------------|----------|-------------|
+| D1 | status | the spaces on standard output, nothing on standard error, 0 | tests/check_daemon.c |
+| D2 | no verb | the usage on standard error, 2 | tests/check_daemon.c |
+| D3 | an unknown verb | "shtetl: V: unknown command" and the usage, 2 | tests/check_daemon.c |
+| D4 | status with a word more | the usage, 2 | tests/check_daemon.c |
+| D5 | a second daemon while one runs | "already running" | tests/check_daemon.c |
+| D6 | a request in two writes, the header cut | answered whole: out, err, exit, nothing after | tests/check_daemon.c |
+| D7 | a client that asks and leaves | the next answered | tests/check_daemon.c |
+| D8 | a client that says nothing and leaves | the next answered | tests/check_daemon.c |
+| D9 | a record that is no request | hung up on, nothing sent; the next answered | tests/check_daemon.c |
+| D10 | SIGTERM | exit 0, the socket removed | tests/check_daemon.c |
+| D11 | no daemon | "shtetl: SOCK: " and connect's words, 1, nothing on standard output | tests/check_daemon.c |
+| D12 | the socket's path holding a file a dead daemon left | replaced, answered | tests/check_daemon.c |
+| D13 | the spaces refused | -1 before the loop, their words, the socket removed | tests/check_daemon.c |
+| D14 | the pidfile | the daemon's pid in it | tests/check_daemon.c |
+| D15 | the socket | mode 0600 | tests/check_daemon.c |
+| D16 | a request and a reply of 256 KiB | both whole, through partial writes | tests/check_daemon.c |
+| D17 | a client that does not read a large reply | another answered meanwhile; the reply whole when read | tests/check_daemon.c |
+| D18 | the rc script | started under daemon(8), stopped by its pidfile | deferred to the box by hand: tests/box/README.md |
+
+Also run by hand on the mac (not in make check, since leaks(1) hangs
+on a forked child that exits): a live daemon over the fake after 600
+commands, no leaks.

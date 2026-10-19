@@ -35,3 +35,9 @@ sh_strdup(const char *s)
 {
 	return (given(strdup(s)));
 }
+
+FILE *
+sh_memstream(char **buf, size_t *len)
+{
+	return (given(open_memstream(buf, len)));
+}

@@ -21,6 +21,19 @@ What runs:
 - family Z (tests/MATRIX.md): build/box_zcheck, tests/zcells.c's
   cells over libzfs, the same cells make check runs over the fake.
 
+By hand, once (tests/MATRIX.md D18), the rc script:
+
+    sudo make install
+    sudo service shtetl onestart
+    sudo shtetl status
+    sudo service shtetl onestatus
+    sudo service shtetl onestop
+
+status prints the spaces this box has marked (none is fine); onestatus
+names the pid in /var/run/shtetl.pid; after onestop both
+/var/run/shtetl.sock and the process are gone. `sudo rm
+/usr/local/sbin/shtetl /usr/local/etc/rc.d/shtetl` takes it away again.
+
 `make freebsd` needs a FreeBSD source tree for the OpenZFS headers,
 /usr/src unless FREEBSD_SRC says otherwise. On the mac, `make xcheck`
 (with FREEBSD_SRC set) compiles the FreeBSD sources against such a

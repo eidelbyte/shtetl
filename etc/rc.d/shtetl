@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# PROVIDE: shtetl
+# REQUIRE: FILESYSTEMS zfs
+# KEYWORD: shutdown
+#
+# shtetl_enable (bool):	run the shtetl daemon (default NO).
+#
+# daemon(8) detaches it, and shtetl writes its own pidfile, which it
+# holds locked for its life. Nothing restarts it (plan 10).
+
+. /etc/rc.subr
+
+name=shtetl
+rcvar=shtetl_enable
+load_rc_config $name
+: ${shtetl_enable:=NO}
+
+pidfile=/var/run/shtetl.pid
+procname=/usr/local/sbin/shtetl
+command=/usr/sbin/daemon
+command_args="-f ${procname} daemon"
+
+run_rc_command "$1"

@@ -118,6 +118,12 @@ sh_spaces_find(struct sh_zfs *z, struct sh_spaces *sp, struct sh_err *e)
 	return (r != 0 || f.sf_bad ? -1 : 0);
 }
 
+const char *
+sh_space_name(enum sh_space sp)
+{
+	return (sp_names[sp]);
+}
+
 void
 sh_spaces_free(struct sh_spaces *sp)
 {

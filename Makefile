@@ -31,7 +31,8 @@ ZFS_LIBS = -lzfs -lzfs_core -lnvpair
 FLAVOR = portable
 BUILD = build
 
-CORE_OBJS = $(BUILD)/err.o $(BUILD)/mem.o $(BUILD)/spaces.o
+CORE_OBJS = $(BUILD)/err.o $(BUILD)/mem.o $(BUILD)/spaces.o \
+	$(BUILD)/wire.o $(BUILD)/daemon.o $(BUILD)/command.o
 # src/core/zfs.h has two implementations, picked at the link: the
 # FreeBSD layer over libzfs, and tests/zfake.c for the tests. The mac
 # has no ZFS to link a program against, so the portable flavor
@@ -39,7 +40,7 @@ CORE_OBJS = $(BUILD)/err.o $(BUILD)/mem.o $(BUILD)/spaces.o
 ZFS_OBJS = $(BUILD)/fbsd_zfs.o
 TEST_OBJS = $(BUILD)/zfake.o $(BUILD)/zcells.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS)
-TESTS = check_mem check_zfs check_spaces
+TESTS = check_mem check_zfs check_spaces check_daemon
 
 ALL_portable = $(SHTETL_OBJS)
 ALL_freebsd = shtetl $(BUILD)/box_zcheck
@@ -53,8 +54,9 @@ flavor:
 	    echo "$(FLAVOR)" > $(BUILD)/.flavor; \
 	fi
 
-shtetl: $(SHTETL_OBJS)
-	$(CC) $(CFLAGS) -o $@ $(SHTETL_OBJS) $(LDFLAGS)
+shtetl: $(SHTETL_OBJS) $(ZFS_OBJS)
+	$(CC) $(CFLAGS) -o $@ $(SHTETL_OBJS) $(ZFS_OBJS) $(LDFLAGS) \
+	    $(ZFS_LIBS)
 
 # tests/box/run.sh's program: family Z against libzfs.
 $(BUILD)/box_zcheck: tests/box/zcheck.c $(BUILD)/zcells.o $(CORE_OBJS) \
@@ -68,8 +70,17 @@ freebsd:
 check-freebsd:
 	$(MAKE) FLAVOR=freebsd check
 
-$(BUILD)/main.o: src/main.c
+$(BUILD)/main.o: src/main.c src/core/daemon.h src/core/err.h \
+	src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/main.c
+$(BUILD)/wire.o: src/core/wire.c src/core/wire.h src/core/mem.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/wire.c
+$(BUILD)/daemon.o: src/core/daemon.c src/core/daemon.h src/core/err.h \
+	src/core/mem.h src/core/spaces.h src/core/wire.h src/core/zfs.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/daemon.c
+$(BUILD)/command.o: src/core/command.c src/core/daemon.h \
+	src/core/err.h src/core/wire.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/command.c
 $(BUILD)/err.o: src/core/err.c src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/err.c
 $(BUILD)/mem.o: src/core/mem.c src/core/mem.h
@@ -97,6 +108,14 @@ check: flavor $(CORE_OBJS) $(TEST_OBJS)
 	    echo "ok   $$t"; \
 	done
 
+# The program in sbin, since the daemon runs as root, and its rc
+# script; build the freebsd flavor first.
+PREFIX ?= /usr/local
+install:
+	install -d $(DESTDIR)$(PREFIX)/sbin $(DESTDIR)$(PREFIX)/etc/rc.d
+	install -m 0555 shtetl $(DESTDIR)$(PREFIX)/sbin/shtetl
+	install -m 0555 etc/rc.d/shtetl $(DESTDIR)$(PREFIX)/etc/rc.d/shtetl
+
 gate:
 	sh tools/gate.sh
 
@@ -108,4 +127,4 @@ xcheck:
 clean:
 	rm -rf $(BUILD) shtetl
 
-.PHONY: all flavor freebsd check-freebsd check gate xcheck clean
+.PHONY: all flavor freebsd check-freebsd check install gate xcheck clean

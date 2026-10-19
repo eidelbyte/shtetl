@@ -31,6 +31,9 @@ int sh_spaces_find(struct sh_zfs *z, struct sh_spaces *sp,
     struct sh_err *e);
 void sh_spaces_free(struct sh_spaces *sp);
 
+/* The word of the space SP: "lake", "config", "build", "run". */
+const char *sh_space_name(enum sh_space sp);
+
 /* The skeleton below each root found, what is missing of it made. */
 int sh_spaces_skeleton(struct sh_zfs *z, const struct sh_spaces *sp,
     struct sh_err *e);
