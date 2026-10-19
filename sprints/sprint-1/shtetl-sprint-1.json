@@ -228,7 +228,8 @@
     ],
     "provides": "A C tree that builds portable on the mac and with make freebsd on the box, a gate, make check, the error sink and the allocators every later issue uses.",
     "estimated_size": "small",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-10-20: built; make check (M1-M5) and make gate clean on the mac; make freebsd on the box owed with M1's box run. Worklog issue-docs/m1-tree.md."
   },
   "m1-zfs": {
     "description": "The ZFS layer, carried from main (src/core/zfs.h, src/fbsd/zfs.c over libzfs and libzfs_core, tests/zfake.c, tests/box/zcheck.c) and trimmed to the calls M1 uses: open and close, the filesystems where a user property is set locally, get (native and user properties), children, create with properties, snapshot (one transaction, properties from birth), the snapshots of a dataset oldest first, rollback to the newest, destroy, mount and unmount. Later issues add their own calls (clone, promote, resumable send and receive in m4-zfs). The fake checks in the order the real layer does and says the same words; main's lessons carried: a mounted filesystem is refused destroy (EBUSY) before its snapshots are looked at; setting a mountpoint mounts a canmount=on dataset. Matrix family Z. The box cells run over the real layer on md pools (tests/box/run.sh, the log sent back by send.sh as the probes do), and make check runs the same cells over the fake (zcheck-fake.c), so the fake cannot disagree with the box unseen. Verify: make check on the mac; tests/box/run.sh on the box, all Z cells ok.",
