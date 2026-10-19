@@ -13,6 +13,7 @@
 
 #include "core/builder.h"
 #include "core/cascade.h"
+#include "core/commands.h"
 #include "core/err.h"
 #include "core/foundation.h"
 #include "core/install.h"
@@ -43,6 +44,7 @@ struct sh_roll {
 	char			*r_srcdir;	/* the checkout */
 	char			*r_obj;		/* where F's obj cache is */
 	struct sh_install	r_install;
+	struct sh_commands	r_commands;
 	char			r_ver[48];	/* 15.1-releng */
 	char			r_commit[72];
 	char			*r_snap;	/* the version made */
@@ -240,7 +242,8 @@ roll_inject(struct sh_job *j, void *arg, struct sh_err *e)
 
 /*
  * F's obj cache made where missing, with the site's lake properties,
- * and mounted; the build and the install added, then the inject.
+ * and mounted; the build and the install added, the packages and the
+ * commands, then the inject.
  */
 static int
 roll_obj(struct sh_job *j, void *arg, struct sh_err *e)
@@ -282,6 +285,11 @@ roll_obj(struct sh_job *j, void *arg, struct sh_err *e)
 	r->r_install.in_update = !r->r_first;
 	if (sh_install_steps(j, &r->r_install, e) != 0)
 		return (-1);
+	r->r_commands.cm_head = r->r_head;
+	r->r_commands.cm_name = r->r_f->f_name;
+	r->r_commands.cm_recipe = &r->r_recipe;
+	r->r_commands.cm_resolv = r->r_env->re_resolv;
+	sh_commands_steps(j, &r->r_commands);
 	sh_job_call(j, "inject", roll_inject, r);
 	return (0);
 }

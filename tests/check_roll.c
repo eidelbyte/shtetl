@@ -31,7 +31,7 @@ static struct sh_builder b;
 static struct sh_rollenv env;
 static struct sh_foundation **fs;
 static size_t nfs;
-static char config[1100], build[1100];
+static char config[1100], build[1100], resolv[1100];
 static char *logbuf;
 static size_t loglen;
 static FILE *logf;
@@ -81,7 +81,7 @@ ask(const char *name)
 		(void) usleep(50000);
 	last = time(NULL);
 	/* what make is asked, this roll's alone */
-	(void) unlink(scratch_path("make.log"));
+	(void) unlink(scratch_path("fake.log"));
 	f = sh_foundation_find(&fs, &nfs, FROOT, name);
 	cap_reset(&c);
 	CHECK(sh_roll_ask(f, &env, config, build, &c.c_err) == 0);
@@ -245,7 +245,7 @@ main(void)
 	(void) snprintf(want, sizeof (want), "%s/tests/bin:%s", cwd,
 	    getenv("PATH"));
 	CHECK(setenv("PATH", want, 1) == 0);
-	CHECK(setenv("FAKE_MAKE_LOG", scratch_path("make.log"), 1) == 0);
+	CHECK(setenv("FAKE_LOG", scratch_path("fake.log"), 1) == 0);
 	(void) snprintf(src, sizeof (src), "%s", scratch_path("build/src"));
 	(void) snprintf(obj, sizeof (obj), "%s",
 	    scratch_path("lake/foundation-builds/r1"));
@@ -266,6 +266,9 @@ main(void)
 	env.re_z = z;
 	env.re_builder = &b;
 	env.re_obj = OROOT;
+	(void) snprintf(resolv, sizeof (resolv), "%s",
+	    scratch_path("resolv.conf"));
+	env.re_resolv = resolv;
 	CHECK((env.re_kq = kqueue()) >= 0);
 	env.re_log = logf;
 	env.re_err = &c.c_err;
@@ -322,12 +325,12 @@ main(void)
 	(void) snprintf(all, sizeof (all), " SRCCONF=%s/shtetl/src.conf "
 	    "KERNCONFDIR=%s/shtetl KERNCONF=R1\n", obj, obj);
 	(void) snprintf(want, sizeof (want),
-	    "-C %s -j3 buildworld buildkernel%s"
-	    "-C %s installworld DESTDIR=%s INSTALL_CMD=install -C%s"
-	    "-C %s installkernel DESTDIR=%s/kernel-install%s"
-	    "-C %s distribution DESTDIR=%s%s",
+	    "make -C %s -j3 buildworld buildkernel%s"
+	    "make -C %s installworld DESTDIR=%s INSTALL_CMD=install -C%s"
+	    "make -C %s installkernel DESTDIR=%s/kernel-install%s"
+	    "make -C %s distribution DESTDIR=%s%s",
 	    src, all, src, head, all, src, obj, all, src, head, all);
-	CHECK(is(slurp("make.log"), want));
+	CHECK(is(slurp("fake.log"), want));
 	CHECK(is(slurp("lake/foundation-builds/r1/buildworld"),
 	    "buildworld\n"));
 	CHECK(is(slurp("lake/foundations/r1/boot/kernel/kernel"),
@@ -358,12 +361,12 @@ main(void)
 	(void) snprintf(snap, sizeof (snap), "%s@%s", ds("r1"), f->f_newest);
 	CHECK(strcmp(user(snap, "shtetl:kind"), "update") == 0);
 	(void) snprintf(want, sizeof (want),
-	    "-C %s -j3 buildworld buildkernel%s"
-	    "-C %s delete-old delete-old-libs DESTDIR=%s "
+	    "make -C %s -j3 buildworld buildkernel%s"
+	    "make -C %s delete-old delete-old-libs DESTDIR=%s "
 	    "BATCH_DELETE_OLD_FILES=yes%s"
-	    "-C %s installworld DESTDIR=%s INSTALL_CMD=install -C%s",
+	    "make -C %s installworld DESTDIR=%s INSTALL_CMD=install -C%s",
 	    src, all, src, head, all, src, head, all);
-	CHECK(strncmp(slurp("make.log"), want, strlen(want)) == 0);
+	CHECK(strncmp(slurp("fake.log"), want, strlen(want)) == 0);
 	CHECK(!there("lake/foundations/r1/sbin/init.bak") &&
 	    !there("lake/foundations/r1/libexec/ld-elf.so.1.old") &&
 	    !there("lake/foundations/r1/boot/loader.old") &&
@@ -436,6 +439,51 @@ main(void)
 	CHECK(f->f_state == SH_F_IDLE &&
 	    (text = slurp("lake/foundation-builds/r6/shtetl/R6")) != NULL &&
 	    strstr(text, want) != NULL);
+
+	/*
+	 * X1, X2, X3: commands-external on the host first; then devfs,
+	 * pkg with the host's resolv.conf lent, each command piece in a
+	 * chroot, devfs off; the resolv.conf taken back
+	 */
+	f = roll("r7");
+	CHECK(f->f_state == SH_F_IDLE);
+	(void) snprintf(head, sizeof (head), "%s",
+	    scratch_path("lake/foundations/r7"));
+	(void) snprintf(want, sizeof (want), "external r7 foundation %s\n"
+	    "mount -t devfs devfs %s/dev\n"
+	    "pkg -c %s install -y -- a b (resolv.conf)\n"
+	    "chroot %s /bin/sh -e -c echo 0\n"
+	    "chroot %s /bin/sh -e -c echo 1\n"
+	    "chroot %s /bin/sh -e -c echo 2\n"
+	    "umount %s/dev\n", head, head, head, head, head, head, head);
+	CHECK((text = slurp("fake.log")) != NULL &&
+	    strlen(text) > strlen(want) &&
+	    is(text + strlen(text) - strlen(want), want));
+	CHECK(!there("lake/foundations/r7/etc/resolv.conf"));
+
+	/* X7: a command failing: rolled back, stalled */
+	CHECK(setenv("FAKE_FAIL", "chroot", 1) == 0);
+	f = roll("r7");
+	CHECK(unsetenv("FAKE_FAIL") == 0);
+	CHECK(has("foundation r7: commands: one: exited 1") &&
+	    f->f_state == SH_F_STALLED);
+	f = roll("r7");
+	CHECK(f->f_state == SH_F_IDLE);
+
+	/* X6: commands alone: devfs, the chroot, no pkg, nothing lent */
+	f = roll("r8");
+	(void) snprintf(head, sizeof (head), "%s",
+	    scratch_path("lake/foundations/r8"));
+	(void) snprintf(want, sizeof (want), "mount -t devfs devfs %s/dev\n"
+	    "chroot %s /bin/sh -e -c true\numount %s/dev\n", head, head, head);
+	CHECK(f->f_state == SH_F_IDLE && (text = slurp("fake.log")) != NULL &&
+	    strstr(text, "pkg ") == NULL && strlen(text) > strlen(want) &&
+	    is(text + strlen(text) - strlen(want), want));
+
+	/* X4: a head with a resolv.conf of its own: kept, not lent */
+	f = roll("r9");
+	CHECK(f->f_state == SH_F_IDLE &&
+	    is(slurp("lake/foundations/r9/etc/resolv.conf"), "mine\n"));
 
 	/* F6: a first roll failing: nothing left of it */
 	f = roll("r2");

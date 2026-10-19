@@ -68,7 +68,7 @@ LANG_OBJS = $(BUILD)/err.o $(BUILD)/mem.o $(BUILD)/tree.o \
 CORE_OBJS = $(LANG_OBJS) $(BUILD)/spaces.o $(BUILD)/wire.o \
 	$(BUILD)/daemon.o $(BUILD)/command.o $(BUILD)/foundation.o \
 	$(BUILD)/job.o $(BUILD)/builder.o $(BUILD)/src.o $(BUILD)/roll.o \
-	$(BUILD)/install.o
+	$(BUILD)/install.o $(BUILD)/commands.o
 # src/core/zfs.h has two implementations, picked at the link: the
 # FreeBSD layer over libzfs, and tests/zfake.c for the tests. The mac
 # has no ZFS to link a program against, so the portable flavor
@@ -126,11 +126,16 @@ $(BUILD)/daemon.o: src/core/daemon.c src/core/daemon.h src/core/builder.h \
 	src/core/wire.h src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/daemon.c
 $(BUILD)/roll.o: src/core/roll.c src/core/roll.h src/core/builder.h \
-	src/core/cascade.h src/core/err.h src/core/foundation.h \
-	src/core/install.h src/core/job.h src/core/mem.h src/core/root.h \
-	src/core/shake.h src/core/show.h src/core/site.h src/core/src.h \
-	src/core/syntax.h src/core/tree.h src/core/zfs.h
+	src/core/cascade.h src/core/commands.h src/core/err.h \
+	src/core/foundation.h src/core/install.h src/core/job.h \
+	src/core/mem.h src/core/root.h src/core/shake.h src/core/show.h \
+	src/core/site.h src/core/src.h src/core/syntax.h src/core/tree.h \
+	src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/roll.c
+$(BUILD)/commands.o: src/core/commands.c src/core/commands.h \
+	src/core/cascade.h src/core/err.h src/core/job.h src/core/mem.h \
+	src/core/root.h src/core/tree.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/commands.c
 $(BUILD)/install.o: src/core/install.c src/core/install.h \
 	src/core/cascade.h src/core/err.h src/core/job.h src/core/mem.h \
 	src/core/root.h src/core/tree.h

@@ -1,0 +1,6 @@
+#!/bin/sh
+# chroot, faked for the tests (tests/bin/make says how the fakes log and
+# fail): logged, and nothing run, on the host least of all.
+echo "chroot $*" >> "${FAKE_LOG:-/dev/null}"
+[ "${FAKE_FAIL:-}" = chroot ] && { echo "chroot: failed" >&2; exit 1; }
+exit 0

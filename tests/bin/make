@@ -1,15 +1,17 @@
 #!/bin/sh
-# The make a roll runs, faked for the tests (tests/check_roll.c): each
-# target leaves what the real one would, where it would, and each call
-# is logged, a line of its words, to $FAKE_MAKE_LOG.
+# The make a roll runs, faked for the tests (tests/check_roll.c), as
+# are the other programs in tests/bin: each call is logged to $FAKE_LOG,
+# a line of the program's name and its words, so that the log holds the
+# roll's calls in order. make's targets leave what the real ones would,
+# where they would.
 #
 #   FAKE_KERNEL	the kernel installkernel installs: 1 (kernel, a.ko,
 #		b.ko, debug files) or 2 (kernel, a.ko alike, b.ko gone,
 #		c.ko new, no debug files)
-#   FAKE_FAIL	the target that exits 2
+#   FAKE_FAIL	the target, or the program, that fails
 #   FAKE_SLEEP	the target that sleeps until it is killed
 
-echo "$*" >> "${FAKE_MAKE_LOG:-/dev/null}"
+echo "make $*" >> "${FAKE_LOG:-/dev/null}"
 D=
 for a; do
 	case $a in

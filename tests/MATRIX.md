@@ -608,3 +608,29 @@ kernconf's lines or buildopts left out.
 | K17 | the obj cache | made on a first roll with the site's properties, mounted; the scratch directory gone after | tests/check_roll.c |
 | K18 | an update's kernel | synced into the head: the kernel replaced, a.ko kept, b.ko and the debug files gone, c.ko new | tests/check_roll.c |
 | K19 | a real build and install | a FreeBSD world and kernel in the head | deferred: m3-box |
+
+## Family X: the packages and the commands (m3-commands)
+
+Dimensions: what the recipe gives {commands-external, pkg, commands,
+none of them, commands alone}; the head's resolv.conf {none, its own};
+a step {ending well, failing}; devfs {mounted, left by a failure or a
+crash}. The rolls run as family F's, with tests/bin's fake mount,
+umount, pkg and chroot logging to the fakes' log, which the
+commands-external of the recipes write to as well, so the log holds
+the order; a fake chroot runs nothing. Mutations caught: no
+commands-external, or no SHTETL_KIND; no devfs, or devfs left
+mounted; nothing lent, or a lent resolv.conf kept, or one lent over
+the head's own; no commands; a chroot for a recipe with neither pkg
+nor commands; a label's last piece alone.
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| X1 | commands-external | on the host, before anything in the chroot, SHTETL_ROOT, SHTETL_NAME and SHTETL_KIND set | tests/check_roll.c |
+| X2 | pkg and commands | devfs mounted on the head's dev; pkg -c HEAD install -y -- the packages; each command piece by chroot HEAD /bin/sh -e -c, a label's pieces in file order (an import's first); devfs unmounted | tests/check_roll.c |
+| X3 | pkg, the head with no resolv.conf | the host's lent for pkg, taken back after | tests/check_roll.c |
+| X4 | pkg, the head with its own | not lent; kept | tests/check_roll.c |
+| X5 | no pkg, no commands | no chroot, no devfs | tests/check_roll.c (K10's exact log of r1) |
+| X6 | commands alone | devfs and the chroot; no pkg, nothing lent | tests/check_roll.c |
+| X7 | a command failing | "commands: LABEL: exited 1"; rolled back, stalled | tests/check_roll.c |
+| X8 | devfs left mounted by a failure, a stop or a crash | unmounted by sh_foundation_idle before the head | deferred: the mac mounts no devfs; m3-box stops a roll in a command and starts again |
+| X9 | real pkg and chroot | the packages in the head | deferred: m3-box |

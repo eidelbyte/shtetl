@@ -395,6 +395,7 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, FILE *log,
 	d.d_env.re_z = z;
 	d.d_env.re_builder = &d.d_builder;
 	d.d_env.re_obj = d.d_oroot;
+	d.d_env.re_resolv = "/etc/resolv.conf";
 	d.d_env.re_kq = d.d_kq;
 	d.d_env.re_log = log;
 	d.d_env.re_err = e;

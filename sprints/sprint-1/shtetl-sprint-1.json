@@ -515,7 +515,8 @@
     ],
     "provides": "A roll that installs the recipe's packages and runs its commands.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-10-20: built; X1-X7 in check_roll with tests/bin fakes (pkg, chroot, mount, umount; one FAKE_LOG), ten mutations caught, gate, xcheck. Order commands-external > pkg > commands (the docs); every roll runs every command; devfs left by a failure/stop/crash unmounted in sh_foundation_idle (unmount(2)). Owed: X8, X9 in m3-box. Worklog issue-docs/m3-commands.md."
   },
   "m3-pkg": {
     "description": "A foundation's package upgrade (plan 6): pkg upgrade in the head, foundation.conf injected again, a snapshot of kind pkg; no src, no build, no commands. A failure rolls back and stalls as any roll. Verify: make check; the box in m3-box.",

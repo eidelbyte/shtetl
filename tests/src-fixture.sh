@@ -148,6 +148,20 @@ f r2 'patches { "patches/conflict" {} }'
 f r3 'ver = ">=16";'
 printf '%s\n' 'src_branch = "main";' 'ver = ">=16";' > c1/foundations/r4.conf
 printf '%s\n' 'src_branch = "stable/14";' > c1/foundations/r5.conf
+# r7: packages, commands, commands-external that write to the fakes'
+# log; r8 commands alone; r9 packages and a resolv.conf of its own.
+mkdir -p c1/common
+echo 'commands { one = "echo 0"; }' > c1/common/c7.conf
+f r7 'import = "common/c7.conf";' 'pkg = [ "a", "b" ];' \
+    'commands { one = "echo 1"; two = "echo 2"; }' \
+    'commands-external { ext = <<EOD' \
+    'echo "external $SHTETL_NAME $SHTETL_KIND $SHTETL_ROOT" >> "$FAKE_LOG"' \
+    'EOD' '}'
+f r8 'commands { only = "true"; }'
+f r9 'pkg = [ "a" ];' 'commands-external { resolv = <<EOD' \
+    'echo mine > "$SHTETL_ROOT/etc/resolv.conf"' 'EOD' '}'
+# the host's resolv.conf, as the tests lend it
+echo 'nameserver 127.0.0.1' > resolv.conf
 
 # c2: shtetl.conf's foundation block gives a directory, at the top.
 mkdir -p c2/foundations c2/patches/top

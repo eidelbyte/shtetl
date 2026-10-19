@@ -13,7 +13,8 @@
  *   src, patches (src.h);
  *   version: REVISION read from the checkout and held to ver;
  *   obj: the foundation's obj cache made where missing and mounted,
- *     then the build and the install (install.h);
+ *     then the build and the install (install.h), the packages and
+ *     the commands (commands.h);
  *   inject: foundation.conf, the shaken recipe under what it was
  *     fetched from;
  *   snapshot: the head unmounted, every dataset of it snapshotted at
@@ -43,6 +44,7 @@ struct sh_rollenv {
 	struct sh_builder	*re_builder;
 	int			re_kq;
 	const char		*re_obj;	/* <lake>/foundation-builds */
+	const char		*re_resolv;	/* the host's resolv.conf */
 	FILE			*re_log;	/* each line a child writes */
 	struct sh_err		*re_err;	/* a roll's failure, said */
 	unsigned long		re_flags;	/* foundation.conf's: schg */

@@ -1,0 +1,5 @@
+#!/bin/sh
+# umount, faked for the tests (tests/bin/make says how the fakes log):
+# logged, nothing unmounted.
+echo "umount $*" >> "${FAKE_LOG:-/dev/null}"
+exit 0

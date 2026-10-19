@@ -10,6 +10,10 @@
  * its foundation while a first roll adds another to the list.
  */
 
+#include <sys/param.h>
+#include <sys/mount.h>
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -51,12 +55,17 @@ last(void *arg, const char *snap)
 	return (0);
 }
 
-/* Children first: one with a filesystem mounted inside will not unmount. */
+/*
+ * Children first, and the devfs a roll mounts on a head's dev for its
+ * chroot (commands.h): one with a filesystem mounted inside will not
+ * unmount. The devfs is unmounted by the system's call; where there is
+ * none, it says so to no one.
+ */
 int
 sh_foundation_idle(struct sh_zfs *z, const char *ds, struct sh_err *e)
 {
 	struct names kids = { NULL, 0 };
-	char newest[256] = "";
+	char newest[256] = "", path[1024], dev[1100];
 	size_t i;
 	int r;
 
@@ -64,6 +73,12 @@ sh_foundation_idle(struct sh_zfs *z, const char *ds, struct sh_err *e)
 	for (i = 0; r == 0 && i < kids.n_n; i++)
 		r = sh_foundation_idle(z, kids.n_v[i], e);
 	names_free(&kids);
+	if (r == 0 && (r = sh_zfs_mounted(z, ds, path, sizeof (path), e)) ==
+	    1) {
+		(void) snprintf(dev, sizeof (dev), "%s/dev", path);
+		(void) unmount(dev, MNT_FORCE);
+		r = 0;
+	}
 	if (r != 0 || sh_zfs_unmount(z, ds, e) != 0 ||
 	    sh_zfs_snapshots(z, ds, last, newest, e) != 0)
 		return (-1);
