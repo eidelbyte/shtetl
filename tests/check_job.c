@@ -48,9 +48,8 @@ fresh(void)
 static void
 child(const char *step, const char *script)
 {
-	char *argv[] = { "sh", "-c", NULL, NULL };
+	const char *argv[] = { "sh", "-c", script, NULL };
 
-	argv[2] = (char *)(uintptr_t)script;
 	sh_job_child(&job, step, argv);
 }
 
@@ -208,7 +207,7 @@ main(void)
 	/* J6: a program not there */
 	fresh();
 	{
-		char *argv[] = { "/nonexistent/shtetl-x", NULL };
+		const char *argv[] = { "/nonexistent/shtetl-x", NULL };
 
 		sh_job_child(&job, "x", argv);
 	}

@@ -67,7 +67,8 @@ void sh_job_init(struct sh_job *j, const char *name, FILE *log,
  * named STEP, for the log, the end's why and status. A call may add
  * steps.
  */
-void sh_job_child(struct sh_job *j, const char *step, char *const *argv);
+void sh_job_child(struct sh_job *j, const char *step,
+    const char *const *argv);
 void sh_job_call(struct sh_job *j, const char *step,
     int (*fn)(struct sh_job *, void *, struct sh_err *), void *arg);
 

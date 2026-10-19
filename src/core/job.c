@@ -74,7 +74,7 @@ sh_job_init(struct sh_job *j, const char *name, FILE *log,
 }
 
 void
-sh_job_child(struct sh_job *j, const char *step, char *const *argv)
+sh_job_child(struct sh_job *j, const char *step, const char *const *argv)
 {
 	struct sh_step *s = step_add(j, step);
 	size_t i, n;
