@@ -1,0 +1,41 @@
+# zfs create -o mountpoint=/containers s2run/containers
+# zfs create -o canmount=noauto s2run/containers/v1
+# zfs create -o canmount=noauto s2run/containers/v1/var
+# zfs mount s2run/containers/v1
+# zfs mount s2run/containers/v1/var
+# mkdir -p /tmp/shtetl-probes/containers/v1/bin /tmp/shtetl-probes/containers/v1/dev
+# cp /rescue/sh /tmp/shtetl-probes/containers/v1/bin/sh
+# zfs unmount s2run/containers/v1/var
+# zfs unmount s2run/containers/v1
+# zfs create -o canmount=noauto s2run/containers/v2
+# zfs create -o canmount=noauto s2run/containers/v2/var
+# zfs mount s2run/containers/v2
+# zfs mount s2run/containers/v2/var
+# mkdir -p /tmp/shtetl-probes/containers/v2/bin /tmp/shtetl-probes/containers/v2/dev
+# cp /rescue/sh /tmp/shtetl-probes/containers/v2/bin/sh
+# zfs unmount s2run/containers/v2/var
+# zfs unmount s2run/containers/v2
+# zpool export s2run
+# zpool import -R /tmp/shtetl-probes -d /dev s2run
+P2 ok P2.1 versions mounted after an import
+# zfs set mountpoint=/containers/H s2run/containers/v1
+P2 answer P2.2 mounted by setting the mountpoint: no
+# zfs mount s2run/containers/v1
+# zfs mount s2run/containers/v1/var
+P2 ok P2.2 v1 at
+P2 ok P2.2 v1/var at
+# jail -c name=s2p2 path=/tmp/shtetl-probes/containers/H mount.devfs persist
+P2 ok P2.3 inside
+P2 ok P2.3 devfs at
+# zfs mount s2run/containers/v2
+# zfs mount s2run/containers/v2/var
+P2 ok P2.4 v2 at, during a roll
+P2 ok P2.4 v1 still at
+# jail -r s2p2
+s2p2: removed
+P2 failed P2.5 devfs after jail -r: got '/tmp/shtetl-probes/containers/H/dev', want ''
+# zfs unmount s2run/containers/v1/var
+# zfs unmount s2run/containers/v1
+cannot unmount '/tmp/shtetl-probes/containers/H': pool or dataset is busy
+-> exit 1
+P2 failed setup: zfs unmount s2run/containers/v1

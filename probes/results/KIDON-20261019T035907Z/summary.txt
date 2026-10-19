@@ -1,0 +1,50 @@
+shtetl 68bc7f8 probes on KIDON 2026-10-19T03:59:07Z
+host: 15.1-RELEASE-p2 amd64
+zfs: zfs-2.4.2-1-FreeBSD_g6330a45b0 zfs-kmod-2.4.2-1-FreeBSD_g6330a45b0 
+zfs_rebase: /usr/local/sbin/zfs_rebase
+
+P1 a beam cut part way resumes from its token
+P1 ok P1.1 a cut full send leaves a token
+P1 ok P1.2 the resumed @1 is the run's
+P1 ok P1.3 a cut incremental leaves a token
+P1 ok P1.3 the lake's newest is still @1
+P1 ok P1.4 a fresh incremental while the token stands
+P1 ok P1.5 the resumed @2 is the run's
+P1 ok P1.5 no token left
+P1 ok P1.6 a cut clone stream leaves a token
+P1 ok P1.7 the resumed clone's origin
+P1 ok P1.7 the resumed h@1 is the run's
+P1 ok P1.8 tokens left
+P1 ok P1.9 a token whose source is gone
+P1 ok P1.10 receive -A takes the cut away
+P1 ok P1.10 the next send lands
+
+P2 a container's active version is the one mounted at its path
+P2 ok P2.1 versions mounted after an import
+P2 answer P2.2 mounted by setting the mountpoint: no
+P2 ok P2.2 v1 at
+P2 ok P2.2 v1/var at
+P2 ok P2.3 inside
+P2 ok P2.3 devfs at
+P2 ok P2.4 v2 at, during a roll
+P2 ok P2.4 v1 still at
+P2 failed P2.5 devfs after jail -r: got '/tmp/shtetl-probes/containers/H/dev', want ''
+P2 failed setup: zfs unmount s2run/containers/v1
+
+P5 a house's own data moves to each new version by clone and promote
+P5 ok P5.1 v2/www's origin
+P5 ok P5.2 the lake's v2/www origin
+P5 ok P5.2 the lake's v2/www@s4
+P5 ok P5.3 v2/www's saves after the promote
+P5 ok P5.4 v2/www's files
+P5 ok P5.5 the lake's v2/www
+P5 ok P5.6 v3/www on the run
+P5 ok P5.7 the lake's v3/www origin
+P5 ok P5.7 the lake's v3/www@s6
+P5 ok P5.8 the lake's v3/www
+
+P6 a house's saves replayed onto the next foundation version
+P6 failed P6.1 step 1, clone form: got '2', want '0'
+P6 failed setup: zfs set readonly=off s2run/h2
+
+== 31 ok, 4 failed

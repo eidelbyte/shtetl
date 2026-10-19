@@ -1,0 +1,78 @@
+# zfs create -o mountpoint=/f s2run/f
+# zfs snapshot s2run/f@1
+# zfs send s2run/f@1 | head -c 8388608 | zfs receive -s -u s2lake/f
+warning: cannot send 's2run/f@1': signal received
+cannot receive new filesystem stream: checksum mismatch or incomplete stream.
+Partially received snapshot is saved.
+A resuming stream can be generated on the sending system by running:
+    zfs send -t 1-a818d3659-b8-789c636064000310a500c4ec50360710e72765a52697303034429460caa7a515a796806478e0f26c48f2499525a9c540ba41a51eabfe92fcf4d2cc140686a3d7746a27edf9704003499e132c9f97989bcac0506c54549aa79fe660c880000085971722
+-> exit 1
+P1 ok P1.1 a cut full send leaves a token
+# zfs send -t 1-a818d3659-b8-789c636064000310a500c4ec50360710e72765a52697303034429460caa7a515a796806478e0f26c48f2499525a9c540ba41a51eabfe92fcf4d2cc140686a3d7746a27edf9704003499e132c9f97989bcac0506c54549aa79fe660c880000085971722 |
+	    zfs receive -s -u s2lake/f
+P1 ok P1.2 the resumed @1 is the run's
+# zfs snapshot s2run/f@2
+# zfs send -i @1 s2run/f@2 | head -c 8388608 |
+	    zfs receive -s -u s2lake/f
+warning: cannot send 's2run/f@2': signal received
+cannot receive incremental stream: checksum mismatch or incomplete stream.
+Partially received snapshot is saved.
+A resuming stream can be generated on the sending system by running:
+    zfs send -t 1-c7e043df5-e0-789c636064000310a501c49c50360710a715e5e7a69766a63040c1d16b3ab593f67c38a00064b323a9cb4fca4a4d2e616060869a85219f96569c5a0292e181cbb321c9275596a416036981237558f597e4435d71778de9ca155e991a48f29c60f9bcc4dc54068662a3a2d23cfd340723060400005b0d1e2e
+-> exit 1
+P1 ok P1.3 a cut incremental leaves a token
+P1 ok P1.3 the lake's newest is still @1
+# zfs send -i @1 s2run/f@2 | zfs receive -s -u s2lake/f
+cannot receive incremental stream: destination s2lake/f contains partially-complete state from "zfs receive -s".
+warning: cannot send 's2run/f@2': signal received
+-> exit 1
+P1 ok P1.4 a fresh incremental while the token stands
+# zfs send -t 1-c7e043df5-e0-789c636064000310a501c49c50360710a715e5e7a69766a63040c1d16b3ab593f67c38a00064b323a9cb4fca4a4d2e616060869a85219f96569c5a0292e181cbb321c9275596a416036981237558f597e4435d71778de9ca155e991a48f29c60f9bcc4dc54068662a3a2d23cfd340723060400005b0d1e2e |
+	    zfs receive -s -u s2lake/f
+P1 ok P1.5 the resumed @2 is the run's
+P1 ok P1.5 no token left
+# zfs clone -o mountpoint=/h s2run/f@2 s2run/h
+# zfs snapshot s2run/h@1
+# zfs send -i s2run/f@2 s2run/h@1 | head -c 8388608 |
+	    zfs receive -s -u s2lake/h
+warning: cannot send 's2run/h@1': signal received
+cannot receive new filesystem stream: checksum mismatch or incomplete stream.
+Partially received snapshot is saved.
+A resuming stream can be generated on the sending system by running:
+    zfs send -t 1-b2ae2424f-e0-789c636064000310a501c49c50360710a715e5e7a69766a630c0c0dd35a62b5778652a0099ec48eaf293b252934b1818daa06661c8a7a515a796806478e0f26c48f2499525a9c520fb7fd461d55f920f71853ff76b66677fa9200d24794eb07c5e626e2a0343b15151699e7e8683210302000070741c02
+-> exit 1
+P1 ok P1.6 a cut clone stream leaves a token
+# zfs send -t 1-b2ae2424f-e0-789c636064000310a501c49c50360710a715e5e7a69766a630c0c0dd35a62b5778652a0099ec48eaf293b252934b1818daa06661c8a7a515a796806478e0f26c48f2499525a9c520fb7fd461d55f920f71853ff76b66677fa9200d24794eb07c5e626e2a0343b15151699e7e8683210302000070741c02 |
+	    zfs receive -s -u s2lake/h
+P1 ok P1.7 the resumed clone's origin
+P1 ok P1.7 the resumed h@1 is the run's
+# zfs list -t all -o name,receive_resume_token -r s2lake
+NAME        RESUMETOK
+s2lake      -
+s2lake/f    -
+s2lake/f@1  -
+s2lake/f@2  -
+s2lake/h    -
+s2lake/h@1  -
+P1 ok P1.8 tokens left
+# zfs snapshot s2run/f@3
+# zfs send -i @2 s2run/f@3 | head -c 8388608 |
+	    zfs receive -s -u s2lake/f
+warning: cannot send 's2run/f@3': signal received
+cannot receive incremental stream: checksum mismatch or incomplete stream.
+Partially received snapshot is saved.
+A resuming stream can be generated on the sending system by running:
+    zfs send -t 1-c52bfdab8-e0-789c636064000310a501c49c50360710a715e5e7a69766a630c0c0dd35a62b5778652a0099ec48eaf293b252934b18187aa1ca30e4d3d28a534b40323c70793624f9a4ca92d462201d71bd0eabfe927c882b2e6c9bc8c0f1c4f98806923c27583e2f31379581a1d8a8a8344f3fcdc198010100cec71ddb
+-> exit 1
+# zfs destroy s2run/f@3
+# zfs send -t 1-c52bfdab8-e0-789c636064000310a501c49c50360710a715e5e7a69766a630c0c0dd35a62b5778652a0099ec48eaf293b252934b18187aa1ca30e4d3d28a534b40323c70793624f9a4ca92d462201d71bd0eabfe927c882b2e6c9bc8c0f1c4f98806923c27583e2f31379581a1d8a8a8344f3fcdc198010100cec71ddb |
+	    zfs receive -s -u s2lake/f
+cannot resume send: 's2run/f@3' used in the initial send no longer exists
+cannot receive: failed to read from stream
+-> exit 1
+P1 ok P1.9 a token whose source is gone
+# zfs receive -A s2lake/f
+P1 ok P1.10 receive -A takes the cut away
+# zfs snapshot s2run/f@4
+# zfs send -i @2 s2run/f@4 | zfs receive -s -u s2lake/f
+P1 ok P1.10 the next send lands

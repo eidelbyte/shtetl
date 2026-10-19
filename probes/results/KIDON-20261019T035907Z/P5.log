@@ -1,0 +1,40 @@
+# zfs create -o mountpoint=/v1 s2run/v1
+# zfs create s2run/v1/www
+# zfs snapshot s2run/v1/www@s1
+# zfs snapshot s2run/v1/www@s2
+# zfs snapshot s2run/v1/www@s3
+# zfs create s2lake/v1
+# zfs send s2run/v1/www@s1 | zfs receive -u s2lake/v1/www
+# zfs send -I @s1 s2run/v1/www@s3 | zfs receive -u s2lake/v1/www
+# zfs create -o mountpoint=/v2 s2run/v2
+# zfs clone s2run/v1/www@s3 s2run/v2/www
+P5 ok P5.1 v2/www's origin
+# zfs snapshot s2run/v2/www@s4
+# zfs create s2lake/v2
+# zfs send -i s2run/v1/www@s3 s2run/v2/www@s4 |
+	    zfs receive -u -o origin=s2lake/v1/www@s3 s2lake/v2/www
+P5 ok P5.2 the lake's v2/www origin
+P5 ok P5.2 the lake's v2/www@s4
+# zfs promote s2run/v2/www
+P5 ok P5.3 v2/www's saves after the promote
+# zfs destroy -r s2run/v1
+P5 ok P5.4 v2/www's files
+# zfs promote s2lake/v2/www
+# zfs destroy -r s2lake/v1
+P5 ok P5.5 the lake's v2/www
+# zfs snapshot s2run/v2/www@s5
+# zfs send -i @s4 s2run/v2/www@s5 | zfs receive -u s2lake/v2/www
+# zfs create -o mountpoint=/v3 s2run/v3
+# zfs clone s2run/v2/www@s5 s2run/v3/www
+# zfs snapshot s2run/v3/www@s6
+# zfs promote s2run/v3/www
+# zfs destroy -r s2run/v2
+P5 ok P5.6 v3/www on the run
+# zfs create s2lake/v3
+# zfs send -i s2run/v3/www@s5 s2run/v3/www@s6 |
+	    zfs receive -u -o origin=s2lake/v2/www@s5 s2lake/v3/www
+P5 ok P5.7 the lake's v3/www origin
+P5 ok P5.7 the lake's v3/www@s6
+# zfs promote s2lake/v3/www
+# zfs destroy -r s2lake/v2
+P5 ok P5.8 the lake's v3/www
