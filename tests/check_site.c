@@ -1,6 +1,6 @@
 /*
  * shtetl.conf (docs/configuration.md 3): tests/MATRIX.md family CS,
- * every cell (CS1 - CS12, CS6 retired).
+ * every cell (CS1 - CS15, CS3 and CS6 retired).
  */
 
 #include <string.h>
@@ -161,6 +161,32 @@ test_values(void)
 	}
 }
 
+/* CS13, CS14: the remotes; the lake's is out of scope (plan 8.1). */
+static void
+test_remotes(void)
+{
+	ok("remotes { src = \"https://git.example.org/src.git\"; }");
+	ok("remotes { src = \"github.com/freebsd/freebsd-src\"; }");
+	ok("remotes { recipes { shtetl-recipes = "
+	    "\"https://github.com/eidelbyte/shtetl-recipes.git\"; "
+	    "site = \"ssh://git@git.example.org/recipes.git\"; } }");
+	bad("remotes { src = \"recipes/local\"; }", "remotes.src: invalid "
+	    "remote: a URL, or a host and a path");
+	bad("remotes { src = \"git@github.com:x/y\"; }", "remotes.src: "
+	    "invalid remote: scp-style address: use ssh://");
+	bad("remotes { src = \"\"; }", "remotes.src: invalid remote: empty");
+	bad("remotes { src = 5; }", "remotes.src: must be a string");
+	/* CS14 */
+	bad("remotes { recipes { \"a.b\" = \"github.com/x/y\"; } }",
+	    "remotes.recipes.\"a.b\": invalid name: only letters, digits, - "
+	    "and _ allowed");
+	bad("remotes { recipes { site = \"site\"; } }", "remotes.recipes.site: "
+	    "invalid remote: a URL, or a host and a path");
+	bad("remotes { recipes = [ \"github.com/x/y\" ]; }",
+	    "remotes.recipes: must be an object");
+	bad("remotes { lake = \"ssh://lake\"; }", "remotes.lake: invalid key");
+}
+
 /* KEY's value in OBJ, a string, set by the layer FROM. */
 static void
 is_str(const struct sh_node *obj, const char *key, const char *want,
@@ -192,6 +218,7 @@ test_load(void)
 {
 	struct sh_site s;
 	const struct sh_node *props, *dflt, *v;
+	const char **repos;
 	char root[1100];
 
 	/* no shtetl.conf at all */
@@ -211,6 +238,12 @@ test_load(void)
 	is_int(sh_obj_get(s.ss_merged, "run"), "keep", 2, "(built-in)");
 	is_int(sh_obj_get(s.ss_merged, "lake"), "keep", 5, "(built-in)");
 	CHECK(strcmp(s.ss_merged->sn_obj.ob_v[0].pr_key, "properties") == 0);
+	/* CS15: the src remote built in, no recipe repository */
+	is_str(sh_obj_get(s.ss_merged, "remotes"), "src",
+	    "https://git.freebsd.org/src.git", "(built-in)");
+	repos = sh_site_repos(&s);
+	CHECK(repos[0] == NULL);
+	free(repos);
 	sh_site_free(&s);
 
 	/* shtetl.conf sets one property, adds a section, sets a keep */
@@ -220,7 +253,9 @@ test_load(void)
 	    "    lake { atime = \"on\"; }\n"
 	    "}\n"
 	    "run { keep = 3; }\n"
-	    "roll { depth = \"30d\"; }\n");
+	    "roll { depth = \"30d\"; }\n"
+	    "remotes { recipes { web = \"github.com/x/web\"; "
+	    "site = \"github.com/x/site\"; } }\n");
 	(void) snprintf(root, sizeof (root), "%s", scratch_path("one"));
 	cap_reset(&c);
 	CHECK(sh_site_load(root, &s, &c.c_err) == 0);
@@ -240,6 +275,14 @@ test_load(void)
 	is_int(sh_obj_get(s.ss_merged, "lake"), "keep", 5, "(built-in)");
 	is_str(sh_obj_get(s.ss_merged, "roll"), "depth", "30d",
 	    "shtetl.conf");
+	/* CS15: the repositories in the order shtetl.conf gives them */
+	repos = sh_site_repos(&s);
+	CHECK(repos[0] != NULL && strcmp(repos[0], "web") == 0);
+	CHECK(repos[1] != NULL && strcmp(repos[1], "site") == 0);
+	CHECK(repos[2] == NULL);
+	free(repos);
+	is_str(sh_obj_get(s.ss_merged, "remotes"), "src",
+	    "https://git.freebsd.org/src.git", "(built-in)");
 	sh_site_free(&s);
 
 	/* a refused shtetl.conf refuses the load */
@@ -281,6 +324,7 @@ main(void)
 	test_keys();
 	test_properties();
 	test_values();
+	test_remotes();
 	test_load();
 	cap_close(&c);
 	scratch_clean();

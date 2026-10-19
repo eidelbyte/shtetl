@@ -1,6 +1,6 @@
 /*
  * The recipe cascade (docs/configuration.md 5, 6): tests/MATRIX.md
- * family CC, every cell (CC1 - CC38). Each test writes the
+ * family CC, every cell (CC1 - CC45). Each test writes the
  * configuration root it needs into the scratch directory.
  */
 
@@ -15,6 +15,9 @@ static struct cap c;
 static struct cap wc;		/* the warnings */
 static struct sh_recipe r;
 static char root[1100];
+/* The recipe repositories R looks in besides the top: none but in CC39 */
+static const char *const norepos[] = { NULL };
+static const char *const *repos = norepos;
 
 /* A configuration root DIR holding FILES, pairs of path and text. */
 static const char *
@@ -38,7 +41,8 @@ R(const char *rt, const char *target)
 	sh_recipe_free(&r);
 	cap_reset(&c);
 	cap_reset(&wc);
-	return (sh_recipe_resolve(rt, target, &r, &c.c_err, &wc.c_err));
+	return (sh_recipe_resolve(rt, repos, target, &r, &c.c_err,
+	    &wc.c_err));
 }
 
 static void
@@ -816,6 +820,79 @@ test_blocks(void)
 	CHECK(is(keys(M("pkg")), "sudo tmux"));
 }
 
+/*
+ * CC39 - CC45: the recipe repositories (plan 4). A recipe is looked
+ * for at zconfig's top and in each repository, and found in one; its
+ * imports and its paths are read there, the default's at the top; one
+ * name in two places is a redefinition.
+ */
+static void
+test_repos(void)
+{
+	static const char *const site[] = { "site", "web", NULL };
+	static const char *const gone[] = { "site", "gone", "web", NULL };
+	static const char *const rp[] = {
+		"shtetl.conf",
+		"import = \"common/top.conf\";\npkg = [ \"sudo\" ];\n",
+		"common/top.conf", "pkg = [ \"tmux\" ];\n",
+		"kernels/TOP", "include GENERIC\n",
+		"site/containers/app.conf",
+		"import = \"common/app.conf\";\nrequires = [ \"db\" ];\n",
+		"site/common/app.conf", "pkg = [ \"nginx\" ];\n",
+		"web/containers/db.conf", "pkg = [ \"postgresql16\" ];\n",
+		"containers/both.conf", "pkg = [ \"a\" ];\n",
+		"web/containers/both.conf", "pkg = [ \"b\" ];\n",
+		"site/containers/twice.conf", "pkg = [ \"a\" ];\n",
+		"web/containers/twice.conf", "pkg = [ \"b\" ];\n",
+		"site/containers/cross.conf", "import = \"common/top.conf\";\n",
+		"site/foundations/f.conf",
+		"src_branch = \"main\";\nkernconf = \"kernels/MINE\";\n",
+		"site/kernels/MINE", "include GENERIC\n",
+		"site/foundations/g.conf",
+		"src_branch = \"main\";\nkernconf = \"kernels/TOP\";\n",
+		NULL
+	};
+	static const char *const dk[] = {
+		"shtetl.conf", "kernconf = \"kernels/TOP\";\n",
+		"kernels/TOP", "include GENERIC\n",
+		"site/foundations/f.conf", "src_branch = \"main\";\n",
+		NULL
+	};
+
+	repos = site;
+	/* CC39: in a repository; its import there, the default's at the top */
+	resolves(mkroot("rp", rp), "containers/app");
+	CHECK(is(r.sr_file, "site/containers/app.conf") &&
+	    is(r.sr_root, "site"));
+	CHECK(is(layers(), "common/top.conf shtetl.conf site/common/app.conf "
+	    "site/containers/app.conf"));
+	CHECK(is(keys(M("pkg")), "tmux sudo nginx"));
+	/* CC43: it requires a container of another repository, found */
+	CHECK(is(keys(M("requires")), "db"));
+	/* CC40: one name in two places */
+	refused(root, "containers/both", "web/containers/both.conf: already "
+	    "defined in containers/both.conf");
+	refused(root, "containers/twice", "web/containers/twice.conf: "
+	    "already defined in site/containers/twice.conf");
+	/* CC41: in none */
+	refused(root, "containers/none", "containers/none.conf: no such file");
+	/* CC45: an import is read in its importer's place, never across */
+	refused(root, "containers/cross", "site/containers/cross.conf: "
+	    "import: site/common/top.conf: no such file");
+	/* CC44: the recipe's paths in its repository, not the top */
+	resolves(root, "foundations/f");
+	refused(root, "foundations/g", "site/foundations/g.conf: kernconf: "
+	    "kernels/TOP: no such file");
+	/* and the default's at the top */
+	resolves(mkroot("dk", dk), "foundations/f");
+	CHECK(is(sh_obj_get(M("kernconf"), "file")->sn_str, "kernels/TOP"));
+	/* CC42: a repository named but not there is an empty one */
+	repos = gone;
+	resolves(mkroot("rp", rp), "containers/app");
+	CHECK(is(r.sr_file, "site/containers/app.conf"));
+	repos = norepos;
+}
+
 int
 main(void)
 {
@@ -835,6 +912,7 @@ main(void)
 	test_default();
 	test_site_checked();
 	test_blocks();
+	test_repos();
 	sh_recipe_free(&r);
 	cap_close(&wc);
 	cap_close(&c);

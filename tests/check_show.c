@@ -18,6 +18,7 @@ static struct sh_recipe r;
 static char root[1100];
 static char *out;
 static size_t outlen;
+static const char *const norepos[] = { NULL };
 
 static const char *
 mkroot(const char *dir, const char *const *files)
@@ -56,7 +57,7 @@ show(const char *rt, const char *target)
 
 	sh_recipe_free(&r);
 	cap_reset(&c);
-	if (sh_recipe_resolve(rt, target, &r, &c.c_err, NULL) != 0)
+	if (sh_recipe_resolve(rt, norepos, target, &r, &c.c_err, NULL) != 0)
 		printf("%s did not resolve:\n%s", target, cap_text(&c));
 	CHECK(c.c_err.se_count == 0);
 	free(out);

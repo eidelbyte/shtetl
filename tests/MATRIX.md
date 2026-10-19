@@ -294,12 +294,16 @@ over it}.
 | CS10 | a section the new model removed, update or retention, is an invalid key | covered: check_site.c |
 | CS11 | the default recipe's keys beside the settings: checked by the recipe schema, and out of the settings' view | covered: check_site.c |
 | CS12 | run.keep and lake.keep: 1 or more (the active version counts); 0, negative, a string refused | covered: check_site.c |
+| CS13 | remotes.src: a URL or a host and a path accepted; a directory of zconfig, an scp-style address, empty, a number refused | covered: check_site.c test_remotes |
+| CS14 | remotes.recipes: name = remote; a bad name, a bad remote, a list refused; remotes.lake an invalid key (out of scope) | covered: check_site.c test_remotes |
+| CS15 | the src remote built in, no recipe repository; shtetl.conf's repositories in the order it gives them (sh_site_repos) | covered: check_site.c test_load |
 
 ### CC: the cascade (docs/configuration.md 5, 6; src/core/cascade.c)
 
 Dimensions: layers {the default (shtetl.conf present or absent, its
 imports), imports flat, nested, repeated, cyclic, missing, the
-target}; merge {one value (agree, disagree, over the default), text
+target}; where the recipe is {the top, a repository, two places,
+none, a repository not cloned}; merge {one value (agree, disagree, over the default), text
 pieces, ver, collection add, a field given again (over a recipe file,
 over the default), a dataset property overridden, a derivation given
 again, a commands piece, array shorthand, true over fields, false};
@@ -344,6 +348,13 @@ spelling.
 | CC36 | in ver a bare major is every minor of it: =15 any 15.x, <=15 takes 15.x, >15 begins at 16.0; N.N is that version; each form's range, and the meets they make (=15 with >=15.3; =15 with <15 and >15 with <16 refused) | covered: check_cascade.c test_ver; configuration.md, example ver |
 | CC37 | kernconf: the config from one file of the stack, a second file giving it refused, alike or not; the default's overridden with a warning; lines stack with the default's and the imports'; merged as { file; lines } | covered: check_cascade.c test_stacked, test_default |
 | CC38 | a kind's block of a default file: a recipe of that kind takes it as a layer of its own after the file's ("container in shtetl.conf"), its values saying so; what it gives stacks with the file's, a commands label a piece of its own; a one-value key given again overrides the file's, with a warning; another kind's block not taken; a file shtetl.conf imports may hold blocks | covered: check_cascade.c test_blocks; running a block's pieces is m5-create's |
+| CC39 | a recipe in a repository is found there, its file named with it; its imports are read there, the default's at the top | covered: check_cascade.c test_repos |
+| CC40 | one recipe in two places (the top and a repository, two repositories) is refused: "B: already defined in A", the top first, then the repositories in order | covered: check_cascade.c test_repos; configuration.md, example repositories |
+| CC41 | a recipe in no place: "F: no such file" | covered: check_cascade.c test_repos |
+| CC42 | a repository named but not there (not cloned yet) is an empty one | covered: check_cascade.c test_repos |
+| CC43 | requires names a container of another repository: found | covered: check_cascade.c test_repos |
+| CC44 | a path a recipe gives (kernconf's config, a patches directory) is in its repository, not at the top; one the default gives is at the top | covered: check_cascade.c test_repos |
+| CC45 | an import is read in its importer's place, never across to the top: "import: R/F: no such file" | covered: check_cascade.c test_repos |
 
 ### CW: what show prints (src/core/show.c)
 

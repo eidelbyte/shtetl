@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "core/err.h"
+#include "core/mem.h"
 #include "core/parse.h"
 #include "core/root.h"
 #include "core/schema.h"
@@ -40,6 +41,9 @@ static const char site_builtin_text[] =
 	"}\n"
 	"lake {\n"
 	"    keep = 5;\n"
+	"}\n"
+	"remotes {\n"
+	"    src = \"https://git.freebsd.org/src.git\";\n"
 	"}\n";
 
 enum sv {
@@ -47,7 +51,9 @@ enum sv {
 	SV_PROPS,	/* ZFS properties */
 	SV_COUNT,	/* an integer, 0 or more */
 	SV_KEEP,	/* an integer, 1 or more: the active one counts */
-	SV_DEPTH	/* 0, a count, or a quoted interval */
+	SV_DEPTH,	/* 0, a count, or a quoted interval */
+	SV_REMOTE,	/* a URL, or a host and a path */
+	SV_REPOS	/* name = remote, each a directory of zconfig */
 };
 
 struct skey {
@@ -78,12 +84,18 @@ static const struct skey sk_keep[] = {
 	{ "keep", SV_KEEP, NULL },
 	SK_END
 };
+static const struct skey sk_remotes[] = {
+	{ "src", SV_REMOTE, NULL },
+	{ "recipes", SV_REPOS, NULL },
+	SK_END
+};
 static const struct skey sk_top[] = {
 	{ "properties", SV_SECTION, sk_properties },
 	{ "build", SV_SECTION, sk_build },
 	{ "roll", SV_SECTION, sk_roll },
 	{ "run", SV_SECTION, sk_keep },
 	{ "lake", SV_SECTION, sk_keep },
+	{ "remotes", SV_SECTION, sk_remotes },
 	SK_END
 };
 
@@ -113,6 +125,25 @@ ck_type(struct ck *x, const char *what)
 
 static void
 ck_value(struct ck *x, const struct skey *k, const struct sh_node *v);
+
+/* A remote: a URL, or a host and a path, as a patch's location is. */
+static void
+ck_remote(struct ck *x, const struct sh_node *v)
+{
+	enum sh_loc kind;
+	const char *why;
+
+	if (v->sn_type != SH_STR) {
+		ck_type(x, "a string");
+		return;
+	}
+	if ((why = sh_syn_location(v->sn_str, &kind)) == NULL &&
+	    kind == SH_LOC_DIR)
+		why = "a URL, or a host and a path";
+	if (why != NULL)
+		sh_err_at(x->ck_err, x->ck_file, &x->ck_path,
+		    "invalid remote: %s", why);
+}
 
 /* The keys of one section, against TABLE. */
 static void
@@ -148,7 +179,9 @@ ck_section(struct ck *x, const struct skey *table, const struct sh_node *v)
 static void
 ck_value(struct ck *x, const struct skey *k, const struct sh_node *v)
 {
+	const struct sh_pair *pr;
 	const char *why;
+	size_t i, was;
 
 	switch (k->sk_type) {
 	case SV_SECTION:
@@ -180,6 +213,25 @@ ck_value(struct ck *x, const struct skey *k, const struct sh_node *v)
 		}
 		/* UCL reads an unquoted 30d as a number of seconds */
 		ck_type(x, "an integer or a quoted interval");
+		return;
+	case SV_REMOTE:
+		ck_remote(x, v);
+		return;
+	case SV_REPOS:
+		if (v->sn_type != SH_OBJECT) {
+			ck_type(x, "an object");
+			return;
+		}
+		for (i = 0; i < v->sn_obj.ob_n; i++) {
+			pr = &v->sn_obj.ob_v[i];
+			was = sh_path_push(&x->ck_path, pr->pr_key);
+			if ((why = sh_syn_name(pr->pr_key)) != NULL)
+				sh_err_at(x->ck_err, x->ck_file, &x->ck_path,
+				    "invalid name: %s", why);
+			else
+				ck_remote(x, pr->pr_val);
+			sh_path_pop(&x->ck_path, was);
+		}
 		return;
 	}
 }
@@ -272,6 +324,21 @@ sh_site_load(const char *root, struct sh_site *s, struct sh_err *e)
 	sh_node_free(conf);
 	s->ss_merged = built;
 	return (0);
+}
+
+const char **
+sh_site_repos(const struct sh_site *s)
+{
+	const struct sh_node *repos;
+	const char **names;
+	size_t i, n;
+
+	repos = sh_obj_get(sh_obj_get(s->ss_merged, "remotes"), "recipes");
+	n = repos != NULL ? repos->sn_obj.ob_n : 0;
+	names = sh_calloc(n + 1, sizeof (*names));
+	for (i = 0; i < n; i++)
+		names[i] = repos->sn_obj.ob_v[i].pr_key;
+	return (names);
 }
 
 void

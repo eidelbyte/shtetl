@@ -42,6 +42,7 @@ mounted:
         containers/X.conf      a container's recipe
         systems/S.conf         a system's recipe
         any/other.conf         files recipes import
+        REPO/                  a recipe repository, laid out as the top
 
 A recipe is named by its path without `.conf` (`.conf` may be given
 too): `foundations/generic`, `containers/nginx`, `systems/router`.
@@ -51,9 +52,69 @@ or a digit, since it is a dataset's name, a jail's name and a file's
 name at once. Files in other directories are not recipes; a recipe
 names them in `import`, by their path in the root, `.conf` included.
 
+The top holds the site's own recipes. Each recipe repository
+`remotes.recipes` names (section 3) is a directory of zconfig named
+for its remote, laid out as the top is; shtetl clones one that is
+missing, with the foundations' builds, and never updates one, so a
+recipe changes when the person changes it. A recipe is looked for at
+the top and in each repository, and is found in one: the same recipe
+in two places is refused, as a redefinition is (section 5). Its
+imports, and the paths it gives (a kernel config, a patches
+directory), are read in the place it is in; shtetl.conf's, at the top.
+
 `shtetl show RECIPE` prints a recipe with its files merged, each
 value with the file it came from. `shtetl show`, with no recipe,
 prints the site's settings.
+
+<!-- example: repositories -->
+
+```ucl
+# shtetl.conf
+remotes {
+    recipes {
+        web = "https://git.example.org/web-recipes.git";
+    }
+}
+pkg = [ "sudo" ];
+```
+
+```ucl
+# containers/base.conf
+pkg = [ "tmux" ];
+```
+
+```ucl
+# web/containers/nginx.conf
+import = "common/tls.conf";
+pkg = [ "nginx" ];
+```
+
+```ucl
+# web/common/tls.conf
+pkg = [ "py311-certbot" ];
+```
+
+```ucl
+# web/containers/base.conf
+pkg = [ "vim" ];
+```
+
+```console
+$ shtetl show containers/nginx
+# web/containers/nginx.conf: a container's recipe, its layers merged
+# layers, nearest last: shtetl.conf, web/common/tls.conf, web/containers/nginx.conf
+pkg {
+    sudo = true;  # shtetl.conf
+    py311-certbot = true;  # web/common/tls.conf
+    nginx = true;  # web/containers/nginx.conf
+}
+$ shtetl show containers/base
+shtetl: web/containers/base.conf: already defined in containers/base.conf
+```
+
+`containers/nginx` is the web repository's, and its import is read
+there: `web/common/tls.conf`. `containers/base` is both the site's
+and the repository's, which is refused.
 
 ## 2. Reading a file
 
@@ -131,8 +192,8 @@ in section 4.
 ## 3. shtetl.conf: the settings
 
 shtetl.conf holds two things. Its sections, `properties`, `build`,
-`roll`, `run` and `lake`, are the site's settings: about this machine,
-never about a recipe. Every other key at its top is the
+`roll`, `run`, `lake` and `remotes`, are the site's settings: about
+this machine, never about a recipe. Every other key at its top is the
 default recipe's (section 6). The settings have built-in values; a
 setting shtetl.conf gives replaces the built-in one, key by key.
 
@@ -144,6 +205,8 @@ setting shtetl.conf gives replaces the built-in one, key by key.
 | `roll.depth` | 0, a count or an interval | `0` | the saves a house's roll replays (plan 8.2); 0 is every save its active version holds |
 | `run.keep` | a count, 1 or more | `2` | the versions of each house zrun keeps, the active one counted (plan 8.2) |
 | `lake.keep` | a count, 1 or more | `5` | the versions of each house zlake keeps (plan 8.2) |
+| `remotes.src` | a remote | `"https://git.freebsd.org/src.git"` | the FreeBSD src repository foundations are built from |
+| `remotes.recipes` | names, each a remote | none | the recipe repositories, each cloned into the directory of zconfig of its name (section 1) |
 
 The forms:
 
@@ -159,6 +222,13 @@ The forms:
 - **An interval**: a quoted count above 0 and one of the units
   `date -v` takes, `y`, `m`, `w`, `d`, `H`, `M`, `S`: `"30d"`,
   `"6m"`, `"1y"`.
+- **A remote**: a URL with a scheme, `https://...`, `ssh://...`, or a
+  host and a path, `github.com/owner/repo`, as a patch's location is
+  (section 4); a directory of zconfig is not one. The patch
+  repositories are the locations recipes give in `patches`, and a lake
+  on another host is out of scope (plan 8.1).
+- **A name**: letters, digits, `-` and `_`, beginning with a letter
+  or a digit.
 
 The settings are read and checked now, and used by the milestones
 that need them: `make_jobs` by the foundations' builds (M3), the keeps
@@ -206,6 +276,9 @@ run {
 }
 lake {
     keep = 5;  # (built-in)
+}
+remotes {
+    src = "https://git.freebsd.org/src.git";  # (built-in)
 }
 ```
 

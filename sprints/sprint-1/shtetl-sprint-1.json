@@ -384,8 +384,8 @@
     ],
     "provides": "The remotes in shtetl.conf, and a recipe found by its name across the recipe repositories in zconfig.",
     "estimated_size": "medium",
-    "completed": "not-started",
-    "note": "2026-10-20: ruled, shtetl never updates recipe repositories (a shtetl upgrade-conf maybe later, maybe never); the lake remote out of scope."
+    "completed": "tested",
+    "note": "2026-10-20: ruled, shtetl never updates recipe repositories (a shtetl upgrade-conf maybe later, maybe never); the lake remote out of scope. 2026-10-20: built; CS13-CS15, CC39-CC45, doc example repositories; two lookup mutations caught; leaks (libucl's known only), gate, xcheck. PROPOSAL: zconfig's top holds the site's own recipes beside the repositories. Cloning a missing repository moved to m3-src (a child). Files only, no box part: tested. Worklog issue-docs/m2-remotes.md."
   },
   "m2-shake": {
     "description": "Shaking (plan 5): a recipe's layers merged into one UCL document whose every value stands merged, parsed again into the same tree it was made from (a round trip is a cell). A house's recipe stacks on the shaken foundation.conf its foundation version carries: ver constraints both hold, pkg lists join, command pieces the foundation ran are not run again. Injection writes /var/db/shtetl/foundation.conf or house.conf into a tree, mode 0444 and schg, opening every path component beneath the tree's root without following a link (O_RESOLVE_BENEATH on FreeBSD), because a replayed save can hold a link there. The host reads a house's file only from its version's create or update snapshot (.zfs/snapshot), the same way. `shtetl show RECIPE` prints a recipe shaken. Verify: make check; the schg and the beneath-open on the box (tests/box/run.sh).",
@@ -427,7 +427,7 @@
     "completed": "not-started"
   },
   "m3-src": {
-    "description": "Roll steps 1 and 2 (plan 6): zbuild's checkout fetched from the src remote and reset hard and cleaned to the head of the recipe's src_branch; then the patches, from their remotes in recipe order, each repository's *.patch in natural order, applied with git apply --3way; a clean three-way merge goes on, a conflict is a failure. From main: natural order, the files a patch touches retouched after a reset so make does not take stale objects (main 8b27e68). No pause, no --continue, --skip or --abort, no snapshots of the build root. Each git is a child (m3-builder). Verify: make check with local git repositories; the box build in m3-box.",
+    "description": "Roll steps 1 and 2 (plan 6), and a recipe repository remotes.recipes names that is missing from zconfig cloned into its directory (never updated, ruled 2026-10-20; from m2-remotes, since a clone is a child): zbuild's checkout fetched from the src remote and reset hard and cleaned to the head of the recipe's src_branch; then the patches, from their remotes in recipe order, each repository's *.patch in natural order, applied with git apply --3way; a clean three-way merge goes on, a conflict is a failure. From main: natural order, the files a patch touches retouched after a reset so make does not take stale objects (main 8b27e68). No pause, no --continue, --skip or --abort, no snapshots of the build root. Each git is a child (m3-builder). Verify: make check with local git repositories; the box build in m3-box.",
     "requires": [
       "m3-builder",
       "m2-shake"
@@ -441,7 +441,8 @@
       "src/core/patch.c",
       "tests/check_src.c",
       "tests/MATRIX.md",
-      "Makefile"
+      "Makefile",
+      "src/core/recipes.c"
     ],
     "provides": "zbuild at the head of a recipe's src_branch with its patches applied, or a failure that leaves zbuild reset.",
     "estimated_size": "medium",

@@ -128,6 +128,27 @@ ld_cycle(struct ld *x, size_t i, const char *name, const char *from,
 static void ld_load(struct ld *x, const char *name, const char *from,
     const struct sh_path *fpath, int optional);
 
+/*
+ * NAME, an import FILE gives at PATH, loaded from the place FILE is
+ * in: the recipe's root for the recipe's files, zconfig's top for the
+ * default's. A path the schema refused it has reported.
+ */
+static void
+ld_import(struct ld *x, const char *name, const char *file,
+    const struct sh_path *path)
+{
+	const char *rt = x->ld_default ? "" : x->ld_r->sr_root;
+	char buf[1100];
+
+	if (sh_syn_relpath(name) != NULL)
+		return;
+	if (rt[0] != '\0') {
+		(void) snprintf(buf, sizeof (buf), "%s/%s", rt, name);
+		name = buf;
+	}
+	ld_load(x, name, file, path, 0);
+}
+
 /* The imports of FILE, whose tree is TREE, each loaded before it. */
 static void
 ld_imports(struct ld *x, const char *file, const struct sh_node *tree)
@@ -142,19 +163,17 @@ ld_imports(struct ld *x, const char *file, const struct sh_node *tree)
 	sh_path_init(&path);
 	(void) sh_path_push(&path, "import");
 	if (imp->sn_type == SH_STR) {
-		if (sh_syn_relpath(imp->sn_str) == NULL)
-			ld_load(x, imp->sn_str, file, &path, 0);
+		ld_import(x, imp->sn_str, file, &path);
 		return;
 	}
 	if (imp->sn_type != SH_ARRAY)
 		return;
 	for (i = 0; i < imp->sn_arr.ar_n; i++) {
 		el = imp->sn_arr.ar_v[i];
-		/* what the schema refused, it has reported */
-		if (el->sn_type != SH_STR || sh_syn_relpath(el->sn_str) != NULL)
+		if (el->sn_type != SH_STR)
 			continue;
 		(void) sh_path_index(&path, i);
-		ld_load(x, el->sn_str, file, &path, 0);
+		ld_import(x, el->sn_str, file, &path);
 		sh_path_pop(&path, strlen("import"));
 	}
 }
@@ -313,6 +332,69 @@ rs_target(const char *target, struct sh_recipe *r, struct sh_err *e)
 	(void) snprintf(r->sr_file, flen, "%s/%s.conf", dirs[i].t_dir,
 	    r->sr_name);
 	return (0);
+}
+
+/* REL in the place RT of zconfig: rt/rel, or rel at its top. */
+static char *
+rs_in(const char *rt, const char *rel)
+{
+	return (rt[0] != '\0' ? sh_root_path(rt, rel) : sh_strdup(rel));
+}
+
+/*
+ * R's file looked for at zconfig's top and in each repository: found
+ * in one, R's file and root say where; a second is a redefinition,
+ * refused as one in a recipe is.
+ */
+static int
+rs_find(const char *root, const char *const *repos, struct sh_recipe *r,
+    struct sh_err *e)
+{
+	char *found = NULL, *path;
+	const char *rt;
+	int i;
+
+	for (i = -1; i < 0 || repos[i] != NULL; i++) {
+		rt = i < 0 ? "" : repos[i];
+		path = rs_in(rt, r->sr_file);
+		if (sh_root_kind(root, path) != 'f') {
+			free(path);
+		} else if (found == NULL) {
+			found = path;
+			r->sr_root = sh_strdup(rt);
+		} else {
+			sh_errf(e, "%s: already defined in %s", path, found);
+			free(path);
+			free(found);
+			return (-1);
+		}
+	}
+	if (found == NULL) {
+		sh_errf(e, "%s: no such file", r->sr_file);
+		return (-1);
+	}
+	free(r->sr_file);
+	r->sr_file = found;
+	return (0);
+}
+
+/*
+ * What a path REL a layer FROM gives is in zconfig ROOT: 'f', 'd', '?'
+ * or 0 as sh_root_kind says; the path is in the recipe's root, or at
+ * the top for the default's.
+ */
+static int
+rs_kind(const char *root, const struct sh_recipe *r, const char *from,
+    const char *rel)
+{
+	const struct sh_layer *l = sh_recipe_layer(r, from);
+	char *path;
+	int k;
+
+	path = rs_in(l != NULL && l->sl_default ? "" : r->sr_root, rel);
+	k = sh_root_kind(root, path);
+	free(path);
+	return (k);
 }
 
 /* Whether the value V came from the default layer. */
@@ -633,13 +715,28 @@ ck_ver(const struct sh_recipe *r, struct sh_err *e)
 		    high->sn_from);
 }
 
+/* Whether the recipe REL is at zconfig's top or in one of REPOS. */
+static int
+ck_any(const char *root, const char *const *repos, const char *rel)
+{
+	char *path;
+	int i, k = 0;
+
+	for (i = -1; k != 'f' && (i < 0 || repos[i] != NULL); i++) {
+		path = rs_in(i < 0 ? "" : repos[i], rel);
+		k = sh_root_kind(root, path);
+		free(path);
+	}
+	return (k == 'f');
+}
+
 /*
  * The checks only the merged recipe can answer: what a kind needs,
- * entries made whole across layers, and what the configuration root
- * must hold.
+ * entries made whole across layers, and what zconfig must hold.
  */
 static void
-ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
+ck_merged(const struct sh_recipe *r, const char *root,
+    const char *const *repos, struct sh_err *e)
 {
 	const struct sh_node *merged = r->sr_merged;
 	const struct sh_node *v, *coll, *dir;
@@ -656,7 +753,7 @@ ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
 	/* kernconf's file: a name is the src tree's, a path zconfig's */
 	if ((v = sh_obj_get(sh_obj_get(merged, "kernconf"), "file")) !=
 	    NULL && strchr(v->sn_str, '/') != NULL &&
-	    sh_root_kind(root, v->sn_str) != 'f') {
+	    rs_kind(root, r, v->sn_from, v->sn_str) != 'f') {
 		(void) sh_path_push(&path, "kernconf");
 		sh_err_at(e, v->sn_from, &path, "%s: no such file",
 		    v->sn_str);
@@ -679,7 +776,7 @@ ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
 		} else {
 			sub = pr->pr_key;
 		}
-		if (sh_root_kind(root, sub) != 'd')
+		if (rs_kind(root, r, pr->pr_from, sub) != 'd')
 			sh_err_at(e, pr->pr_from, &path, "%s: no such "
 			    "directory", sub);
 		sh_path_pop(&path, 0);
@@ -693,15 +790,16 @@ ck_merged(const struct sh_recipe *r, const char *root, struct sh_err *e)
 		    pr->pr_key);
 		if (strcmp(pr->pr_key, r->sr_name) == 0)
 			sh_err_at(e, pr->pr_from, &path, "requires itself");
-		else if (sh_root_kind(root, rel) != 'f')
+		else if (!ck_any(root, repos, rel))
 			sh_err_at(e, pr->pr_from, &path, "no such container");
 		sh_path_pop(&path, 0);
 	}
 }
 
 int
-sh_recipe_resolve(const char *root, const char *target,
-    struct sh_recipe *r, struct sh_err *e, struct sh_err *w)
+sh_recipe_resolve(const char *root, const char *const *repos,
+    const char *target, struct sh_recipe *r, struct sh_err *e,
+    struct sh_err *w)
 {
 	struct ld x;
 	struct mg m;
@@ -710,12 +808,8 @@ sh_recipe_resolve(const char *root, const char *target,
 
 	(void) memset(r, 0, sizeof (*r));
 	before = e->se_count;
-	if (rs_target(target, r, e) != 0)
+	if (rs_target(target, r, e) != 0 || rs_find(root, repos, r, e) != 0)
 		return (-1);
-	if (sh_root_kind(root, r->sr_file) == 0) {
-		sh_errf(e, "%s: no such file", r->sr_file);
-		return (-1);
-	}
 	(void) memset(&x, 0, sizeof (x));
 	x.ld_root = root;
 	x.ld_r = r;
@@ -738,7 +832,7 @@ sh_recipe_resolve(const char *root, const char *target,
 		mg_layer(&m);
 	}
 	if (e->se_count == before)
-		ck_merged(r, root, e);
+		ck_merged(r, root, repos, e);
 	return (e->se_count == before ? 0 : -1);
 }
 
@@ -755,5 +849,6 @@ sh_recipe_free(struct sh_recipe *r)
 	free(r->sr_layers);
 	free(r->sr_name);
 	free(r->sr_file);
+	free(r->sr_root);
 	(void) memset(r, 0, sizeof (*r));
 }

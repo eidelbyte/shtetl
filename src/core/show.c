@@ -28,6 +28,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "core/cascade.h"
@@ -309,21 +310,23 @@ sh_show(const char *root, const char *recipe, FILE *out, FILE *err)
 	struct sh_recipe r;
 	struct sh_site s;
 	struct sh_err e, w;
-	int rc = 1;
+	const char **repos;
+	int rc = 0;
 
 	sh_err_init(&e, err, "shtetl: ");
 	sh_err_init(&w, err, "shtetl: warning: ");
+	if (sh_site_load(root, &s, &e) != 0)
+		return (1);
 	if (recipe == NULL) {
-		if (sh_site_load(root, &s, &e) != 0)
-			return (1);
 		sh_show_site(out, &s);
-		sh_site_free(&s);
-		return (0);
+	} else {
+		repos = sh_site_repos(&s);
+		rc = sh_recipe_resolve(root, repos, recipe, &r, &e, &w) != 0;
+		if (rc == 0)
+			sh_show_recipe(out, &r);
+		sh_recipe_free(&r);
+		free(repos);
 	}
-	if (sh_recipe_resolve(root, recipe, &r, &e, &w) == 0) {
-		sh_show_recipe(out, &r);
-		rc = 0;
-	}
-	sh_recipe_free(&r);
+	sh_site_free(&s);
 	return (rc);
 }
