@@ -28,12 +28,14 @@ ZFS="-I$ZT/lib/libspl/include/os/freebsd -I$ZT/lib/libspl/include \
 -include $ZT/include/os/freebsd/spl/sys/ccompile.h \
 -include $F/sys/modules/zfs/zfs_config.h \
 -DNEED_SOLARIS_BOOLEAN -DHAVE_ISSETUGID -DHAVE_STRLCAT -DHAVE_STRLCPY"
+UCL="-I$F/contrib/libucl/include"
 rc=0
 for f in src/main.c src/core/*.c src/fbsd/*.c tests/zcells.c \
     tests/box/zcheck.c; do
 	extra=""
 	case "$f" in
 	src/fbsd/*) extra="$ZFS" ;;
+	src/core/parse.c) extra="$UCL" ;;
 	esac
 	if cc -fsyntax-only -target x86_64-unknown-freebsd15.0 -nostdinc \
 	    -std=c99 -Wall -Wextra -Wcast-qual -Werror -Isrc -Itests \

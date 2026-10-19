@@ -16,5 +16,7 @@ void *sh_realloc(void *p, size_t size);
 char *sh_strdup(const char *s);
 /* open_memstream(3): what is written lands in *BUF, *LEN long. */
 FILE *sh_memstream(char **buf, size_t *len);
+/* What a foreign allocator's failure is met with: the same end. */
+void sh_nomem(void) __attribute__((noreturn));
 
 #endif	/* SH_MEM_H */

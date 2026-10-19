@@ -24,6 +24,7 @@
 
 static const char usage[] =
 	"usage: shtetl daemon\n"
+	"       shtetl show [RECIPE]\n"
 	"       shtetl status\n";
 
 #define	BIG	(256 * 1024)	/* more than any socket takes at once */
@@ -134,19 +135,27 @@ main(void)
 {
 	static const char want[] =
 	    "space lake tank/lake\n"
+	    "space config tank/config\n"
 	    "space run fast/run\n"
 	    "foundation generic idle v1\n";
 	static const char *const v1[] = { "tank/lake/foundations/generic@v1" };
 	static const struct sh_zprop lake = { "shtetl:space", "lake" };
 	static const struct sh_zprop run = { "shtetl:space", "run" };
+	struct sh_zprop config[] = {
+		{ "shtetl:space", "config" }, { "mountpoint", NULL }
+	};
 	struct sh_buf b = { NULL, 0, 0 };
 	struct stat st;
 	const char *p;
 	char *noargs[] = { NULL };
 	char *frob[] = { "frob" };
 	char *extra[] = { "status", "x" };
+	char *site[] = { "show" };
+	char *web[] = { "show", "containers/web" };
+	char *broken[] = { "show", "containers/broken" };
+	char *two[] = { "show", "containers/web", "x" };
 	char *big;
-	char buf[64], wantpid[32];
+	char buf[64], wantpid[32], zconfig[1024];
 	size_t len;
 	int fd, lk, sk, kind, got;
 
@@ -154,12 +163,22 @@ main(void)
 	cap_open(&c);
 	(void) snprintf(lockp, sizeof (lockp), "%s", scratch_path("pid"));
 	(void) snprintf(sockp, sizeof (sockp), "%s", scratch_path("sock"));
+	/* zconfig, the files show reads, where the fake mounts it */
+	(void) scratch_write("zconfig/shtetl.conf", "run { keep = 3; }\n");
+	(void) scratch_write("zconfig/containers/web.conf",
+	    "pkg = [ \"nginx\" ];\n");
+	(void) scratch_write("zconfig/containers/broken.conf", "pkgs = 1;\n");
+	(void) snprintf(zconfig, sizeof (zconfig), "%s",
+	    scratch_path("zconfig"));
+	config[1].zp_value = zconfig;
 	zfake_reset();
 	zfake_pool("tank");
 	zfake_pool("fast");
 	CHECK(sh_zfs_open(&z, &c.c_err) == 0);
 	CHECK(sh_zfs_create(z, "tank/lake", &lake, 1, &c.c_err) == 0);
 	CHECK(sh_zfs_create(z, "fast/run", &run, 1, &c.c_err) == 0);
+	CHECK(sh_zfs_create(z, "tank/config", config, 2, &c.c_err) == 0);
+	CHECK(sh_zfs_mount(z, "tank/config", &c.c_err) == 0);
 	/* a foundation with a version: D1 shows its actor started */
 	CHECK(sh_zfs_create(z, "tank/lake/foundations", NULL, 0,
 	    &c.c_err) == 0);
@@ -271,9 +290,48 @@ main(void)
 	(void) memset(&b, 0, sizeof (b));
 	free(big);
 
+	/* D19: show: the site's settings, from zconfig where it is mounted */
+	CHECK(sht(1, site) == 0 && strcmp(ebuf, "") == 0);
+	CHECK(strstr(obuf, "# the site's settings: shtetl.conf over the "
+	    "built-in ones\n") == obuf);
+	CHECK(strstr(obuf, "    keep = 3;  # shtetl.conf, over "
+	    "(built-in)\n") != NULL);
+
+	/* D20: show RECIPE: it merged */
+	CHECK(sht(2, web) == 0 && strcmp(ebuf, "") == 0);
+	CHECK(strstr(obuf, "# containers/web.conf: a container's recipe, "
+	    "its layers merged\n") == obuf);
+	CHECK(strstr(obuf, "    nginx = true;  # containers/web.conf\n") !=
+	    NULL);
+
+	/* D21: a refused recipe: its words, nothing shown, 1 */
+	CHECK(sht(2, broken) == 1 && strcmp(obuf, "") == 0);
+	CHECK(strcmp(ebuf, "shtetl: containers/broken.conf: pkgs: invalid "
+	    "key\n") == 0);
+
+	/* D22: two recipes: the usage, 2 */
+	CHECK(sht(3, two) == 2 && strcmp(ebuf, usage) == 0);
+
 	/* D10: SIGTERM: exit 0, the socket gone */
 	CHECK(down() == 0);
 	CHECK(stat(sockp, &st) != 0);
+
+	/* D23: zconfig not mounted: said, 1 */
+	CHECK(sh_zfs_unmount(z, "tank/config", &c.c_err) == 0);
+	up();
+	CHECK(sht(1, site) == 1 &&
+	    strcmp(ebuf, "shtetl: tank/config: not mounted\n") == 0);
+	CHECK(down() == 0);
+
+	/* D24: no config space at all: said, 1 */
+	zfake_reset();
+	zfake_pool("tank");
+	zfake_pool("fast");
+	CHECK(sh_zfs_create(z, "tank/lake", &lake, 1, &c.c_err) == 0);
+	up();
+	CHECK(sht(1, site) == 1 &&
+	    strcmp(ebuf, "shtetl: no config space\n") == 0);
+	CHECK(down() == 0);
 
 	/* D11: no daemon: the command says what connect said, exit 1 */
 	CHECK(status() == 1);

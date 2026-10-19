@@ -11,7 +11,7 @@ nonascii=$(printf '[^\t -~]')
 # tools/cstyle.pl is left out by name: it is carried OpenZFS code, and
 # holds 0x01 bytes of its own. probes/results is the box's output.
 if LC_ALL=C grep -rn "$nonascii" Makefile README.md LICENSE CLAUDE.md \
-    .gitignore etc src tests sprints probes/*.sh probes/README.md \
+    .gitignore docs etc src tests sprints probes/*.sh probes/README.md \
     tools/*.sh tools/*.py; then
 	echo "gate: non-ASCII bytes above"; rc=1
 fi

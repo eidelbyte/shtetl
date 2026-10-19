@@ -39,7 +39,10 @@ names the pid in /var/run/shtetl.pid; after onestop both
 /var/run/shtetl.sock and the process are gone. `sudo rm
 /usr/local/sbin/shtetl /usr/local/etc/rc.d/shtetl` takes it away again.
 
-`make freebsd` needs a FreeBSD source tree for the OpenZFS headers,
+`make freebsd` links the textproc/libucl port (`pkg install libucl`),
+since base's libucl is private, and `make check-freebsd` runs every
+unit test with it, the configuration language's against that libucl.
+It needs a FreeBSD source tree for the OpenZFS headers,
 /usr/src unless FREEBSD_SRC says otherwise. On the mac, `make xcheck`
 (with FREEBSD_SRC set) compiles the FreeBSD sources against such a
 tree for a syntax check before the box sees them.

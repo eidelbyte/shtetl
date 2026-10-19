@@ -26,6 +26,7 @@
 #include "core/err.h"
 #include "core/foundation.h"
 #include "core/mem.h"
+#include "core/show.h"
 #include "core/spaces.h"
 #include "core/wire.h"
 #include "core/zfs.h"
@@ -49,6 +50,7 @@ struct daemon {
 
 static const char usage[] =
 	"usage: shtetl daemon\n"
+	"       shtetl show [RECIPE]\n"
 	"       shtetl status\n";
 
 /* shtetl status */
@@ -75,11 +77,38 @@ act_status(struct daemon *d, int argc, char **argv, FILE *out,
 	return (0);
 }
 
+/* shtetl show [RECIPE]: read from zconfig, where its root is mounted */
+static int
+act_show(struct daemon *d, int argc, char **argv, FILE *out,
+    struct sh_err *e)
+{
+	const char *cfg = d->d_sp.ss_root[SH_SP_CONFIG];
+	char root[1024];
+	int r;
+
+	if (argc > 2) {
+		(void) fputs(usage, e->se_out);
+		return (2);
+	}
+	if (cfg == NULL) {
+		sh_errf(e, "no config space");
+		return (1);
+	}
+	if ((r = sh_zfs_mounted(d->d_zfs, cfg, root, sizeof (root), e)) !=
+	    1) {
+		if (r == 0)
+			sh_errf(e, "%s: not mounted", cfg);
+		return (1);
+	}
+	return (sh_show(root, argc == 2 ? argv[1] : NULL, out, e->se_out));
+}
+
 static const struct {
 	const char	*a_verb;
 	int		(*a_fn)(struct daemon *, int, char **, FILE *,
 			    struct sh_err *);
 } acts[] = {
+	{ "show", act_show },
 	{ "status", act_status }
 };
 

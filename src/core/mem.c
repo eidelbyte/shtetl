@@ -8,13 +8,18 @@
 
 #include "core/mem.h"
 
+void
+sh_nomem(void)
+{
+	syslog(LOG_ERR, "out of memory");
+	exit(1);
+}
+
 static void *
 given(void *p)
 {
-	if (p == NULL) {
-		syslog(LOG_ERR, "out of memory");
-		exit(1);
-	}
+	if (p == NULL)
+		sh_nomem();
 	return (p);
 }
 
