@@ -425,7 +425,8 @@
     ],
     "provides": "Actors that take messages one at a time and run long steps as watched children; one builder handing out turns.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-10-20: built; J1-J12, T1-T3 on the mac (sh -c children), two mutations caught, no leaks, gate, xcheck. No per-actor message queue (what waits is read from ZFS; a busy actor refuses); the daemon's loop integration and SIGTERM stopping jobs come with m3-roll. Owed: make check-freebsd on the box (check_job on FreeBSD kqueue). Worklog issue-docs/m3-builder.md."
   },
   "m3-src": {
     "description": "Roll steps 1 and 2 (plan 6), and a recipe repository remotes.recipes names that is missing from zconfig cloned into its directory (never updated, ruled 2026-10-20; from m2-remotes, since a clone is a child): zbuild's checkout fetched from the src remote and reset hard and cleaned to the head of the recipe's src_branch; then the patches, from their remotes in recipe order, each repository's *.patch in natural order, applied with git apply --3way; a clean three-way merge goes on, a conflict is a failure. From main: natural order, the files a patch touches retouched after a reset so make does not take stale objects (main 8b27e68). No pause, no --continue, --skip or --abort, no snapshots of the build root. Each git is a child (m3-builder). Verify: make check with local git repositories; the box build in m3-box.",

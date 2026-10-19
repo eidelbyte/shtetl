@@ -414,3 +414,40 @@ it is refused (fstatat, not following it): the errno a component
 opened without following a link meets is ELOOP on the mac's open,
 ENOTDIR on its openat with O_DIRECTORY, EMLINK on FreeBSD.
 
+
+## Family J: jobs, steps and children (m3-builder)
+
+Dimensions: a step {a child, a call, a call adding steps}; how a child
+ends {exit 0, exit N, a signal, not run at all}; what it writes {lines,
+a last line with no newline, a line past 4096, nothing, many lines};
+what it leaves {nothing, a process of its group}; the daemon's
+signals {ignored there}; standard input; the job stopped while a child
+runs.
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| J1 | children in order, ending well | each line logged "NAME: line", in order; the end with no why | tests/check_job.c |
+| J2 | a child exiting 3 | "STEP: exited 3"; no later step; its lines told again to E, not an earlier child's | tests/check_job.c |
+| J3 | a failing child of 20 lines | only its last 8 told again | tests/check_job.c |
+| J4 | calls: one adding a child, one failing | the added child runs; "STEP: its words", no later step | tests/check_job.c |
+| J5 | a child killed by a signal | "STEP: killed by signal 9" | tests/check_job.c |
+| J6 | a program not there | "STEP: exited 127", the reason in the log | tests/check_job.c |
+| J7 | a last line with no newline | told at the child's end | tests/check_job.c |
+| J8 | a line past 4096 bytes | told in pieces of 4096 | tests/check_job.c |
+| J9 | stopped while a child runs | the child and its group killed and reaped, no end | tests/check_job.c |
+| J10 | a child leaving a process of its group behind | the leftover sent SIGTERM at the step's end | tests/check_job.c |
+| J11 | SIGTERM ignored by the daemon | the child's own again: a child sending itself SIGTERM dies of it | tests/check_job.c |
+| J12 | a child reading standard input | /dev/null: it ends | tests/check_job.c |
+
+Mutations caught: the signals not put back (J11), no SIGTERM to a
+step's leftovers (J10). On FreeBSD, make check-freebsd (in the box run)
+runs the same cells: EVFILT_PROC and a child gone before it is watched
+(ESRCH) are kqueue's there.
+
+## Family T: the builder's turns (m3-builder)
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| T1 | a turn asked of a free builder | given at once | tests/check_job.c |
+| T2 | turns asked while one is out | given in the order asked, one at each give | tests/check_job.c |
+| T3 | the last given back | the builder free; the next ask given at once | tests/check_job.c |
