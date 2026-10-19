@@ -2,20 +2,19 @@
 
 Status: plan of record, 2026-10-19. Opened by the author's message of
 2026-10-18, ruled by their answers to fourteen questions the same day
-and to four more the next; all are quoted in section 18, and nothing
-is open. Nothing is built yet but the M0 probes, whose box runs are in
-section 14.1: P1, P2, P5 and P6 hold on the box; P3 and P4 wait on a
-VM. What waits on the author is in open-questions.md beside
-this file. A point marked PROPOSAL is a decision made where the
-rulings are silent and is not yet confirmed.
+and to four more the next; all are quoted in section 18. The M0
+probes' box runs are in section 14.1: P1, P2, P5 and P6 hold on the
+box; P3 and P4 wait on a VM and hold up only M6. What waits on the
+author is in open-questions.md beside this file. A point marked
+PROPOSAL is a decision made where the rulings are silent and is not
+yet confirmed.
 
 The tracker is shtetl-sprint-1.json beside this file:
 
     tools/tracker.py list
 
-It holds the issues of M0 (section 14): the probes and the ruling that
-folds their results in. The issues of M1 to M7 are written with that
-ruling.
+It holds the issues of M0 (section 14), the probes and the ruling that
+folded their results in, and the issues of M1 to M7 written with it.
 
 
 ## 1. What shtetl is
