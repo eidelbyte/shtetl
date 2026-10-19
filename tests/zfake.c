@@ -290,6 +290,55 @@ sh_zfs_user(struct sh_zfs *z, const char *name, const char *prop,
 	return (0);
 }
 
+/* The property NAME of O set there no more. */
+static void
+zf_drop(struct zf_obj *o, const char *name)
+{
+	int i;
+
+	for (i = 0; i < o->zo_nprops; i++) {
+		if (strcmp(o->zo_props[i].zp_name, name) == 0) {
+			o->zo_props[i] = o->zo_props[--o->zo_nprops];
+			return;
+		}
+	}
+}
+
+int
+sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
+    const char *value, struct sh_err *e)
+{
+	struct zf_obj *d;
+
+	(void) z;
+	if (zf_fails("set", e))
+		return (-1);
+	if ((d = zf_fs(ds)) == NULL) {
+		sh_errf(e, "zfake: %s: no such filesystem", ds);
+		return (-1);
+	}
+	zf_drop(d, prop);
+	zf_put(d, prop, value);
+	return (0);
+}
+
+int
+sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
+    struct sh_err *e)
+{
+	struct zf_obj *d;
+
+	(void) z;
+	if (zf_fails("inherit", e))
+		return (-1);
+	if ((d = zf_fs(ds)) == NULL) {
+		sh_errf(e, "zfake: %s: no such filesystem", ds);
+		return (-1);
+	}
+	zf_drop(d, prop);
+	return (0);
+}
+
 int
 sh_zfs_children(struct sh_zfs *z, const char *ds,
     int (*fn)(void *, const char *), void *arg, struct sh_err *e)

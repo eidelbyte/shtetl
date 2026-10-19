@@ -46,6 +46,21 @@ int sh_zfs_local(struct sh_zfs *z, const char *prop,
 int sh_zfs_user(struct sh_zfs *z, const char *name, const char *prop,
     char *val, size_t len, struct sh_err *e);
 
+/*
+ * The user property PROP set on the filesystem DS to VALUE, below it
+ * inherited. Refused: "no such filesystem".
+ */
+int sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
+    const char *value, struct sh_err *e);
+
+/*
+ * The user property PROP set on the filesystem DS no more: DS takes
+ * its parent's, or none; nothing done where DS does not set it.
+ * Refused: "no such filesystem".
+ */
+int sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
+    struct sh_err *e);
+
 /* The filesystems directly below DS. Refused: "no such filesystem". */
 int sh_zfs_children(struct sh_zfs *z, const char *ds,
     int (*fn)(void *arg, const char *child), void *arg, struct sh_err *e);

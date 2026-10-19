@@ -82,14 +82,22 @@ words. The fake's data is words; the box's are files.
 | Z9 | destroy | a child only | "has children" |
 | Z9 | destroy | nothing in the way | destroyed |
 | Z9 | destroy | a filesystem or a snapshot not there | "no such dataset" |
+| Z10 | set | a user property on a filesystem | its value; below it inherited (m3-roll) |
+| Z10 | set | set there already | replaced |
+| Z10 | inherit | set there, set above | the ancestor's value |
+| Z10 | inherit | not set there | nothing done |
+| Z10 | inherit | set there, nothing above | unset: 1 |
+| Z10 | set, inherit | no such filesystem | "no such filesystem" |
 
 Disposition of every row above: tests/zcells.c, over the fake (make
 check) and over libzfs (tests/box/run.sh). Deferred, with what
 unblocks them:
 
 - mount "mounted at PATH, not its mountpoint": the cell needs a
-  mountpoint changed under a mounted filesystem, which needs a set;
-  it comes with the first issue that sets one (m3-roll).
+  mountpoint changed under a mounted filesystem. shtetl sets only
+  user properties (Z10, m3-roll), and libzfs remounts a filesystem
+  whose mountpoint it sets, so the cell waits for an issue that
+  mounts something itself.
 - destroy of a snapshot "has clones" and "has holds": shtetl makes
   clones from m4-zfs, which adds the cell; it takes no holds.
 - a walk refused by libzfs part way, and open refused: nothing a cell

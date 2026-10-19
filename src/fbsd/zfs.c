@@ -177,6 +177,36 @@ sh_zfs_user(struct sh_zfs *z, const char *name, const char *prop,
 	return (v != NULL ? 0 : 1);
 }
 
+int
+sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
+    const char *value, struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	int r;
+
+	if ((zhp = zz_open(z, ds, e)) == NULL)
+		return (-1);
+	if ((r = zfs_prop_set(zhp, prop, value)) != 0)
+		zz_err(z, e, ds);
+	zfs_close(zhp);
+	return (r != 0 ? -1 : 0);
+}
+
+int
+sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
+    struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	int r;
+
+	if ((zhp = zz_open(z, ds, e)) == NULL)
+		return (-1);
+	if ((r = zfs_prop_inherit(zhp, prop, B_FALSE)) != 0)
+		zz_err(z, e, ds);
+	zfs_close(zhp);
+	return (r != 0 ? -1 : 0);
+}
+
 static int
 zz_child(zfs_handle_t *zhp, void *arg)
 {

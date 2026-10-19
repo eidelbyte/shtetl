@@ -399,6 +399,34 @@ cells_destroy(void)
 	    sh_zfs_destroy(z, at("f@v9"), &e), "f@v9", "no such dataset");
 }
 
+/* Last: f/usr set and inherited, g's own let go. */
+static void
+cells_set(void)
+{
+	cell("Z10", "set: its value, and inherited below it",
+	    sh_zfs_set(z, at("f/usr"), "shtetl:zcheck", "u", &e) == 0 &&
+	    strcmp(user("f/usr", "shtetl:zcheck"), "u") == 0 &&
+	    strcmp(user("f/usr/local", "shtetl:zcheck"), "u") == 0);
+	cell("Z10", "set again: replaced",
+	    sh_zfs_set(z, at("f/usr"), "shtetl:zcheck", "v", &e) == 0 &&
+	    strcmp(user("f/usr", "shtetl:zcheck"), "v") == 0);
+	cell("Z10", "inherited: its parent's again",
+	    sh_zfs_inherit(z, at("f/usr"), "shtetl:zcheck", &e) == 0 &&
+	    strcmp(user("f/usr", "shtetl:zcheck"), "f") == 0);
+	cell("Z10", "inherited where not set there: nothing done",
+	    sh_zfs_inherit(z, at("f/usr"), "shtetl:zcheck", &e) == 0 &&
+	    strcmp(user("f/usr", "shtetl:zcheck"), "f") == 0);
+	cell("Z10", "inherited with nothing above: none",
+	    sh_zfs_inherit(z, at("g"), "shtetl:zcheck", &e) == 0 &&
+	    strcmp(user("g", "shtetl:zcheck"), "(unset)") == 0);
+	refused("Z10", "set on no such filesystem: refused",
+	    sh_zfs_set(z, at("nope"), "shtetl:zcheck", "x", &e), "nope",
+	    "no such filesystem");
+	refused("Z10", "inherited on no such filesystem: refused",
+	    sh_zfs_inherit(z, at("nope"), "shtetl:zcheck", &e), "nope",
+	    "no such filesystem");
+}
+
 int
 zcells(FILE *o, const char *t)
 {
@@ -419,6 +447,7 @@ zcells(FILE *o, const char *t)
 	cells_rollback();
 	cells_mount();
 	cells_destroy();
+	cells_set();
 	sh_zfs_close(z);
 	(void) fclose(ef);
 	free(ebuf);
