@@ -4,7 +4,8 @@ Status: plan of record, 2026-10-19. Opened by the author's message of
 2026-10-18, ruled by their answers to fourteen questions the same day
 and to four more the next; all are quoted in section 18, and nothing
 is open. Nothing is built yet but the M0 probes, whose box runs are in
-section 14.1. What waits on the author is in open-questions.md beside
+section 14.1: P1, P2, P5 and P6 hold on the box; P3 and P4 wait on a
+VM. What waits on the author is in open-questions.md beside
 this file. A point marked PROPOSAL is a decision made where the
 rulings are silent and is not yet confirmed.
 
@@ -283,10 +284,12 @@ One sequence for both kinds of house:
    clone form rebase onto the foundation version, each later step a
    dataset form rebase with --allow-unrelated, --base the previous
    original save, and its pre-apply snapshot named for that save; -m
-   always, so a conflict that merges three ways clean goes on. A
-   canmount=off placeholder is cloned, not replayed. Derivations:
-   derived files answered keep and regenerated at the gate, as on main
-   (probe P6);
+   always, so a conflict that merges three ways clean goes on. The
+   first step leaves its result read-only, unmounted, its mountpoint
+   none; it is placed before the second, readonly off and mounted at
+   its own path. A canmount=off placeholder is cloned, not replayed.
+   Derivations: derived files answered keep and regenerated at the
+   gate, as on main (probe P6, box run 3);
 4. what the house's recipe gained since the active version was made:
    packages installed, command pieces that never ran run once. A
    changed recipe is picked up by the next roll, automatic or by hand
@@ -622,6 +625,21 @@ Box run 2, KIDON, 2026-10-19, at 422bf9c (results 7e9be07), P2 and P6:
   `zfs_rebase 2>&1 | grep merge-non-conflict` prints the usage line of
   a build that has it.
 
+Box run 3, KIDON, 2026-10-20, at 7e9be07 (results 388144a), P6 alone
+on zfs_rebase 69d8223: 16 ok, 0 failed.
+
+- P6, 16 of 16: four saves replayed onto the next foundation version
+  as 7.2 step 3 says, the clone form and then three dataset forms;
+  step 3 stops at its conflict over /etc/motd, answered from, and
+  --continue goes through; the new version holds s1 s2 s3 and then the
+  update snapshot. The result equals one rebase of the final save in
+  type, mode, owner, size, link, sha256 and flags, and holds what each
+  side meant. Answers: the four steps took under a second on these
+  small trees (P6.5), so a real house's time waits for M5's box run;
+  every file's time agrees with the one rebase's, and only the times
+  of the two directories the replay wrote in (etc, share) differ,
+  being the moments of the two runs (P6.8). 7.2 stands.
+
 
 ## 15. Verification
 
@@ -639,7 +657,8 @@ Box run 2, KIDON, 2026-10-19, at 422bf9c (results 7e9be07), P2 and P6:
 ## 16. Risks
 
 - A house is down for the whole of its roll, the replay included; it
-  grows with roll.depth and with what the saves changed. P6 times it.
+  grows with roll.depth and with what the saves changed. P6 took
+  under a second over small trees; M5's box run times a real house.
 - Systems need zrun on the boot pool, since bootfs is a pool property.
   main had the same constraint.
 - Space: each house keeps run.keep versions, and each pins its
