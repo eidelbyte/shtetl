@@ -3,7 +3,7 @@
     "project": "shtetl",
     "sprint": 1,
     "created": "2026-10-18",
-    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 tested (box run 2 54 of 54, D18 by hand); m2-language built (make check-freebsd owed), m2-remotes tested; next m2-shake.",
+    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 and M2 tested (box run 3, 73 of 73); next M3, m3-builder.",
     "planning_docs": [
       "sprints/sprint-1/implementation-plan.md",
       "sprints/sprint-1/open-questions.md"
@@ -361,8 +361,8 @@
     ],
     "provides": "The configuration language as built on main, everything stacking, with the keys the new model has and none it does not.",
     "estimated_size": "large",
-    "completed": "testing",
-    "note": "2026-10-20: carried; allocation checks removed (tree never fails); settings roll.depth/run.keep/lake.keep, update/retention invalid; show is the daemon's verb (D19-D24), docs run via tests/docshow.c. make check (1,010 language checks, 36 doc commands), leaks (libucl's known only), gate, xcheck. Owed: make check-freebsd on the box (textproc/libucl). Worklog issue-docs/m2-language.md."
+    "completed": "tested",
+    "note": "2026-10-20: carried; allocation checks removed (tree never fails); settings roll.depth/run.keep/lake.keep, update/retention invalid; show is the daemon's verb (D19-D24), docs run via tests/docshow.c. make check (1,010 language checks, 36 doc commands), leaks (libucl's known only), gate, xcheck. Owed: make check-freebsd on the box (textproc/libucl). Worklog issue-docs/m2-language.md. Box run 3 (KIDON at 230f87d, results c8df572): make check-freebsd on the textproc/libucl port, every program ok, doccheck 38 commands. Tested."
   },
   "m2-remotes": {
     "description": "The remotes (plan 4, ruled): shtetl.conf at zconfig's top names the FreeBSD src remote, the patch repositories and the recipe repositories. Each recipe repository is a directory of zconfig of its own, named for its remote; a recipe is found by its name across them, and one name in two is refused as a redefinition is. shtetl clones a recipe repository missing from zconfig and never updates one, so a recipe changes only when the person changes it (ruled 2026-10-20); src and patches are fetched by each foundation roll (m3-src). The lake remote is out of scope (ruled 2026-10-20): it is not read. Verify: make check over scratch trees and local git repositories.",
@@ -403,8 +403,8 @@
     ],
     "provides": "The shaken recipe: one UCL document, made from a recipe's layers, a house's stacked on its foundation version's; written into a tree read-only and schg, and read back from a snapshot only.",
     "estimated_size": "medium",
-    "completed": "testing",
-    "note": "2026-10-20: built; the shaken text is show's; a house stacks on its foundation version's shaken recipe through resolve's UNDER (CC46-CC52); sh_shaken_write/read beneath, never through a link (I1-I8 on the mac with nodump). Box owed: tests/box/run.sh family I (I9-I14, schg as root, a real .zfs view). Worklog issue-docs/m2-shake.md."
+    "completed": "tested",
+    "note": "2026-10-20: built; the shaken text is show's; a house stacks on its foundation version's shaken recipe through resolve's UNDER (CC46-CC52); sh_shaken_write/read beneath, never through a link (I1-I8 on the mac with nodump). Box owed: tests/box/run.sh family I (I9-I14, schg as root, a real .zfs view). Worklog issue-docs/m2-shake.md. Box run 3 (c8df572): family I as root on ZFS, I9 - I14 ok (schg holds against root, replaced again, read back through a real .zfs view, a link in the snapshot refused, the live file's change unseen). Tested."
   },
   "m3-builder": {
     "description": "The actor's queue and its children (plan 9, 10). An actor takes one message at a time; a message arriving while it works waits in its queue. A step that takes long runs as a child in a process group of its own, watched with EVFILT_PROC, its output to syslog line by line, and the actor answers messages while it waits, its state naming the step. SIGTERM to the daemon ends every child's group before the daemon exits, and each actor starting again finds its step undone or redoes it from ZFS. The builder: one turn at a time across foundation actors, in the order asked, nothing polled. Verify: make check with children that are sh -c scripts; kill tests at each state.",
