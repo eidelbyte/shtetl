@@ -1,11 +1,13 @@
 # Sprint 1: houses that roll
 
-Status: plan of record, 2026-10-19. Opened by the author's message of
-2026-10-18, ruled by their answers to fourteen questions the same day
-and to four more the next; all are quoted in section 18. The M0
-probes' box runs are in section 14.1: P1, P2, P5 and P6 hold on the
-box; P3 and P4 wait on a VM and hold up only M6. What waits on the
-author is in open-questions.md beside this file. A point marked
+Status: plan of record, 2026-10-20. Opened by the author's message of
+2026-10-18, ruled by their answers to fourteen questions the same day,
+to four more the next, and to the two the issues raised; all are
+quoted in section 18. The M0 probes' box runs are in section 14.1:
+P1, P2, P5 and P6 hold on the box; P3 and P4 wait on a VM and hold up
+only M6. M1 and the configuration language are built (the tracker and
+its worklogs say how far each is verified). What waits on the author
+is in open-questions.md beside this file. A point marked
 PROPOSAL is a decision made where the rulings are silent and is not
 yet confirmed.
 
@@ -96,12 +98,14 @@ it (built, m1-spaces).
   ZFS dataset; the person may snapshot it, shtetl never does (ruled).
   The remotes (ruled): the FreeBSD src remote, the patch repositories,
   the recipe repositories, and the lake remote, which is ZFS, not git:
-  where zlake is when it is on another host. Each recipe repository is
-  cloned into a directory of zconfig of its own, named for its remote;
-  a recipe is found by its name across them, and one name in two
-  repositories is refused, as a redefinition is in the language
-  (ruled). shtetl.conf, the remotes in it, stays the site's own at
-  zconfig's top.
+  where zlake is when it is on another host, out of scope for now
+  (ruled, 8.1). Each recipe repository is cloned into a directory of
+  zconfig of its own, named for its remote; a recipe is found by its
+  name across them, and one name in two repositories is refused, as a
+  redefinition is in the language (ruled). shtetl clones a recipe
+  repository that is missing and never updates one: a recipe changes
+  when the person changes it (ruled). shtetl.conf, the remotes in it,
+  stays the site's own at zconfig's top.
 - zbuild: the FreeBSD src checkout.
 - zlake: where foundations are built and owned, their obj caches, and
   the copy of every house version beamed from zrun, kept deeper than
@@ -408,11 +412,11 @@ next attempt resumes from it (lzc_send_resume, with the token decoded
 to an nvlist by zfs_send_resume_token_to_nvlist). Nothing is destroyed
 on a failure. A broken beam is a beam not yet converged (probe P1).
 
-When zlake is on another host, the lake remote names it and the
-streams cross the network; it is the same convergence. The beam actor
-converges after every snapshot and on a timer, backs off while the
-other space cannot be reached, and holds nobody up. A foundation
-version's arrival on zrun is what its houses roll on.
+A zlake on another host, which the lake remote would name, is out of
+scope for now (ruled 2026-10-20): zlake and zrun are on one host. The
+beam actor converges after every snapshot and on a timer, and holds
+nobody up. A foundation version's arrival on zrun is what its houses
+roll on.
 
 Restore is a beam the other way, by hand: a house version and its
 foundation version from zlake to zrun.
@@ -678,9 +682,12 @@ on zfs_rebase 69d8223: 16 ok, 0 failed.
 
 ## 17. Out of scope
 
-Several run hosts sharing one lake (nothing in the beam rules it out).
-A TUI. Moving a house to another foundation recipe. Dropping a
-foundation's datasets. The notifier's channels, until M7.
+Several run hosts sharing one lake (nothing in the beam rules it out),
+and a lake on another host at all (ruled 2026-10-20). shtetl updating
+the recipe repositories: a `shtetl upgrade-conf` may come later, or
+never (ruled 2026-10-20). A TUI. Moving a house to another foundation
+recipe. Dropping a foundation's datasets. The notifier's channels,
+until M7.
 
 
 ## 18. Rulings
@@ -863,3 +870,19 @@ So: the foundation's schedule is the only schedule, and a house rolls
 as soon as its foundation's version arrives. `shtetl freeze H` pins a
 house where it is, and it is the one control a house has over its
 rolls (7.2).
+
+### 2026-10-20 (the two the issues raised)
+
+Asked who updates the recipe repositories in zconfig, and how the beam
+reaches a lake on another host (open-questions.md, with the issues of
+M1 to M7), the author answered:
+
+    1. shtetl never updates repos, correct. we can write a shtetl
+    upgrade-conf or something later. not now, and we may never.
+    2. consider this out of scope for now. Do not need to implement
+    this
+
+So: shtetl clones a recipe repository that is missing from zconfig
+and never updates one; a recipe changes when the person changes it,
+and the next roll of what it builds picks it up (4). A lake on another
+host is out of scope (8.1, 17): m4-lake-remote leaves the tracker.

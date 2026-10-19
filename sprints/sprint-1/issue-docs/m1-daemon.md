@@ -79,3 +79,14 @@
 
 The commit after 6153fae, "daemon: the loop, its lock and socket, and
 the command".
+
+## Box run 1
+
+KIDON, 2026-10-20, at 48050c7 (results 7b6513e), tests/box/run.sh: 53
+ok, 1 failed (Z6, m1-zfs's).
+The daemon (./shtetl daemon) started on the box, answered status over
+its socket and stopped on SIGTERM with exit 0, its socket removed
+(D10). Found: FreeBSD 15's syslog(3) writes LOG_PERROR's copy as
+"shtetl 109 - - message" (the RFC 5424 form), not "shtetl: message";
+nothing reads that copy but a person, and the box cells grep the
+message alone. D18, the rc script by hand, is still owed.

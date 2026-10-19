@@ -46,3 +46,10 @@ box is owed, with M1's box run.
 
 The commit after bbf60bd, "skeleton: the C tree, its gate and make
 check".
+
+## Box run 1
+
+KIDON, 2026-10-20, at 48050c7 (results 7b6513e), tests/box/run.sh: 53
+ok, 1 failed (Z6, m1-zfs's).
+make freebsd built shtetl and box_zcheck there, against libzfs and the
+textproc/libucl port. Tested.

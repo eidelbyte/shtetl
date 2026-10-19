@@ -3,7 +3,7 @@
     "project": "shtetl",
     "sprint": 1,
     "created": "2026-10-18",
-    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18); P1, P2, P5 and P6 tested on the box, P3 and P4 wait on a VM; the issues of M1 to M7 are written at rulings-1.",
+    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 built, box run 1 53 of 54 (Z6 fixed, rerun owed), D18 by hand owed; m2-language built, make check-freebsd owed; next m2-remotes, m2-shake.",
     "planning_docs": [
       "sprints/sprint-1/implementation-plan.md",
       "sprints/sprint-1/open-questions.md"
@@ -228,8 +228,8 @@
     ],
     "provides": "A C tree that builds portable on the mac and with make freebsd on the box, a gate, make check, the error sink and the allocators every later issue uses.",
     "estimated_size": "small",
-    "completed": "testing",
-    "note": "2026-10-20: built; make check (M1-M5) and make gate clean on the mac; make freebsd on the box owed with M1's box run. Worklog issue-docs/m1-tree.md."
+    "completed": "tested",
+    "note": "2026-10-20: built; make check (M1-M5) and make gate clean on the mac; make freebsd on the box owed with M1's box run. Worklog issue-docs/m1-tree.md. Box run 1 (KIDON at 48050c7, results 7b6513e): make freebsd built shtetl and box_zcheck, linked against libzfs and the textproc/libucl port. Tested."
   },
   "m1-zfs": {
     "description": "The ZFS layer, carried from main (src/core/zfs.h, src/fbsd/zfs.c over libzfs and libzfs_core, tests/zfake.c, tests/box/zcheck.c) and trimmed to the calls M1 uses: open and close, the filesystems where a user property is set locally, get (native and user properties), children, create with properties, snapshot (one transaction, properties from birth), the snapshots of a dataset oldest first, rollback to the newest, destroy, mount and unmount. Later issues add their own calls (clone, promote, resumable send and receive in m4-zfs). The fake checks in the order the real layer does and says the same words; main's lessons carried: a mounted filesystem is refused destroy (EBUSY) before its snapshots are looked at; setting a mountpoint mounts a canmount=on dataset. Matrix family Z. The box cells run over the real layer on md pools (tests/box/run.sh, the log sent back by send.sh as the probes do), and make check runs the same cells over the fake (zcheck-fake.c), so the fake cannot disagree with the box unseen. Verify: make check on the mac; tests/box/run.sh on the box, all Z cells ok.",
@@ -256,7 +256,7 @@
     "provides": "One layer over libzfs and libzfs_core with a fake that refuses and answers as ZFS does, in ZFS's order, and a box program that holds the two to the same cells.",
     "estimated_size": "medium",
     "completed": "testing",
-    "note": "2026-10-20: built; 46 Z cells over the fake, four fake mutations caught, xcheck and gate clean on the mac. Cells written once (tests/zcells.c) for fake and box; no stub, the portable flavor links only tests. Box owed: make freebsd && sudo sh tests/box/run.sh. Worklog issue-docs/m1-zfs.md."
+    "note": "2026-10-20: built; 46 Z cells over the fake, four fake mutations caught, xcheck and gate clean on the mac. Cells written once (tests/zcells.c) for fake and box; no stub, the portable flavor links only tests. Box owed: make freebsd && sudo sh tests/box/run.sh. Worklog issue-docs/m1-zfs.md. Box run 1 (7b6513e): Z 46 of 47; Z6 (a walk FN stops) failed: zfs_iter_snapshots_sorted_v2 calls the callback for every snapshot whatever it returns; fixed 0e5bb61 (zz_snap calls FN no more once stopped, main's guard lost in the trim). Rerun of Z6 owed."
   },
   "m1-spaces": {
     "description": "The spaces (plan 4): config, build, lake and run, each the one filesystem where shtetl:space is set locally to that word; two roots of one space are refused and the daemon does not start; a space nobody marked is absent, and what needs it does not run (a run host whose lake is elsewhere has no local lake). Marking a space is the person's zfs set; there is no bootstrap verb. The skeleton each space needs is made when the daemon starts, from one table of names and properties, so that nothing later asks whether a parent exists: M1's row is <lake>/foundations (canmount=off); later issues add theirs (run/foundations, run/containers mountpoint=/containers, lake/foundation-builds, lake/containers, run/systems...). An unknown value of shtetl:space is refused. Matrix family S over the fake. Verify: make check; the box cells of m1-zfs cover the calls.",
@@ -299,7 +299,7 @@
     "provides": "shtetl daemon: one kqueue loop holding the actors, a lock against a second daemon, and the shtetl command, which sends its arguments over the socket and prints the reply.",
     "estimated_size": "medium",
     "completed": "testing",
-    "note": "2026-10-20: built; D1-D17 over the fake (256 KiB request/reply, a reader that does not read), live leaks check after 600 commands, xcheck, gate. No peer check: the socket's mode is the rule. Owed: D18, the rc script on the box by hand (tests/box/README.md). Worklog issue-docs/m1-daemon.md."
+    "note": "2026-10-20: built; D1-D17 over the fake (256 KiB request/reply, a reader that does not read), live leaks check after 600 commands, xcheck, gate. No peer check: the socket's mode is the rule. Owed: D18, the rc script on the box by hand (tests/box/README.md). Worklog issue-docs/m1-daemon.md. Box run 1 (7b6513e): D10 on real pools ok (SIGTERM exit 0, socket gone); the daemon started, answered status and stopped under the box run. D18 (the rc script by hand) still owed."
   },
   "m1-foundation-start": {
     "description": "The first actor (plan 6, 9): one foundation actor for each filesystem under <lake>/foundations, started with the daemon. Starting, it puts the foundation where an idle one is: every dataset of its tree rolled back to its newest snapshot (a no-op when nothing was written), a dataset with no snapshot destroyed (what a crashed first build leaves), the head unmounted. So a crash part way is not a failure and leaves no stall. shtetl:stall on the head makes it stalled, showing the property's text. `shtetl status` prints one line per actor: its kind, its name, idle or stalled, and its newest version or the stall. Matrix family A (actor starts): fresh, written since the newest, no snapshot at all, a child with none, mounted, stalled. Verify: make check; the box run of tests/box/run.sh starts a daemon on md pools after a written head and reads status.",
@@ -318,8 +318,8 @@
     ],
     "provides": "A foundation actor for each foundation in zlake that starts from what ZFS shows, a crash undone without a stall, and shtetl status listing each with its state.",
     "estimated_size": "small",
-    "completed": "testing",
-    "note": "2026-10-20: built; A1-A10 over the fake, D1 shows a foundation, four mutations caught, no leaks, xcheck, gate. No written@ (plan 6 updated): rollback to the newest is the one rule; a head with no snapshot is undone. Box owed: tests/box/run.sh family A. Worklog issue-docs/m1-foundation-start.md."
+    "completed": "tested",
+    "note": "2026-10-20: built; A1-A10 over the fake, D1 shows a foundation, four mutations caught, no leaks, xcheck, gate. No written@ (plan 6 updated): rollback to the newest is the one rule; a head with no snapshot is undone. Box owed: tests/box/run.sh family A. Worklog issue-docs/m1-foundation-start.md. Box run 1 (7b6513e): family A on a real lake: A1 status, A2 written file undone and unmounted, A3 first build undone and logged, all ok. Tested."
   },
   "m2-language": {
     "description": "The language carried from main (plan 5, 12): parse (libucl, built from FREEBSD_SRC on the mac and the textproc/libucl port on FreeBSD), syntax, schema, the default layer and the object layer, cascade, show, the key paths in err, with matrix family C, docs/configuration.md, docs/ucl-primer.md and tools/doccheck.py. Trimmed: update.suffix, retention.archive, age retention and any key whose reader is gone become invalid keys (no legacy). Added: run.keep, lake.keep, roll.depth (a count or an age), with the PROPOSAL defaults 2 and 5. Every carried test kept green, and every cell of family C either kept or retired with its key. Verify: make check, make doc.",
@@ -365,7 +365,7 @@
     "note": "2026-10-20: carried; allocation checks removed (tree never fails); settings roll.depth/run.keep/lake.keep, update/retention invalid; show is the daemon's verb (D19-D24), docs run via tests/docshow.c. make check (1,010 language checks, 36 doc commands), leaks (libucl's known only), gate, xcheck. Owed: make check-freebsd on the box (textproc/libucl). Worklog issue-docs/m2-language.md."
   },
   "m2-remotes": {
-    "description": "The remotes (plan 4, ruled): shtetl.conf at zconfig's top names the FreeBSD src remote, the patch repositories, the recipe repositories and the lake remote. Each recipe repository is a directory of zconfig of its own, named for its remote; a recipe is found by its name across them, and one name in two is refused as a redefinition is. PROPOSAL: shtetl clones a recipe repository missing from zconfig and never pulls one, so a recipe changes only when the person changes it; src and patches are fetched by each foundation roll (m3-src). Verify: make check over scratch trees and local git repositories.",
+    "description": "The remotes (plan 4, ruled): shtetl.conf at zconfig's top names the FreeBSD src remote, the patch repositories and the recipe repositories. Each recipe repository is a directory of zconfig of its own, named for its remote; a recipe is found by its name across them, and one name in two is refused as a redefinition is. shtetl clones a recipe repository missing from zconfig and never updates one, so a recipe changes only when the person changes it (ruled 2026-10-20); src and patches are fetched by each foundation roll (m3-src). The lake remote is out of scope (ruled 2026-10-20): it is not read. Verify: make check over scratch trees and local git repositories.",
     "requires": [
       "m2-language",
       "m1-spaces"
@@ -384,7 +384,8 @@
     ],
     "provides": "The remotes in shtetl.conf, and a recipe found by its name across the recipe repositories in zconfig.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "not-started",
+    "note": "2026-10-20: ruled, shtetl never updates recipe repositories (a shtetl upgrade-conf maybe later, maybe never); the lake remote out of scope."
   },
   "m2-shake": {
     "description": "Shaking (plan 5): a recipe's layers merged into one UCL document whose every value stands merged, parsed again into the same tree it was made from (a round trip is a cell). A house's recipe stacks on the shaken foundation.conf its foundation version carries: ver constraints both hold, pkg lists join, command pieces the foundation ran are not run again. Injection writes /var/db/shtetl/foundation.conf or house.conf into a tree, mode 0444 and schg, opening every path component beneath the tree's root without following a link (O_RESOLVE_BENEATH on FreeBSD), because a replayed save can hold a link there. The host reads a house's file only from its version's create or update snapshot (.zfs/snapshot), the same way. `shtetl show RECIPE` prints a recipe shaken. Verify: make check; the schg and the beneath-open on the box (tests/box/run.sh).",
@@ -537,7 +538,8 @@
     ],
     "provides": "The beam actor: every dataset's copy converging to its owner's, foundation versions to zrun and house versions to zlake, resuming where a cut left it, telling each foundation version's arrival.",
     "estimated_size": "large",
-    "completed": "not-started"
+    "completed": "not-started",
+    "note": "2026-10-20: a lake on another host ruled out of scope; m4-lake-remote removed from the tracker."
   },
   "m4-prune": {
     "description": "Pruning (plan 8.2): run.keep house versions on zrun, the active one counted; lake.keep on zlake; nothing leaves a space while the other still lacks it; a version pruned by promoting any clone of it (the newer version's own datasets) and destroying it; a foundation version kept while a house version on the same space is cloned from it, its newest always kept. The house actor prunes zrun after a roll, the beam actor the copies it keeps, the foundation actor a version once its last clone is gone. Matrix family P. Verify: make check; m4-box.",
@@ -554,22 +556,6 @@
       "Makefile"
     ],
     "provides": "Versions pruned by count once the beam is consistent; a foundation version kept while a house version is cloned from it.",
-    "estimated_size": "medium",
-    "completed": "not-started"
-  },
-  "m4-lake-remote": {
-    "description": "A lake on another host (plan 8.1): the same convergence, the streams crossing the network. How the two hosts speak is a question for the author before any code (open-questions.md): the recommendation is a shtetl daemon on the lake host too, the two speaking shtetl's own framed records over ssh, so guids are read from libzfs on both ends and nothing parses zfs(8)'s output. Verify: make check over two fake hosts; a box run with two pools standing in for two hosts.",
-    "requires": [
-      "m4-beam"
-    ],
-    "epic": "beam",
-    "milestone": "M4",
-    "expected_changed_files": [
-      "src/core/beam.c",
-      "tests/check_beam.c",
-      "tests/MATRIX.md"
-    ],
-    "provides": "The beam reaching a zlake on another host named by the lake remote.",
     "estimated_size": "medium",
     "completed": "not-started"
   },

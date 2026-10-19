@@ -74,3 +74,11 @@ text; otherwise it is idle at its newest version.
 
 The commit after 287d27f, "foundation: the actor's start from what ZFS
 shows".
+
+## Box run 1
+
+KIDON, 2026-10-20, at 48050c7 (results 7b6513e), tests/box/run.sh: 53
+ok, 1 failed (Z6, m1-zfs's).
+Family A on a real lake pool: A1 status as written, A2 the file
+written after v1 gone and the head unmounted, A3 the first build
+with no version destroyed and logged; D10 too. Tested.
