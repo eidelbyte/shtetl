@@ -112,30 +112,32 @@ pools_down() {
 
 # ---- sending the results back ----------------------------------------
 
-# The run's directory committed and pushed by the person who ran the
+# The run's results committed and pushed by the person who ran the
 # script through sudo, with their identity and credentials (su, which
-# root takes without a password). SEND=no keeps it local.
-send() {	# DIR SUMMARYLINE
+# root takes without a password). SEND=no keeps them local. SENDER
+# names whose they are: the probes', or tests/box's.
+send() {	# PATH SUMMARYLINE
 	_u=${SUDO_USER:-}
+	_s=${SENDER:-probes}
 	if [ "${SEND:-yes}" = no ]; then
-		echo "probes: SEND=no: $1 not sent"
+		echo "$_s: SEND=no: $1 not sent"
 		return 0
 	fi
 	if [ -z "$_u" ]; then
-		echo "probes: not run through sudo: $1 not sent"
+		echo "$_s: not run through sudo: $1 not sent"
 		return 1
 	fi
 	chown -R "$_u" "$1"
 	_g="git -C '$TOP'"
-	_msg="probes: $(hostname -s): $2"
+	_msg="$_s: $(hostname -s): $2"
 	if ! su "$_u" -c "$_g add -- '$1' && $_g commit -q -m '$_msg' -- '$1'"; then
-		echo "probes: $1 not committed"
+		echo "$_s: $1 not committed"
 		return 1
 	fi
 	if su "$_u" -c "$_g pull -q --rebase --autostash && $_g push -q"; then
-		echo "probes: sent, $(su "$_u" -c "$_g log -1 --format=%h")"
+		echo "$_s: sent, $(su "$_u" -c "$_g log -1 --format=%h")"
 		return 0
 	fi
-	echo "probes: committed, not pushed: git pull --rebase && git push"
+	echo "$_s: committed, not pushed: git pull --rebase && git push"
 	return 1
 }

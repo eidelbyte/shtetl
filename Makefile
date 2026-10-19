@@ -11,26 +11,56 @@ CFLAGS ?= -O2 -g
 CFLAGS += -std=c99 -Wall -Wextra -Werror -Wcast-qual -Isrc
 LDFLAGS ?=
 
+# libzfs (plan 10): FreeBSD installs libzfs.h and libnvpair.h but not
+# the OpenZFS headers they assume (sys/fs/zfs.h, libspl's Solaris
+# types), so the FreeBSD layer takes them from a source tree, with the
+# include set zfs_rebase's Makefile uses. Only src/fbsd gets them:
+# libspl ships headers that would shadow FreeBSD's for everything else.
+FREEBSD_SRC ?= /usr/src
+ZFS_TOP = $(FREEBSD_SRC)/sys/contrib/openzfs
+ZFS_CFLAGS = -I$(ZFS_TOP)/lib/libspl/include/os/freebsd \
+	-I$(ZFS_TOP)/lib/libspl/include \
+	-I$(ZFS_TOP)/include/os/freebsd -I$(ZFS_TOP)/include \
+	-include $(ZFS_TOP)/include/os/freebsd/spl/sys/ccompile.h \
+	-include $(FREEBSD_SRC)/sys/modules/zfs/zfs_config.h \
+	-DNEED_SOLARIS_BOOLEAN -DHAVE_ISSETUGID -DHAVE_STRLCAT -DHAVE_STRLCPY
+ZFS_LIBS = -lzfs -lzfs_core -lnvpair
+
 # Which flavor build/ holds: the two share no objects, and asking for
 # the other empties build/ first.
 FLAVOR = portable
 BUILD = build
 
 CORE_OBJS = $(BUILD)/err.o $(BUILD)/mem.o
+# src/core/zfs.h has two implementations, picked at the link: the
+# FreeBSD layer over libzfs, and tests/zfake.c for the tests. The mac
+# has no ZFS to link a program against, so the portable flavor
+# compiles the program's objects and links only the tests.
+ZFS_OBJS = $(BUILD)/fbsd_zfs.o
+TEST_OBJS = $(BUILD)/zfake.o $(BUILD)/zcells.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS)
-TESTS = check_mem
+TESTS = check_mem check_zfs
 
-all: flavor shtetl
+ALL_portable = $(SHTETL_OBJS)
+ALL_freebsd = shtetl $(BUILD)/box_zcheck
+
+all: flavor $(ALL_$(FLAVOR))
 
 flavor:
 	@mkdir -p $(BUILD); \
 	if [ "$$(cat $(BUILD)/.flavor 2>/dev/null)" != "$(FLAVOR)" ]; then \
-	    rm -f $(BUILD)/*.o $(BUILD)/check_* shtetl; \
+	    rm -f $(BUILD)/*.o $(BUILD)/check_* $(BUILD)/box_* shtetl; \
 	    echo "$(FLAVOR)" > $(BUILD)/.flavor; \
 	fi
 
 shtetl: $(SHTETL_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(SHTETL_OBJS) $(LDFLAGS)
+
+# tests/box/run.sh's program: family Z against libzfs.
+$(BUILD)/box_zcheck: tests/box/zcheck.c $(BUILD)/zcells.o $(CORE_OBJS) \
+	$(ZFS_OBJS)
+	$(CC) $(CFLAGS) -Itests -o $@ tests/box/zcheck.c $(BUILD)/zcells.o \
+	    $(CORE_OBJS) $(ZFS_OBJS) $(LDFLAGS) $(ZFS_LIBS)
 
 freebsd:
 	$(MAKE) FLAVOR=freebsd all
@@ -44,12 +74,22 @@ $(BUILD)/err.o: src/core/err.c src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/err.c
 $(BUILD)/mem.o: src/core/mem.c src/core/mem.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/mem.c
+$(BUILD)/fbsd_zfs.o: src/fbsd/zfs.c src/core/zfs.h src/core/err.h \
+	src/core/mem.h
+	$(CC) $(CFLAGS) $(ZFS_CFLAGS) -c -o $@ src/fbsd/zfs.c
+$(BUILD)/zfake.o: tests/zfake.c tests/zfake.h src/core/zfs.h \
+	src/core/err.h
+	$(CC) $(CFLAGS) -c -o $@ tests/zfake.c
+$(BUILD)/zcells.o: tests/zcells.c tests/zcells.h src/core/zfs.h \
+	src/core/err.h
+	$(CC) $(CFLAGS) -c -o $@ tests/zcells.c
 
-# make check: each tests/check_*.c linked against the core and run.
-check: flavor $(CORE_OBJS)
+# make check: each tests/check_*.c linked against the core and the
+# fake, and run.
+check: flavor $(CORE_OBJS) $(TEST_OBJS)
 	@for t in $(TESTS); do \
 	    $(CC) $(CFLAGS) -Itests -o $(BUILD)/$$t tests/$$t.c \
-		$(CORE_OBJS) $(LDFLAGS) || exit 1; \
+		$(CORE_OBJS) $(TEST_OBJS) $(LDFLAGS) || exit 1; \
 	    ./$(BUILD)/$$t || { echo "FAIL $$t"; exit 1; }; \
 	    echo "ok   $$t"; \
 	done
@@ -57,7 +97,12 @@ check: flavor $(CORE_OBJS)
 gate:
 	sh tools/gate.sh
 
+# The FreeBSD sources compiled for FreeBSD on a machine that is not:
+# a syntax check against a FreeBSD tree's headers, not a build.
+xcheck:
+	sh tools/xcheck-freebsd.sh
+
 clean:
 	rm -rf $(BUILD) shtetl
 
-.PHONY: all flavor freebsd check-freebsd check gate clean
+.PHONY: all flavor freebsd check-freebsd check gate xcheck clean

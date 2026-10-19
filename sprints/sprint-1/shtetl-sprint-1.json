@@ -255,7 +255,8 @@
     ],
     "provides": "One layer over libzfs and libzfs_core with a fake that refuses and answers as ZFS does, in ZFS's order, and a box program that holds the two to the same cells.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-10-20: built; 46 Z cells over the fake, four fake mutations caught, xcheck and gate clean on the mac. Cells written once (tests/zcells.c) for fake and box; no stub, the portable flavor links only tests. Box owed: make freebsd && sudo sh tests/box/run.sh. Worklog issue-docs/m1-zfs.md."
   },
   "m1-spaces": {
     "description": "The spaces (plan 4): config, build, lake and run, each the one filesystem where shtetl:space is set locally to that word; two roots of one space are refused and the daemon does not start; a space nobody marked is absent, and what needs it does not run (a run host whose lake is elsewhere has no local lake). Marking a space is the person's zfs set; there is no bootstrap verb. The skeleton each space needs is made when the daemon starts, from one table of names and properties, so that nothing later asks whether a parent exists: M1's row is <lake>/foundations (canmount=off); later issues add theirs (run/foundations, run/containers mountpoint=/containers, lake/foundation-builds, lake/containers, run/systems...). An unknown value of shtetl:space is refused. Matrix family S over the fake. Verify: make check; the box cells of m1-zfs cover the calls.",
