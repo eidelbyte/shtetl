@@ -1,0 +1,86 @@
+# zfs create -o mountpoint=/w s2run/w
+# zfs create -o mountpoint=/f s2run/f
+# mkdir -p /tmp/shtetl-probes/f/etc /tmp/shtetl-probes/f/bin /tmp/shtetl-probes/f/share
+# zfs snapshot s2run/f@1
+# zfs clone -o mountpoint=/h1 s2run/f@1 s2run/h1
+# zfs snapshot s2run/h1@s1
+# rm /tmp/shtetl-probes/h1/share/a
+# zfs snapshot s2run/h1@s2
+# zfs snapshot s2run/h1@s3
+# chmod 600 /tmp/shtetl-probes/h1/etc/app.conf
+# zfs snapshot s2run/h1@s4
+# zfs snapshot s2run/f@2
+# zfs_rebase -m -o /tmp/shtetl-probes/w/r1 --from s2run/h1@s1 --onto s2run/f@2 --result s2run/h2
+zfs_rebase: unknown option "-m"
+usage: zfs_rebase [-p] [-v] [-q] [--manifest FILE]
+                  [--allow-unrelated --base SNAP]
+                  [--take-onto | --take-from] [--interactive [CMD]] [--no-merge]
+                  --from SNAP|DATASET --onto SNAP|DATASET --result NAME
+       zfs_rebase --dry-run [-p] [--manifest FILE]
+                  --from SNAP|DATASET --onto SNAP|DATASET
+       zfs_rebase --continue [--interactive [CMD]] [--no-merge]
+                  [--from SNAP] [--onto SNAP] IDENT
+       zfs_rebase --restart IDENT
+       zfs_rebase --abort   IDENT
+       zfs_rebase --verify  IDENT
+       zfs_rebase --posix [-p] [-o FILE] BASEDIR FROMDIR ONTODIR
+       zfs_rebase --build-fixture FIXTURE DIR
+       zfs_rebase --edit-fixture FIXTURE TREE DIR
+a verb names its rebase with IDENT, resolved in this order: an
+absolute path to its manifest; the dataset carrying the record,
+in full or by the last part of its name; the pre-apply snapshot,
+as "snap" or "pool/fs@snap"; a relative path to its manifest;
+its run directory under /var/db/zfs_rebase. Two rebases that
+answer to one IDENT are refused, never chosen between, and the
+record and the header must name each other. --result is a start
+flag: a start takes no IDENT, and no verb takes --result.
+every flag has both forms, and the two parse to the same run:
+  -f, --from SNAP|DS      the side whose changes are replayed (--off-of)
+                          on a verb: checked against the header, never
+                          the thing that says which rebase it is
+  -t, --onto SNAP|DS      the side they go onto (--to); it sets the form
+  -r, --result NAME       the name the run makes; a start flag only;
+                          a NAME with no slash goes beside onto's dataset
+  -p, --permissive-merge  permissive merge; strict is the default
+  -v, --verbose           counts and steps on stderr
+  -o, --manifest FILE     where the manifest goes, resolution beside it;
+                          a start option, and a dry run's
+  -V, --verify            a verb: report one rebase and write
+                          nothing; it never repairs, and it goes
+                          with no flag that starts or moves one
+  -q, --quiet             silence the final check's report; a start
+                          option, kept in the record for the whole
+                          run
+  -O, --take-onto         answer every conflict of the skeleton onto
+  -F, --take-from         answer every conflict of the skeleton from
+  -i, --interactive [CMD] open a child on the resolution at the
+                          conflicts gate and read the document back
+                          when it exits 0; anything else and the
+                          gate stands. CMD is the command that edits
+                          it, run as sh -c with the path as its last
+                          argument, and its own flags are part of it
+                          ("code --wait"); with none the built-in
+                          picker opens. A bare word after -i is CMD
+                          unless it is the only one on a verb's
+                          line, where it is IDENT. This invocation
+                          only: say it on each --continue
+  -M, --no-merge          stop at the conflicts gate however the
+                          resolution is answered; an error past it
+  -c, --continue          take the rebase on from the gate it left
+  -R, --restart           the result back as onto was, applied again
+  -A, --abort             the rebase undone, as if it never happened
+  -n, --dry-run           the manifest only, to stdout without -o;
+                          --result is ignored
+  -u, --allow-unrelated   no derivation of the base, and no pruning;
+                          it needs --base, since there is none to derive
+  -b, --base SNAP         with --allow-unrelated only: the base
+--posix, --build-fixture and --edit-fixture are the project's own
+test aids: they are long only and take the first argument position.
+exit: 0 done, 1 stopped at conflicts, 2 refused, 3 failed or
+drifted -- done is reached all the same when a check finds drift
+-> exit 2
+P6 failed P6.1 step 1, clone form: got '2', want '0'
+# zfs set readonly=off s2run/h2
+cannot open 's2run/h2': dataset does not exist
+-> exit 1
+P6 failed setup: zfs set readonly=off s2run/h2

@@ -1,0 +1,29 @@
+shtetl 422bf9c probes on KIDON 2026-10-19T04:08:28Z
+host: 15.1-RELEASE-p2 amd64
+zfs: zfs-2.4.2-1-FreeBSD_g6330a45b0 zfs-kmod-2.4.2-1-FreeBSD_g6330a45b0 
+zfs_rebase: /usr/local/sbin/zfs_rebase
+
+P2 a container's active version is the one mounted at its path
+P2 ok P2.1 versions mounted after an import
+P2 answer P2.2 mounted by setting the mountpoint: no
+P2 ok P2.2 v1 at
+P2 ok P2.2 v1/var at
+P2 ok P2.3 inside
+P2 ok P2.3 devfs at
+P2 ok P2.4 v2 at, during a roll
+P2 ok P2.4 v1 still at
+P2 ok P2.5 devfs after jail -r
+P2 answer P2.5 v2 and v2/var after the set, before any mount: /tmp/shtetl-probes/containers/H /tmp/shtetl-probes/containers/H/var
+P2 ok P2.5 v2 at
+P2 ok P2.5 v2/var at
+P2 ok P2.5 v1's mountpoint
+P2 ok P2.6 inside, started again
+P2 ok P2.6 v1 mounted at
+P2 answer P2.7 zfs mount of v1 at H over v2: exit: 0
+P2 answer P2.7 mounted at H now: s2run/containers/v2 s2run/containers/v1 
+
+P6 a house's saves replayed onto the next foundation version
+P6 failed P6.1 step 1, clone form: got '2', want '0'
+P6 failed setup: zfs set readonly=off s2run/h2
+
+== 13 ok, 2 failed
