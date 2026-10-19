@@ -93,3 +93,29 @@ unblocks them:
 - a walk refused by libzfs part way, and open refused: nothing a cell
   can do makes libzfs fail them; the fake fails them on request
   (zfake_fail) for the tests of their callers.
+
+## Family S: the spaces and their skeleton (m1-spaces)
+
+Dimensions: how many filesystems set shtetl:space locally to each
+value (none, one, two), the values (a space's, another), where the
+roots sit (apart, one inside another), whether the walk is refused;
+then for the skeleton, each row's space found or not, its dataset
+there or not, its making refused or not.
+
+| cell | what is there | expected | disposition |
+|------|---------------|----------|-------------|
+| S1 | nothing marked | every space absent, nothing said | tests/check_spaces.c |
+| S2 | one root of each, in two pools | each found | tests/check_spaces.c |
+| S3 | a root with a filesystem below it, inheriting the value | the root only | tests/check_spaces.c |
+| S4 | two roots of one space | "two lake roots: A and B", sorted; none taken | tests/check_spaces.c |
+| S5 | a value no space has | "DS: invalid shtetl:space \"V\""; none taken | tests/check_spaces.c |
+| S6 | a root inside another's | "DS: run root inside lake root R" | tests/check_spaces.c |
+| S7 | the walk refused | its words; none taken | tests/check_spaces.c |
+| S8 | a row's dataset missing | made, its property from birth | tests/check_spaces.c |
+| S9 | there already | left, nothing said | tests/check_spaces.c |
+| S10 | the row's space absent | nothing made | tests/check_spaces.c |
+| S11 | making it refused | its words | tests/check_spaces.c |
+
+On the box, discovery and the skeleton run inside the daemon's start,
+which m1-foundation-start's box cells exercise; the ZFS calls under
+them are family Z's.

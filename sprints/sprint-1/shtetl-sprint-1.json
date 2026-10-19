@@ -274,7 +274,8 @@
     ],
     "provides": "The four spaces found by shtetl:space, and each space's skeleton there whenever the daemon runs.",
     "estimated_size": "small",
-    "completed": "not-started"
+    "completed": "tested",
+    "note": "2026-10-20: built; S1-S11 over the fake, no leaks, gate and xcheck clean. Root inside root refused (main's Q-Y, carried). Its ZFS calls are family Z's, owed on the box with m1-zfs. Worklog issue-docs/m1-spaces.md."
   },
   "m1-daemon": {
     "description": "The daemon and the command (plan 9, 10). `shtetl daemon` runs the loop in the foreground and logs to syslog; etc/rc.d/shtetl starts it under daemon(8). It takes an flock on /var/run/shtetl.pid first (a second daemon says it is already running and exits), then replaces any socket left at /var/run/shtetl.sock, mode 0600, so only root reaches it. One kqueue: the socket (EVFILT_READ), each connection (EVFILT_READ, and EVFILT_WRITE while a reply waits on a slow reader), SIGTERM and SIGINT (EVFILT_SIGNAL: the socket removed, exit 0). The wire is framed records over a stream socket, never text to parse: the command sends its arguments as one record; the daemon answers with records of standard output, standard error and the exit status, and the command copies each to its own descriptor and exits with that status. Every other verb is decided by the daemon; an unknown verb is refused with the usage. PROPOSALs: the paths; the command prints, the daemon never writes to a person's terminal (an attended roll passes descriptors in m5-queue). Matrix family D: a daemon forked over the fake ZFS on a listening socket made before the fork. Verify: make check; on the box, the rc script starts and stops it.",

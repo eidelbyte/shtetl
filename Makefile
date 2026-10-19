@@ -31,7 +31,7 @@ ZFS_LIBS = -lzfs -lzfs_core -lnvpair
 FLAVOR = portable
 BUILD = build
 
-CORE_OBJS = $(BUILD)/err.o $(BUILD)/mem.o
+CORE_OBJS = $(BUILD)/err.o $(BUILD)/mem.o $(BUILD)/spaces.o
 # src/core/zfs.h has two implementations, picked at the link: the
 # FreeBSD layer over libzfs, and tests/zfake.c for the tests. The mac
 # has no ZFS to link a program against, so the portable flavor
@@ -39,7 +39,7 @@ CORE_OBJS = $(BUILD)/err.o $(BUILD)/mem.o
 ZFS_OBJS = $(BUILD)/fbsd_zfs.o
 TEST_OBJS = $(BUILD)/zfake.o $(BUILD)/zcells.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS)
-TESTS = check_mem check_zfs
+TESTS = check_mem check_zfs check_spaces
 
 ALL_portable = $(SHTETL_OBJS)
 ALL_freebsd = shtetl $(BUILD)/box_zcheck
@@ -74,6 +74,9 @@ $(BUILD)/err.o: src/core/err.c src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/err.c
 $(BUILD)/mem.o: src/core/mem.c src/core/mem.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/mem.c
+$(BUILD)/spaces.o: src/core/spaces.c src/core/spaces.h src/core/err.h \
+	src/core/mem.h src/core/zfs.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/spaces.c
 $(BUILD)/fbsd_zfs.o: src/fbsd/zfs.c src/core/zfs.h src/core/err.h \
 	src/core/mem.h
 	$(CC) $(CFLAGS) $(ZFS_CFLAGS) -c -o $@ src/fbsd/zfs.c
