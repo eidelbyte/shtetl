@@ -106,7 +106,10 @@ it (built, m1-spaces).
   repository that is missing and never updates one: a recipe changes
   when the person changes it (ruled). shtetl.conf, the remotes in it,
   stays the site's own at zconfig's top.
-- zbuild: the FreeBSD src checkout.
+- zbuild: src, the FreeBSD src checkout, and patches/N, the N'th patch
+  source from a remote as the roll under way fetched it (m3-src): a
+  patch repository is the roll's, fetched again at its ref each time,
+  and kept out of the checkout. Each is made by git init when missing.
 - zlake: where foundations are built and owned, their obj caches, and
   the copy of every house version beamed from zrun, kept deeper than
   zrun keeps it.

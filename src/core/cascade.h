@@ -64,4 +64,12 @@ void sh_recipe_free(struct sh_recipe *r);
 const struct sh_layer *sh_recipe_layer(const struct sh_recipe *r,
     const char *from);
 
+/*
+ * Where in zconfig the path REL is that the layer FROM gives: in R's
+ * place, or at the top for the default's (plan 4). Allocated, relative
+ * to zconfig's root.
+ */
+char *sh_recipe_rel(const struct sh_recipe *r, const char *from,
+    const char *rel);
+
 #endif	/* SH_CASCADE_H */

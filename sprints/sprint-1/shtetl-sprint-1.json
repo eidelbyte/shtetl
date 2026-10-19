@@ -448,7 +448,8 @@
     ],
     "provides": "zbuild at the head of a recipe's src_branch with its patches applied, or a failure that leaves zbuild reset.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-10-20: built; GS1-GS9, GP1-GP15, GR1-GR4 on the mac with git 2.50 over file:// remotes, mutations caught, no leaks of ours, gate, xcheck. zbuild = src/ + patches/N (plan 4 amended); no retouch code (git reset --hard rewrites patched files); one git apply --3way per patch (already-in merges clean). Owed: GS10 (real src fetch) in m3-box; check_src under make check-freebsd on the box. Worklog issue-docs/m3-src.md."
   },
   "m3-roll": {
     "description": "Roll steps 3 to 7 (plan 6) and the stall (7.4). buildworld and buildkernel over the foundation's obj cache (<lake>/foundation-builds/F); into the head, mounted for the roll: delete-old before installworld, the kernel installed into a scratch directory of the obj cache and synced with install -C semantics, distribution, installworld's backups removed (all carried from main as knowledge); pkg, commands-external, commands; foundation.conf injected with the src commit and the patches; snapshot -r F@<ver>-<branch>-<date>-<create|update> with shtetl:kind and shtetl:commit. A first roll creates the foundation's datasets from its recipe. Any failure rolls every dataset back to its newest snapshot (or destroys a first roll's), resets zbuild, sets shtetl:stall (the step and the reason) and logs it. `shtetl roll F` clears a stall and asks the builder for a turn; a roll of a foundation already rolling is refused. Kill tests at each step, the actor started again landing where family A says. Verify: make check with make and git faked as children; the box in m3-box.",
@@ -471,7 +472,8 @@
     ],
     "provides": "A foundation rolls by hand: built, installed, injected and snapshotted, or rolled back and stalled; shtetl roll F restarts a stalled one.",
     "estimated_size": "large",
-    "completed": "not-started"
+    "completed": "not-started",
+    "note": "2026-10-20 (from m3-src): rc's and service(8)'s PATH lack /usr/local/bin, so the daemon's git children exit 127 under rc; give etc/rc.d/shtetl the PATH when the daemon first runs a job. foundation.conf needs the src and patch-source commits: read them from git without parsing its words where possible. On failure run sh_src_reset."
   },
   "m3-pkg": {
     "description": "A foundation's package upgrade (plan 6): pkg upgrade in the head, foundation.conf injected again, a snapshot of kind pkg; no src, no build, no commands. A failure rolls back and stalls as any roll. Verify: make check; the box in m3-box.",

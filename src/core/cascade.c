@@ -395,20 +395,26 @@ rs_find(const char *root, const char *const *repos, struct sh_recipe *r,
 	return (0);
 }
 
+char *
+sh_recipe_rel(const struct sh_recipe *r, const char *from, const char *rel)
+{
+	const struct sh_layer *l = sh_recipe_layer(r, from);
+
+	return (rs_in(l != NULL && l->sl_default ? "" : r->sr_root, rel));
+}
+
 /*
  * What a path REL a layer FROM gives is in zconfig ROOT: 'f', 'd', '?'
- * or 0 as sh_root_kind says; the path is in the recipe's root, or at
- * the top for the default's.
+ * or 0 as sh_root_kind says.
  */
 static int
 rs_kind(const char *root, const struct sh_recipe *r, const char *from,
     const char *rel)
 {
-	const struct sh_layer *l = sh_recipe_layer(r, from);
 	char *path;
 	int k;
 
-	path = rs_in(l != NULL && l->sl_default ? "" : r->sr_root, rel);
+	path = sh_recipe_rel(r, from, rel);
 	k = sh_root_kind(root, path);
 	free(path);
 	return (k);

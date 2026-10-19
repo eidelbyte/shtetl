@@ -451,3 +451,72 @@ runs the same cells: EVFILT_PROC and a child gone before it is watched
 | T1 | a turn asked of a free builder | given at once | tests/check_job.c |
 | T2 | turns asked while one is out | given in the order asked, one at each give | tests/check_job.c |
 | T3 | the last given back | the builder free; the next ask given at once | tests/check_job.c |
+
+## Family G: what a roll fetches (m3-src)
+
+The cells run git for real, over repositories made in the scratch
+directory and reached as file:// remotes. Mutations caught: the clean
+left out (GS2); the reset made a checkout (GS2); byte order for natural
+order, and hidden names listed (GP7); git apply without --3way (GP9);
+a directory always at zconfig's top (GP4); the ref or the dir passed
+over (GP3); a recipe repository cloned though there (GR3). The patch
+sources' shallow fetch is economy, and no cell's: a mutation of it
+fails nothing.
+
+### GS: the src checkout (plan 6 step 1)
+
+Dimensions: zbuild's src {not there, a checkout as an earlier roll
+left it: at an older head, a tracked change, a patch's new file, an
+untracked and an ignored file, a conflict in the index}; the src
+remote {there, not}; the branch {on it, not}; the remote's form {a
+URL, a host and a path}.
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| GS1 | no checkout yet | src at the branch's head | tests/check_src.c |
+| GS2 | a checkout at an older head, a tracked change, an untracked and an ignored file | at the new head, nothing else | tests/check_src.c |
+| GS3 | a conflict an earlier roll's patch left in the index | gone; at the head | tests/check_src.c |
+| GS4 | the src remote not there | "src: fetch: exited 128"; no step after | tests/check_src.c |
+| GS5 | the branch not on the remote | "src: fetch: exited 128" | tests/check_src.c |
+| GS6 | a file an earlier roll's patch changed, the patch now dropped, its time 2000 | unpatched, its time now's (main 8b27e68) | tests/check_src.c |
+| GS7 | sh_src_reset after a failed patch | the checkout at HEAD, clean | tests/check_src.c |
+| GS8 | a remote as a host and a path | https://host/path | tests/check_src.c (sh_src_url) |
+| GS9 | a remote as a URL | as written | tests/check_src.c (sh_src_url) |
+| GS10 | a FreeBSD src fetch over https | the checkout of a real branch | deferred: the network and the size are the box's; m3-box |
+
+### GP: the patches (plan 6 step 2)
+
+Dimensions: the sources {none, one from a remote, a directory of
+zconfig, several}; a remote source's {ref, HEAD} by {dir, its top}; a
+directory's place {zconfig's top, as the default gives it; a recipe
+repository, as a recipe in it gives it}; the files {*.patch, others,
+hidden, numbered past 9}; a patch {applies, its context moved, merges
+three ways, already in, conflicts, its base unknown and not
+applying}; a remote source {fetched, not reachable, its dir missing}.
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| GP1 | no patches | the src steps alone; ends well | tests/check_src.c |
+| GP2 | a remote source, no ref, no dir | fetched at HEAD into patches/1; its top's patches applied | tests/check_src.c |
+| GP3 | a remote source with a ref and a dir | fetched at the ref; the dir's patches, not the top's | tests/check_src.c |
+| GP4 | a directory a recipe in a recipe repository gives | read in the repository's place | tests/check_src.c |
+| GP5 | a directory shtetl.conf's foundation block gives | read at zconfig's top | tests/check_src.c |
+| GP6 | several sources | applied in the recipe's order | tests/check_src.c |
+| GP7 | 1, 2 and 10.patch beside README and .#3.patch | applied 1, 2, 10; the others never | tests/check_src.c |
+| GP8 | a patch whose context moved | applied | tests/check_src.c |
+| GP9 | a patch whose context changed, its base in the checkout | merged three ways | tests/check_src.c |
+| GP10 | a patch already in | goes on | tests/check_src.c |
+| GP11 | a conflict | "LOC: NAME: exited 1"; no patch after it | tests/check_src.c |
+| GP12 | a patch whose base the checkout lacks, not applying | "LOC: NAME: exited 1" | tests/check_src.c |
+| GP13 | a remote source not reachable | "LOC: fetch: exited 128" | tests/check_src.c |
+| GP14 | a remote source's dir not in it | "patches: PATH: No such file or directory" | tests/check_src.c |
+| GP15 | natural order | 2 before 10, a2 before a10, 02 and 2 by their bytes once equal, x before x1 | tests/check_src.c (sh_natcmp) |
+
+### GR: the recipe repositories (plan 4)
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| GR1 | none named | no step | tests/check_src.c |
+| GR2 | one missing from zconfig | cloned into its directory | tests/check_src.c |
+| GR3 | one there, behind its remote | no step; its head as it was | tests/check_src.c |
+| GR4 | one whose remote is not there | "NAME: clone: exited 128" | tests/check_src.c |
