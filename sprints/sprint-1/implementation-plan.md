@@ -86,7 +86,11 @@ follows:
 ## 4. The spaces
 
 Four spaces, as on main: each one dataset the user already has, found
-by its `shtetl:space` property.
+by its `shtetl:space` property, set there by the person with zfs set;
+two roots of a space, or one inside another's, are refused. There is
+no bootstrap: the daemon makes the skeleton below each root (the
+datasets below, shtetl's own) each time it starts, what is missing of
+it (built, m1-spaces).
 
 - zconfig: the recipes and the remotes, nothing else (ruled). It is a
   ZFS dataset; the person may snapshot it, shtetl never does (ruled).
@@ -205,10 +209,14 @@ with zconfig as it is then, and the obj cache makes that a rebuild of
 what changed. main's pause, with --continue, --skip and --abort, is
 gone.
 
-A crash part way is not a failure. Starting, the actor finds the head
-written since the newest snapshot (written@, after a sync) and rolls
-it back, without a stall; the next roll comes from the clock or a
-person.
+A crash part way is not a failure. Starting, the actor puts the
+foundation where an idle one is, without a stall: every dataset of
+its tree, children first, unmounted and rolled back to its newest
+snapshot, which changes nothing where nothing was written, so no
+written@ is asked; a dataset with no snapshot holds no version and is
+destroyed, which is what a first build that never finished leaves.
+The next roll comes from the clock or a person (built,
+m1-foundation-start).
 
 A pkg upgrade is a roll of steps 5 to 7 with only pkg in step 5, kind
 pkg.

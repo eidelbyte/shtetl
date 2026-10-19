@@ -318,7 +318,8 @@
     ],
     "provides": "A foundation actor for each foundation in zlake that starts from what ZFS shows, a crash undone without a stall, and shtetl status listing each with its state.",
     "estimated_size": "small",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-10-20: built; A1-A10 over the fake, D1 shows a foundation, four mutations caught, no leaks, xcheck, gate. No written@ (plan 6 updated): rollback to the newest is the one rule; a head with no snapshot is undone. Box owed: tests/box/run.sh family A. Worklog issue-docs/m1-foundation-start.md."
   },
   "m2-language": {
     "description": "The language carried from main (plan 5, 12): parse (libucl, built from FREEBSD_SRC on the mac and the textproc/libucl port on FreeBSD), syntax, schema, the default layer and the object layer, cascade, show, the key paths in err, with matrix family C, docs/configuration.md, docs/ucl-primer.md and tools/doccheck.py. Trimmed: update.suffix, retention.archive, age retention and any key whose reader is gone become invalid keys (no legacy). Added: run.keep, lake.keep, roll.depth (a count or an age), with the PROPOSAL defaults 2 and 5. Every carried test kept green, and every cell of family C either kept or retired with its key. Verify: make check, make doc.",

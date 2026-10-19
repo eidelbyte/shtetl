@@ -134,7 +134,9 @@ main(void)
 {
 	static const char want[] =
 	    "space lake tank/lake\n"
-	    "space run fast/run\n";
+	    "space run fast/run\n"
+	    "foundation generic idle v1\n";
+	static const char *const v1[] = { "tank/lake/foundations/generic@v1" };
 	static const struct sh_zprop lake = { "shtetl:space", "lake" };
 	static const struct sh_zprop run = { "shtetl:space", "run" };
 	struct sh_buf b = { NULL, 0, 0 };
@@ -158,6 +160,12 @@ main(void)
 	CHECK(sh_zfs_open(&z, &c.c_err) == 0);
 	CHECK(sh_zfs_create(z, "tank/lake", &lake, 1, &c.c_err) == 0);
 	CHECK(sh_zfs_create(z, "fast/run", &run, 1, &c.c_err) == 0);
+	/* a foundation with a version: D1 shows its actor started */
+	CHECK(sh_zfs_create(z, "tank/lake/foundations", NULL, 0,
+	    &c.c_err) == 0);
+	CHECK(sh_zfs_create(z, "tank/lake/foundations/generic", NULL, 0,
+	    &c.c_err) == 0);
+	CHECK(sh_zfs_snapshot(z, v1, 1, NULL, 0, &c.c_err) == 0);
 
 	/* D12: a socket's path holding what a dead daemon left */
 	scratch_write("sock", "left\n");

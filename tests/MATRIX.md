@@ -156,3 +156,34 @@ over the fake on a socket listened on before the fork.
 Also run by hand on the mac (not in make check, since leaks(1) hangs
 on a forked child that exits): a live daemon over the fake after 600
 commands, no leaks.
+
+## Family A: an actor's start (m1-foundation-start)
+
+Dimensions, for a foundation as a crash left it: its head's
+versions (some, none), what was written since the newest (nothing,
+something), its children (none, one with versions, one with none),
+what is mounted (nothing, the head, the head and a child inside it),
+shtetl:stall (unset, set), a step refused or not; and across
+foundations, how many and in what order ZFS walks them, and the walk
+of <lake>/foundations refused. Expected throughout: every dataset
+rolled back to its newest snapshot or destroyed where it has none,
+children first, unmounted; no stall but shtetl:stall's or a refused
+step's.
+
+| cell | what the crash left | expected | disposition |
+|------|---------------------|----------|-------------|
+| A1 | versions, nothing written | idle at the newest; "foundation F idle V"; nothing said | tests/check_foundation.c; box: tests/box/run.sh |
+| A2 | written since the newest, mounted | the writes undone, unmounted | tests/check_foundation.c; box: tests/box/run.sh |
+| A3 | no version at all, mounted, a child | destroyed, children first; no actor; "foundation F: a first build undone" said | tests/check_foundation.c; box: tests/box/run.sh |
+| A4 | a version on the head, a child with none | the child destroyed, the head idle | tests/check_foundation.c |
+| A5 | the head mounted, a child mounted inside it, written | the child unmounted first (busy otherwise), the writes undone | tests/check_foundation.c |
+| A6 | shtetl:stall set | stalled with its text, its newest kept; "foundation F stalled TEXT" | tests/check_foundation.c; box: tests/box/run.sh |
+| A7 | a step refused | that one stalled with the refusal, said; the others started | tests/check_foundation.c |
+| A8 | several | by name in status, whatever the walk's order | tests/check_foundation.c |
+| A9 | the walk of <lake>/foundations refused | no start: the daemon does not start | tests/check_foundation.c |
+| A10 | no foundations | none | tests/check_foundation.c |
+
+Mutations of src/core/foundation.c, each caught: the parent unmounted
+before its children (A3), nothing unmounted (A2), the stall never read
+(A1), a head with no version kept (A3). On the box the daemon also
+gives D10 (SIGTERM, its socket removed) on real pools.

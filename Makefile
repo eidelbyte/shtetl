@@ -32,7 +32,8 @@ FLAVOR = portable
 BUILD = build
 
 CORE_OBJS = $(BUILD)/err.o $(BUILD)/mem.o $(BUILD)/spaces.o \
-	$(BUILD)/wire.o $(BUILD)/daemon.o $(BUILD)/command.o
+	$(BUILD)/wire.o $(BUILD)/daemon.o $(BUILD)/command.o \
+	$(BUILD)/foundation.o
 # src/core/zfs.h has two implementations, picked at the link: the
 # FreeBSD layer over libzfs, and tests/zfake.c for the tests. The mac
 # has no ZFS to link a program against, so the portable flavor
@@ -40,7 +41,7 @@ CORE_OBJS = $(BUILD)/err.o $(BUILD)/mem.o $(BUILD)/spaces.o \
 ZFS_OBJS = $(BUILD)/fbsd_zfs.o
 TEST_OBJS = $(BUILD)/zfake.o $(BUILD)/zcells.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS)
-TESTS = check_mem check_zfs check_spaces check_daemon
+TESTS = check_mem check_zfs check_spaces check_daemon check_foundation
 
 ALL_portable = $(SHTETL_OBJS)
 ALL_freebsd = shtetl $(BUILD)/box_zcheck
@@ -76,8 +77,12 @@ $(BUILD)/main.o: src/main.c src/core/daemon.h src/core/err.h \
 $(BUILD)/wire.o: src/core/wire.c src/core/wire.h src/core/mem.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/wire.c
 $(BUILD)/daemon.o: src/core/daemon.c src/core/daemon.h src/core/err.h \
-	src/core/mem.h src/core/spaces.h src/core/wire.h src/core/zfs.h
+	src/core/foundation.h src/core/mem.h src/core/spaces.h \
+	src/core/wire.h src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/daemon.c
+$(BUILD)/foundation.o: src/core/foundation.c src/core/foundation.h \
+	src/core/err.h src/core/mem.h src/core/zfs.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/foundation.c
 $(BUILD)/command.o: src/core/command.c src/core/daemon.h \
 	src/core/err.h src/core/wire.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/command.c

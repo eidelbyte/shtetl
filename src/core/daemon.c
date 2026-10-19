@@ -24,6 +24,7 @@
 
 #include "core/daemon.h"
 #include "core/err.h"
+#include "core/foundation.h"
 #include "core/mem.h"
 #include "core/spaces.h"
 #include "core/wire.h"
@@ -38,10 +39,12 @@ struct conn {
 };
 
 struct daemon {
-	int		d_kq;
-	struct sh_zfs	*d_zfs;
-	struct sh_spaces d_sp;
-	struct conn	*d_conns;
+	int			d_kq;
+	struct sh_zfs		*d_zfs;
+	struct sh_spaces	d_sp;
+	struct sh_foundation	*d_found;
+	size_t			d_nfound;
+	struct conn		*d_conns;
 };
 
 static const char usage[] =
@@ -53,6 +56,7 @@ static int
 act_status(struct daemon *d, int argc, char **argv, FILE *out,
     struct sh_err *e)
 {
+	size_t f;
 	int i;
 
 	(void) argv;
@@ -66,6 +70,8 @@ act_status(struct daemon *d, int argc, char **argv, FILE *out,
 			    sh_space_name((enum sh_space)i),
 			    d->d_sp.ss_root[i]);
 	}
+	for (f = 0; f < d->d_nfound; f++)
+		sh_foundation_status(&d->d_found[f], out);
 	return (0);
 }
 
@@ -276,6 +282,7 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, struct sh_err *e)
 {
 	struct daemon d;
 	struct kevent ev[16];
+	char root[512];
 	int i, n, done = 0, r = -1;
 
 	(void) memset(&d, 0, sizeof (d));
@@ -284,6 +291,13 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, struct sh_err *e)
 	if (sh_spaces_find(z, &d.d_sp, e) != 0 ||
 	    sh_spaces_skeleton(z, &d.d_sp, e) != 0)
 		goto out;
+	if (d.d_sp.ss_root[SH_SP_LAKE] != NULL) {
+		(void) snprintf(root, sizeof (root), "%s/foundations",
+		    d.d_sp.ss_root[SH_SP_LAKE]);
+		if (sh_foundations_start(z, root, &d.d_found, &d.d_nfound,
+		    e) != 0)
+			goto out;
+	}
 	if ((d.d_kq = kqueue()) < 0) {
 		sh_errf(e, "kqueue: %s", strerror(errno));
 		goto out;
@@ -324,6 +338,7 @@ out:
 	if (d.d_kq >= 0)
 		(void) close(d.d_kq);
 	(void) unlink(sock);
+	sh_foundations_free(d.d_found, d.d_nfound);
 	sh_spaces_free(&d.d_sp);
 	return (r);
 }

@@ -20,6 +20,11 @@ What runs:
 
 - family Z (tests/MATRIX.md): build/box_zcheck, tests/zcells.c's
   cells over libzfs, the same cells make check runs over the fake.
+- family A: ./shtetl daemon started over a lake pool holding what a
+  crash leaves (a version with a file written after it, a first build
+  with no version, a stalled foundation), asked for its status, and
+  stopped with SIGTERM. It needs a box with no shtetl space marked and
+  no shtetl daemon running, and says so otherwise.
 
 By hand, once (tests/MATRIX.md D18), the rc script:
 
