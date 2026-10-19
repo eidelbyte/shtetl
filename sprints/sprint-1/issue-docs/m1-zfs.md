@@ -107,3 +107,9 @@ libzfs's last, stale, description. main's zz_snap had the guard; it was
 lost in the trim. Back, with the reason in its comment, in its own
 commit (0486a19 is pushed). The fake stops at once, which is what the
 layer now does too. A rerun of Z6 is owed.
+
+## Box run 2
+
+KIDON, 2026-10-20, at d8b82aa (results 898e804): 54 ok, 0 failed.
+Z6 passes with the guard of 0e5bb61: every Z cell holds on libzfs.
+Tested.

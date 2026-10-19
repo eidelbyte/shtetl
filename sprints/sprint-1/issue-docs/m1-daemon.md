@@ -90,3 +90,12 @@ its socket and stopped on SIGTERM with exit 0, its socket removed
 "shtetl 109 - - message" (the RFC 5424 form), not "shtetl: message";
 nothing reads that copy but a person, and the box cells grep the
 message alone. D18, the rc script by hand, is still owed.
+
+## Box run 2
+
+KIDON, 2026-10-20, at d8b82aa (results 898e804): 54 ok, 0 failed.
+D10 again. And D18 by hand the same day: make install; service
+shtetl onestart; shtetl status, which printed nothing, the box having
+no space marked; service shtetl onestatus, "shtetl is running as pid
+563", read from the pidfile shtetl writes; service shtetl onestop,
+which waited for that pid. Tested.
