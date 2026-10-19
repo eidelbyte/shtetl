@@ -181,6 +181,14 @@ zf_mountpoint(const char *ds, char *buf)
 		    "" : v, ds + strlen(cur));
 }
 
+const char *
+zfake_local(const char *ds, const char *prop)
+{
+	const struct zf_obj *d = zf_fs(ds);
+
+	return (d != NULL ? zf_prop(d, prop) : NULL);
+}
+
 int
 zfake_put(const char *ds, const char *word)
 {
@@ -265,6 +273,9 @@ sh_zfs_user(struct sh_zfs *z, const char *name, const char *prop,
 		    strchr(name, '@') != NULL ? "snapshot" : "filesystem");
 		return (-1);
 	}
+	/* a native property is none of the user properties libzfs gives */
+	if (strchr(prop, ':') == NULL)
+		return (1);
 	/* its own; else its filesystem's, and up from there */
 	if ((v = zf_prop(o, prop)) == NULL) {
 		(void) snprintf(cur, sizeof (cur), "%.*s",

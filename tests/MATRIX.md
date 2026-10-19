@@ -44,6 +44,7 @@ words. The fake's data is words; the box's are files.
 | Z2 | user | set on it | its value, 0 |
 | Z2 | user | set above it | the ancestor's value, 0 |
 | Z2 | user | set nowhere | 1 |
+| Z2 | user | a native property | 1: none of the user properties |
 | Z2 | user | no such filesystem | "no such filesystem" |
 | Z3 | local | set locally on two, inherited below one | the two, each with its value |
 | Z3 | local | FN stops | FN's value returned |

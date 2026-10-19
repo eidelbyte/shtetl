@@ -21,6 +21,9 @@ void zfake_pool(const char *pool);
 void zfake_fail(const char *what);
 void zfake_fail_nth(const char *what, int nth);
 
+/* PROP as set on the filesystem DS itself, native or user; or NULL. */
+const char *zfake_local(const char *ds, const char *prop);
+
 /*
  * The fake's data: WORD written into the mounted filesystem DS, as a
  * file would be, and whether DS holds it. A snapshot keeps the words

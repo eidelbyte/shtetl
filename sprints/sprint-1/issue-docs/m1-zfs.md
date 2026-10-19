@@ -86,3 +86,12 @@
 
 The commit after 371973f, "zfs: the layer, its fake, and one set of
 cells for both".
+
+## After the commit
+
+Writing m1-spaces found the fake answering a native property's name
+through sh_zfs_user with its value, where libzfs's user properties
+hold none: a test would pass over the fake and fail on the box. The
+fake now answers 1 as the real layer does, Z2 has the cell, and
+zfake_local gives tests what the fake holds on a filesystem. The fix
+is its own commit, since 0486a19 was pushed.

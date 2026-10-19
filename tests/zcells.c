@@ -216,6 +216,8 @@ cells_user(void)
 	    strcmp(user("f/usr/local", "shtetl:zcheck"), "f") == 0);
 	cell("Z2", "set nowhere: 1",
 	    strcmp(user("f", "shtetl:nothing"), "(unset)") == 0);
+	cell("Z2", "a native property is no user property: 1",
+	    strcmp(user("f", "canmount"), "(unset)") == 0);
 	refused("Z2", "no such filesystem: refused",
 	    sh_zfs_user(z, at("nope"), "shtetl:zcheck", seen, sizeof (seen),
 	    &e), "nope", "no such filesystem");
