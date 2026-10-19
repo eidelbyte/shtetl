@@ -355,6 +355,13 @@ spelling.
 | CC43 | requires names a container of another repository: found | covered: check_cascade.c test_repos |
 | CC44 | a path a recipe gives (kernconf's config, a patches directory) is in its repository, not at the top; one the default gives is at the top | covered: check_cascade.c test_repos |
 | CC45 | an import is read in its importer's place, never across to the top: "import: R/F: no such file" | covered: check_cascade.c test_repos |
+| CC46 | a house stacked on its foundation version's shaken recipe (show's text, parsed back): the first layer, taken as the default is | covered: check_cascade.c test_stack |
+| CC47 | what stacks, stacks: the foundation's packages and datasets first | covered: check_cascade.c test_stack |
+| CC48 | the foundation's ver kept with the house's, to hold together | covered: check_cascade.c test_stack |
+| CC49 | the foundation's kind alone (src_branch, kernconf) left out | covered: check_cascade.c test_stack |
+| CC50 | commands: the shaken blocks' pieces keyed by their files; the default's piece given again, alike, one piece | covered: check_cascade.c test_stack |
+| CC51 | a dataset property the house gives again overrides the foundation's, with a warning; a derivation the default gives again, alike, says nothing | covered: check_cascade.c test_stack |
+| CC52 | a house's ver the foundation's cannot meet: refused naming the foundation version | covered: check_cascade.c test_stack |
 
 ### CW: what show prints (src/core/show.c)
 
@@ -375,4 +382,35 @@ spelling.
 main's command line (`shtetl -C DIR config show`, tests/run-cli.sh)
 is gone: show is the daemon's verb, its cells D19 - D24 of family D,
 and the doc examples run the daemon's show itself (tests/docshow.c).
+
+## Family I: the shaken recipe in what it built (m2-shake)
+
+Dimensions: writing {into a tree with nothing on the way, over the
+file there, a link on a directory of the way, a link at the file's
+place}, the flag {one a user may set, schg as root on ZFS}; reading
+{back through the snapshot's view, a link on the way, the file a
+link, none there, the live tree changed after the snapshot}. The
+shaken recipe's text is show's (CW1 holds that it parses back).
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| I1 | written into a tree | the text, mode 0444, the flag set; directories made 0755 | tests/check_shake.c |
+| I2 | written again | replaced, its flag cleared first and set again | tests/check_shake.c |
+| I3 | a link on the way | "var/db: a link", nothing written through it | tests/check_shake.c |
+| I4 | a link at the file's place | replaced by the file, the link's target untouched | tests/check_shake.c |
+| I5 | read through .zfs/snapshot/SNAP | parsed, the layer named as asked | tests/check_shake.c (a directory standing in) |
+| I6 | a link on the way in the snapshot | ".zfs/snapshot/S/var: a link" | tests/check_shake.c |
+| I7 | the file itself a link | "PATH: a link" | tests/check_shake.c |
+| I8 | no such snapshot or file | the system's words | tests/check_shake.c |
+| I9 | written schg, as root on ZFS | the flag on, mode 0444 | box: tests/box/shake.c |
+| I10 | schg | root may not write it, nor unlink it: EPERM | box: tests/box/shake.c |
+| I11 | written again over schg | replaced, schg again | box: tests/box/shake.c |
+| I12 | read back through a real snapshot's .zfs view | parsed | box: tests/box/shake.c |
+| I13 | a link in the snapshot on the way | refused | box: tests/box/shake.c |
+| I14 | the live file rewritten after the snapshot | the snapshot's read unchanged | box: tests/box/shake.c |
+
+A link on the way is told from other refusals by looking at it once
+it is refused (fstatat, not following it): the errno a component
+opened without following a link meets is ELOOP on the mac's open,
+ENOTDIR on its openat with O_DIRECTORY, EMLINK on FreeBSD.
 

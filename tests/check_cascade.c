@@ -1,6 +1,6 @@
 /*
  * The recipe cascade (docs/configuration.md 5, 6): tests/MATRIX.md
- * family CC, every cell (CC1 - CC45). Each test writes the
+ * family CC, every cell (CC1 - CC52). Each test writes the
  * configuration root it needs into the scratch directory.
  */
 
@@ -8,6 +8,8 @@
 
 #include "check.h"
 #include "core/cascade.h"
+#include "core/parse.h"
+#include "core/show.h"
 #include "core/syntax.h"
 #include "core/tree.h"
 
@@ -18,6 +20,8 @@ static char root[1100];
 /* The recipe repositories R looks in besides the top: none but in CC39 */
 static const char *const norepos[] = { NULL };
 static const char *const *repos = norepos;
+/* The shaken recipe R stacks on: none but in CC46 - CC52 */
+static const struct sh_node *under;
 
 /* A configuration root DIR holding FILES, pairs of path and text. */
 static const char *
@@ -41,7 +45,7 @@ R(const char *rt, const char *target)
 	sh_recipe_free(&r);
 	cap_reset(&c);
 	cap_reset(&wc);
-	return (sh_recipe_resolve(rt, repos, target, &r, &c.c_err,
+	return (sh_recipe_resolve(rt, repos, target, under, &r, &c.c_err,
 	    &wc.c_err));
 }
 
@@ -893,6 +897,86 @@ test_repos(void)
 	repos = norepos;
 }
 
+/*
+ * CC46 - CC52: a house stacked on the shaken recipe of its foundation
+ * version (plan 5), made as the foundation's is: shown, and parsed
+ * back.
+ */
+static void
+test_stack(void)
+{
+	static const char *const st[] = {
+		"shtetl.conf",
+		"ver = \">=15.1\";\npkg = [ \"sudo\" ];\n"
+		"commands { motd = \"echo shtetl > /etc/motd\"; }\n"
+		"derivations { \"etc/pwd.db\" { "
+		"source = \"etc/master.passwd\"; "
+		"command = \"pwd_mkdb -p /etc/master.passwd\"; } }\n",
+		"foundations/generic.conf",
+		"src_branch = \"releng/15.1\";\nkernconf = \"GENERIC\";\n"
+		"pkg = [ \"tmux\" ];\n"
+		"datasets { var { compression = \"zstd\"; } }\n"
+		"commands { base = \"echo base\"; }\n",
+		"containers/web.conf",
+		"ver = \"<16\";\npkg = [ \"nginx\" ];\n"
+		"datasets { var { compression = \"lz4\"; } www {} }\n"
+		"commands { web = \"echo web\"; }\n",
+		"containers/old.conf", "ver = \"<15\";\n",
+		NULL
+	};
+	struct sh_node *shaken;
+	const struct sh_node *cmd, *ver;
+	char *text = NULL;
+	size_t len = 0;
+	FILE *f;
+
+	resolves(mkroot("st", st), "foundations/generic");
+	CHECK((f = open_memstream(&text, &len)) != NULL);
+	sh_show_recipe(f, &r);
+	CHECK(fclose(f) == 0);
+	cap_reset(&c);
+	shaken = sh_parse_buf(text, len, "foundations/generic@v1", &c.c_err);
+	CHECK(shaken != NULL);
+	under = shaken;
+
+	/* CC46: the first layer, taken as the default is */
+	resolves(root, "containers/web");
+	CHECK(is(layers(), "foundations/generic@v1 shtetl.conf "
+	    "containers/web.conf"));
+	CHECK(r.sr_layers[0].sl_default && !r.sr_layers[2].sl_default);
+	/* CC47: what stacks, stacks, the foundation's first */
+	CHECK(is(keys(M("pkg")), "sudo tmux nginx"));
+	CHECK(is(sh_obj_get(M("pkg"), "tmux")->sn_from,
+	    "foundations/generic@v1"));
+	CHECK(is(keys(M("datasets")), "var www"));
+	/* CC48: every ver kept, to hold together */
+	ver = M("ver");
+	CHECK(ver->sn_arr.ar_n == 3 &&
+	    is(ver->sn_arr.ar_v[0]->sn_from, "foundations/generic@v1") &&
+	    is(ver->sn_arr.ar_v[2]->sn_str, "<16"));
+	/* CC49: the foundation's kind alone is left out */
+	CHECK(M("src_branch") == NULL && M("kernconf") == NULL);
+	/* CC50: pieces keyed by their files; the default's again, one */
+	cmd = M("commands");
+	CHECK(is(keys(cmd), "motd base web"));
+	CHECK(is(keys(sh_obj_get(cmd, "motd")), "shtetl.conf"));
+	CHECK(is(keys(sh_obj_get(cmd, "base")), "foundations/generic.conf"));
+	CHECK(is(keys(sh_obj_get(cmd, "web")), "containers/web.conf"));
+	/* CC51: a property given again overrides, said; alike, nothing */
+	CHECK(is(sh_obj_get(sh_obj_get(M("datasets"), "var"),
+	    "compression")->sn_str, "lz4"));
+	CHECK(wc.c_err.se_count == 1 && cap_has(&wc, "containers/web.conf: "
+	    "datasets.var.compression: lz4 overrides zstd from "
+	    "foundations/generic@v1"));
+	/* CC52: a ver the foundation's cannot meet */
+	refused(root, "containers/old", "containers/old.conf: ver: >=15.1 in "
+	    "foundations/generic@v1 conflicts with <15 in "
+	    "containers/old.conf");
+	under = NULL;
+	sh_node_free(shaken);
+	free(text);
+}
+
 int
 main(void)
 {
@@ -913,6 +997,7 @@ main(void)
 	test_site_checked();
 	test_blocks();
 	test_repos();
+	test_stack();
 	sh_recipe_free(&r);
 	cap_close(&wc);
 	cap_close(&c);

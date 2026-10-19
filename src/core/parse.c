@@ -387,15 +387,25 @@ sh_parse_buf(const char *buf, size_t len, const char *name, struct sh_err *e)
 struct sh_node *
 sh_parse_file(const char *path, const char *name, struct sh_err *e)
 {
+	int fd;
+
+	if ((fd = open(path, O_RDONLY | O_CLOEXEC)) == -1) {
+		sh_errf(e, "%s: %s", name, strerror(errno));
+		return (NULL);
+	}
+	return (sh_parse_fd(fd, name, e));
+}
+
+struct sh_node *
+sh_parse_fd(int fd, const char *name, struct sh_err *e)
+{
 	struct sh_node *n = NULL;
 	struct stat st;
 	char *buf = NULL;
 	ssize_t r = 0;
 	size_t got, size;
-	int fd;
 
-	if ((fd = open(path, O_RDONLY | O_CLOEXEC)) == -1 ||
-	    fstat(fd, &st) == -1) {
+	if (fstat(fd, &st) == -1) {
 		sh_errf(e, "%s: %s", name, strerror(errno));
 		goto out;
 	}
@@ -425,8 +435,7 @@ sh_parse_file(const char *path, const char *name, struct sh_err *e)
 	else
 		n = sh_parse_buf(buf, size, name, e);
 out:
-	if (fd >= 0)
-		(void) close(fd);
+	(void) close(fd);
 	free(buf);
 	return (n);
 }

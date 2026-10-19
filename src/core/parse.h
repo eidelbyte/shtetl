@@ -27,6 +27,8 @@
  */
 struct sh_node *sh_parse_file(const char *path, const char *name,
     struct sh_err *e);
+/* The same of the open file FD, which it closes. */
+struct sh_node *sh_parse_fd(int fd, const char *name, struct sh_err *e);
 struct sh_node *sh_parse_buf(const char *buf, size_t len, const char *name,
     struct sh_err *e);
 

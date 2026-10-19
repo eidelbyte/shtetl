@@ -63,7 +63,8 @@ BUILD = build
 # documentation's examples.
 LANG_OBJS = $(BUILD)/err.o $(BUILD)/mem.o $(BUILD)/tree.o \
 	$(BUILD)/parse.o $(BUILD)/root.o $(BUILD)/syntax.o \
-	$(BUILD)/schema.o $(BUILD)/site.o $(BUILD)/cascade.o $(BUILD)/show.o
+	$(BUILD)/schema.o $(BUILD)/site.o $(BUILD)/cascade.o $(BUILD)/show.o \
+	$(BUILD)/shake.o
 CORE_OBJS = $(LANG_OBJS) $(BUILD)/spaces.o $(BUILD)/wire.o \
 	$(BUILD)/daemon.o $(BUILD)/command.o $(BUILD)/foundation.o
 # src/core/zfs.h has two implementations, picked at the link: the
@@ -74,10 +75,11 @@ ZFS_OBJS = $(BUILD)/fbsd_zfs.o
 TEST_OBJS = $(BUILD)/zfake.o $(BUILD)/zcells.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS)
 TESTS = check_mem check_zfs check_spaces check_daemon check_foundation \
-	check_parse check_schema check_site check_cascade check_show
+	check_parse check_schema check_site check_cascade check_show \
+	check_shake
 
 ALL_portable = $(SHTETL_OBJS)
-ALL_freebsd = shtetl $(BUILD)/box_zcheck
+ALL_freebsd = shtetl $(BUILD)/box_zcheck $(BUILD)/box_shake
 
 all: flavor $(ALL_$(FLAVOR))
 
@@ -99,6 +101,11 @@ $(BUILD)/box_zcheck: tests/box/zcheck.c $(BUILD)/zcells.o $(CORE_OBJS) \
 	$(CC) $(CFLAGS) -Itests -o $@ tests/box/zcheck.c $(BUILD)/zcells.o \
 	    $(CORE_OBJS) $(ZFS_OBJS) $(UCL_OBJS) $(LDFLAGS) $(ZFS_LIBS) \
 	    $(UCL_LIBS)
+
+# tests/box/run.sh's program: family I, schg and .zfs, as root on ZFS.
+$(BUILD)/box_shake: tests/box/shake.c $(LANG_OBJS) $(UCL_OBJS)
+	$(CC) $(CFLAGS) -o $@ tests/box/shake.c $(LANG_OBJS) $(UCL_OBJS) \
+	    $(LDFLAGS) $(UCL_LIBS)
 
 freebsd:
 	$(MAKE) FLAVOR=freebsd UCL=port all
@@ -158,6 +165,9 @@ $(BUILD)/cascade.o: src/core/cascade.c src/core/cascade.h src/core/err.h \
 	src/core/mem.h src/core/parse.h src/core/root.h src/core/schema.h \
 	src/core/site.h src/core/syntax.h src/core/tree.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/cascade.c
+$(BUILD)/shake.o: src/core/shake.c src/core/shake.h src/core/err.h \
+	src/core/parse.h src/core/tree.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/shake.c
 $(BUILD)/show.o: src/core/show.c src/core/show.h src/core/cascade.h \
 	src/core/schema.h src/core/site.h src/core/tree.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/show.c

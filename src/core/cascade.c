@@ -224,6 +224,23 @@ ld_block(struct ld *x, const char *file, const struct sh_node *tree)
 }
 
 /*
+ * UNDER, the shaken recipe of the foundation version a house stands on
+ * (plan 5), as the first layer, named as its nodes are and taken as
+ * the default's is: what the house gives again overrides it, with a
+ * warning, and what stacks, stacks. Its keys of the foundation's kind
+ * alone are no house's, and are left out as the default's are.
+ */
+static void
+ld_under(struct ld *x, const struct sh_node *under)
+{
+	struct sh_node *copy = sh_node_copy(under);
+	char *name = sh_strdup(under->sn_from);
+
+	ld_restamp(copy, under->sn_from, name);
+	ld_append(x, name, copy);
+}
+
+/*
  * Loads NAME, after what it imports. FROM and FPATH say where NAME
  * was named, for messages (FROM NULL: by shtetl itself). OPTIONAL: a
  * missing file is no layer rather than an error. A refusal sets
@@ -450,14 +467,22 @@ mg_piece(struct mg *m, struct sh_node *coll, struct sh_pair *cur,
     const char *ek, const struct sh_node *ev)
 {
 	struct sh_node *block;
+	size_t i;
 
 	if (cur != NULL) {
-		mg_set(m, cur->pr_val, m->mg_l->sl_file, ev);
+		block = cur->pr_val;
+	} else {
+		block = sh_node_new(SH_OBJECT, m->mg_l->sl_file);
+		sh_obj_set(coll, ek, block, m->mg_l->sl_file);
+	}
+	if (ev->sn_type != SH_OBJECT) {
+		mg_set(m, block, m->mg_l->sl_file, ev);
 		return;
 	}
-	block = sh_node_new(SH_OBJECT, m->mg_l->sl_file);
-	sh_obj_set(coll, ek, block, m->mg_l->sl_file);
-	mg_set(m, block, m->mg_l->sl_file, ev);
+	/* a shaken recipe's block: its pieces keyed by their files already */
+	for (i = 0; i < ev->sn_obj.ob_n; i++)
+		mg_set(m, block, ev->sn_obj.ob_v[i].pr_key,
+		    ev->sn_obj.ob_v[i].pr_val);
 }
 
 /*
@@ -798,8 +823,8 @@ ck_merged(const struct sh_recipe *r, const char *root,
 
 int
 sh_recipe_resolve(const char *root, const char *const *repos,
-    const char *target, struct sh_recipe *r, struct sh_err *e,
-    struct sh_err *w)
+    const char *target, const struct sh_node *under, struct sh_recipe *r,
+    struct sh_err *e, struct sh_err *w)
 {
 	struct ld x;
 	struct mg m;
@@ -815,6 +840,8 @@ sh_recipe_resolve(const char *root, const char *const *repos,
 	x.ld_r = r;
 	x.ld_err = e;
 	x.ld_default = 1;
+	if (under != NULL)
+		ld_under(&x, under);
 	ld_load(&x, cascade_default, NULL, NULL, 1);
 	x.ld_default = 0;
 	ld_load(&x, r->sr_file, NULL, NULL, 0);

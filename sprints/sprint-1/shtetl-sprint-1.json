@@ -403,7 +403,8 @@
     ],
     "provides": "The shaken recipe: one UCL document, made from a recipe's layers, a house's stacked on its foundation version's; written into a tree read-only and schg, and read back from a snapshot only.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-10-20: built; the shaken text is show's; a house stacks on its foundation version's shaken recipe through resolve's UNDER (CC46-CC52); sh_shaken_write/read beneath, never through a link (I1-I8 on the mac with nodump). Box owed: tests/box/run.sh family I (I9-I14, schg as root, a real .zfs view). Worklog issue-docs/m2-shake.md."
   },
   "m3-builder": {
     "description": "The actor's queue and its children (plan 9, 10). An actor takes one message at a time; a message arriving while it works waits in its queue. A step that takes long runs as a child in a process group of its own, watched with EVFILT_PROC, its output to syslog line by line, and the actor answers messages while it waits, its state naming the step. SIGTERM to the daemon ends every child's group before the daemon exits, and each actor starting again finds its step undone or redoes it from ZFS. The builder: one turn at a time across foundation actors, in the order asked, nothing polled. Verify: make check with children that are sh -c scripts; kill tests at each state.",

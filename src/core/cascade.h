@@ -48,14 +48,16 @@ struct sh_recipe {
  * the recipe is looked for at its top and in each recipe repository
  * of REPOS (NULL-ended), a directory of it, and found in one; its
  * imports are read in the place it was found, the default's at the
- * top (plan 4). 0, or -1 with every reason reported to E;
- * sh_recipe_free cleans up R either way. A dataset property one file
- * overrides another's on is reported to W, when there is one, and
- * refuses nothing.
+ * top (plan 4). UNDER, when not NULL, is the shaken recipe a house
+ * stacks on, its foundation version's (plan 5): the first layer, named
+ * as its nodes are, taken as the default is. 0, or -1 with every
+ * reason reported to E; sh_recipe_free cleans up R either way. A
+ * dataset property one file overrides another's on is reported to W,
+ * when there is one, and refuses nothing.
  */
 int sh_recipe_resolve(const char *root, const char *const *repos,
-    const char *target, struct sh_recipe *r, struct sh_err *e,
-    struct sh_err *w);
+    const char *target, const struct sh_node *under, struct sh_recipe *r,
+    struct sh_err *e, struct sh_err *w);
 void sh_recipe_free(struct sh_recipe *r);
 
 /* The layer FROM (a pointer out of sr_merged) names, or NULL. */

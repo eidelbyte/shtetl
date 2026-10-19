@@ -2,8 +2,9 @@
 # tests/box/run.sh -- shtetl's cells on the box: make check-freebsd, the
 # unit tests on this libc and the textproc/libucl port; then, on
 # throwaway pools made as the probes make theirs (probes/lib.sh),
-# family Z over libzfs (build/box_zcheck), and a daemon (./shtetl)
-# started over what a crash left, family A.
+# family Z over libzfs (build/box_zcheck), a daemon (./shtetl) started
+# over what a crash left, family A, and the shaken recipe made schg and
+# read through .zfs, family I (build/box_shake).
 #
 #   make freebsd && sudo sh tests/box/run.sh
 #   sudo sh tests/box/run.sh --clean     what a crash left
@@ -132,6 +133,16 @@ trap 'pools_down; exit 130' INT TERM
 	echo
 	echo "family A, the daemon on real pools"
 	daemon_cells
+	echo
+	echo "family I, the shaken recipe on ZFS, as root"
+	if pool_make $RUN && x zfs create -o mountpoint=/shake $RUN/shake; then
+		"$TOP/build/box_shake" write "$(dir $RUN/shake)"
+		x zfs snapshot $RUN/shake@s1
+		"$TOP/build/box_shake" read "$(dir $RUN/shake)" s1
+	else
+		echo "FAIL setup: pool $RUN and $RUN/shake"
+	fi
+	pools_down
 	echo
 } >"$OUT" 2>&1
 ok=$(grep -c '^ok ' "$OUT")

@@ -57,7 +57,8 @@ show(const char *rt, const char *target)
 
 	sh_recipe_free(&r);
 	cap_reset(&c);
-	if (sh_recipe_resolve(rt, norepos, target, &r, &c.c_err, NULL) != 0)
+	if (sh_recipe_resolve(rt, norepos, target, NULL, &r, &c.c_err,
+	    NULL) != 0)
 		printf("%s did not resolve:\n%s", target, cap_text(&c));
 	CHECK(c.c_err.se_count == 0);
 	free(out);

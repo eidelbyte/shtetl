@@ -321,7 +321,8 @@ sh_show(const char *root, const char *recipe, FILE *out, FILE *err)
 		sh_show_site(out, &s);
 	} else {
 		repos = sh_site_repos(&s);
-		rc = sh_recipe_resolve(root, repos, recipe, &r, &e, &w) != 0;
+		rc = sh_recipe_resolve(root, repos, recipe, NULL, &r, &e,
+		    &w) != 0;
 		if (rc == 0)
 			sh_show_recipe(out, &r);
 		sh_recipe_free(&r);

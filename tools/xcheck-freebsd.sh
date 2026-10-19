@@ -31,7 +31,7 @@ ZFS="-I$ZT/lib/libspl/include/os/freebsd -I$ZT/lib/libspl/include \
 UCL="-I$F/contrib/libucl/include"
 rc=0
 for f in src/main.c src/core/*.c src/fbsd/*.c tests/zcells.c \
-    tests/box/zcheck.c; do
+    tests/box/zcheck.c tests/box/shake.c; do
 	extra=""
 	case "$f" in
 	src/fbsd/*) extra="$ZFS" ;;
