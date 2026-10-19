@@ -8,6 +8,7 @@
 #include <sys/event.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/utsname.h>
 
 #include <time.h>
 
@@ -22,6 +23,7 @@
 #include "zfake.h"
 
 #define	FROOT	"lake/l/foundations"
+#define	OROOT	"lake/l/foundation-builds"
 
 static struct cap c;
 static struct sh_zfs *z;
@@ -78,6 +80,8 @@ ask(const char *name)
 	while (time(NULL) == last)
 		(void) usleep(50000);
 	last = time(NULL);
+	/* what make is asked, this roll's alone */
+	(void) unlink(scratch_path("make.log"));
 	f = sh_foundation_find(&fs, &nfs, FROOT, name);
 	cap_reset(&c);
 	CHECK(sh_roll_ask(f, &env, config, build, &c.c_err) == 0);
@@ -171,6 +175,42 @@ is(const char *a, const char *b)
 	return (a != NULL && strcmp(a, b) == 0);
 }
 
+/* The scratch file NAME whole, until the next call; NULL if none. */
+static const char *
+slurp(const char *name)
+{
+	static char *text;
+	size_t n = 0;
+	FILE *in;
+
+	free(text);
+	text = NULL;
+	if ((in = fopen(scratch_path(name), "r")) == NULL)
+		return (NULL);
+	if (getdelim(&text, &n, '\0', in) < 0) {
+		free(text);
+		text = NULL;
+	}
+	(void) fclose(in);
+	return (text);
+}
+
+static int
+there(const char *name)
+{
+	struct stat st;
+
+	return (lstat(scratch_path(name), &st) == 0);
+}
+
+static ino_t
+ino(const char *name)
+{
+	struct stat st;
+
+	return (lstat(scratch_path(name), &st) == 0 ? st.st_ino : 0);
+}
+
 int
 main(void)
 {
@@ -178,8 +218,12 @@ main(void)
 	static const struct sh_zprop off = { "canmount", "off" };
 	struct sh_foundation *f, *g;
 	struct sh_zprop lake;
-	char want[2048], cwd[1024], oid[72], snap[512], first[256];
+	char want[4096], cwd[1024], oid[72], snap[512], first[256];
+	char src[1100], obj[1100], head[1100], all[3500];
+	struct utsname u;
 	struct stat st;
+	const char *text;
+	ino_t kept;
 
 	cap_open(&c);
 	(void) scratch_path("");
@@ -197,6 +241,16 @@ main(void)
 	CHECK(system(want) == 0);
 	/* releng/15.1 at B, which c5.patch conflicts with */
 	CHECK(sh("git -C up branch -f releng/15.1 main"));
+	/* make is tests/bin's, which logs its words */
+	(void) snprintf(want, sizeof (want), "%s/tests/bin:%s", cwd,
+	    getenv("PATH"));
+	CHECK(setenv("PATH", want, 1) == 0);
+	CHECK(setenv("FAKE_MAKE_LOG", scratch_path("make.log"), 1) == 0);
+	(void) snprintf(src, sizeof (src), "%s", scratch_path("build/src"));
+	(void) snprintf(obj, sizeof (obj), "%s",
+	    scratch_path("lake/foundation-builds/r1"));
+	(void) snprintf(head, sizeof (head), "%s",
+	    scratch_path("lake/foundations/r1"));
 
 	/* the lake: its root mounted in the scratch directory */
 	zfake_reset();
@@ -206,10 +260,12 @@ main(void)
 	lake.zp_value = scratch_path("lake");
 	CHECK(sh_zfs_create(z, "lake/l", &lake, 1, &c.c_err) == 0);
 	CHECK(sh_zfs_create(z, FROOT, &off, 1, &c.c_err) == 0);
+	CHECK(sh_zfs_create(z, OROOT, &off, 1, &c.c_err) == 0);
 	CHECK((logf = open_memstream(&logbuf, &loglen)) != NULL);
 	sh_builder_init(&b);
 	env.re_z = z;
 	env.re_builder = &b;
+	env.re_obj = OROOT;
 	CHECK((env.re_kq = kqueue()) >= 0);
 	env.re_log = logf;
 	env.re_err = &c.c_err;
@@ -262,12 +318,61 @@ main(void)
 	    &st) == 0 && (st.st_flags & UF_NODUMP) != 0);
 	CHECK(b.b_busy == 0);
 
-	/* F2: an update */
+	/* K9, K10, K14: the build, a first roll's install */
+	(void) snprintf(all, sizeof (all), " SRCCONF=%s/shtetl/src.conf "
+	    "KERNCONFDIR=%s/shtetl KERNCONF=R1\n", obj, obj);
+	(void) snprintf(want, sizeof (want),
+	    "-C %s -j3 buildworld buildkernel%s"
+	    "-C %s installworld DESTDIR=%s INSTALL_CMD=install -C%s"
+	    "-C %s installkernel DESTDIR=%s/kernel-install%s"
+	    "-C %s distribution DESTDIR=%s%s",
+	    src, all, src, head, all, src, obj, all, src, head, all);
+	CHECK(is(slurp("make.log"), want));
+	CHECK(is(slurp("lake/foundation-builds/r1/buildworld"),
+	    "buildworld\n"));
+	CHECK(is(slurp("lake/foundations/r1/boot/kernel/kernel"),
+	    "kernel 1\n") && is(slurp("lake/foundations/r1/etc/rc.conf"),
+	    "dist\n") && there("lake/foundations/r1/usr/lib/debug/boot/"
+	    "kernel/kernel.debug") && !there("lake/foundations/r1/sbin/"
+	    "init.bak"));
+	/* K12: the kernel config and src.conf */
+	CHECK(uname(&u) == 0);
+	(void) snprintf(want, sizeof (want), "# written by shtetl for "
+	    "foundation r1\ninclude \"%s/sys/%s/conf/GENERIC\"\nident R1\n"
+	    "device vmm\n", src, u.machine);
+	CHECK(is(slurp("lake/foundation-builds/r1/shtetl/R1"), want));
+	CHECK(is(slurp("lake/foundation-builds/r1/shtetl/src.conf"),
+	    "WITHOUT_LIB32=yes\n"));
+	/* K17: the obj cache made, mounted; the scratch directory gone */
+	CHECK(is(zfake_local(OROOT "/r1", "compression"), "zstd-9") &&
+	    sh_zfs_mounted(z, OROOT "/r1", want, sizeof (want), &c.c_err) ==
+	    1 && !there("lake/foundation-builds/r1/kernel-install"));
+
+	/* F2, K11, K18: an update, its install, its kernel synced */
+	kept = ino("lake/foundations/r1/boot/kernel/a.ko");
+	CHECK(setenv("FAKE_KERNEL", "2", 1) == 0);
 	f = roll("r1");
+	CHECK(unsetenv("FAKE_KERNEL") == 0);
 	CHECK(f->f_state == SH_F_IDLE && strcmp(f->f_newest, first) != 0 &&
 	    strcmp(f->f_newest + strlen(f->f_newest) - 7, "-update") == 0);
 	(void) snprintf(snap, sizeof (snap), "%s@%s", ds("r1"), f->f_newest);
 	CHECK(strcmp(user(snap, "shtetl:kind"), "update") == 0);
+	(void) snprintf(want, sizeof (want),
+	    "-C %s -j3 buildworld buildkernel%s"
+	    "-C %s delete-old delete-old-libs DESTDIR=%s "
+	    "BATCH_DELETE_OLD_FILES=yes%s"
+	    "-C %s installworld DESTDIR=%s INSTALL_CMD=install -C%s",
+	    src, all, src, head, all, src, head, all);
+	CHECK(strncmp(slurp("make.log"), want, strlen(want)) == 0);
+	CHECK(!there("lake/foundations/r1/sbin/init.bak") &&
+	    !there("lake/foundations/r1/libexec/ld-elf.so.1.old") &&
+	    !there("lake/foundations/r1/boot/loader.old") &&
+	    there("lake/foundations/r1/boot/loader"));
+	CHECK(is(slurp("lake/foundations/r1/boot/kernel/kernel"),
+	    "kernel 2\n") && ino("lake/foundations/r1/boot/kernel/a.ko") ==
+	    kept && !there("lake/foundations/r1/boot/kernel/b.ko") &&
+	    there("lake/foundations/r1/boot/kernel/c.ko") &&
+	    !there("lake/foundations/r1/usr/lib/debug/boot/kernel"));
 
 	/* F5: an update failing at a patch, after a word was written */
 	CHECK(sh("printf '%s\\n' 'src_branch = \"releng/15.1\";' "
@@ -312,6 +417,25 @@ main(void)
 	    0);
 	f = roll("r1");
 	CHECK(f->f_state == SH_F_IDLE);
+
+	/* K15: a make failing: its last lines told; rolled back, stalled */
+	CHECK(setenv("FAKE_FAIL", "installworld", 1) == 0);
+	f = roll("r1");
+	CHECK(unsetenv("FAKE_FAIL") == 0);
+	CHECK(has("foundation r1: installworld: exited 2") &&
+	    has("r1: make: installworld failed"));
+	CHECK(f->f_state == SH_F_STALLED &&
+	    is(f->f_stall, "installworld: exited 2"));
+	f = roll("r1");
+	CHECK(f->f_state == SH_F_IDLE);
+
+	/* K13: kernconf a path, a file of zconfig in the recipe's place */
+	f = roll("r6");
+	(void) snprintf(want, sizeof (want), "include \"%s/site/kern/MINE\"\n",
+	    config);
+	CHECK(f->f_state == SH_F_IDLE &&
+	    (text = slurp("lake/foundation-builds/r6/shtetl/R6")) != NULL &&
+	    strstr(text, want) != NULL);
 
 	/* F6: a first roll failing: nothing left of it */
 	f = roll("r2");
@@ -364,6 +488,20 @@ main(void)
 	    sh_zfs_unmount(z, ds("r1"), &c.c_err) == 0);
 	f = roll("r1");
 	CHECK(f->f_state == SH_F_IDLE && strcmp(f->f_newest, first) != 0);
+
+	/* K16: stopped in the build; started again */
+	CHECK(setenv("FAKE_SLEEP", "buildworld", 1) == 0);
+	f = ask("r1");
+	(void) snprintf(first, sizeof (first), "%s", f->f_newest);
+	pump_to(f, "build");
+	CHECK(zfake_put(ds("r1"), "junk") == 0);
+	restart();
+	CHECK(unsetenv("FAKE_SLEEP") == 0);
+	f = sh_foundation_find(&fs, &nfs, FROOT, "r1");
+	CHECK(f->f_state == SH_F_IDLE && strcmp(f->f_newest, first) == 0);
+	CHECK(sh_zfs_mount(z, ds("r1"), &c.c_err) == 0 &&
+	    zfake_has(ds("r1"), "junk") == 0 &&
+	    sh_zfs_unmount(z, ds("r1"), &c.c_err) == 0);
 
 	/* F11: stopped in a child of a first roll; started again */
 	f = ask("f6");

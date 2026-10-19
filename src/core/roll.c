@@ -15,6 +15,7 @@
 #include "core/cascade.h"
 #include "core/err.h"
 #include "core/foundation.h"
+#include "core/install.h"
 #include "core/job.h"
 #include "core/mem.h"
 #include "core/roll.h"
@@ -39,6 +40,9 @@ struct sh_roll {
 	struct sh_src		r_src;
 	struct sh_branch	r_branch;
 	char			*r_head;	/* where F is mounted */
+	char			*r_srcdir;	/* the checkout */
+	char			*r_obj;		/* where F's obj cache is */
+	struct sh_install	r_install;
 	char			r_ver[48];	/* 15.1-releng */
 	char			r_commit[72];
 	char			*r_snap;	/* the version made */
@@ -234,6 +238,54 @@ roll_inject(struct sh_job *j, void *arg, struct sh_err *e)
 	return (rc);
 }
 
+/*
+ * F's obj cache made where missing, with the site's lake properties,
+ * and mounted; the build and the install added, then the inject.
+ */
+static int
+roll_obj(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	struct sh_roll *r = arg;
+	struct sh_zfs *z = r->r_env->re_z;
+	struct names have = { NULL, 0 };
+	const struct sh_node *props, *jobs;
+	struct sh_zprop *p;
+	char ds[512], path[1024];
+	size_t n;
+	int rc;
+
+	(void) snprintf(ds, sizeof (ds), "%s/%s", r->r_env->re_obj,
+	    r->r_f->f_name);
+	if ((rc = sh_zfs_children(z, r->r_env->re_obj, roll_name, &have,
+	    e)) == 0 && !names_have(&have, ds)) {
+		props = sh_obj_get(r->r_site.ss_merged, "properties");
+		p = roll_props(sh_obj_get(props, "default"),
+		    sh_obj_get(props, "lake"), &n);
+		rc = sh_zfs_create(z, ds, p, n, e);
+		free(p);
+	}
+	names_free(&have);
+	if (rc != 0 || sh_zfs_mount(z, ds, e) != 0 ||
+	    sh_zfs_mounted(z, ds, path, sizeof (path), e) != 1)
+		return (-1);
+	r->r_obj = sh_strdup(path);
+	r->r_srcdir = sh_root_path(r->r_build, "src");
+	jobs = sh_obj_get(sh_obj_get(r->r_site.ss_merged, "build"),
+	    "make_jobs");
+	r->r_install.in_src = r->r_srcdir;
+	r->r_install.in_config = r->r_config;
+	r->r_install.in_obj = r->r_obj;
+	r->r_install.in_head = r->r_head;
+	r->r_install.in_name = r->r_f->f_name;
+	r->r_install.in_recipe = &r->r_recipe;
+	r->r_install.in_jobs = jobs != NULL ? (long)jobs->sn_int : 0;
+	r->r_install.in_update = !r->r_first;
+	if (sh_install_steps(j, &r->r_install, e) != 0)
+		return (-1);
+	sh_job_call(j, "inject", roll_inject, r);
+	return (0);
+}
+
 /* REVISION, N.M, as the checkout's sys/conf/newvers.sh sets it. */
 static int
 roll_revision(const struct sh_roll *r, long *major, long *minor,
@@ -291,7 +343,7 @@ roll_version(struct sh_job *j, void *arg, struct sh_err *e)
 	rc = sh_src_commit(src, r->r_commit, sizeof (r->r_commit), e);
 	free(src);
 	if (rc == 0)
-		sh_job_call(j, "inject", roll_inject, r);
+		sh_job_call(j, "obj", roll_obj, r);
 	return (rc);
 }
 
@@ -451,6 +503,8 @@ roll_free(struct sh_roll *r)
 	sh_site_free(&r->r_site);
 	sh_recipe_free(&r->r_recipe);
 	free(r->r_head);
+	free(r->r_srcdir);
+	free(r->r_obj);
 	free(r->r_snap);
 	free(r);
 }

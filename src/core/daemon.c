@@ -49,6 +49,7 @@ struct daemon {
 	struct sh_zfs		*d_zfs;
 	struct sh_spaces	d_sp;
 	char			*d_froot;	/* <lake>/foundations */
+	char			*d_oroot;	/* <lake>/foundation-builds */
 	struct sh_foundation	**d_found;
 	size_t			d_nfound;
 	struct sh_builder	d_builder;
@@ -376,9 +377,12 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, FILE *log,
 		goto out;
 	if (d.d_sp.ss_root[SH_SP_LAKE] != NULL) {
 		n = strlen(d.d_sp.ss_root[SH_SP_LAKE]) +
-		    sizeof ("/foundations");
+		    sizeof ("/foundation-builds");
 		d.d_froot = sh_calloc(1, n);
+		d.d_oroot = sh_calloc(1, n);
 		(void) snprintf(d.d_froot, n, "%s/foundations",
+		    d.d_sp.ss_root[SH_SP_LAKE]);
+		(void) snprintf(d.d_oroot, n, "%s/foundation-builds",
 		    d.d_sp.ss_root[SH_SP_LAKE]);
 		if (sh_foundations_start(z, d.d_froot, &d.d_found,
 		    &d.d_nfound, e) != 0)
@@ -390,6 +394,7 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, FILE *log,
 	}
 	d.d_env.re_z = z;
 	d.d_env.re_builder = &d.d_builder;
+	d.d_env.re_obj = d.d_oroot;
 	d.d_env.re_kq = d.d_kq;
 	d.d_env.re_log = log;
 	d.d_env.re_err = e;
@@ -441,6 +446,7 @@ out:
 	(void) unlink(sock);
 	sh_foundations_free(d.d_found, d.d_nfound);
 	free(d.d_froot);
+	free(d.d_oroot);
 	sh_spaces_free(&d.d_sp);
 	return (r);
 }

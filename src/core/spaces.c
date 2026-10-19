@@ -28,7 +28,8 @@ static const struct {
 	const char	*sk_name;
 	struct sh_zprop	sk_prop;
 } sp_skeleton[] = {
-	{ SH_SP_LAKE, "foundations", { "canmount", "off" } }
+	{ SH_SP_LAKE, "foundations", { "canmount", "off" } },
+	{ SH_SP_LAKE, "foundation-builds", { "canmount", "off" } }
 };
 
 /* Every root of every space the walk found, before the rules. */

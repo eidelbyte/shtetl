@@ -566,3 +566,45 @@ the commit not the src's (F1).
 | F16 | shtetl roll over the socket: a bad name, a space missing, no argument | "NAME: invalid name: why", "no build space", the usage | tests/check_daemon.c |
 | F17 | the rc script starting the daemon, git found under service(8) | a roll's git runs | deferred: rc and a real roll are the box's; m3-box |
 | F18 | foundation.conf schg, a roll over libzfs | as F1, on ZFS | deferred: m3-box |
+
+## Family K: the build and the install (m3-install)
+
+Dimensions: the kernel's sync {a file alike, changed, gone from the
+new kernel, new; a link alike or changed; a directory where a file was;
+in a kernel directory or outside one; a kernel directory the new
+kernel has none of}; installworld's backups {each kind, and names that
+are none}; a tree removed {with flags, not there}; the make steps {a
+first roll, an update}; the configs {kernconf a name or a path,
+buildopts, make_jobs}; a make {failing, stopped}. The unit cells run
+on files in the scratch directory (tests/check_install.c); the roll's
+over the fake ZFS with tests/bin/make, which leaves what each target
+would and logs its words (tests/check_roll.c). Mutations caught: no
+delete-old on an update, or one on a first roll; installworld without
+install -C; no removal in the kernel's directories, or a kernel
+directory the new kernel lacks kept; a file alike copied anyway; no
+backups step; .old alone taken for a backup; flags not cleared; no
+MAKEOBJDIRPREFIX; the ident not in capitals; a kernconf path at
+zconfig's top; make_jobs passed over; the scratch directory kept;
+kernconf's lines or buildopts left out.
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| K1 | a kernel file alike | kept: its inode the same, its mode set where it differs | tests/check_install.c |
+| K2 | a kernel file changed | a copy in its place: a new inode, the content and mode | tests/check_install.c |
+| K3 | a file the new kernel has not, in boot/kernel; one outside | removed; kept | tests/check_install.c |
+| K4 | a kernel directory the new kernel has none of | removed | tests/check_install.c |
+| K5 | a link alike; a link changed | kept; replaced | tests/check_install.c |
+| K6 | a directory where a file was | the file removed, the directory made | tests/check_install.c |
+| K7 | installworld's backups | boot's *.old, kernel.old, libexec's ld-elf*.so.1.old, sbin/init.bak removed; boot/.old, ld-elf.so.1, init, loader kept | tests/check_install.c |
+| K8 | a tree with flags; a path not there | removed; done | tests/check_install.c |
+| K9 | the build | env MAKEOBJDIRPREFIX=OBJ make -C SRC -jN buildworld buildkernel SRCCONF KERNCONFDIR KERNCONF | tests/check_roll.c |
+| K10 | a first roll's install | installworld (install -C) into the head, installkernel into the scratch directory, distribution; no delete-old, no backups | tests/check_roll.c |
+| K11 | an update's install | delete-old before installworld; the backups removed after | tests/check_roll.c |
+| K12 | the configs | the kernel config: include of the checkout's GENERIC for this machine, ident in capitals, kernconf's lines; src.conf: buildopts | tests/check_roll.c |
+| K13 | kernconf a path | include of the file of zconfig in the recipe's place | tests/check_roll.c |
+| K14 | make_jobs | -jN from the site | tests/check_roll.c |
+| K15 | a make failing | "installworld: exited 2", its last lines told; rolled back and stalled | tests/check_roll.c |
+| K16 | stopped in the build; started again | the head at its newest version | tests/check_roll.c |
+| K17 | the obj cache | made on a first roll with the site's properties, mounted; the scratch directory gone after | tests/check_roll.c |
+| K18 | an update's kernel | synced into the head: the kernel replaced, a.ko kept, b.ko and the debug files gone, c.ko new | tests/check_roll.c |
+| K19 | a real build and install | a FreeBSD world and kernel in the head | deferred: m3-box |

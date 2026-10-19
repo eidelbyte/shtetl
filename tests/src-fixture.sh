@@ -93,6 +93,11 @@ mkdir -p siterepo/foundations siterepo/patches/local
 printf '%s\n' 'src_branch = "releng/15.1";' \
     'patches { "patches/local" {} }' > siterepo/foundations/f4.conf
 cp p/s1.patch siterepo/patches/local/
+# r6 (tests/check_roll.c): a kernel config of its own, in its place
+mkdir -p siterepo/kern
+echo 'include GENERIC' > siterepo/kern/MINE
+printf '%s\n' 'src_branch = "releng/15.1";' 'kernconf = "kern/MINE";' \
+    > siterepo/foundations/r6.conf
 git -C siterepo add -A
 git -C siterepo commit -q -m f4
 git init -q otherrepo
@@ -116,7 +121,8 @@ cp p/bogus.patch c1/patches/bogus/
 printf '%s\n' 'remotes {' "    src = \"file://$S/up\";" \
     "    recipes { site = \"file://$S/siterepo\";" \
     "        other = \"file://$S/otherrepo\"; }" '}' \
-    'properties { lake { compression = "zstd-9"; } }' > c1/shtetl.conf
+    'properties { lake { compression = "zstd-9"; } }' \
+    'build { make_jobs = 3; }' > c1/shtetl.conf
 f() {
 	n=$1
 	shift
@@ -136,7 +142,8 @@ printf '%s\n' 'src_branch = "releng/9.9";' > c1/foundations/f11.conf
 # The rolls of tests/check_roll.c: r1 with datasets, a placeholder
 # among them; r2 a conflict; r3 and r4 a ver refused before and after
 # the checkout; r5 a tree with no REVISION.
-f r1 'datasets { "usr/local" {} var { atime = true; } }'
+f r1 'datasets { "usr/local" {} var { atime = true; } }' \
+    'kernconf = <<EOD' 'device vmm' 'EOD' 'buildopts = "WITHOUT_LIB32=yes";'
 f r2 'patches { "patches/conflict" {} }'
 f r3 'ver = ">=16";'
 printf '%s\n' 'src_branch = "main";' 'ver = ">=16";' > c1/foundations/r4.conf

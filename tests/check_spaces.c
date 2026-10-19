@@ -106,6 +106,8 @@ main(void)
 	CHECK(sh_spaces_skeleton(z, &sp, &c.c_err) == 0);
 	CHECK(strcmp(zfake_local("tank/lake/foundations", "canmount"),
 	    "off") == 0);
+	CHECK(strcmp(zfake_local("tank/lake/foundation-builds", "canmount"),
+	    "off") == 0);
 
 	/* S9: there already: left as it is, nothing said */
 	CHECK(sh_spaces_skeleton(z, &sp, &c.c_err) == 0);

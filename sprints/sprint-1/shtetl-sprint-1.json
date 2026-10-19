@@ -495,7 +495,8 @@
     ],
     "provides": "A roll that builds and installs a world and a kernel into the head.",
     "estimated_size": "large",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-10-20: built; K1-K8 (check_install), K9-K18 (check_roll with tests/bin/make), sixteen mutations caught, no leaks of ours, gate, xcheck. Obj cache <lake>/foundation-builds/F mounted for the roll and left mounted; copies take new times; version queues obj, obj queues install then inject. Owed: K19 in m3-box; check_install/check_roll on FreeBSD. Worklog issue-docs/m3-install.md."
   },
   "m3-commands": {
     "description": "Roll step 5 (plan 6): pkg, commands-external and commands, added to m3-roll's frame after m3-install's steps. pkg and commands in a chroot of the head with devfs mounted, and the host's resolv.conf for pkg where the head has none, each undone at the step's end and after a failure; commands-external on the host, given the head's path. Carried from main as knowledge (its fb_chroot). Verify: make check with the programs faked as children; the box in m3-box.",
