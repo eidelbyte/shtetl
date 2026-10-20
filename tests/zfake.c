@@ -321,38 +321,64 @@ zf_drop(struct zf_obj *o, const char *name)
 	}
 }
 
+/* NAME, a snapshot when it has an @, or NULL with why said. */
+static struct zf_obj *
+zf_named(const char *name, struct sh_err *e)
+{
+	int snap = strchr(name, '@') != NULL;
+	struct zf_obj *o = snap ? zf_snap(name) : zf_fs(name);
+
+	if (o == NULL)
+		sh_errf(e, "zfake: %s: no such %s", name, snap ? "snapshot" :
+		    "filesystem");
+	return (o);
+}
+
 int
-sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
+sh_zfs_set(struct sh_zfs *z, const char *name, const char *prop,
     const char *value, struct sh_err *e)
 {
-	struct zf_obj *d;
+	struct zf_obj *o;
 
 	(void) z;
-	if (zf_fails("set", e))
+	if (zf_fails("set", e) || (o = zf_named(name, e)) == NULL)
 		return (-1);
-	if ((d = zf_fs(ds)) == NULL) {
-		sh_errf(e, "zfake: %s: no such filesystem", ds);
-		return (-1);
-	}
-	zf_drop(d, prop);
-	zf_put(d, prop, value);
+	zf_drop(o, prop);
+	zf_put(o, prop, value);
 	return (0);
 }
 
 int
-sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
+sh_zfs_inherit(struct sh_zfs *z, const char *name, const char *prop,
     struct sh_err *e)
 {
-	struct zf_obj *d;
+	struct zf_obj *o;
 
 	(void) z;
-	if (zf_fails("inherit", e))
+	if (zf_fails("inherit", e) || (o = zf_named(name, e)) == NULL)
 		return (-1);
-	if ((d = zf_fs(ds)) == NULL) {
-		sh_errf(e, "zfake: %s: no such filesystem", ds);
+	zf_drop(o, prop);
+	return (0);
+}
+
+/* A user property's name has a colon; a native one's none. */
+int
+sh_zfs_props(struct sh_zfs *z, const char *name,
+    int (*fn)(void *, const char *, const char *), void *arg,
+    struct sh_err *e)
+{
+	const struct zf_obj *o;
+	int i, r;
+
+	(void) z;
+	if (zf_fails("props", e) || (o = zf_named(name, e)) == NULL)
 		return (-1);
+	for (i = 0; i < o->zo_nprops; i++) {
+		if (strchr(o->zo_props[i].zp_name, ':') != NULL &&
+		    (r = fn(arg, o->zo_props[i].zp_name,
+		    o->zo_props[i].zp_val)) != 0)
+			return (r);
 	}
-	zf_drop(d, prop);
 	return (0);
 }
 

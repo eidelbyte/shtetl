@@ -48,18 +48,29 @@ int sh_zfs_user(struct sh_zfs *z, const char *name, const char *prop,
     char *val, size_t len, struct sh_err *e);
 
 /*
- * The user property PROP set on the filesystem DS to VALUE, below it
- * inherited. Refused: "no such filesystem".
+ * The user property PROP set on NAME to VALUE: a filesystem, below it
+ * inherited, or a snapshot (ds@snap). Refused: "no such filesystem",
+ * "no such snapshot".
  */
-int sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
+int sh_zfs_set(struct sh_zfs *z, const char *name, const char *prop,
     const char *value, struct sh_err *e);
 
 /*
- * The user property PROP set on the filesystem DS no more: DS takes
- * its parent's, or none; nothing done where DS does not set it.
- * Refused: "no such filesystem".
+ * The user property PROP set on NAME, a filesystem or a snapshot, no
+ * more: NAME takes its parent's, a snapshot its filesystem's, or none;
+ * nothing done where NAME does not set it. Refused: "no such
+ * filesystem", "no such snapshot".
  */
-int sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
+int sh_zfs_inherit(struct sh_zfs *z, const char *name, const char *prop,
+    struct sh_err *e);
+
+/*
+ * The user properties set on NAME itself, a filesystem or a snapshot:
+ * FN with each one's name and value; none inherited. Refused: "no such
+ * filesystem", "no such snapshot".
+ */
+int sh_zfs_props(struct sh_zfs *z, const char *name,
+    int (*fn)(void *arg, const char *prop, const char *value), void *arg,
     struct sh_err *e);
 
 /* The filesystems directly below DS. Refused: "no such filesystem". */

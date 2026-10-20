@@ -109,6 +109,15 @@ words. The fake's data is words; the box's are files.
 | Z15 | abort | an incremental; a whole | nothing to resume, the target as before; what the whole made gone |
 | Z15 | abort | nothing to resume | "no receive to resume" |
 | Z15 | send | after an abort | it lands |
+| Z16 | set | a user property on a snapshot | its value there, not its filesystem's (m4-beam) |
+| Z16 | set | set there already | replaced |
+| Z16 | inherit | set on a snapshot | its filesystem's again |
+| Z16 | set, inherit | no such snapshot | "no such snapshot" |
+| Z17 | props | a filesystem: one set there, one inherited, a native one set there | the one set there, with its value (m4-beam) |
+| Z17 | props | a snapshot with one set there | that one, not its filesystem's |
+| Z17 | props | nothing set there | nothing |
+| Z17 | props | FN stops | FN's value returned |
+| Z17 | props | no such filesystem; no such snapshot | "no such filesystem"; "no such snapshot" |
 
 The streams' cells cut a stream through the driver (zc_cut): on the
 box as probe P1 cuts it, zfs send into head -c into zfs receive -s;

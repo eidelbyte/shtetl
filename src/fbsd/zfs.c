@@ -181,33 +181,56 @@ sh_zfs_user(struct sh_zfs *z, const char *name, const char *prop,
 }
 
 int
-sh_zfs_set(struct sh_zfs *z, const char *ds, const char *prop,
+sh_zfs_set(struct sh_zfs *z, const char *name, const char *prop,
     const char *value, struct sh_err *e)
 {
 	zfs_handle_t *zhp;
 	int r;
 
-	if ((zhp = zz_open(z, ds, e)) == NULL)
+	if ((zhp = zz_open(z, name, e)) == NULL)
 		return (-1);
 	if ((r = zfs_prop_set(zhp, prop, value)) != 0)
-		zz_err(z, e, ds);
+		zz_err(z, e, name);
 	zfs_close(zhp);
 	return (r != 0 ? -1 : 0);
 }
 
 int
-sh_zfs_inherit(struct sh_zfs *z, const char *ds, const char *prop,
+sh_zfs_inherit(struct sh_zfs *z, const char *name, const char *prop,
     struct sh_err *e)
 {
 	zfs_handle_t *zhp;
 	int r;
 
-	if ((zhp = zz_open(z, ds, e)) == NULL)
+	if ((zhp = zz_open(z, name, e)) == NULL)
 		return (-1);
 	if ((r = zfs_prop_inherit(zhp, prop, B_FALSE)) != 0)
-		zz_err(z, e, ds);
+		zz_err(z, e, name);
 	zfs_close(zhp);
 	return (r != 0 ? -1 : 0);
+}
+
+int
+sh_zfs_props(struct sh_zfs *z, const char *name,
+    int (*fn)(void *, const char *, const char *), void *arg,
+    struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	nvlist_t *nv;
+	nvpair_t *p = NULL;
+	const char *v;
+	int local, r = 0;
+
+	if ((zhp = zz_open(z, name, e)) == NULL)
+		return (-1);
+	nv = zfs_get_user_props(zhp);
+	while (r == 0 && (p = nvlist_next_nvpair(nv, p)) != NULL) {
+		if ((v = zz_user(zhp, nvpair_name(p), &local)) != NULL &&
+		    local)
+			r = fn(arg, nvpair_name(p), v);
+	}
+	zfs_close(zhp);
+	return (r);
 }
 
 static int

@@ -430,6 +430,79 @@ cells_set(void)
 	    "no such filesystem");
 }
 
+/* A walk of properties: "PROP=VALUE" each, as seen. */
+static int
+see_prop(void *arg, const char *prop, const char *value)
+{
+	char buf[512];
+
+	(void) arg;
+	(void) snprintf(buf, sizeof (buf), "%s=%s", prop, value);
+	return (see(NULL, buf));
+}
+
+/* The user properties set on REL itself, sorted, or "(refused)". */
+static const char *
+props(const char *rel)
+{
+	if (walked(0) != 0 || sh_zfs_props(z, at(rel), see_prop, NULL, &e) !=
+	    0)
+		return ("(refused)");
+	return (sorted());
+}
+
+/*
+ * A snapshot's own user properties, set and inherited (Z16), and a
+ * name's own listed (Z17): f/usr@v1, which Z5 took with shtetl:kind.
+ */
+static void
+cells_props(void)
+{
+	static const struct sh_zprop pp[2] = {
+		{ "canmount", "off" }, { "shtetl:zcheck", "p" }
+	};
+
+	cell("Z16", "set on a snapshot: its value there, not its filesystem's",
+	    sh_zfs_set(z, at("f/usr@v1"), "shtetl:commit", "c1", &e) == 0 &&
+	    strcmp(user("f/usr@v1", "shtetl:commit"), "c1") == 0 &&
+	    strcmp(user("f/usr", "shtetl:commit"), "(unset)") == 0);
+	cell("Z16", "set again: replaced",
+	    sh_zfs_set(z, at("f/usr@v1"), "shtetl:commit", "c2", &e) == 0 &&
+	    strcmp(user("f/usr@v1", "shtetl:commit"), "c2") == 0);
+	cell("Z16", "inherited on a snapshot: its filesystem's again",
+	    sh_zfs_set(z, at("f/usr@v1"), "shtetl:zcheck", "s", &e) == 0 &&
+	    strcmp(user("f/usr@v1", "shtetl:zcheck"), "s") == 0 &&
+	    sh_zfs_inherit(z, at("f/usr@v1"), "shtetl:zcheck", &e) == 0 &&
+	    strcmp(user("f/usr@v1", "shtetl:zcheck"), "f") == 0);
+	refused("Z16", "set on no such snapshot: refused",
+	    sh_zfs_set(z, at("f@v9"), "shtetl:zcheck", "x", &e), "f@v9",
+	    "no such snapshot");
+	refused("Z16", "inherited on no such snapshot: refused",
+	    sh_zfs_inherit(z, at("f@v9"), "shtetl:zcheck", &e), "f@v9",
+	    "no such snapshot");
+	cell("Z17", "a filesystem's: the one set there, not the native one",
+	    sh_zfs_create(z, at("p"), pp, 2, &e) == 0 &&
+	    sh_zfs_create(z, at("p/q"), NULL, 0, &e) == 0 &&
+	    strcmp(props("p"), "shtetl:zcheck=p") == 0);
+	cell("Z17", "a snapshot's: its own, not its filesystem's",
+	    strcmp(props("f/usr@v1"), "shtetl:commit=c2 shtetl:kind=create") ==
+	    0);
+	cell("Z17", "nothing set there, one inherited: nothing",
+	    strcmp(props("p/q"), "") == 0);
+	stop_at = 1;
+	cell("Z17", "the walk stopped, FN's value returned",
+	    walked(0) == 0 &&
+	    sh_zfs_props(z, at("f/usr@v1"), see_prop, NULL, &e) == 7 &&
+	    strchr(seen, ' ') == NULL);
+	stop_at = 0;
+	refused("Z17", "no such filesystem: refused",
+	    sh_zfs_props(z, at("nope"), see_prop, NULL, &e), "nope",
+	    "no such filesystem");
+	refused("Z17", "no such snapshot: refused",
+	    sh_zfs_props(z, at("f@v9"), see_prop, NULL, &e), "f@v9",
+	    "no such snapshot");
+}
+
 /* Whether the snapshots A and B, below the top, share a guid. */
 static int
 same(const char *a, const char *b)
@@ -605,6 +678,7 @@ zcells(FILE *o, const char *t)
 	cells_mount();
 	cells_destroy();
 	cells_set();
+	cells_props();
 	cells_send();
 	sh_zfs_close(z);
 	(void) fclose(ef);
