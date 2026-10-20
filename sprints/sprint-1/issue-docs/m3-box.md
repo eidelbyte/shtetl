@@ -48,3 +48,15 @@
 ## Commit
 
 The commit after a06997d, "box: M3 on the box, build.sh".
+
+## Box run 4 and build run 1
+
+Build run 1: KIDON, 2026-10-20, tests/box/build.sh at b55fa79 (results
+39daa4e): 25 ok, 1 failed. R1 - R8 ok. R9 "what the roll wrote gone"
+read written after the rollback: 1K, not 0, though the start had
+rolled the head back (idle at the newest, no stall, devfs gone,
+unmounted). The rollback itself writes a little. 942c699: the stopped
+roll's commands-external leaves a marker in the head, checked there at
+the stop and gone after. The log carried 109,000 lines of the build's
+output from syslog (17 MB); build.sh keeps the daemon's own lines now.
+Testing: the next build.sh owed.

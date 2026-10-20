@@ -74,3 +74,11 @@
 4d85567, "job: steps, watched children, and the builder's turns". It
 went out with one line of job.c past 80 columns (the gate's failure
 was hidden by a pipe); the next commit rewrites that loop to fit.
+
+## Box run 4 and build run 1
+
+Box run 4: KIDON, 2026-10-20, run.sh at 0d4768e (results
+b55fa79): 113 ok, 1 failed. check_job ok under make check-freebsd:
+EVFILT_PROC, the child gone before it is watched, and the process
+groups behave on FreeBSD's kqueue as on the mac's. The daemon ran
+builds' children for hours in build run 1. Tested.

@@ -3,7 +3,7 @@
     "project": "shtetl",
     "sprint": 1,
     "created": "2026-10-18",
-    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 and M2 tested (box run 3, 73 of 73); M3 built on the mac (2026-10-20): m3-builder, m3-src, m3-roll, m3-install, m3-commands and m3-pkg in testing; m3-box's tests/box/build.sh written, its run owed, with run.sh's for check-freebsd and Z10.",
+    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 and M2 tested (box run 3, 73 of 73); M3 on the box 2026-10-20 (box run 4, 113 of 114; build run 1, 25 of 26): m3-builder, m3-src, m3-roll, m3-commands tested; m3-install, m3-pkg and m3-box wait on reruns of run.sh and build.sh after 942c699 and a53af20; m4-zfs tested (Z10 - Z15 over libzfs); next m4-beam.",
     "planning_docs": [
       "sprints/sprint-1/implementation-plan.md",
       "sprints/sprint-1/open-questions.md"
@@ -425,7 +425,7 @@
     ],
     "provides": "Actors that take messages one at a time and run long steps as watched children; one builder handing out turns.",
     "estimated_size": "medium",
-    "completed": "testing",
+    "completed": "tested",
     "note": "2026-10-20: built; J1-J12, T1-T3 on the mac (sh -c children), two mutations caught, no leaks, gate, xcheck. No per-actor message queue (what waits is read from ZFS; a busy actor refuses); the daemon's loop integration and SIGTERM stopping jobs come with m3-roll. Owed: make check-freebsd on the box (check_job on FreeBSD kqueue). Worklog issue-docs/m3-builder.md."
   },
   "m3-src": {
@@ -448,7 +448,7 @@
     ],
     "provides": "zbuild at the head of a recipe's src_branch with its patches applied, or a failure that leaves zbuild reset.",
     "estimated_size": "medium",
-    "completed": "testing",
+    "completed": "tested",
     "note": "2026-10-20: built; GS1-GS9, GP1-GP15, GR1-GR4 on the mac with git 2.50 over file:// remotes, mutations caught, no leaks of ours, gate, xcheck. zbuild = src/ + patches/N (plan 4 amended); no retouch code (git reset --hard rewrites patched files); one git apply --3way per patch (already-in merges clean). Owed: GS10 (real src fetch) in m3-box; check_src under make check-freebsd on the box. Worklog issue-docs/m3-src.md."
   },
   "m3-roll": {
@@ -475,7 +475,7 @@
     ],
     "provides": "A foundation rolls by hand through its src and patches to an injected, snapshotted version, or rolls back and stalls; shtetl roll F restarts a stalled one.",
     "estimated_size": "large",
-    "completed": "testing",
+    "completed": "tested",
     "note": "2026-10-20 (from m3-src): rc's and service(8)'s PATH lack /usr/local/bin, so the daemon's git children exit 127 under rc; give etc/rc.d/shtetl the PATH when the daemon first runs a job. foundation.conf needs the src and patch-source commits: read them from git without parsing its words where possible. On failure run sh_src_reset. 2026-10-20: split; the build and install moved to m3-install, pkg and the commands to m3-commands, so each lands with its own worklog. 2026-10-20: built (6ca6b61 zfs set/inherit, then the roll): F1-F15 in check_roll over the fake with real git, F16 in check_daemon, Z10; twelve mutations caught; no leaks of ours; gate, xcheck. Head made before src; one kevent at a time; recipe resolved in the job. Owed: Z10 over libzfs, check_roll/check_job on FreeBSD (next box run), F17/F18 in m3-box. Worklog issue-docs/m3-roll.md."
   },
   "m3-install": {
@@ -496,7 +496,7 @@
     "provides": "A roll that builds and installs a world and a kernel into the head.",
     "estimated_size": "large",
     "completed": "testing",
-    "note": "2026-10-20: built; K1-K8 (check_install), K9-K18 (check_roll with tests/bin/make), sixteen mutations caught, no leaks of ours, gate, xcheck. Obj cache <lake>/foundation-builds/F mounted for the roll and left mounted; copies take new times; version queues obj, obj queues install then inject. Owed: K19 in m3-box; check_install/check_roll on FreeBSD. Worklog issue-docs/m3-install.md."
+    "note": "2026-10-20: built; K1-K8 (check_install), K9-K18 (check_roll with tests/bin/make), sixteen mutations caught, no leaks of ours, gate, xcheck. Obj cache <lake>/foundation-builds/F mounted for the roll and left mounted; copies take new times; version queues obj, obj queues install then inject. Owed: K19 in m3-box; check_install/check_roll on FreeBSD. Worklog issue-docs/m3-install.md. 2026-10-20 box run 4 (b55fa79): check_install FAIL (uchg as user; FreeBSD ZFS has none) -> nodump, 942c699; build run 1 (39daa4e): K19 ok (R3, R5). Rerun of run.sh owed."
   },
   "m3-commands": {
     "description": "Roll step 5 (plan 6): pkg, commands-external and commands, added to m3-roll's frame after m3-install's steps. pkg and commands in a chroot of the head with devfs mounted, and the host's resolv.conf for pkg where the head has none, each undone at the step's end and after a failure; commands-external on the host, given the head's path. Carried from main as knowledge (its fb_chroot). Verify: make check with the programs faked as children; the box in m3-box.",
@@ -515,7 +515,7 @@
     ],
     "provides": "A roll that installs the recipe's packages and runs its commands.",
     "estimated_size": "medium",
-    "completed": "testing",
+    "completed": "tested",
     "note": "2026-10-20: built; X1-X7 in check_roll with tests/bin fakes (pkg, chroot, mount, umount; one FAKE_LOG), ten mutations caught, gate, xcheck. Order commands-external > pkg > commands (the docs); every roll runs every command; devfs left by a failure/stop/crash unmounted in sh_foundation_idle (unmount(2)). Owed: X8, X9 in m3-box. Worklog issue-docs/m3-commands.md."
   },
   "m3-pkg": {
@@ -533,7 +533,7 @@
     "provides": "shtetl pkg F: a roll of steps 5 to 7 with only pkg upgrade, snapshot kind pkg.",
     "estimated_size": "small",
     "completed": "testing",
-    "note": "2026-10-20: built; U1-U5 (check_roll), U6 (check_daemon), I15 (check_shake), seven mutations caught, gate, xcheck. shtetl pkg F; foundation.conf NOT injected again (the version's is in the head and still true); the version's datasets from its foundation.conf, read live; snapshot -pkg with the version's commit; failure leaves zbuild alone. Owed: U7 in m3-box. Worklog issue-docs/m3-pkg.md."
+    "note": "2026-10-20: built; U1-U5 (check_roll), U6 (check_daemon), I15 (check_shake), seven mutations caught, gate, xcheck. shtetl pkg F; foundation.conf NOT injected again (the version's is in the head and still true); the version's datasets from its foundation.conf, read live; snapshot -pkg with the version's commit; failure leaves zbuild alone. Owed: U7 in m3-box. Worklog issue-docs/m3-pkg.md. 2026-10-20 build run 1: U7 ok (R8). Ruled: the version's foundation.conf pkg list -> a53af20. R8 again owed."
   },
   "m3-box": {
     "description": "The box run of M3: tests/box/build.sh on a sparse-file pool kept between runs (its obj cache and src clone, as main's build.sh did, so later runs are incremental), the spaces marked, the daemon started, shtetl roll F by hand: a create roll from releng/15.1, an update roll, a patch that conflicts (stall, the dataset at its newest snapshot, zbuild reset), shtetl roll F after the patch is fixed, shtetl pkg F; the daemon killed during a build and started again (the head rolled back, no stall). The log sent back. Verify: the box log, its first line and its ok/failed line.",
@@ -548,8 +548,8 @@
     ],
     "provides": "A real foundation built in zlake on the box by the daemon, a stall from a bad patch and its restart, and a pkg roll.",
     "estimated_size": "medium",
-    "completed": "code",
-    "note": "2026-10-20: tests/box/build.sh written (family R, R1-R9; B is m4-beam's): rc-started daemon on pool s2box (sparse file kept, exported between runs), create/update/conflict stall/fix/pkg/stop in a command and start again. sh -n, gate. OWED: the run (sudo sh tests/box/build.sh), and run.sh for check-freebsd + Z10. Found a06997d on the way. Worklog issue-docs/m3-box.md."
+    "completed": "testing",
+    "note": "2026-10-20: tests/box/build.sh written (family R, R1-R9; B is m4-beam's): rc-started daemon on pool s2box (sparse file kept, exported between runs), create/update/conflict stall/fix/pkg/stop in a command and start again. sh -n, gate. OWED: the run (sudo sh tests/box/build.sh), and run.sh for check-freebsd + Z10. Found a06997d on the way. Worklog issue-docs/m3-box.md. 2026-10-20 build run 1 (39daa4e): 25 ok, 1 failed (R9 written 1K after rollback) -> marker, 942c699; log trimmed to the daemon's lines. Rerun owed."
   },
   "m4-zfs": {
     "description": "Layer calls (plan 8.1, probe P1, P5): clone with properties; promote; a snapshot's guid and createtxg; send from a snapshot whole, incremental, or as a clone stream received with -o origin= (lzc_send into lzc_receive_resumable in a forked child, as main's sh_zfs_send forked lzc_send); the receive_resume_token of a filesystem, decoded to an nvlist with zfs_send_resume_token_to_nvlist, and a send resumed from it (lzc_send_resume); a token taken away (receive -A). The fake models a cut stream and its token. Matrix family Z cells for each, on the box and the fake. Verify: make check; tests/box/run.sh.",
@@ -568,8 +568,8 @@
     ],
     "provides": "The ZFS calls the beam and the houses need: clone, promote, guid, resumable send and receive, a resume token and its abort.",
     "estimated_size": "medium",
-    "completed": "testing",
-    "note": "2026-10-20: built; Z9 has clones, Z11-Z15 over the fake (check_zfs), drivers zc_fill/zc_cut (box: P1's head -c cut). send synchronous (m4-beam forks it in a job), resumable/resume/abort keep tokens inside the layer; resume via lzc_send_resume with the base found by guid. xcheck, gate. Owed: the cells over libzfs (run.sh). Worklog issue-docs/m4-zfs.md."
+    "completed": "tested",
+    "note": "2026-10-20: built; Z9 has clones, Z11-Z15 over the fake (check_zfs), drivers zc_fill/zc_cut (box: P1's head -c cut). send synchronous (m4-beam forks it in a job), resumable/resume/abort keep tokens inside the layer; resume via lzc_send_resume with the base found by guid. xcheck, gate. Owed: the cells over libzfs (run.sh). Worklog issue-docs/m4-zfs.md. 2026-10-20 box run 4: Z9, Z10-Z15 over libzfs all ok. Tested."
   },
   "m4-beam": {
     "description": "The beam (plan 8.1): in origin order, every snapshot a space should hold and lacks is sent, from the newest snapshot of the dataset's history whose guid the receiving space holds, wherever it is there; a dataset new to the receiving space received as a clone of its snapshot of that guid; a foundation's first version a full stream; shtetl:* properties copied after each receive, no send -p. A standing resume token is resumed first; nothing is destroyed on a failure. The actor converges after every snapshot it is told of and on a timer, backs off while a space cannot be reached, and tells the house actors of each foundation version that arrives on zrun. Skeleton rows for run/foundations (canmount=off) and lake/containers, lake/systems. Matrix family B: each shape of history on each side, cut at each stream, a promote before and after. Verify: make check; m4-box.",

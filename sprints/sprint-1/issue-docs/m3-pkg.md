@@ -53,3 +53,11 @@
 ## Commit
 
 The commit after 1fa0f4b, "pkg: a foundation's package upgrade".
+
+## Box run 4 and build run 1
+
+Build run 1: KIDON, 2026-10-20, tests/box/build.sh at b55fa79 (results
+39daa4e): 25 ok, 1 failed. U7: a pkg roll, kind pkg, the version's
+commit (R8). Ruled the same day that the packages a pkg roll upgrades
+are those its version's foundation.conf lists (plan 18): a53af20
+upgrades that list, not every package. Testing: R8 again owed.

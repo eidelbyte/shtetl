@@ -84,3 +84,12 @@ src/core/src.[ch], steps a job runs, each git a child (m3-builder):
 
 The commit after d976523 ("job: a child's argv taken const", which
 src.c's argv needed under -Wcast-qual).
+
+## Box run 4 and build run 1
+
+Box run 4: KIDON, 2026-10-20, run.sh at 0d4768e (results
+b55fa79): 113 ok, 1 failed. check_src ok on FreeBSD.
+Build run 1: KIDON, 2026-10-20, tests/box/build.sh at b55fa79 (results
+39daa4e): 25 ok, 1 failed. GS10: R1, a real releng/15.1 fetched over https
+into zbuild, reset and cleaned; R6, a three-way conflict, its stall,
+zbuild reset after it; R7, the patch in the checkout. Tested.

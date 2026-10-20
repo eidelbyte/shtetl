@@ -69,3 +69,10 @@ zfake_cut.
 
 The commit after fa86471, "zfs: clones, promotes, and streams that
 resume".
+
+## Box run 4 and build run 1
+
+Box run 4: KIDON, 2026-10-20, run.sh at 0d4768e (results
+b55fa79): 113 ok, 1 failed. Z9's "has clones" and Z10 - Z15 over
+libzfs, 36 lines, all ok: the cells the fake passes, the box passes,
+with P1's cut by head -c. Tested.
