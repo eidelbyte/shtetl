@@ -532,7 +532,8 @@
     ],
     "provides": "shtetl pkg F: a roll of steps 5 to 7 with only pkg upgrade, snapshot kind pkg.",
     "estimated_size": "small",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-10-20: built; U1-U5 (check_roll), U6 (check_daemon), I15 (check_shake), seven mutations caught, gate, xcheck. shtetl pkg F; foundation.conf NOT injected again (the version's is in the head and still true); the version's datasets from its foundation.conf, read live; snapshot -pkg with the version's commit; failure leaves zbuild alone. Owed: U7 in m3-box. Worklog issue-docs/m3-pkg.md."
   },
   "m3-box": {
     "description": "The box run of M3: tests/box/build.sh on a sparse-file pool kept between runs (its obj cache and src clone, as main's build.sh did, so later runs are incremental), the spaces marked, the daemon started, shtetl roll F by hand: a create roll from releng/15.1, an update roll, a patch that conflicts (stall, the dataset at its newest snapshot, zbuild reset), shtetl roll F after the patch is fixed, shtetl pkg F; the daemon killed during a build and started again (the head rolled back, no stall). The log sent back. Verify: the box log, its first line and its ok/failed line.",

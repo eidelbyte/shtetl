@@ -59,6 +59,7 @@ struct daemon {
 
 static const char usage[] =
 	"usage: shtetl daemon\n"
+	"       shtetl pkg FOUNDATION\n"
 	"       shtetl roll FOUNDATION\n"
 	"       shtetl show [RECIPE]\n"
 	"       shtetl status\n";
@@ -134,7 +135,28 @@ act_roll(struct daemon *d, int argc, char **argv, FILE *out,
 		return (1);
 	f = sh_foundation_find(&d->d_found, &d->d_nfound, d->d_froot,
 	    argv[1]);
-	return (sh_roll_ask(f, &d->d_env, config, build, e) != 0);
+	return (sh_roll_ask(f, &d->d_env, config, build, 0, e) != 0);
+}
+
+/* shtetl pkg FOUNDATION: a pkg roll asked for, the reply at once */
+static int
+act_pkg(struct daemon *d, int argc, char **argv, FILE *out,
+    struct sh_err *e)
+{
+	size_t i;
+
+	(void) out;
+	if (argc != 2) {
+		(void) fputs(usage, e->se_out);
+		return (2);
+	}
+	for (i = 0; i < d->d_nfound; i++) {
+		if (strcmp(d->d_found[i]->f_name, argv[1]) == 0)
+			return (sh_roll_ask(d->d_found[i], &d->d_env, NULL,
+			    NULL, 1, e) != 0);
+	}
+	sh_errf(e, "%s: no such foundation", argv[1]);
+	return (1);
 }
 
 /* shtetl show [RECIPE]: read from zconfig, where its root is mounted */
@@ -158,6 +180,7 @@ static const struct {
 	int		(*a_fn)(struct daemon *, int, char **, FILE *,
 			    struct sh_err *);
 } acts[] = {
+	{ "pkg", act_pkg },
 	{ "roll", act_roll },
 	{ "show", act_show },
 	{ "status", act_status }

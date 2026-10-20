@@ -132,28 +132,30 @@ cm_return(struct sh_job *j, void *arg, struct sh_err *e)
 void
 sh_commands_steps(struct sh_job *j, struct sh_commands *cm)
 {
-	const struct sh_node *pkg, *cmds;
+	const struct sh_node *pkg = NULL, *cmds;
 	const char **argv, *words[8];
 	char *root, *name, *dev;
-	size_t i;
+	size_t i, n = 0;
 
-	root = cm_cat("SHTETL_ROOT=", cm->cm_head);
-	name = cm_cat("SHTETL_NAME=", cm->cm_name);
-	words[0] = "env";
-	words[1] = root;
-	words[2] = name;
-	words[3] = "SHTETL_KIND=foundation";
-	words[4] = "sh";
-	words[5] = "-e";
-	words[6] = "-c";
-	cm_pieces(j, cm, "commands-external", "external", words, 7);
-	free(root);
-	free(name);
-	pkg = sh_obj_get(cm->cm_recipe->sr_merged, "pkg");
-	cmds = sh_obj_get(cm->cm_recipe->sr_merged, "commands");
-	if ((pkg == NULL || pkg->sn_obj.ob_n == 0) &&
-	    (cmds == NULL || cmds->sn_obj.ob_n == 0))
-		return;
+	if (!cm->cm_upgrade) {
+		root = cm_cat("SHTETL_ROOT=", cm->cm_head);
+		name = cm_cat("SHTETL_NAME=", cm->cm_name);
+		words[0] = "env";
+		words[1] = root;
+		words[2] = name;
+		words[3] = "SHTETL_KIND=foundation";
+		words[4] = "sh";
+		words[5] = "-e";
+		words[6] = "-c";
+		cm_pieces(j, cm, "commands-external", "external", words, 7);
+		free(root);
+		free(name);
+		pkg = sh_obj_get(cm->cm_recipe->sr_merged, "pkg");
+		cmds = sh_obj_get(cm->cm_recipe->sr_merged, "commands");
+		n = pkg != NULL ? pkg->sn_obj.ob_n : 0;
+		if (n == 0 && (cmds == NULL || cmds->sn_obj.ob_n == 0))
+			return;
+	}
 	dev = sh_root_path(cm->cm_head, "dev");
 	words[0] = "mount";
 	words[1] = "-t";
@@ -162,28 +164,30 @@ sh_commands_steps(struct sh_job *j, struct sh_commands *cm)
 	words[4] = dev;
 	words[5] = NULL;
 	sh_job_child(j, "devfs", words);
-	if (pkg != NULL && pkg->sn_obj.ob_n > 0) {
+	if (cm->cm_upgrade || n > 0) {
 		sh_job_call(j, "resolv.conf", cm_lend, cm);
-		argv = sh_calloc(pkg->sn_obj.ob_n + 9, sizeof (*argv));
+		argv = sh_calloc(n + 9, sizeof (*argv));
 		argv[0] = "env";
 		argv[1] = "ASSUME_ALWAYS_YES=yes";
 		argv[2] = "pkg";
 		argv[3] = "-c";
 		argv[4] = cm->cm_head;
-		argv[5] = "install";
+		argv[5] = cm->cm_upgrade ? "upgrade" : "install";
 		argv[6] = "-y";
-		argv[7] = "--";
-		for (i = 0; i < pkg->sn_obj.ob_n; i++)
+		argv[7] = cm->cm_upgrade ? NULL : "--";
+		for (i = 0; i < n; i++)
 			argv[8 + i] = pkg->sn_obj.ob_v[i].pr_key;
 		sh_job_child(j, "pkg", argv);
 		free(argv);
 	}
-	words[0] = "chroot";
-	words[1] = cm->cm_head;
-	words[2] = "/bin/sh";
-	words[3] = "-e";
-	words[4] = "-c";
-	cm_pieces(j, cm, "commands", "commands", words, 5);
+	if (!cm->cm_upgrade) {
+		words[0] = "chroot";
+		words[1] = cm->cm_head;
+		words[2] = "/bin/sh";
+		words[3] = "-e";
+		words[4] = "-c";
+		cm_pieces(j, cm, "commands", "commands", words, 5);
+	}
 	words[0] = "umount";
 	words[1] = dev;
 	words[2] = NULL;

@@ -416,6 +416,7 @@ shaken recipe's text is show's (CW1 holds that it parses back).
 | I12 | read back through a real snapshot's .zfs view | parsed | box: tests/box/shake.c |
 | I13 | a link in the snapshot on the way | refused | box: tests/box/shake.c |
 | I14 | the live file rewritten after the snapshot | the snapshot's read unchanged | box: tests/box/shake.c |
+| I15 | read from the tree as it is, no snapshot (m3-pkg); a link on its way | parsed; "var/db: a link" | tests/check_shake.c |
 
 A link on the way is told from other refusals by looking at it once
 it is refused (fstatat, not following it): the errno a component
@@ -634,3 +635,23 @@ nor commands; a label's last piece alone.
 | X7 | a command failing | "commands: LABEL: exited 1"; rolled back, stalled | tests/check_roll.c |
 | X8 | devfs left mounted by a failure, a stop or a crash | unmounted by sh_foundation_idle before the head | deferred: the mac mounts no devfs; m3-box stops a roll in a command and starts again |
 | X9 | real pkg and chroot | the packages in the head | deferred: m3-box |
+
+## Family U: a pkg roll (m3-pkg)
+
+Dimensions: the foundation {a version, none, stalled}; its recipe
+{as the version was built, changed since}; the upgrade {ending well,
+failing}. Run as family F's, the fakes logging. Mutations caught: a
+failed pkg roll resetting zbuild (U3); kind update (U1); the version's
+datasets not mounted (U1); the commit not the version's (U1); no
+refusal without a version (U2, a crash); install for upgrade, and no
+resolv.conf lent for it (U1).
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| U1 | a pkg roll | F and the datasets its version's foundation.conf gives mounted; devfs, the resolv.conf lent, pkg -c HEAD upgrade -y, devfs off; nothing built; F@<ver>-<date>-pkg on every dataset, kind pkg, the version's shtetl:commit | tests/check_roll.c |
+| U2 | a foundation with no version | "F: no version" | tests/check_roll.c |
+| U3 | the upgrade failing | "pkg: exited 1"; rolled back, stalled; zbuild untouched | tests/check_roll.c |
+| U4 | the recipe given a dataset since the version | not made, not mounted: the version's recipe is the pkg roll's | tests/check_roll.c |
+| U5 | asked of a stalled foundation | the stall cleared; it rolls | tests/check_roll.c |
+| U6 | shtetl pkg over the socket: no argument, no such foundation | the usage; "NAME: no such foundation" | tests/check_daemon.c |
+| U7 | a real pkg upgrade | the packages upgraded in a version of kind pkg | deferred: m3-box |

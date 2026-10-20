@@ -120,7 +120,11 @@ sh_shaken_read(const char *dir, const char *snap, const char *rel,
 	char path[1024];
 	int dfd, fd;
 
-	(void) snprintf(path, sizeof (path), ".zfs/snapshot/%s/%s", snap, rel);
+	if (snap != NULL)
+		(void) snprintf(path, sizeof (path), ".zfs/snapshot/%s/%s",
+		    snap, rel);
+	else
+		(void) snprintf(path, sizeof (path), "%s", rel);
 	if ((dfd = open(dir, O_RDONLY | O_DIRECTORY | O_CLOEXEC)) < 0) {
 		sh_errf(e, "%s: %s", dir, strerror(errno));
 		return (NULL);

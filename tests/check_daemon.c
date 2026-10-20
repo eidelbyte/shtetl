@@ -24,6 +24,7 @@
 
 static const char usage[] =
 	"usage: shtetl daemon\n"
+	"       shtetl pkg FOUNDATION\n"
 	"       shtetl roll FOUNDATION\n"
 	"       shtetl show [RECIPE]\n"
 	"       shtetl status\n";
@@ -158,6 +159,8 @@ main(void)
 	char *roll[] = { "roll" };
 	char *rollbad[] = { "roll", "bad/name" };
 	char *rollgen[] = { "roll", "generic" };
+	char *pkg[] = { "pkg" };
+	char *pkgnope[] = { "pkg", "nope" };
 	char *big;
 	char buf[64], wantpid[32], zconfig[1024];
 	size_t len;
@@ -323,6 +326,10 @@ main(void)
 	    1) == 0);
 	CHECK(sht(2, rollgen) == 1 &&
 	    strcmp(ebuf, "shtetl: no build space\n") == 0);
+	/* U6: pkg with no foundation, one that is not there */
+	CHECK(sht(1, pkg) == 2 && strcmp(ebuf, usage) == 0);
+	CHECK(sht(2, pkgnope) == 1 &&
+	    strcmp(ebuf, "shtetl: nope: no such foundation\n") == 0);
 	CHECK(status() == 0 && strcmp(obuf, want) == 0);
 
 	/* D10: SIGTERM: exit 0, the socket gone */

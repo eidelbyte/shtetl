@@ -22,12 +22,16 @@
 struct sh_commands {
 	const char		*cm_head;	/* where the head is mounted */
 	const char		*cm_name;	/* the foundation's */
-	const struct sh_recipe	*cm_recipe;
+	const struct sh_recipe	*cm_recipe;	/* none for an upgrade */
 	const char		*cm_resolv;	/* the host's resolv.conf */
+	int			cm_upgrade;	/* a pkg roll's: pkg upgrade */
 	int			cm_lent;	/* resolv.conf lent */
 };
 
-/* CM's steps added to J; CM outlives them. */
+/*
+ * CM's steps added to J; CM outlives them. An upgrade's are the
+ * chroot's with pkg upgrade in it, and nothing else.
+ */
 void sh_commands_steps(struct sh_job *j, struct sh_commands *cm);
 
 #endif	/* SH_COMMANDS_H */

@@ -48,6 +48,9 @@ struct sh_roll {
 	char			r_ver[48];	/* 15.1-releng */
 	char			r_commit[72];
 	char			*r_snap;	/* the version made */
+	const char		*r_kind;	/* create, update or pkg */
+	struct sh_node		*r_shaken;	/* a pkg roll's version's */
+	int			r_pkg;		/* a pkg roll */
 	int			r_first;	/* F had no version: a create */
 	int			r_made;		/* F made by this roll */
 	int			r_reset;	/* zbuild's reset under way */
@@ -198,14 +201,14 @@ roll_snapshot(struct sh_job *j, void *arg, struct sh_err *e)
 	(void) strftime(date, sizeof (date), "%Y-%m-%dT%H_%M_%SZ",
 	    gmtime_r(&now, &tm));
 	(void) snprintf(snap, sizeof (snap), "%s-%s-%s", r->r_ver, date,
-	    r->r_first ? "create" : "update");
+	    r->r_kind);
 	for (i = 0; i < tree.n_n; i++) {
 		(void) snprintf(name, sizeof (name), "%s@%s", tree.n_v[i],
 		    snap);
 		(void) roll_name(&snaps, name);
 	}
 	p[0].zp_name = "shtetl:kind";
-	p[0].zp_value = r->r_first ? "create" : "update";
+	p[0].zp_value = r->r_kind;
 	p[1].zp_name = "shtetl:commit";
 	p[1].zp_value = r->r_commit;
 	if ((rc = sh_zfs_snapshot(z, (const char *const *)snaps.n_v,
@@ -400,37 +403,22 @@ roll_dataset(struct sh_roll *r, const struct sh_pair *pr,
 }
 
 /*
- * The head: F made on a first roll, the recipe's datasets where they
- * are missing, a parent before its children; F and they mounted.
+ * F mounted, and the datasets DSS gives made where they are missing
+ * and mounted, a parent before its children; where F is, the head.
  */
 static int
-roll_head(struct sh_job *j, void *arg, struct sh_err *e)
+roll_mount(struct sh_roll *r, const struct sh_node *dss, struct sh_err *e)
 {
-	struct sh_roll *r = arg;
 	struct sh_zfs *z = r->r_env->re_z;
-	const struct sh_node *props, *dss;
 	struct names have = { NULL, 0 };
 	struct sh_pair *v = NULL;
-	struct sh_zprop *p;
 	char path[1024];
 	size_t i, n;
 	int rc = -1;
 
-	(void) j;
-	if (r->r_first) {
-		props = sh_obj_get(r->r_site.ss_merged, "properties");
-		p = roll_props(sh_obj_get(props, "default"),
-		    sh_obj_get(props, "lake"), &n);
-		rc = sh_zfs_create(z, r->r_f->f_ds, p, n, e);
-		free(p);
-		if (rc != 0)
-			return (-1);
-		r->r_made = 1;
-	}
 	if (roll_tree(z, r->r_f->f_ds, &have, e) != 0 ||
 	    sh_zfs_mount(z, r->r_f->f_ds, e) != 0)
 		goto out;
-	dss = sh_obj_get(r->r_recipe.sr_merged, "datasets");
 	n = dss != NULL ? dss->sn_obj.ob_n : 0;
 	v = sh_calloc(n + 1, sizeof (*v));
 	if (n > 0)
@@ -450,6 +438,80 @@ out:
 	names_free(&have);
 	return (rc);
 }
+
+/*
+ * The head: F made on a first roll, the recipe's datasets where they
+ * are missing, a parent before its children; F and they mounted.
+ */
+static int
+roll_head(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	struct sh_roll *r = arg;
+	const struct sh_node *props;
+	struct sh_zprop *p;
+	size_t n;
+	int rc;
+
+	(void) j;
+	if (r->r_first) {
+		props = sh_obj_get(r->r_site.ss_merged, "properties");
+		p = roll_props(sh_obj_get(props, "default"),
+		    sh_obj_get(props, "lake"), &n);
+		rc = sh_zfs_create(r->r_env->re_z, r->r_f->f_ds, p, n, e);
+		free(p);
+		if (rc != 0)
+			return (-1);
+		r->r_made = 1;
+	}
+	return (roll_mount(r, sh_obj_get(r->r_recipe.sr_merged, "datasets"),
+	    e));
+}
+
+/*
+ * A pkg roll's head: F mounted, its newest version's foundation.conf
+ * read from it, and the datasets that gives mounted; then pkg upgrade
+ * in a chroot (commands.h), and the snapshot. The version is the
+ * newest's, VER of its name VER-DATE-KIND, and so is the commit.
+ */
+static int
+roll_pkg(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	struct sh_roll *r = arg;
+	struct sh_zfs *z = r->r_env->re_z;
+	const char *v = r->r_f->f_newest, *kind = strrchr(v, '-');
+	char path[1024], snap[512];
+	size_t n = kind != NULL ? (size_t)(kind - v) : 0;
+	int rc;
+
+	/* the date is 2026-10-15T09_30_12Z: twenty, and a dash before */
+	if (n < 22) {
+		sh_errf(e, "%s: not a version's name", v);
+		return (-1);
+	}
+	(void) snprintf(r->r_ver, sizeof (r->r_ver), "%.*s", (int)(n - 21),
+	    v);
+	(void) snprintf(snap, sizeof (snap), "%s@%s", r->r_f->f_ds, v);
+	if ((rc = sh_zfs_user(z, snap, "shtetl:commit", r->r_commit,
+	    sizeof (r->r_commit), e)) != 0) {
+		if (rc == 1)
+			sh_errf(e, "%s: no shtetl:commit", snap);
+		return (-1);
+	}
+	if (sh_zfs_mount(z, r->r_f->f_ds, e) != 0 ||
+	    sh_zfs_mounted(z, r->r_f->f_ds, path, sizeof (path), e) != 1 ||
+	    (r->r_shaken = sh_shaken_read(path, NULL, SH_SHAKEN_FOUNDATION,
+	    SH_SHAKEN_FOUNDATION, e)) == NULL ||
+	    roll_mount(r, sh_obj_get(r->r_shaken, "datasets"), e) != 0)
+		return (-1);
+	r->r_commands.cm_head = r->r_head;
+	r->r_commands.cm_name = r->r_f->f_name;
+	r->r_commands.cm_resolv = r->r_env->re_resolv;
+	r->r_commands.cm_upgrade = 1;
+	sh_commands_steps(j, &r->r_commands);
+	sh_job_call(j, "snapshot", roll_snapshot, r);
+	return (0);
+}
+
 
 /*
  * The recipe resolved and its ver held to src_branch; then the head,
@@ -514,6 +576,7 @@ roll_free(struct sh_roll *r)
 	free(r->r_srcdir);
 	free(r->r_obj);
 	free(r->r_snap);
+	sh_node_free(r->r_shaken);
 	free(r);
 }
 
@@ -577,6 +640,11 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 	}
 	sh_errf(env->re_err, "foundation %s: %s", f->f_name, why);
 	roll_back(r, why);
+	/* a pkg roll never touched zbuild */
+	if (r->r_pkg) {
+		roll_done(r);
+		return;
+	}
 	/* zbuild put back too, the turn still held */
 	r->r_reset = 1;
 	sh_job_init(j, f->f_name, env->re_log, env->re_err, roll_end, r);
@@ -594,18 +662,25 @@ roll_go(void *arg)
 	r->r_f->f_state = SH_F_ROLLING;
 	sh_job_init(&r->r_job, r->r_f->f_name, env->re_log, env->re_err,
 	    roll_end, r);
-	sh_job_call(&r->r_job, "site", roll_site, r);
+	if (r->r_pkg)
+		sh_job_call(&r->r_job, "head", roll_pkg, r);
+	else
+		sh_job_call(&r->r_job, "site", roll_site, r);
 	sh_job_run(&r->r_job, env->re_kq);
 }
 
 int
 sh_roll_ask(struct sh_foundation *f, const struct sh_rollenv *env,
-    const char *config, const char *build, struct sh_err *e)
+    const char *config, const char *build, int pkg, struct sh_err *e)
 {
 	struct sh_roll *r;
 
 	if (f->f_state == SH_F_WAITING || f->f_state == SH_F_ROLLING) {
 		sh_errf(e, "%s: rolling", f->f_name);
+		return (-1);
+	}
+	if (pkg && f->f_newest == NULL) {
+		sh_errf(e, "%s: no version", f->f_name);
 		return (-1);
 	}
 	if (f->f_state == SH_F_STALLED) {
@@ -617,9 +692,11 @@ sh_roll_ask(struct sh_foundation *f, const struct sh_rollenv *env,
 	r = sh_calloc(1, sizeof (*r));
 	r->r_f = f;
 	r->r_env = env;
-	r->r_config = sh_strdup(config);
-	r->r_build = sh_strdup(build);
+	r->r_config = config != NULL ? sh_strdup(config) : NULL;
+	r->r_build = build != NULL ? sh_strdup(build) : NULL;
 	r->r_first = f->f_newest == NULL;
+	r->r_pkg = pkg;
+	r->r_kind = pkg ? "pkg" : r->r_first ? "create" : "update";
 	f->f_roll = r;
 	f->f_state = SH_F_WAITING;
 	sh_builder_ask(env->re_builder, roll_go, r);

@@ -34,9 +34,9 @@ int sh_shaken_write(const char *dir, const char *rel, const char *text,
 
 /*
  * REL of the snapshot SNAP of the filesystem mounted at DIR, read
- * through DIR/.zfs/snapshot/SNAP and parsed with NAME as its layer:
- * the tree, or NULL with the reason in E. A link on the way is
- * refused.
+ * through DIR/.zfs/snapshot/SNAP, or with SNAP NULL of the tree at DIR
+ * as it is, and parsed with NAME as its layer: the tree, or NULL with
+ * the reason in E. A link on the way is refused.
  */
 struct sh_node *sh_shaken_read(const char *dir, const char *snap,
     const char *rel, const char *name, struct sh_err *e);

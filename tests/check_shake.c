@@ -139,6 +139,15 @@ main(void)
 	    &c.c_err) == NULL);
 	CHECK(cap_has(&c, ".zfs/snapshot/s9: No such file or directory"));
 
+	/* I15: the tree as it is, no snapshot: read, a link refused */
+	CHECK(write_it(SH_SHAKEN_HOUSE) == 0);
+	cap_reset(&c);
+	n = sh_shaken_read(tree, NULL, SH_SHAKEN_HOUSE, "live", &c.c_err);
+	CHECK(n != NULL && strcmp(n->sn_from, "live") == 0);
+	sh_node_free(n);
+	CHECK(sh_shaken_read(scratch_path("t3"), NULL, SH_SHAKEN_HOUSE, "t3",
+	    &c.c_err) == NULL && cap_has(&c, "var/db: a link"));
+
 	/* the flags off, or the scratch directory will not go */
 	(void) chflags(scratch_path("t1/" SH_SHAKEN_HOUSE), 0);
 	(void) chflags(scratch_path("t4/" SH_SHAKEN_HOUSE), 0);

@@ -55,9 +55,17 @@ struct sh_rollenv {
  * while F rolls or waits to; a stall cleared; then F waits for the
  * builder's turn, and rolls. CONFIG and BUILD are where zconfig and
  * zbuild are mounted. ENV outlives the roll.
+ *
+ * With PKG, as shtetl pkg F asks, a pkg roll (plan 6): its newest
+ * version's packages upgraded and nothing else, the steps head (F and
+ * the datasets that version's foundation.conf gives, mounted), pkg
+ * upgrade in a chroot (commands.h) and snapshot,
+ * F@<ver>-<date>-pkg with the version's shtetl:commit; its failure
+ * rolls back and stalls, and leaves zbuild alone; CONFIG and BUILD
+ * may be NULL. Refused, "F: no version", for F with none.
  */
 int sh_roll_ask(struct sh_foundation *f, const struct sh_rollenv *env,
-    const char *config, const char *build, struct sh_err *e);
+    const char *config, const char *build, int pkg, struct sh_err *e);
 
 /*
  * F's roll, if it has one, stopped where it stands, as when the daemon
