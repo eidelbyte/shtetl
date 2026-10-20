@@ -610,7 +610,8 @@ would and logs its words (tests/check_roll.c). Mutations caught: no
 delete-old on an update, or one on a first roll; installworld without
 install -C; no removal in the kernel's directories, or a kernel
 directory the new kernel lacks kept; a file alike copied anyway; no
-backups step; .old alone taken for a backup; flags not cleared; no
+backups step; .old alone taken for a backup; flags not cleared (on
+the mac, when the flag was uchg; now the box's R5); no
 MAKEOBJDIRPREFIX; the ident not in capitals; a kernconf path at
 zconfig's top; make_jobs passed over; the scratch directory kept;
 kernconf's lines or buildopts left out.
@@ -624,7 +625,7 @@ kernconf's lines or buildopts left out.
 | K5 | a link alike; a link changed | kept; replaced | tests/check_install.c |
 | K6 | a directory where a file was | the file removed, the directory made | tests/check_install.c |
 | K7 | installworld's backups | boot's *.old, kernel.old, libexec's ld-elf*.so.1.old, sbin/init.bak removed; boot/.old, ld-elf.so.1, init, loader kept | tests/check_install.c |
-| K8 | a tree with flags; a path not there | removed; done | tests/check_install.c |
+| K8 | a tree with flags; a path not there | removed; done | tests/check_install.c (nodump, a user's flag: FreeBSD's ZFS has no uchg); schg, root's, box: tests/box/build.sh R5, installworld's backups |
 | K9 | the build | env MAKEOBJDIRPREFIX=OBJ make -C SRC -jN buildworld buildkernel SRCCONF KERNCONFDIR KERNCONF | tests/check_roll.c |
 | K10 | a first roll's install | installworld (install -C) into the head, installkernel into the scratch directory, distribution; no delete-old, no backups | tests/check_roll.c |
 | K11 | an update's install | delete-old before installworld; the backups removed after | tests/check_roll.c |

@@ -253,8 +253,10 @@ rolls() {
 	    "$(newest $FD)")" "pkg $(prop shtetl:commit "$_v")"
 	_v=$(newest $FD)
 
-	# R9: stopped in a command, devfs mounted; started again (X8)
-	recipe 'commands { slow = "sleep 600"; }'
+	# R9: stopped in a command, devfs mounted, the head written (a
+	# marker by commands-external); started again (X8)
+	recipe 'commands-external { mark = "touch $SHTETL_ROOT/root/R9"; }' \
+	    'commands { slow = "sleep 600"; }'
 	x "$SH" roll $F
 	_slow="^foundation $F rolling commands: slow"
 	until "$SH" status 2>&1 | grep -q "$_slow"; do
@@ -268,6 +270,8 @@ rolls() {
 	x service shtetl onestop
 	cell R9 "stopped: devfs left on the head" \
 	    "$(mount -p | awk -v d="$_head/dev" '$2 == d { print $3 }')" devfs
+	cell R9 "and the roll's marker in it" \
+	    "$(ls "$_head/root/R9" 2>/dev/null)" "$_head/root/R9"
 	x service shtetl onestart
 	sleep 5
 	cell R9 "started again: idle at the newest, no stall" \
@@ -275,9 +279,11 @@ rolls() {
 	    "foundation $F idle ${_v#*@}"
 	cell R9 "devfs gone" \
 	    "$(mount -p | awk -v d="$_head/dev" '$2 == d { print $3 }')" ""
-	x zpool sync $P
-	cell R9 "what the roll wrote gone" "$(prop written $FD)" 0
 	cell R9 "the head unmounted" "$(prop mounted $FD)" no
+	# written, read after a rollback, is 1K, not 0 (build run 1): the
+	# marker says what the roll wrote is gone
+	cell R9 "what the roll wrote gone" \
+	    "$(inhead 'ls root/R9' 2>/dev/null)" ""
 }
 
 mkdir -p "$BD/results" || exit 2
@@ -299,8 +305,11 @@ trap 'pool_down; exit 130' INT TERM
 	fi
 	pool_down
 	echo
-	echo "syslog, daemon.log from the run's start:"
-	tail -n "+$LOGFROM" /var/log/daemon.log | grep shtetl
+	# the daemon's own lines: what children write is a build's whole
+	# output (build run 1: 109,000 lines)
+	echo "syslog, daemon.log from the run's start, the daemon's own:"
+	tail -n "+$LOGFROM" /var/log/daemon.log | grep 'shtetl\[' |
+	    grep -e ': foundation ' -e ": $F: version "
 } >"$OUT" 2>&1
 ok=$(grep -c '^ok ' "$OUT")
 failed=$(grep -c '^FAIL ' "$OUT")

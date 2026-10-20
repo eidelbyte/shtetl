@@ -1,8 +1,11 @@
 /*
  * The kernel's sync, installworld's backups and the tree removal of
  * src/core/install.c: family K's cells K1 - K8 of tests/MATRIX.md, on
- * trees in the scratch directory. The flag is uchg, which a user may
- * set and clear on the mac and on FreeBSD.
+ * trees in the scratch directory. The flag is nodump, which a user may
+ * set on the mac and on FreeBSD's ZFS, which has no uchg (box run 4):
+ * a flag cleared before the removal, though not one that would stop
+ * it. schg, which would, is root's: tests/box/build.sh R5 removes
+ * installworld's schg backups.
  */
 
 #include <sys/stat.h>
@@ -131,7 +134,7 @@ main(void)
 	(void) scratch_write("b/sbin/init.bak", "old\n");
 	(void) scratch_write("b/sbin/init", "init\n");
 	CHECK(chflags(scratch_path("b/libexec/ld-elf.so.1.old"),
-	    UF_IMMUTABLE) == 0);
+	    UF_NODUMP) == 0);
 	cap_reset(&c);
 	CHECK(sh_install_backups(scratch_path("b"), &c.c_err) == 0);
 	CHECK(!there("b/boot/kernel.old") && !there("b/boot/loader.old") &&
@@ -144,8 +147,8 @@ main(void)
 
 	/* K8: a tree with flags removed; one not there, done */
 	(void) scratch_write("t/d/f", "f\n");
-	CHECK(chflags(scratch_path("t/d/f"), UF_IMMUTABLE) == 0 &&
-	    chflags(scratch_path("t/d"), UF_IMMUTABLE) == 0);
+	CHECK(chflags(scratch_path("t/d/f"), UF_NODUMP) == 0 &&
+	    chflags(scratch_path("t/d"), UF_NODUMP) == 0);
 	CHECK(sh_install_rmtree(scratch_path("t"), &c.c_err) == 0 &&
 	    !there("t"));
 	CHECK(sh_install_rmtree(scratch_path("t"), &c.c_err) == 0);
