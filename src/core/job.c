@@ -27,6 +27,7 @@ struct sh_step {
 	char		**sp_argv;	/* a child's, NULL-ended; else a call */
 	int		(*sp_fn)(struct sh_job *, void *, struct sh_err *);
 	void		*sp_arg;
+	int		sp_fork;	/* the call made in a child */
 	struct sh_step	*sp_next;
 };
 
@@ -93,17 +94,29 @@ sh_job_call(struct sh_job *j, const char *step,
 	s->sp_arg = arg;
 }
 
+void
+sh_job_fork(struct sh_job *j, const char *step,
+    int (*fn)(struct sh_job *, void *, struct sh_err *), void *arg)
+{
+	struct sh_step *s = step_add(j, step);
+
+	s->sp_fn = fn;
+	s->sp_arg = arg;
+	s->sp_fork = 1;
+}
+
 const char *
 sh_job_step(const struct sh_job *j)
 {
 	return (j->j_steps != NULL ? j->j_steps->sp_name : NULL);
 }
 
-/* A line the child wrote, logged. */
+/* A line the child wrote, logged, and kept as its last. */
 static void
 job_line(struct sh_job *j, const char *p, size_t len)
 {
 	(void) fprintf(j->j_log, "%.*s\n", (int)len, p);
+	(void) snprintf(j->j_said, sizeof (j->j_said), "%.*s", (int)len, p);
 }
 
 /* What the child has written so far: each line told as it ends. */
@@ -151,18 +164,21 @@ job_end(struct sh_job *j, const char *why)
 static void job_exited(struct sh_job *j, int kq);
 
 /*
- * The first step's child begun and watched: 0; -1 with errno when it
- * could not be.
+ * The first step's child begun and watched, a program or a forked
+ * call: 0; -1 with errno when it could not be.
  */
 static int
 job_spawn(struct sh_job *j, int kq)
 {
-	char **argv = j->j_steps->sp_argv;
+	struct sh_step *s = j->j_steps;
+	char **argv = s->sp_argv;
 	struct kevent ev;
+	struct sh_err e;
 	int fds[2], null;
 	pid_t pid;
 
-	(void) fprintf(j->j_log, "# %s\n", j->j_steps->sp_name);
+	(void) fprintf(j->j_log, "# %s\n", s->sp_name);
+	j->j_said[0] = '\0';
 	if (pipe(fds) != 0)
 		return (-1);
 	if ((pid = fork()) == 0) {
@@ -175,6 +191,10 @@ job_spawn(struct sh_job *j, int kq)
 		(void) dup2(null, 0);
 		(void) dup2(fds[1], 1);
 		(void) dup2(fds[1], 2);
+		if (s->sp_fork) {
+			sh_err_init(&e, stderr, "");
+			_exit(s->sp_fn(j, s->sp_arg, &e) != 0);
+		}
 		(void) execvp(argv[0], argv);
 		(void) dprintf(2, "%s: %s\n", argv[0], strerror(errno));
 		_exit(127);
@@ -213,7 +233,7 @@ job_next(struct sh_job *j, int kq)
 	int r;
 
 	while ((s = j->j_steps) != NULL) {
-		if (s->sp_argv != NULL) {
+		if (s->sp_argv != NULL || s->sp_fork) {
 			if (job_spawn(j, kq) == 0)
 				return;
 			(void) snprintf(why, sizeof (why), "%s: %s",
@@ -242,7 +262,7 @@ job_next(struct sh_job *j, int kq)
 /*
  * The first step's child has exited: its output read to the last, it
  * reaped, what is left of its group sent SIGTERM; the next step, or
- * the end, with the last lines told again when it failed.
+ * the end: a forked call's why its words, a program's its status.
  */
 static void
 job_exited(struct sh_job *j, int kq)
@@ -264,7 +284,10 @@ job_exited(struct sh_job *j, int kq)
 		job_next(j, kq);
 		return;
 	}
-	if (WIFEXITED(st))
+	if (WIFEXITED(st) && j->j_steps->sp_fork)
+		(void) snprintf(why, sizeof (why), "%s: %s",
+		    j->j_steps->sp_name, j->j_said);
+	else if (WIFEXITED(st))
 		(void) snprintf(why, sizeof (why), "%s: exited %d",
 		    j->j_steps->sp_name, WEXITSTATUS(st));
 	else

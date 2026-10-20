@@ -461,12 +461,12 @@ ENOTDIR on its openat with O_DIRECTORY, EMLINK on FreeBSD.
 
 ## Family J: jobs, steps and children (m3-builder)
 
-Dimensions: a step {a child, a call, a call adding steps}; how a child
-ends {exit 0, exit N, a signal, not run at all}; what it writes {lines,
-a last line with no newline, a line past 4096, nothing, many lines};
-what it leaves {nothing, a process of its group}; the daemon's
-signals {ignored there}; standard input; the job stopped while a child
-runs.
+Dimensions: a step {a child, a call, a call adding steps, a call in a
+child of its own (m4-beam)}; how a child ends {exit 0, exit N, a
+signal, not run at all}; what it writes {lines, a last line with no
+newline, a line past 4096, nothing, many lines}; what it leaves
+{nothing, a process of its group}; the daemon's signals {ignored
+there}; standard input; the job stopped while a child runs.
 
 | cell | what | expected | disposition |
 |------|------|----------|-------------|
@@ -482,6 +482,10 @@ runs.
 | J10 | a child leaving a process of its group behind | the leftover sent SIGTERM at the step's end | tests/check_job.c |
 | J11 | SIGTERM ignored by the daemon | the child's own again: a child sending itself SIGTERM dies of it | tests/check_job.c |
 | J12 | a child reading standard input | /dev/null: it ends | tests/check_job.c |
+| J13 | a forked call ending well | "# STEP" logged, then what it writes; the daemon not held while it runs; what it changes not the daemon's; the next step, the end with no why | tests/check_job.c |
+| J14 | a forked call failing | "STEP: its words", the last line it wrote; its words logged; no later step | tests/check_job.c |
+| J15 | a forked call sending itself SIGTERM, the daemon ignoring it | "STEP: killed by signal 15" | tests/check_job.c |
+| J16 | stopped while a forked call runs, a child of its own under it | both killed, reaped, no end | tests/check_job.c |
 
 Mutations caught: the signals not put back (J11), no SIGTERM to a
 step's leftovers (J10). On FreeBSD, make check-freebsd (in the box run)

@@ -1,8 +1,9 @@
 /*
  * A job (plan 9): the steps an act takes, in order, each a child the
  * daemon runs and watches, or a call it makes, the next begun when the
- * last has ended well. A step that takes long, a build or a rebase, is
- * a child, and the daemon answers everyone else while it runs.
+ * last has ended well. A step that takes long, a build, a rebase or a
+ * send, is a child, a program or a call forked, and the daemon answers
+ * everyone else while it runs.
  *
  * A child runs in a process group of its own, its standard input
  * /dev/null, its standard output and error one pipe the daemon reads:
@@ -41,6 +42,7 @@ struct sh_job {
 	pid_t		j_pid;		/* the child under way, or 0 */
 	int		j_fd;		/* its output, or -1 */
 	struct sh_buf	j_line;		/* the line it has not ended yet */
+	char		j_said[1024];	/* the last line it wrote */
 };
 
 /*
@@ -58,10 +60,19 @@ void sh_job_init(struct sh_job *j, FILE *log,
  * which reports why it failed to E and returns -1, or 0. Either is
  * named STEP, for the log, the end's why and status. A call may add
  * steps.
+ *
+ * With sh_job_fork, the call is made in a child of its own, run and
+ * watched as a program is, for a call that takes long: it runs in a
+ * copy of the daemon, so what it changes is not the daemon's and it
+ * adds no steps. What it reports to E is logged, and when it fails,
+ * the last line it wrote is the end's why ("STEP: its words"), as a
+ * call's words are.
  */
 void sh_job_child(struct sh_job *j, const char *step,
     const char *const *argv);
 void sh_job_call(struct sh_job *j, const char *step,
+    int (*fn)(struct sh_job *, void *, struct sh_err *), void *arg);
+void sh_job_fork(struct sh_job *j, const char *step,
     int (*fn)(struct sh_job *, void *, struct sh_err *), void *arg);
 
 /* J begun on the kqueue KQ: its steps run until a child, or its end. */

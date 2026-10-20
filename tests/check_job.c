@@ -1,6 +1,7 @@
 /*
  * Jobs and the builder, src/core/job.c and builder.c: families J and
- * T of tests/MATRIX.md. The children are sh -c scripts.
+ * T of tests/MATRIX.md. The children are sh -c scripts, and calls
+ * forked.
  */
 
 #include <sys/types.h>
@@ -117,6 +118,62 @@ call_notes(struct sh_job *j, void *arg, struct sh_err *e)
 	(void) arg;
 	(void) e;
 	called++;
+	return (0);
+}
+
+/*
+ * Forked calls: one that writes, a while later, what it set; one that
+ * fails; one that sends itself SIGTERM; one that leaves a child of its
+ * own, its pid written, and waits.
+ */
+static int forked;
+
+static int
+fork_writes(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	(void) j;
+	(void) arg;
+	(void) e;
+	forked = 1;
+	(void) usleep(300000);
+	(void) dprintf(1, "forked %d\n", forked);
+	return (0);
+}
+
+static int
+fork_fails(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	(void) j;
+	(void) arg;
+	sh_errf(e, "zrun/foundations/f: no such filesystem");
+	return (-1);
+}
+
+static int
+fork_term(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	(void) j;
+	(void) arg;
+	(void) e;
+	(void) kill(getpid(), SIGTERM);
+	(void) sleep(5);
+	return (0);
+}
+
+static int
+fork_leaves(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	pid_t pid;
+
+	(void) j;
+	(void) arg;
+	(void) e;
+	if ((pid = fork()) == 0) {
+		(void) sleep(30);
+		_exit(0);
+	}
+	(void) dprintf(1, "%ld\n", (long)pid);
+	(void) sleep(30);
 	return (0);
 }
 
@@ -270,6 +327,57 @@ main(void)
 	fresh();
 	child("cat", "cat");
 	CHECK(strcmp(run(), "(well)") == 0);
+
+	/*
+	 * J13: a forked call: logged as a child is, the daemon not held
+	 * while it runs, what it sets its copy's; then the next step
+	 */
+	fresh();
+	sh_job_fork(&job, "f", fork_writes, NULL);
+	child("after", "echo after");
+	CHECK((kq = kqueue()) >= 0);
+	sh_job_run(&job, kq);
+	CHECK(ended == 0 && strcmp(sh_job_step(&job), "f") == 0);
+	wait_end(kq);
+	(void) close(kq);
+	CHECK(strcmp(why, "(well)") == 0 && forked == 0);
+	CHECK(logged("# f\nforked 1\n# after\nafter\n"));
+
+	/* J14: a forked call failing: its words the why, and logged */
+	fresh();
+	sh_job_fork(&job, "send", fork_fails, NULL);
+	child("after", "echo after");
+	CHECK(strcmp(run(), "send: zrun/foundations/f: no such filesystem") ==
+	    0);
+	CHECK(logged("# send\nzrun/foundations/f: no such filesystem\n") &&
+	    !logged("after"));
+
+	/* J15: the daemon's ignored SIGTERM the forked call's own again */
+	(void) signal(SIGTERM, SIG_IGN);
+	fresh();
+	sh_job_fork(&job, "term", fork_term, NULL);
+	CHECK(strcmp(run(), "term: killed by signal 15") == 0);
+	(void) signal(SIGTERM, SIG_DFL);
+
+	/* J16: stopped: the forked call and the child it made killed */
+	fresh();
+	sh_job_fork(&job, "hold", fork_leaves, NULL);
+	CHECK((kq = kqueue()) >= 0);
+	sh_job_run(&job, kq);
+	while (lines() < 2) {
+		struct timespec ts = { 20, 0 };
+		struct kevent ev;
+
+		CHECK(kevent(kq, NULL, 0, &ev, 1, &ts) == 1);
+		sh_job_event(ev.udata, kq, &ev);
+	}
+	{
+		pid_t f = job.j_pid, g = logged_pid();
+
+		sh_job_stop(&job);
+		CHECK(ended == 0 && gone(f) && gone(g));
+	}
+	(void) close(kq);
 
 	/* T1, T2, T3: one turn at a time, in the order asked */
 	sh_builder_init(&b);
