@@ -585,15 +585,19 @@ static void
 roll_done(struct sh_roll *r)
 {
 	struct sh_builder *b = r->r_env->re_builder;
+	struct sh_foundation *f = r->r_f;
 
-	r->r_f->f_roll = NULL;
+	/* rolling until here, so that no roll is asked under this one */
+	f->f_state = f->f_stall != NULL ? SH_F_STALLED : SH_F_IDLE;
+	f->f_roll = NULL;
 	roll_free(r);
 	sh_builder_give(b);
 }
 
 /*
  * F put back where its newest version left it, a first roll's undone,
- * and stalled at WHY where it has a version to stall at.
+ * and its stall recorded, WHY, where it has a version to stall at; it
+ * shows stalled once the roll is over (roll_done).
  */
 static void
 roll_back(struct sh_roll *r, const char *why)
@@ -604,13 +608,10 @@ roll_back(struct sh_roll *r, const char *why)
 	if ((!r->r_first || r->r_made) &&
 	    sh_foundation_idle(env->re_z, f->f_ds, env->re_err) != 0)
 		sh_errf(env->re_err, "foundation %s: not put back", f->f_name);
-	if (r->r_first) {
-		f->f_state = SH_F_IDLE;
+	if (r->r_first)
 		return;
-	}
 	(void) sh_zfs_set(env->re_z, f->f_ds, "shtetl:stall", why,
 	    env->re_err);
-	f->f_state = SH_F_STALLED;
 	f->f_stall = sh_strdup(why);
 }
 
@@ -634,7 +635,6 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 		free(f->f_newest);
 		f->f_newest = r->r_snap;
 		r->r_snap = NULL;
-		f->f_state = SH_F_IDLE;
 		roll_done(r);
 		return;
 	}

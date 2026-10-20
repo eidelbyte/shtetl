@@ -391,6 +391,12 @@ main(void)
 	f = ask("r1");
 	pump_to(f, "src: fetch");
 	CHECK(zfake_put(ds("r1"), "junk") == 0);
+	/* F19: while zbuild is reset after it: rolling still, refused */
+	while (f->f_roll != NULL && f->f_stall == NULL)
+		one();
+	CHECK(f->f_roll != NULL && f->f_state == SH_F_ROLLING &&
+	    sh_roll_ask(f, &env, config, build, 0, &c.c_err) == -1 &&
+	    has("r1: rolling"));
 	pump(f);
 	CHECK(has("foundation r1: patches/conflict: c5.patch: exited 1"));
 	CHECK(f->f_state == SH_F_STALLED &&

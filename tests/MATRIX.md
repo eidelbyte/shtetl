@@ -567,6 +567,7 @@ the commit not the src's (F1).
 | F16 | shtetl roll over the socket: a bad name, a space missing, no argument | "NAME: invalid name: why", "no build space", the usage | tests/check_daemon.c |
 | F17 | the rc script starting the daemon, git found under service(8) | a roll's git runs | deferred: rc and a real roll are the box's; m3-box |
 | F18 | foundation.conf schg, a roll over libzfs | as F1, on ZFS | deferred: m3-box |
+| F19 | asked while zbuild is reset after a failure | rolling still: "F: rolling"; stalled only once the reset is over | tests/check_roll.c |
 
 ## Family K: the build and the install (m3-install)
 
