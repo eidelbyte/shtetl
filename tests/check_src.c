@@ -45,7 +45,7 @@ fresh(void)
 	logbuf = NULL;
 	CHECK((logf = open_memstream(&logbuf, &loglen)) != NULL);
 	cap_reset(&c);
-	sh_job_init(&job, "f", logf, &c.c_err, end, NULL);
+	sh_job_init(&job, logf, end, NULL);
 	ended = 0;
 }
 

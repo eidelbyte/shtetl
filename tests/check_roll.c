@@ -32,9 +32,7 @@ static struct sh_rollenv env;
 static struct sh_foundation **fs;
 static size_t nfs;
 static char config[1100], build[1100], resolv[1100];
-static char *logbuf;
-static size_t loglen;
-static FILE *logf;
+static char logdir[1100];
 static char *statusbuf;
 
 /* One event of the roll's kqueue handled, in 60 s at most. */
@@ -267,7 +265,8 @@ main(void)
 	CHECK(sh_zfs_create(z, "lake/l", &lake, 1, &c.c_err) == 0);
 	CHECK(sh_zfs_create(z, FROOT, &off, 1, &c.c_err) == 0);
 	CHECK(sh_zfs_create(z, OROOT, &off, 1, &c.c_err) == 0);
-	CHECK((logf = open_memstream(&logbuf, &loglen)) != NULL);
+	(void) snprintf(logdir, sizeof (logdir), "%s", scratch_path("logs"));
+	CHECK(mkdir(logdir, 0755) == 0);
 	sh_builder_init(&b);
 	env.re_z = z;
 	env.re_builder = &b;
@@ -276,7 +275,7 @@ main(void)
 	    scratch_path("resolv.conf"));
 	env.re_resolv = resolv;
 	CHECK((env.re_kq = kqueue()) >= 0);
-	env.re_log = logf;
+	env.re_logdir = logdir;
 	env.re_err = &c.c_err;
 	env.re_flags = UF_NODUMP;
 	CHECK(sh_foundations_start(z, FROOT, &fs, &nfs, &c.c_err) == 0);
@@ -288,7 +287,18 @@ main(void)
 	    sh_roll_step(f->f_roll));
 	CHECK(strcmp(status(), want) == 0 && strchr(want, ':') != NULL);
 	pump(f);
-	CHECK(f->f_state == SH_F_IDLE && f->f_newest != NULL && !has("r1"));
+	CHECK(f->f_state == SH_F_IDLE && f->f_newest != NULL);
+	/*
+	 * L1, L5: the log, a line of each step's start and the version at
+	 * the end; syslog hears nothing of a roll that ends well
+	 */
+	(void) snprintf(want, sizeof (want), "# version %s\n", f->f_newest);
+	CHECK((text = slurp("logs/r1.log")) != NULL &&
+	    strncmp(text, "# other: clone\n", 15) == 0 &&
+	    strstr(text, "# src: fetch\n") != NULL &&
+	    strstr(text, "# build\n") != NULL &&
+	    strcmp(text + strlen(text) - strlen(want), want) == 0);
+	CHECK(strcmp(cap_text(&c), "") == 0);
 	CHECK(strncmp(f->f_newest, "15.1-releng-", 12) == 0 &&
 	    strcmp(f->f_newest + strlen(f->f_newest) - 7, "-create") == 0);
 	(void) snprintf(first, sizeof (first), "%s", f->f_newest);
@@ -373,6 +383,10 @@ main(void)
 	    "make -C %s installworld DESTDIR=%s INSTALL_CMD=install -C%s",
 	    src, all, src, head, all, src, head, all);
 	CHECK(strncmp(slurp("fake.log"), want, strlen(want)) == 0);
+	/* L2: the log made anew: the first roll's version not in it */
+	(void) snprintf(want, sizeof (want), "# version %s\n", first);
+	CHECK((text = slurp("logs/r1.log")) != NULL &&
+	    strstr(text, want) == NULL && strstr(text, "# version ") != NULL);
 	CHECK(!there("lake/foundations/r1/sbin/init.bak") &&
 	    !there("lake/foundations/r1/libexec/ld-elf.so.1.old") &&
 	    !there("lake/foundations/r1/boot/loader.old") &&
@@ -394,11 +408,18 @@ main(void)
 	/* F19: while zbuild is reset after it: rolling still, refused */
 	while (f->f_roll != NULL && f->f_stall == NULL)
 		one();
+	/* L3: syslog hears the failure, one line, and nothing else */
+	CHECK(strcmp(cap_text(&c), "foundation r1: patches/conflict: "
+	    "c5.patch: exited 1\n") == 0);
 	CHECK(f->f_roll != NULL && f->f_state == SH_F_ROLLING &&
 	    sh_roll_ask(f, &env, config, build, 0, &c.c_err) == -1 &&
 	    has("r1: rolling"));
 	pump(f);
 	CHECK(has("foundation r1: patches/conflict: c5.patch: exited 1"));
+	/* L3: the log says why, and zbuild's reset after it */
+	CHECK((text = slurp("logs/r1.log")) != NULL &&
+	    strstr(text, "# failed: patches/conflict: c5.patch: exited 1\n"
+	    "# src: reset\n") != NULL);
 	CHECK(f->f_state == SH_F_STALLED &&
 	    is(zfake_local(ds("r1"), "shtetl:stall"),
 	    "patches/conflict: c5.patch: exited 1"));
@@ -438,7 +459,8 @@ main(void)
 	f = roll("r1");
 	CHECK(unsetenv("FAKE_FAIL") == 0);
 	CHECK(has("foundation r1: installworld: exited 2") &&
-	    has("r1: make: installworld failed"));
+	    (text = slurp("logs/r1.log")) != NULL &&
+	    strstr(text, "make: installworld failed\n") != NULL);
 	CHECK(f->f_state == SH_F_STALLED &&
 	    is(f->f_stall, "installworld: exited 2"));
 	f = roll("r1");
@@ -627,15 +649,23 @@ main(void)
 	f = ask("f6");
 	pump_to(f, "src: fetch");
 	restart();
-	CHECK(has("foundation f6: a first build undone"));
+	/* no stall: nothing said */
+	CHECK(!has("f6"));
 	CHECK(strstr(status(), "f6") == NULL);
+
+	/* L4: a log that cannot be made: the ask refused, nothing changed */
+	f = sh_foundation_find(&fs, &nfs, FROOT, "r1");
+	env.re_logdir = scratch_path("nologs");
+	cap_reset(&c);
+	CHECK(sh_roll_ask(f, &env, config, build, 0, &c.c_err) == -1 &&
+	    has("nologs/r1.log: No such file or directory") &&
+	    f->f_state == SH_F_IDLE && f->f_roll == NULL);
+	env.re_logdir = logdir;
 
 	restart();
 	sh_foundations_free(fs, nfs);
 	(void) close(env.re_kq);
 	sh_zfs_close(z);
-	(void) fclose(logf);
-	free(logbuf);
 	free(statusbuf);
 	cap_close(&c);
 	scratch_clean();

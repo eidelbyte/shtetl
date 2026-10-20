@@ -14,7 +14,6 @@
 #include "core/builder.h"
 #include "core/job.h"
 
-static struct cap c;		/* the failed child's last lines */
 static char *logbuf;
 static size_t loglen;
 static FILE *logf;
@@ -31,7 +30,7 @@ end(struct sh_job *j, const char *w, void *arg)
 	(void) snprintf(why, sizeof (why), "%s", w != NULL ? w : "(well)");
 }
 
-/* A fresh job named t, its log and its sink empty. */
+/* A fresh job, its log empty. */
 static void
 fresh(void)
 {
@@ -40,8 +39,7 @@ fresh(void)
 	free(logbuf);
 	logbuf = NULL;
 	CHECK((logf = open_memstream(&logbuf, &loglen)) != NULL);
-	cap_reset(&c);
-	sh_job_init(&job, "t", logf, &c.c_err, end, NULL);
+	sh_job_init(&job, logf, end, NULL);
 	ended = 0;
 }
 
@@ -136,12 +134,25 @@ gone(pid_t pid)
 	return (0);
 }
 
-/* The number a line "t: N" of the log holds. */
+/* The lines of the log so far. */
+static int
+lines(void)
+{
+	const char *p;
+	int n = 0;
+
+	(void) fflush(logf);
+	for (p = logbuf; p != NULL && (p = strchr(p, '\n')) != NULL; p++)
+		n++;
+	return (n);
+}
+
+/* The number the line after the step's own, "# STEP", holds. */
 static pid_t
 logged_pid(void)
 {
 	(void) fflush(logf);
-	return ((pid_t)strtol(logbuf + 3, NULL, 10));
+	return ((pid_t)strtol(strchr(logbuf, '\n') + 1, NULL, 10));
 }
 
 static int order[4], norder;
@@ -159,32 +170,21 @@ main(void)
 	char big[5000];
 	int kq;
 
-	cap_open(&c);
-
-	/* J1: children in order, each line logged with the job's name */
+	/* J1: children in order, each line logged after its step's own */
 	fresh();
 	child("a", "echo one; echo two");
 	child("b", "echo three");
 	CHECK(strcmp(run(), "(well)") == 0);
-	CHECK(strcmp(logbuf, "t: one\nt: two\nt: three\n") == 0);
+	CHECK(strcmp(logbuf, "# a\none\ntwo\n# b\nthree\n") == 0);
 	CHECK(sh_job_step(&job) == NULL);
 
-	/* J2: a child that fails ends it; its last lines told again */
+	/* J2: a child that fails ends it, its lines logged, no step after */
 	fresh();
 	child("a", "echo a");
 	child("b", "echo b1; echo b2 >&2; exit 3");
 	child("c", "echo c");
 	CHECK(strcmp(run(), "b: exited 3") == 0);
-	CHECK(logged("t: b1\n") && logged("t: b2\n") && !logged("t: c"));
-	CHECK(strcmp(cap_text(&c), "t: b1\nt: b2\n") == 0);
-
-	/* J3: only the last eight lines told again */
-	fresh();
-	child("many", "i=1; while [ $i -le 20 ]; do echo l$i; i=$((i+1)); "
-	    "done; exit 1");
-	CHECK(strcmp(run(), "many: exited 1") == 0);
-	CHECK(strncmp(cap_text(&c), "t: l13\n", 7) == 0 &&
-	    cap_has(&c, "t: l20\n") && !cap_has(&c, "t: l12\n"));
+	CHECK(logged("b1\n") && logged("b2\n") && !logged("# c"));
 
 	/* J4: calls, one adding a step, one failing with its words */
 	fresh();
@@ -192,7 +192,7 @@ main(void)
 	sh_job_call(&job, "adds", call_adds, NULL);
 	sh_job_call(&job, "notes", call_notes, NULL);
 	CHECK(strcmp(run(), "(well)") == 0);
-	CHECK(called == 1 && logged("t: added\n"));
+	CHECK(called == 1 && logged("# added\nadded\n"));
 	fresh();
 	sh_job_call(&job, "inject", call_fails, NULL);
 	child("after", "echo after");
@@ -212,13 +212,13 @@ main(void)
 		sh_job_child(&job, "x", argv);
 	}
 	CHECK(strcmp(run(), "x: exited 127") == 0);
-	CHECK(logged("t: /nonexistent/shtetl-x: No such file or directory"));
+	CHECK(logged("/nonexistent/shtetl-x: No such file or directory"));
 
 	/* J7: a last line with no newline told all the same */
 	fresh();
 	child("n", "printf 'no newline'");
 	CHECK(strcmp(run(), "(well)") == 0);
-	CHECK(strcmp(logbuf, "t: no newline\n") == 0);
+	CHECK(strcmp(logbuf, "# n\nno newline\n") == 0);
 
 	/* J8: a line longer than 4096 told in pieces */
 	fresh();
@@ -228,15 +228,16 @@ main(void)
 	(void) memset(big, 'x', 4096);
 	big[4096] = '\n';
 	big[4097] = '\0';
-	CHECK(strncmp(logbuf + 3, big, 4097) == 0 &&
-	    strlen(logbuf) == 3 + 4097 + 3 + 904 + 1);
+	CHECK(strncmp(logbuf, "# long\n", 7) == 0 &&
+	    strncmp(logbuf + 7, big, 4097) == 0 &&
+	    strlen(logbuf) == 7 + 4097 + 904 + 1);
 
 	/* J9: stopped: the child and its group killed, reaped, no end */
 	fresh();
 	child("sleep", "sleep 30 & echo $!; wait");
 	CHECK((kq = kqueue()) >= 0);
 	sh_job_run(&job, kq);
-	while (!logged("\n")) {
+	while (lines() < 2) {
 		struct timespec ts = { 20, 0 };
 		struct kevent ev;
 
@@ -289,6 +290,5 @@ main(void)
 
 	(void) fclose(logf);
 	free(logbuf);
-	cap_close(&c);
 	return (0);
 }

@@ -577,7 +577,8 @@
     ],
     "provides": "A roll's output in a file of its foundation; syslog one error per stall.",
     "estimated_size": "small",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-10-20: built; L1-L6 (check_roll, check_daemon), J3 retired, A3 nothing said, four mutations caught, gate, xcheck. Owed: build.sh R2/R10, run.sh A3. Worklog issue-docs/m3-logs.md."
   },
   "m4-zfs": {
     "description": "Layer calls (plan 8.1, probe P1, P5): clone with properties; promote; a snapshot's guid and createtxg; send from a snapshot whole, incremental, or as a clone stream received with -o origin= (lzc_send into lzc_receive_resumable in a forked child, as main's sh_zfs_send forked lzc_send); the receive_resume_token of a filesystem, decoded to an nvlist with zfs_send_resume_token_to_nvlist, and a send resumed from it (lzc_send_resume); a token taken away (receive -A). The fake models a cut stream and its token. Matrix family Z cells for each, on the box and the fake. Verify: make check; tests/box/run.sh.",

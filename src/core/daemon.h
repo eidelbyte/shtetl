@@ -15,6 +15,7 @@
 
 #define	SH_PIDFILE	"/var/run/shtetl.pid"
 #define	SH_SOCKET	"/var/run/shtetl.sock"
+#define	SH_LOGDIR	"/var/log/shtetl"	/* a roll's log, F.log */
 
 /*
  * The daemon's lock and socket. LOCK, a pidfile, is held with flock
@@ -28,12 +29,13 @@ int sh_daemon_listen(const char *lock, const char *sock, int *lk, int *sk,
 
 /*
  * The daemon, on SK, listening at SOCK: the spaces found and their
- * skeleton made, then the loop until SIGTERM or SIGINT, every roll
- * stopped, and the socket removed. What its children write goes to
- * LOG, what it has to say to E. -1 when it never started.
+ * skeleton made, the directory LOGDIR made for the rolls' logs, then
+ * the loop until SIGTERM or SIGINT, every roll stopped, and the socket
+ * removed. What it has to say goes to E: why it could not start, and
+ * a line for each roll that fails. -1 when it never started.
  */
-int sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, FILE *log,
-    struct sh_err *e);
+int sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
+    const char *logdir, struct sh_err *e);
 
 /*
  * The command: its ARGC arguments sent to the daemon at SOCK, and the

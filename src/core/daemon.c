@@ -382,8 +382,8 @@ fail:
 }
 
 int
-sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, FILE *log,
-    struct sh_err *e)
+sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
+    const char *logdir, struct sh_err *e)
 {
 	struct daemon d;
 	struct kevent ev[3];
@@ -411,6 +411,10 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, FILE *log,
 		    &d.d_nfound, e) != 0)
 			goto out;
 	}
+	if (mkdir(logdir, 0755) != 0 && errno != EEXIST) {
+		sh_errf(e, "%s: %s", logdir, strerror(errno));
+		goto out;
+	}
 	if ((d.d_kq = kqueue()) < 0) {
 		sh_errf(e, "kqueue: %s", strerror(errno));
 		goto out;
@@ -420,7 +424,7 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z, FILE *log,
 	d.d_env.re_obj = d.d_oroot;
 	d.d_env.re_resolv = "/etc/resolv.conf";
 	d.d_env.re_kq = d.d_kq;
-	d.d_env.re_log = log;
+	d.d_env.re_logdir = logdir;
 	d.d_env.re_err = e;
 	d.d_env.re_flags = SF_IMMUTABLE;
 	/* a signal kqueue watches is recorded even while it is ignored */

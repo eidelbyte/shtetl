@@ -104,8 +104,8 @@ start(struct sh_zfs *z, struct sh_foundation *f, struct sh_err *e)
 	sh_err_init(&fe, fp, "");
 	if ((r = sh_zfs_snapshots(z, f->f_ds, last, newest, &fe)) == 0)
 		r = sh_foundation_idle(z, f->f_ds, &fe);
+	/* a first roll that never finished: no stall, so nothing said */
 	if (r == 0 && newest[0] == '\0') {
-		sh_errf(e, "foundation %s: a first build undone", f->f_name);
 		free(f->f_name);
 		f->f_name = NULL;
 	} else if (r == 0 && (r = sh_zfs_user(z, f->f_ds, "shtetl:stall",

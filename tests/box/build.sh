@@ -202,6 +202,9 @@ rolls() {
 	cell R2 "shtetl:commit the checkout's" \
 	    "$(prop shtetl:commit "$_v")" "$(git -C "$SRCD" rev-parse HEAD)"
 	cell R2 "usr a placeholder" "$(prop canmount $FD/usr)" off
+	cell R2 "its log: the build's step, the version" \
+	    "$(grep -c -e '^# build$' -e "^# version ${_v#*@}\$" \
+	    "/var/log/shtetl/$F.log")" 2
 	cell R3 "a world and a kernel (K19)" \
 	    "$(inhead 'ls bin/sh boot/kernel/kernel' 2>&1 | tr '\n' ' ')" \
 	    "bin/sh boot/kernel/kernel "
@@ -284,6 +287,12 @@ rolls() {
 	# marker says what the roll wrote is gone
 	cell R9 "what the roll wrote gone" \
 	    "$(inhead 'ls root/R9' 2>/dev/null)" ""
+
+	# R10: of all the rolls, syslog heard R6's stall and nothing else
+	cell R10 "syslog: one line, the stall" \
+	    "$(tail -n "+$LOGFROM" /var/log/daemon.log | grep 'shtetl\[' |
+	    sed 's/.*shtetl\[[0-9]*\]: //')" \
+	    "foundation $F: patches/local: 2-b.patch: exited 1"
 }
 
 mkdir -p "$BD/results" || exit 2
@@ -305,11 +314,13 @@ trap 'pool_down; exit 130' INT TERM
 	fi
 	pool_down
 	echo
-	# the daemon's own lines: what children write is a build's whole
-	# output (build run 1: 109,000 lines)
-	echo "syslog, daemon.log from the run's start, the daemon's own:"
-	tail -n "+$LOGFROM" /var/log/daemon.log | grep 'shtetl\[' |
-	    grep -e ': foundation ' -e ": $F: version "
+	# a roll's own output is its log's (m3-logs); syslog has a line
+	# for each roll that fails
+	echo "syslog, daemon.log from the run's start:"
+	tail -n "+$LOGFROM" /var/log/daemon.log | grep 'shtetl\['
+	echo
+	echo "the last roll's log, /var/log/shtetl/$F.log, its step lines:"
+	grep '^# ' "/var/log/shtetl/$F.log"
 } >"$OUT" 2>&1
 ok=$(grep -c '^ok ' "$OUT")
 failed=$(grep -c '^FAIL ' "$OUT")

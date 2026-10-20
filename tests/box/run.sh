@@ -97,8 +97,8 @@ foundation stalled stalled build: make exited 2"
 	x zfs unmount $F/generic
 	cell A3 "first, with no version, gone" \
 	    "$(zfs list -H -o name $F/first 2>/dev/null)" ""
-	cell A3 "and logged" "$(grep -c 'foundation first: a first build undone' \
-	    "$OUT")" 1
+	cell A3 "and nothing said: no stall" "$(grep -c 'foundation first' \
+	    "$OUT")" 0
 	kill -TERM $_d
 	wait $_d
 	cell D10 "SIGTERM: exit 0" "$?" 0

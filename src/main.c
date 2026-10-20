@@ -6,9 +6,7 @@
  */
 
 #include <signal.h>
-#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
 
@@ -16,28 +14,17 @@
 #include "core/err.h"
 #include "core/zfs.h"
 
-/* A line at a time to syslog, at the priority the cookie holds. */
+/*
+ * The daemon's reports, a line at a time, to syslog: why it could not
+ * start, and a line for each roll that fails (ruled 2026-10-20); what
+ * a roll's programs write is in its log (SH_LOGDIR).
+ */
 static int
 logged(void *cookie, const char *p, int n)
 {
-	syslog((int)(intptr_t)cookie, "%.*s",
-	    n > 0 && p[n - 1] == '\n' ? n - 1 : n, p);
+	(void) cookie;
+	syslog(LOG_ERR, "%.*s", n > 0 && p[n - 1] == '\n' ? n - 1 : n, p);
 	return (n);
-}
-
-/* A stream to syslog at PRI, a line at a time. */
-static FILE *
-logstream(int pri)
-{
-	FILE *f;
-
-	if ((f = funopen((void *)(intptr_t)pri, NULL, logged, NULL,
-	    NULL)) == NULL) {
-		syslog(LOG_ERR, "out of memory");
-		exit(1);
-	}
-	(void) setvbuf(f, NULL, _IOLBF, 0);
-	return (f);
 }
 
 int
@@ -53,12 +40,15 @@ main(int argc, char **argv)
 		return (sh_command(SH_SOCKET, argc - 1, argv + 1, stdout,
 		    stderr));
 	openlog("shtetl", LOG_PID | LOG_PERROR, LOG_DAEMON);
-	/* what children write is info; what goes wrong, an error */
-	log = logstream(LOG_INFO);
-	sh_err_init(&e, logstream(LOG_ERR), "");
+	if ((log = funopen(NULL, NULL, logged, NULL, NULL)) == NULL) {
+		syslog(LOG_ERR, "out of memory");
+		return (1);
+	}
+	(void) setvbuf(log, NULL, _IOLBF, 0);
+	sh_err_init(&e, log, "");
 	if (sh_daemon_listen(SH_PIDFILE, SH_SOCKET, &lk, &sk, &e) != 0 ||
 	    sh_zfs_open(&z, &e) != 0 ||
-	    sh_daemon_run(sk, SH_SOCKET, z, log, &e) != 0)
+	    sh_daemon_run(sk, SH_SOCKET, z, SH_LOGDIR, &e) != 0)
 		return (1);
 	return (0);
 }

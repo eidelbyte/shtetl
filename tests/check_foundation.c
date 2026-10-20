@@ -151,9 +151,9 @@ main(void)
 	mount("first");
 	mount("first/usr");
 	CHECK(zfake_put(at("first"), "a") == 0);
-	CHECK(start() == 0 && n == 0);
+	/* no stall: nothing said (m3-logs) */
+	CHECK(start() == 0 && n == 0 && strcmp(cap_text(&c), "") == 0);
 	CHECK(!there("first") && !there("first/usr"));
-	CHECK(cap_has(&c, "foundation first: a first build undone"));
 
 	/* A4: a version on the head, a child with none: the child gone */
 	fresh();

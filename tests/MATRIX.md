@@ -208,7 +208,7 @@ step's.
 |------|---------------------|----------|-------------|
 | A1 | versions, nothing written | idle at the newest; "foundation F idle V"; nothing said | tests/check_foundation.c; box: tests/box/run.sh |
 | A2 | written since the newest, mounted | the writes undone, unmounted | tests/check_foundation.c; box: tests/box/run.sh |
-| A3 | no version at all, mounted, a child | destroyed, children first; no actor; "foundation F: a first build undone" said | tests/check_foundation.c; box: tests/box/run.sh |
+| A3 | no version at all, mounted, a child | destroyed, children first; no actor; nothing said, no stall (m3-logs) | tests/check_foundation.c; box: tests/box/run.sh |
 | A4 | a version on the head, a child with none | the child destroyed, the head idle | tests/check_foundation.c |
 | A5 | the head mounted, a child mounted inside it, written | the child unmounted first (busy otherwise), the writes undone | tests/check_foundation.c |
 | A6 | shtetl:stall set | stalled with its text, its newest kept; "foundation F stalled TEXT" | tests/check_foundation.c; box: tests/box/run.sh |
@@ -461,9 +461,9 @@ runs.
 
 | cell | what | expected | disposition |
 |------|------|----------|-------------|
-| J1 | children in order, ending well | each line logged "NAME: line", in order; the end with no why | tests/check_job.c |
-| J2 | a child exiting 3 | "STEP: exited 3"; no later step; its lines told again to E, not an earlier child's | tests/check_job.c |
-| J3 | a failing child of 20 lines | only its last 8 told again | tests/check_job.c |
+| J1 | children in order, ending well | a line "# STEP" as each begins, then each line it writes, in order; the end with no why | tests/check_job.c |
+| J2 | a child exiting 3 | "STEP: exited 3"; its lines logged; no later step | tests/check_job.c |
+| J3 | a failing child of 20 lines | retired (m3-logs): nothing is told again; a failing child's lines are in its log | - |
 | J4 | calls: one adding a child, one failing | the added child runs; "STEP: its words", no later step | tests/check_job.c |
 | J5 | a child killed by a signal | "STEP: killed by signal 9" | tests/check_job.c |
 | J6 | a program not there | "STEP: exited 127", the reason in the log | tests/check_job.c |
@@ -632,7 +632,7 @@ kernconf's lines or buildopts left out.
 | K12 | the configs | the kernel config: include of the checkout's GENERIC for this machine, ident in capitals, kernconf's lines; src.conf: buildopts | tests/check_roll.c |
 | K13 | kernconf a path | include of the file of zconfig in the recipe's place | tests/check_roll.c |
 | K14 | make_jobs | -jN from the site | tests/check_roll.c |
-| K15 | a make failing | "installworld: exited 2", its last lines told; rolled back and stalled | tests/check_roll.c |
+| K15 | a make failing | "installworld: exited 2"; make's words in the foundation's log; rolled back and stalled | tests/check_roll.c |
 | K16 | stopped in the build; started again | the head at its newest version | tests/check_roll.c |
 | K17 | the obj cache | made on a first roll with the site's properties, mounted; the scratch directory gone after | tests/check_roll.c |
 | K18 | an update's kernel | synced into the head: the kernel replaced, a.ko kept, b.ko and the debug files gone, c.ko new | tests/check_roll.c |
@@ -696,11 +696,27 @@ to the box are these.
 | cell | what | expected | disposition |
 |------|------|----------|-------------|
 | R1 | shtetl roll box, a first roll, the daemon rc's (F17, GS10) | idle at <ver>-<date>-create | tests/box/build.sh |
-| R2 | the version | every dataset kind create; shtetl:commit zbuild's HEAD; usr a placeholder | tests/box/build.sh |
+| R2 | the version | every dataset kind create; shtetl:commit zbuild's HEAD; usr a placeholder; its log, /var/log/shtetl/box.log, the build's step line and the version's | tests/box/build.sh |
 | R3 | the head (K19, X9) | bin/sh and boot/kernel/kernel; the package in usr/local; the command's motd; no resolv.conf left | tests/box/build.sh |
 | R4 | foundation.conf on ZFS (F18) | schg, 0444; the head unmounted | tests/box/build.sh |
 | R5 | an update | idle at -update, kind update | tests/box/build.sh |
 | R6 | two patches of one line, a three-way conflict | stalled "patches/local: 2-b.patch: exited 1", shtetl:stall, the newest version unchanged, zbuild clean | tests/box/build.sh |
 | R7 | the patch taken out, rolled again | the stall cleared, idle at -update, the first patch in the checkout | tests/box/build.sh |
 | R8 | shtetl pkg box (U7) | idle at -pkg, kind pkg, the version's commit | tests/box/build.sh |
-| R9 | the daemon stopped in a command, started again (X8, K16, F10) | devfs left on the head, then gone; idle at the newest, no stall; written 0; unmounted | tests/box/build.sh |
+| R9 | the daemon stopped in a command, started again (X8, K16, F10) | devfs left on the head, a marker the roll wrote in it, then devfs and the marker gone; idle at the newest, no stall; unmounted | tests/box/build.sh |
+| R10 | every roll of the run | syslog one line, R6's stall, and nothing else (m3-logs) | tests/box/build.sh |
+
+## Family L: where a roll's output goes (m3-logs)
+
+Ruled 2026-10-20 (plan 18): a roll's output in its foundation's log,
+syslog one line for each roll that fails.
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| L1 | a roll ending well | its log, F.log: a line "# STEP" as each program begins, their output, "# version SNAP" last | tests/check_roll.c |
+| L2 | a second roll | the log made anew: the first roll's lines gone | tests/check_roll.c |
+| L3 | a roll failing | syslog one line, "foundation F: STEP: why", and nothing else; the log "# failed: why", then zbuild's reset | tests/check_roll.c |
+| L4 | a log that cannot be made | the ask refused, "PATH: why"; the foundation as it was | tests/check_roll.c |
+| L5 | a roll ending well | syslog nothing | tests/check_roll.c |
+| L6 | the daemon's start | the log directory made | tests/check_daemon.c |
+| L7 | the box: every roll of a run, the log of the last | box: tests/box/build.sh R2, R10 | box |

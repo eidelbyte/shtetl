@@ -58,15 +58,12 @@ step_drop(struct sh_job *j)
 }
 
 void
-sh_job_init(struct sh_job *j, const char *name, FILE *log,
-    struct sh_err *e, void (*end)(struct sh_job *, const char *, void *),
-    void *arg)
+sh_job_init(struct sh_job *j, FILE *log,
+    void (*end)(struct sh_job *, const char *, void *), void *arg)
 {
 	(void) memset(j, 0, sizeof (*j));
 	j->j_ev = SH_EV_JOB;
-	j->j_name = name;
 	j->j_log = log;
-	j->j_err = e;
 	j->j_end = end;
 	j->j_arg = arg;
 	j->j_last = &j->j_steps;
@@ -102,16 +99,11 @@ sh_job_step(const struct sh_job *j)
 	return (j->j_steps != NULL ? j->j_steps->sp_name : NULL);
 }
 
-/* A line the child wrote: logged, and kept among the last. */
+/* A line the child wrote, logged. */
 static void
 job_line(struct sh_job *j, const char *p, size_t len)
 {
-	char **slot = &j->j_tail[j->j_ntail++ % SH_JOB_TAIL];
-
-	(void) fprintf(j->j_log, "%s: %.*s\n", j->j_name, (int)len, p);
-	free(*slot);
-	*slot = sh_calloc(1, len + 1);
-	(void) memcpy(*slot, p, len);
+	(void) fprintf(j->j_log, "%.*s\n", (int)len, p);
 }
 
 /* What the child has written so far: each line told as it ends. */
@@ -145,26 +137,12 @@ job_read(struct sh_job *j)
 	}
 }
 
-/* The last lines forgotten: a child's are its own. */
-static void
-job_untail(struct sh_job *j)
-{
-	unsigned i;
-
-	for (i = 0; i < SH_JOB_TAIL; i++) {
-		free(j->j_tail[i]);
-		j->j_tail[i] = NULL;
-	}
-	j->j_ntail = 0;
-}
-
 /* Everything J holds let go, and END told WHY. */
 static void
 job_end(struct sh_job *j, const char *why)
 {
 	while (j->j_steps != NULL)
 		step_drop(j);
-	job_untail(j);
 	free(j->j_line.b_data);
 	(void) memset(&j->j_line, 0, sizeof (j->j_line));
 	j->j_end(j, why, j->j_arg);
@@ -184,7 +162,7 @@ job_spawn(struct sh_job *j, int kq)
 	int fds[2], null;
 	pid_t pid;
 
-	job_untail(j);
+	(void) fprintf(j->j_log, "# %s\n", j->j_steps->sp_name);
 	if (pipe(fds) != 0)
 		return (-1);
 	if ((pid = fork()) == 0) {
@@ -270,7 +248,6 @@ static void
 job_exited(struct sh_job *j, int kq)
 {
 	char why[1024];
-	unsigned i;
 	int st;
 
 	job_read(j);
@@ -293,10 +270,6 @@ job_exited(struct sh_job *j, int kq)
 	else
 		(void) snprintf(why, sizeof (why), "%s: killed by signal %d",
 		    j->j_steps->sp_name, WTERMSIG(st));
-	i = j->j_ntail > SH_JOB_TAIL ? j->j_ntail - SH_JOB_TAIL : 0;
-	for (; i < j->j_ntail; i++)
-		sh_errf(j->j_err, "%s: %s", j->j_name,
-		    j->j_tail[i % SH_JOB_TAIL]);
 	job_end(j, why);
 }
 
@@ -328,7 +301,6 @@ sh_job_stop(struct sh_job *j)
 	}
 	while (j->j_steps != NULL)
 		step_drop(j);
-	job_untail(j);
 	free(j->j_line.b_data);
-	sh_job_init(j, j->j_name, j->j_log, j->j_err, j->j_end, j->j_arg);
+	sh_job_init(j, j->j_log, j->j_end, j->j_arg);
 }

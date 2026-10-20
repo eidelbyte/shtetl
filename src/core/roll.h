@@ -45,25 +45,31 @@ struct sh_rollenv {
 	int			re_kq;
 	const char		*re_obj;	/* <lake>/foundation-builds */
 	const char		*re_resolv;	/* the host's resolv.conf */
-	FILE			*re_log;	/* each line a child writes */
+	const char		*re_logdir;	/* each foundation's log */
 	struct sh_err		*re_err;	/* a roll's failure, said */
 	unsigned long		re_flags;	/* foundation.conf's: schg */
 };
 
 /*
  * A roll of F asked for, as shtetl roll F asks: refused, "F: rolling",
- * while F rolls or waits to; a stall cleared; then F waits for the
- * builder's turn, and rolls. CONFIG and BUILD are where zconfig and
+ * while F rolls or waits to; its log, F.log in the log directory, made
+ * anew, or the ask refused with why; a stall cleared; then F waits for
+ * the builder's turn, and rolls. CONFIG and BUILD are where zconfig and
  * zbuild are mounted. ENV outlives the roll.
+ *
+ * The log holds what the roll's programs write, a line "# STEP" as
+ * each begins, and what the roll says of itself, "# version SNAP" or
+ * "# failed: why". ENV's error sink, syslog in the daemon, hears one
+ * line of a roll, "foundation F: why", when it fails (ruled
+ * 2026-10-20).
  *
  * With PKG, as shtetl pkg F asks, a pkg roll (plan 6): its newest
  * version's packages upgraded and nothing else, the steps head (F and
  * the datasets that version's foundation.conf gives, mounted), pkg
  * upgrade of the packages it gives in a chroot (commands.h) and
- * snapshot,
- * F@<ver>-<date>-pkg with the version's shtetl:commit; its failure
- * rolls back and stalls, and leaves zbuild alone; CONFIG and BUILD
- * may be NULL. Refused, "F: no version", for F with none.
+ * snapshot, F@<ver>-<date>-pkg with the version's shtetl:commit; its
+ * failure rolls back and stalls, and leaves zbuild alone; CONFIG and
+ * BUILD may be NULL. Refused, "F: no version", for F with none.
  */
 int sh_roll_ask(struct sh_foundation *f, const struct sh_rollenv *env,
     const char *config, const char *build, int pkg, struct sh_err *e);

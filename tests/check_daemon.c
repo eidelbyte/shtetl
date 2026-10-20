@@ -33,7 +33,7 @@ static const char usage[] =
 
 static struct sh_zfs *z;
 static struct cap c;
-static char lockp[1024], sockp[1024];
+static char lockp[1024], sockp[1024], logp[1024];
 static pid_t pid;
 
 /* What the last command wrote. */
@@ -61,7 +61,7 @@ up(void)
 	CHECK((pid = fork()) >= 0);
 	if (pid == 0) {
 		sh_err_init(&e, stderr, "daemon: ");
-		_exit(sh_daemon_run(sk, sockp, z, stderr, &e) != 0);
+		_exit(sh_daemon_run(sk, sockp, z, logp, &e) != 0);
 	}
 	(void) close(sk);
 	(void) close(lk);
@@ -170,6 +170,7 @@ main(void)
 	cap_open(&c);
 	(void) snprintf(lockp, sizeof (lockp), "%s", scratch_path("pid"));
 	(void) snprintf(sockp, sizeof (sockp), "%s", scratch_path("sock"));
+	(void) snprintf(logp, sizeof (logp), "%s", scratch_path("logs"));
 	/* zconfig, the files show reads, where the fake mounts it */
 	(void) scratch_write("zconfig/shtetl.conf", "run { keep = 3; }\n");
 	(void) scratch_write("zconfig/containers/web.conf",
@@ -200,6 +201,8 @@ main(void)
 	/* D1: status, on standard output, nothing on standard error */
 	CHECK(status() == 0);
 	CHECK(strcmp(obuf, want) == 0 && strcmp(ebuf, "") == 0);
+	/* L6: the rolls' log directory made at the start */
+	CHECK(stat(logp, &st) == 0 && S_ISDIR(st.st_mode));
 
 	/* D14, D15: the pidfile holds the pid; the socket is root's alone */
 	(void) snprintf(wantpid, sizeof (wantpid), "%ld\n", (long)getpid());
@@ -362,7 +365,7 @@ main(void)
 	CHECK(sh_zfs_create(z, "fast/lake", &lake, 1, &c.c_err) == 0);
 	cap_reset(&c);
 	CHECK(sh_daemon_listen(lockp, sockp, &lk, &sk, &c.c_err) == 0);
-	CHECK(sh_daemon_run(sk, sockp, z, stderr, &c.c_err) == -1);
+	CHECK(sh_daemon_run(sk, sockp, z, logp, &c.c_err) == -1);
 	CHECK(cap_has(&c, "two lake roots: fast/lake and tank/lake"));
 	CHECK(stat(sockp, &st) != 0);
 	(void) close(sk);

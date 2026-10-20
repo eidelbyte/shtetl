@@ -54,6 +54,8 @@ struct sh_roll {
 	int			r_first;	/* F had no version: a create */
 	int			r_made;		/* F made by this roll */
 	int			r_reset;	/* zbuild's reset under way */
+	FILE			*r_log;		/* F.log, made anew */
+	struct sh_err		r_lerr;		/* what the roll says, there */
 };
 
 /* Names a walk found. */
@@ -580,6 +582,7 @@ roll_free(struct sh_roll *r)
 	free(r->r_obj);
 	free(r->r_snap);
 	sh_node_free(r->r_shaken);
+	(void) fclose(r->r_log);
 	free(r);
 }
 
@@ -609,12 +612,12 @@ roll_back(struct sh_roll *r, const char *why)
 	struct sh_foundation *f = r->r_f;
 
 	if ((!r->r_first || r->r_made) &&
-	    sh_foundation_idle(env->re_z, f->f_ds, env->re_err) != 0)
-		sh_errf(env->re_err, "foundation %s: not put back", f->f_name);
+	    sh_foundation_idle(env->re_z, f->f_ds, &r->r_lerr) != 0)
+		sh_errf(&r->r_lerr, "not put back");
 	if (r->r_first)
 		return;
 	(void) sh_zfs_set(env->re_z, f->f_ds, "shtetl:stall", why,
-	    env->re_err);
+	    &r->r_lerr);
 	f->f_stall = sh_strdup(why);
 }
 
@@ -627,21 +630,21 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 
 	if (r->r_reset) {
 		if (why != NULL)
-			sh_errf(env->re_err, "foundation %s: zbuild: %s",
-			    f->f_name, why);
+			sh_errf(&r->r_lerr, "zbuild not reset: %s", why);
 		roll_done(r);
 		return;
 	}
 	if (why == NULL) {
-		(void) fprintf(env->re_log, "%s: version %s\n", f->f_name,
-		    r->r_snap);
+		sh_errf(&r->r_lerr, "version %s", r->r_snap);
 		free(f->f_newest);
 		f->f_newest = r->r_snap;
 		r->r_snap = NULL;
 		roll_done(r);
 		return;
 	}
+	/* the one line of a roll syslog hears (ruled 2026-10-20) */
 	sh_errf(env->re_err, "foundation %s: %s", f->f_name, why);
+	sh_errf(&r->r_lerr, "failed: %s", why);
 	roll_back(r, why);
 	/* a pkg roll never touched zbuild */
 	if (r->r_pkg) {
@@ -650,7 +653,7 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 	}
 	/* zbuild put back too, the turn still held */
 	r->r_reset = 1;
-	sh_job_init(j, f->f_name, env->re_log, env->re_err, roll_end, r);
+	sh_job_init(j, r->r_log, roll_end, r);
 	sh_src_reset(j, r->r_build);
 	sh_job_run(j, env->re_kq);
 }
@@ -663,8 +666,7 @@ roll_go(void *arg)
 	const struct sh_rollenv *env = r->r_env;
 
 	r->r_f->f_state = SH_F_ROLLING;
-	sh_job_init(&r->r_job, r->r_f->f_name, env->re_log, env->re_err,
-	    roll_end, r);
+	sh_job_init(&r->r_job, r->r_log, roll_end, r);
 	if (r->r_pkg)
 		sh_job_call(&r->r_job, "head", roll_pkg, r);
 	else
@@ -677,6 +679,8 @@ sh_roll_ask(struct sh_foundation *f, const struct sh_rollenv *env,
     const char *config, const char *build, int pkg, struct sh_err *e)
 {
 	struct sh_roll *r;
+	char path[1024];
+	FILE *log;
 
 	if (f->f_state == SH_F_WAITING || f->f_state == SH_F_ROLLING) {
 		sh_errf(e, "%s: rolling", f->f_name);
@@ -686,13 +690,26 @@ sh_roll_ask(struct sh_foundation *f, const struct sh_rollenv *env,
 		sh_errf(e, "%s: no version", f->f_name);
 		return (-1);
 	}
+	(void) snprintf(path, sizeof (path), "%s/%s.log", env->re_logdir,
+	    f->f_name);
+	if ((log = fopen(path, "w")) == NULL) {
+		sh_errf(e, "%s: %s", path, strerror(errno));
+		return (-1);
+	}
+	/* a line at a time, so the file is the roll as far as it has come */
+	(void) setvbuf(log, NULL, _IOLBF, 0);
 	if (f->f_state == SH_F_STALLED) {
-		if (sh_zfs_inherit(env->re_z, f->f_ds, "shtetl:stall", e) != 0)
+		if (sh_zfs_inherit(env->re_z, f->f_ds, "shtetl:stall", e) !=
+		    0) {
+			(void) fclose(log);
 			return (-1);
+		}
 		free(f->f_stall);
 		f->f_stall = NULL;
 	}
 	r = sh_calloc(1, sizeof (*r));
+	r->r_log = log;
+	sh_err_init(&r->r_lerr, log, "# ");
 	r->r_f = f;
 	r->r_env = env;
 	r->r_config = config != NULL ? sh_strdup(config) : NULL;
