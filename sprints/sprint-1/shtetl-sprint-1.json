@@ -3,7 +3,7 @@
     "project": "shtetl",
     "sprint": 1,
     "created": "2026-10-18",
-    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 and M2 tested (box run 3, 73 of 73); M3 on the box 2026-10-20 (box run 4, 113 of 114; build run 1, 25 of 26): m3-builder, m3-src, m3-roll, m3-commands tested; m3-install, m3-pkg and m3-box wait on reruns of run.sh and build.sh after 942c699 and a53af20; m4-zfs tested (Z10 - Z15 over libzfs); next m4-beam.",
+    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 and M2 tested (box run 3, 73 of 73); M3 tested 2026-10-20 (box run 5, 114 of 114; build run 2, 27 of 27); m4-zfs tested; next m3-logs (ruled: each roll's output in /var/log/shtetl/F.log, syslog one error per stall), then m4-beam.",
     "planning_docs": [
       "sprints/sprint-1/implementation-plan.md",
       "sprints/sprint-1/open-questions.md"
@@ -495,7 +495,7 @@
     ],
     "provides": "A roll that builds and installs a world and a kernel into the head.",
     "estimated_size": "large",
-    "completed": "testing",
+    "completed": "tested",
     "note": "2026-10-20: built; K1-K8 (check_install), K9-K18 (check_roll with tests/bin/make), sixteen mutations caught, no leaks of ours, gate, xcheck. Obj cache <lake>/foundation-builds/F mounted for the roll and left mounted; copies take new times; version queues obj, obj queues install then inject. Owed: K19 in m3-box; check_install/check_roll on FreeBSD. Worklog issue-docs/m3-install.md. 2026-10-20 box run 4 (b55fa79): check_install FAIL (uchg as user; FreeBSD ZFS has none) -> nodump, 942c699; build run 1 (39daa4e): K19 ok (R3, R5). Rerun of run.sh owed."
   },
   "m3-commands": {
@@ -532,7 +532,7 @@
     ],
     "provides": "shtetl pkg F: a roll of steps 5 to 7 with only pkg upgrade, snapshot kind pkg.",
     "estimated_size": "small",
-    "completed": "testing",
+    "completed": "tested",
     "note": "2026-10-20: built; U1-U5 (check_roll), U6 (check_daemon), I15 (check_shake), seven mutations caught, gate, xcheck. shtetl pkg F; foundation.conf NOT injected again (the version's is in the head and still true); the version's datasets from its foundation.conf, read live; snapshot -pkg with the version's commit; failure leaves zbuild alone. Owed: U7 in m3-box. Worklog issue-docs/m3-pkg.md. 2026-10-20 build run 1: U7 ok (R8). Ruled: the version's foundation.conf pkg list -> a53af20. R8 again owed."
   },
   "m3-box": {
@@ -548,8 +548,8 @@
     ],
     "provides": "A real foundation built in zlake on the box by the daemon, a stall from a bad patch and its restart, and a pkg roll.",
     "estimated_size": "medium",
-    "completed": "testing",
-    "note": "2026-10-20: tests/box/build.sh written (family R, R1-R9; B is m4-beam's): rc-started daemon on pool s2box (sparse file kept, exported between runs), create/update/conflict stall/fix/pkg/stop in a command and start again. sh -n, gate. OWED: the run (sudo sh tests/box/build.sh), and run.sh for check-freebsd + Z10. Found a06997d on the way. Worklog issue-docs/m3-box.md. 2026-10-20 build run 1 (39daa4e): 25 ok, 1 failed (R9 written 1K after rollback) -> marker, 942c699; log trimmed to the daemon's lines. Rerun owed."
+    "completed": "tested",
+    "note": "2026-10-20: tests/box/build.sh written (family R, R1-R9; B is m4-beam's): rc-started daemon on pool s2box (sparse file kept, exported between runs), create/update/conflict stall/fix/pkg/stop in a command and start again. sh -n, gate. OWED: the run (sudo sh tests/box/build.sh), and run.sh for check-freebsd + Z10. Found a06997d on the way. Worklog issue-docs/m3-box.md. 2026-10-20 build run 1 (39daa4e): 25 ok, 1 failed (R9 written 1K after rollback) -> marker, 942c699; log trimmed to the daemon's lines. Rerun owed. 2026-10-20 build run 2 (86c8ac0): 27 ok, 0 failed. Tested; M3 done."
   },
   "m4-zfs": {
     "description": "Layer calls (plan 8.1, probe P1, P5): clone with properties; promote; a snapshot's guid and createtxg; send from a snapshot whole, incremental, or as a clone stream received with -o origin= (lzc_send into lzc_receive_resumable in a forked child, as main's sh_zfs_send forked lzc_send); the receive_resume_token of a filesystem, decoded to an nvlist with zfs_send_resume_token_to_nvlist, and a send resumed from it (lzc_send_resume); a token taken away (receive -A). The fake models a cut stream and its token. Matrix family Z cells for each, on the box and the fake. Verify: make check; tests/box/run.sh.",

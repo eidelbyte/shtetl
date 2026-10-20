@@ -60,3 +60,10 @@ roll's commands-external leaves a marker in the head, checked there at
 the stop and gone after. The log carried 109,000 lines of the build's
 output from syslog (17 MB); build.sh keeps the daemon's own lines now.
 Testing: the next build.sh owed.
+
+## Box run 5 and build run 2
+
+Build run 2: KIDON, 2026-10-20, build.sh at f57133c (results
+86c8ac0): 27 ok, 0 failed. R9 by its marker: there at the stop,
+gone after the start. The incremental rolls took about a minute and
+a half each. The log is 60 lines. Tested.

@@ -61,3 +61,9 @@ Build run 1: KIDON, 2026-10-20, tests/box/build.sh at b55fa79 (results
 commit (R8). Ruled the same day that the packages a pkg roll upgrades
 are those its version's foundation.conf lists (plan 18): a53af20
 upgrades that list, not every package. Testing: R8 again owed.
+
+## Box run 5 and build run 2
+
+Build run 2: KIDON, 2026-10-20, build.sh at f57133c (results
+86c8ac0): 27 ok, 0 failed. R8, a pkg roll of the version's own
+packages (a53af20), kind pkg, the version's commit. Tested.
