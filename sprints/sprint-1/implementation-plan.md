@@ -234,7 +234,8 @@ The next roll comes from the clock or a person (built,
 m1-foundation-start).
 
 A pkg upgrade is a roll of steps 5 to 7 with only pkg in step 5, kind
-pkg.
+pkg: the packages its version's foundation.conf lists upgraded, the
+file itself left as the version wrote it (ruled 2026-10-20).
 
 Builds share zbuild and the CPU, so foundation actors ask one builder
 for a turn (section 9). Two builds never run at once, and nothing
@@ -897,3 +898,25 @@ So: shtetl clones a recipe repository that is missing from zconfig
 and never updates one; a recipe changes when the person changes it,
 and the next roll of what it builds picks it up (4). A lake on another
 host is out of scope (8.1, 17): m4-lake-remote leaves the tracker.
+
+### 2026-10-20 (four of M3's decisions)
+
+Told of four decisions M3 made on its own (the pkg roll's
+foundation.conf, the head made before the src, the order of the
+packages and the commands, two rolls in one second), the author
+answered:
+
+    No re-inject on a pkg roll: correct. whatever the foundation's
+    shipped pkg list is in the included conf in var is is what's used
+    as the list for pkg roll.
+    Head made earlier: technically fetching source can be done first
+    since source lives outside the final build (destdir) but yes.
+    Order of packages and commands: correct!
+    Same-second rolls: yes, out of scope. do not concern youself with
+    it.
+
+So: a pkg roll leaves foundation.conf as its version wrote it, and the
+packages it upgrades are the ones that file lists, not the recipe's as
+it is now (6). The head is made and mounted before the src steps, as
+built (6). commands-external, then pkg, then commands, as the docs
+say. Two rolls of a foundation in one second are out of scope.
