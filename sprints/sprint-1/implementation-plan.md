@@ -394,9 +394,12 @@ they answer (ruled). `shtetl freeze H` sets a stall by hand (7.2).
 Without the property, a house whose roll failed would find its
 foundation still newer and roll straight into the same failure.
 
-A stall is shown by `shtetl status` and logged to syslog. Notifying
-the person is a pluggable interface, worked out at the very end
-(ruled; M7).
+A stall is shown by `shtetl status` and logged to syslog, one line,
+the step and why, the only line a roll puts there (ruled 2026-10-20).
+What a roll's programs write, a line of each step's start, and what
+the roll says of itself is in /var/log/shtetl/F.log, the foundation's,
+replaced when a roll of it is asked. Notifying the person is a
+pluggable interface, worked out at the very end (ruled; M7).
 
 
 ## 8. Beam and prune
@@ -920,3 +923,18 @@ packages it upgrades are the ones that file lists, not the recipe's as
 it is now (6). The head is made and mounted before the src steps, as
 built (6). commands-external, then pkg, then commands, as the docs
 say. Two rolls of a foundation in one second are out of scope.
+
+### 2026-10-20 (where a roll's output goes)
+
+Told that build run 1 put a build's whole output in syslog, 109,000
+lines, and offered a file per foundation for it, with syslog keeping
+the daemon's events, the author answered:
+
+    that recommendation seems good. the only think in syslog should be
+    one error print per stall
+
+So: what a roll's programs write, and what the roll says of itself,
+goes to /var/log/shtetl/F.log, the foundation's, replaced when a roll
+of it is asked (7.4). Syslog gets one line for each roll that fails,
+"foundation F: STEP: why", and nothing else of a roll; a daemon that
+cannot start or runs out of memory still says so there (10). m3-logs.
