@@ -491,7 +491,7 @@ URL, a host and a path}.
 | GS7 | sh_src_reset after a failed patch | the checkout at HEAD, clean | tests/check_src.c |
 | GS8 | a remote as a host and a path | https://host/path | tests/check_src.c (sh_src_url) |
 | GS9 | a remote as a URL | as written | tests/check_src.c (sh_src_url) |
-| GS10 | a FreeBSD src fetch over https | the checkout of a real branch | box: tests/box/build.sh B1, B2 |
+| GS10 | a FreeBSD src fetch over https | the checkout of a real branch | box: tests/box/build.sh R1, R2 |
 
 ### GP: the patches (plan 6 step 2)
 
@@ -565,8 +565,8 @@ the commit not the src's (F1).
 | F14 | status while it rolls | "foundation F rolling STEP" | tests/check_roll.c |
 | F15 | a recipe that is not there | "recipe: ..."; nothing made | tests/check_roll.c |
 | F16 | shtetl roll over the socket: a bad name, a space missing, no argument | "NAME: invalid name: why", "no build space", the usage | tests/check_daemon.c |
-| F17 | the rc script starting the daemon, git found under service(8) | a roll's git runs | box: tests/box/build.sh B1 |
-| F18 | foundation.conf schg, a roll over libzfs | as F1, on ZFS | box: tests/box/build.sh B1 - B4 |
+| F17 | the rc script starting the daemon, git found under service(8) | a roll's git runs | box: tests/box/build.sh R1 |
+| F18 | foundation.conf schg, a roll over libzfs | as F1, on ZFS | box: tests/box/build.sh R1 - R4 |
 | F19 | asked while zbuild is reset after a failure | rolling still: "F: rolling"; stalled only once the reset is over | tests/check_roll.c |
 
 ## Family K: the build and the install (m3-install)
@@ -609,7 +609,7 @@ kernconf's lines or buildopts left out.
 | K16 | stopped in the build; started again | the head at its newest version | tests/check_roll.c |
 | K17 | the obj cache | made on a first roll with the site's properties, mounted; the scratch directory gone after | tests/check_roll.c |
 | K18 | an update's kernel | synced into the head: the kernel replaced, a.ko kept, b.ko and the debug files gone, c.ko new | tests/check_roll.c |
-| K19 | a real build and install | a FreeBSD world and kernel in the head | box: tests/box/build.sh B3 |
+| K19 | a real build and install | a FreeBSD world and kernel in the head | box: tests/box/build.sh R3 |
 
 ## Family X: the packages and the commands (m3-commands)
 
@@ -634,8 +634,8 @@ nor commands; a label's last piece alone.
 | X5 | no pkg, no commands | no chroot, no devfs | tests/check_roll.c (K10's exact log of r1) |
 | X6 | commands alone | devfs and the chroot; no pkg, nothing lent | tests/check_roll.c |
 | X7 | a command failing | "commands: LABEL: exited 1"; rolled back, stalled | tests/check_roll.c |
-| X8 | devfs left mounted by a failure, a stop or a crash | unmounted by sh_foundation_idle before the head | box: tests/box/build.sh B9 (the mac mounts no devfs) |
-| X9 | real pkg and chroot | the packages in the head | box: tests/box/build.sh B3 |
+| X8 | devfs left mounted by a failure, a stop or a crash | unmounted by sh_foundation_idle before the head | box: tests/box/build.sh R9 (the mac mounts no devfs) |
+| X9 | real pkg and chroot | the packages in the head | box: tests/box/build.sh R3 |
 
 ## Family U: a pkg roll (m3-pkg)
 
@@ -655,9 +655,9 @@ resolv.conf lent for it (U1).
 | U4 | the recipe given a dataset since the version | not made, not mounted: the version's recipe is the pkg roll's | tests/check_roll.c |
 | U5 | asked of a stalled foundation | the stall cleared; it rolls | tests/check_roll.c |
 | U6 | shtetl pkg over the socket: no argument, no such foundation | the usage; "NAME: no such foundation" | tests/check_daemon.c |
-| U7 | a real pkg upgrade | the packages upgraded in a version of kind pkg | box: tests/box/build.sh B8 |
+| U7 | a real pkg upgrade | the packages upgraded in a version of kind pkg | box: tests/box/build.sh R8 |
 
-## Family B: M3 on the box (m3-box)
+## Family R: real rolls on the box (m3-box)
 
 tests/box/build.sh: the daemon, installed and started by rc, rolling
 a real foundation from the FreeBSD src remote on a pool kept between
@@ -667,12 +667,12 @@ to the box are these.
 
 | cell | what | expected | disposition |
 |------|------|----------|-------------|
-| B1 | shtetl roll box, a first roll, the daemon rc's (F17, GS10) | idle at <ver>-<date>-create | tests/box/build.sh |
-| B2 | the version | every dataset kind create; shtetl:commit zbuild's HEAD; usr a placeholder | tests/box/build.sh |
-| B3 | the head (K19, X9) | bin/sh and boot/kernel/kernel; the package in usr/local; the command's motd; no resolv.conf left | tests/box/build.sh |
-| B4 | foundation.conf on ZFS (F18) | schg, 0444; the head unmounted | tests/box/build.sh |
-| B5 | an update | idle at -update, kind update | tests/box/build.sh |
-| B6 | two patches of one line, a three-way conflict | stalled "patches/local: 2-b.patch: exited 1", shtetl:stall, the newest version unchanged, zbuild clean | tests/box/build.sh |
-| B7 | the patch taken out, rolled again | the stall cleared, idle at -update, the first patch in the checkout | tests/box/build.sh |
-| B8 | shtetl pkg box (U7) | idle at -pkg, kind pkg, the version's commit | tests/box/build.sh |
-| B9 | the daemon stopped in a command, started again (X8, K16, F10) | devfs left on the head, then gone; idle at the newest, no stall; written 0; unmounted | tests/box/build.sh |
+| R1 | shtetl roll box, a first roll, the daemon rc's (F17, GS10) | idle at <ver>-<date>-create | tests/box/build.sh |
+| R2 | the version | every dataset kind create; shtetl:commit zbuild's HEAD; usr a placeholder | tests/box/build.sh |
+| R3 | the head (K19, X9) | bin/sh and boot/kernel/kernel; the package in usr/local; the command's motd; no resolv.conf left | tests/box/build.sh |
+| R4 | foundation.conf on ZFS (F18) | schg, 0444; the head unmounted | tests/box/build.sh |
+| R5 | an update | idle at -update, kind update | tests/box/build.sh |
+| R6 | two patches of one line, a three-way conflict | stalled "patches/local: 2-b.patch: exited 1", shtetl:stall, the newest version unchanged, zbuild clean | tests/box/build.sh |
+| R7 | the patch taken out, rolled again | the stall cleared, idle at -update, the first patch in the checkout | tests/box/build.sh |
+| R8 | shtetl pkg box (U7) | idle at -pkg, kind pkg, the version's commit | tests/box/build.sh |
+| R9 | the daemon stopped in a command, started again (X8, K16, F10) | devfs left on the head, then gone; idle at the newest, no stall; written 0; unmounted | tests/box/build.sh |

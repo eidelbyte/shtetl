@@ -29,7 +29,7 @@ What runs:
   stopped with SIGTERM. It needs a box with no shtetl space marked and
   no shtetl daemon running, and says so otherwise.
 
-M3 on the box, a real foundation rolled by the daemon (family B):
+M3 on the box, a real foundation rolled by the daemon (family R):
 
     git pull
     make freebsd

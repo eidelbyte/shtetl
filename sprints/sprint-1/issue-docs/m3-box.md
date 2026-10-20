@@ -2,16 +2,16 @@
 
 ## What was built
 
-- tests/box/build.sh, family B of tests/MATRIX.md: make install, then
+- tests/box/build.sh, family R of tests/MATRIX.md: make install, then
   the daemon started by service(8), as rc starts it, on the pool s2box,
   a sparse file kept in IMGDIR and exported between runs; zbuild's
   checkout and the obj cache are kept, so only the first build takes
   hours. Each run destroys the foundation box and writes zconfig anew,
-  then: a create roll from the FreeBSD src remote (B1 - B4), an update
-  (B5), two patches of one line made from zbuild's own checkout, the
-  second a three-way conflict (B6, a stall), the patch taken out and
-  the roll asked again (B7), a pkg roll (B8), and the daemon stopped in
-  a command, devfs on the head, and started again (B9). Each roll is
+  then: a create roll from the FreeBSD src remote (R1 - R4), an update
+  (R5), two patches of one line made from zbuild's own checkout, the
+  second a three-way conflict (R6, a stall), the patch taken out and
+  the roll asked again (R7), a pkg roll (R8), and the daemon stopped in
+  a command, devfs on the head, and started again (R9). Each roll is
   asked with the command and waited out on shtetl status; what came of
   it is read from ZFS and the head. The log carries the run's lines of
   /var/log/daemon.log.
@@ -23,7 +23,7 @@
 
 - a06997d: a failed roll showed stalled before zbuild's reset under it
   ended, and a roll asked then began beside it and was later let go of
-  by the first. Found writing B6, which would have read zbuild while
+  by the first. Found writing R6, which would have read zbuild while
   the reset ran; fixed in roll.c, with F19.
 
 ## Decisions
@@ -32,11 +32,11 @@
   the build (WITHOUT_TESTS, WITHOUT_LIB32, WITHOUT_DEBUG_FILES), a
   usr/local dataset (a placeholder usr on the way), one package, tree,
   and one command; GENERIC as the kernel.
-- B9 stops the daemon in a command that sleeps, so the stop finds devfs
+- R9 stops the daemon in a command that sleeps, so the stop finds devfs
   mounted and the head written by the install: one cell for X8, and
   for K16 and F10 on real ZFS.
 - The conflict's patches touch README.md, which nothing builds, so the
-  patch left in for B7 changes no build.
+  patch left in for R7 changes no build.
 
 ## Verified
 

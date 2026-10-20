@@ -1,7 +1,7 @@
 #!/bin/sh
 # tests/box/build.sh -- M3 on the box (m3-box): the daemon, started by
 # rc, rolling a real foundation, box, on a pool kept from run to run,
-# the box cells of tests/MATRIX.md family B: a create roll from the
+# the box cells of tests/MATRIX.md family R: a create roll from the
 # FreeBSD src remote, an update, a patch that conflicts (a stall, the
 # foundation at its newest version, zbuild reset), the patch taken
 # out and the roll asked again, a pkg roll, and the daemon stopped in
@@ -192,37 +192,37 @@ inhead() {	# CMD
 
 rolls() {
 	recipe "$MOTD"
-	# B1 - B4: a create roll, by the daemon rc started
-	cell B1 "a create roll (F17, GS10)" "$(ask roll)" \
+	# R1 - R4: a create roll, by the daemon rc started
+	cell R1 "a create roll (F17, GS10)" "$(ask roll)" \
 	    "foundation $F idle $V-DATE-create"
 	_v=$(newest $FD)
-	cell B2 "every dataset snapshotted, kind create" \
+	cell R2 "every dataset snapshotted, kind create" \
 	    "$(zfs get -H -r -t snapshot -o value shtetl:kind $FD |
 	    sort -u)" create
-	cell B2 "shtetl:commit the checkout's" \
+	cell R2 "shtetl:commit the checkout's" \
 	    "$(prop shtetl:commit "$_v")" "$(git -C "$SRCD" rev-parse HEAD)"
-	cell B2 "usr a placeholder" "$(prop canmount $FD/usr)" off
-	cell B3 "a world and a kernel (K19)" \
+	cell R2 "usr a placeholder" "$(prop canmount $FD/usr)" off
+	cell R3 "a world and a kernel (K19)" \
 	    "$(inhead 'ls bin/sh boot/kernel/kernel' 2>&1 | tr '\n' ' ')" \
 	    "bin/sh boot/kernel/kernel "
-	cell B3 "the package, in usr/local (X9)" \
+	cell R3 "the package, in usr/local (X9)" \
 	    "$(inhead 'ls usr/local/bin/tree' 2>&1)" usr/local/bin/tree
-	cell B3 "the command run in the chroot" \
+	cell R3 "the command run in the chroot" \
 	    "$(inhead 'cat etc/motd.template' 2>&1)" shtetl-box
-	cell B3 "no resolv.conf left" \
+	cell R3 "no resolv.conf left" \
 	    "$(inhead 'ls etc/resolv.conf' 2>/dev/null)" ""
-	cell B4 "foundation.conf schg (F18)" \
+	cell R4 "foundation.conf schg (F18)" \
 	    "$(inhead 'ls -lo var/db/shtetl/foundation.conf' 2>&1 |
 	    awk '{ print $1, $5 }')" "-r--r--r-- schg"
-	cell B4 "the head unmounted" "$(prop mounted $FD)" no
+	cell R4 "the head unmounted" "$(prop mounted $FD)" no
 
-	# B5: an update
-	cell B5 "an update roll" "$(ask roll)" \
+	# R5: an update
+	cell R5 "an update roll" "$(ask roll)" \
 	    "foundation $F idle $V-DATE-update"
-	cell B5 "kind update" "$(prop shtetl:kind "$(newest $FD)")" update
+	cell R5 "kind update" "$(prop shtetl:kind "$(newest $FD)")" update
 	_v=$(newest $FD)
 
-	# B6: two patches of one line, the second a conflict
+	# R6: two patches of one line, the second a conflict
 	x sed -i '' '1s/.*/shtetl box a/' "$SRCD/README.md"
 	git -C "$SRCD" diff >"$CONF/patches/local/1-a.patch"
 	x git -C "$SRCD" checkout -q README.md
@@ -230,54 +230,54 @@ rolls() {
 	git -C "$SRCD" diff >"$CONF/patches/local/2-b.patch"
 	x git -C "$SRCD" checkout -q README.md
 	recipe "$MOTD" 'patches { "patches/local" {} }'
-	cell B6 "a conflict: stalled" "$(ask roll)" \
+	cell R6 "a conflict: stalled" "$(ask roll)" \
 	    "foundation $F stalled patches/local: 2-b.patch: exited 1"
-	cell B6 "shtetl:stall" "$(prop shtetl:stall $FD)" \
+	cell R6 "shtetl:stall" "$(prop shtetl:stall $FD)" \
 	    "patches/local: 2-b.patch: exited 1"
-	cell B6 "at its newest version still" "$(newest $FD)" "$_v"
-	cell B6 "zbuild reset" "$(git -C "$SRCD" status --porcelain)" ""
+	cell R6 "at its newest version still" "$(newest $FD)" "$_v"
+	cell R6 "zbuild reset" "$(git -C "$SRCD" status --porcelain)" ""
 
-	# B7: the patch taken out, the roll asked again
+	# R7: the patch taken out, the roll asked again
 	x rm "$CONF/patches/local/2-b.patch"
-	cell B7 "asked again: the stall cleared, rolled" "$(ask roll)" \
+	cell R7 "asked again: the stall cleared, rolled" "$(ask roll)" \
 	    "foundation $F idle $V-DATE-update"
-	cell B7 "the patch in the checkout" \
+	cell R7 "the patch in the checkout" \
 	    "$(head -1 "$SRCD/README.md")" "shtetl box a"
-	cell B7 "no stall" "$(prop shtetl:stall $FD)" -
+	cell R7 "no stall" "$(prop shtetl:stall $FD)" -
 	_v=$(newest $FD)
 
-	# B8: a pkg roll (U7)
-	cell B8 "a pkg roll" "$(ask pkg)" "foundation $F idle $V-DATE-pkg"
-	cell B8 "kind pkg, the version's commit" \
+	# R8: a pkg roll (U7)
+	cell R8 "a pkg roll" "$(ask pkg)" "foundation $F idle $V-DATE-pkg"
+	cell R8 "kind pkg, the version's commit" \
 	    "$(prop shtetl:kind "$(newest $FD)") $(prop shtetl:commit \
 	    "$(newest $FD)")" "pkg $(prop shtetl:commit "$_v")"
 	_v=$(newest $FD)
 
-	# B9: stopped in a command, devfs mounted; started again (X8)
+	# R9: stopped in a command, devfs mounted; started again (X8)
 	recipe 'commands { slow = "sleep 600"; }'
 	x "$SH" roll $F
 	_slow="^foundation $F rolling commands: slow"
 	until "$SH" status 2>&1 | grep -q "$_slow"; do
 		if ! "$SH" status 2>&1 | grep -q "^foundation $F rolling"; then
-			echo "B9: box no longer rolling: $("$SH" status 2>&1)"
+			echo "R9: box no longer rolling: $("$SH" status 2>&1)"
 			break
 		fi
 		sleep 30
 	done
 	_head=$(dir $FD)
 	x service shtetl onestop
-	cell B9 "stopped: devfs left on the head" \
+	cell R9 "stopped: devfs left on the head" \
 	    "$(mount -p | awk -v d="$_head/dev" '$2 == d { print $3 }')" devfs
 	x service shtetl onestart
 	sleep 5
-	cell B9 "started again: idle at the newest, no stall" \
+	cell R9 "started again: idle at the newest, no stall" \
 	    "$("$SH" status 2>&1 | grep "^foundation $F ")" \
 	    "foundation $F idle ${_v#*@}"
-	cell B9 "devfs gone" \
+	cell R9 "devfs gone" \
 	    "$(mount -p | awk -v d="$_head/dev" '$2 == d { print $3 }')" ""
 	x zpool sync $P
-	cell B9 "what the roll wrote gone" "$(prop written $FD)" 0
-	cell B9 "the head unmounted" "$(prop mounted $FD)" no
+	cell R9 "what the roll wrote gone" "$(prop written $FD)" 0
+	cell R9 "the head unmounted" "$(prop mounted $FD)" no
 }
 
 mkdir -p "$BD/results" || exit 2
