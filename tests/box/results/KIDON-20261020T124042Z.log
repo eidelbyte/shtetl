@@ -1,0 +1,152 @@
+shtetl 5ff2662 box on KIDON 2026-10-20T12:40:42Z
+host: 15.1-RELEASE-p2 amd64
+zfs: zfs-2.4.2-1-FreeBSD_g6330a45b0 zfs-kmod-2.4.2-1-FreeBSD_g6330a45b0 
+
+make check-freebsd: the unit tests, on this libc and libucl
+make FLAVOR=freebsd UCL=port check
+ok   check_mem
+ok   check_zfs
+ok   check_spaces
+ok   check_daemon
+ok   check_foundation
+check_parse: 189 checks
+ok   check_parse
+check_schema: 356 checks
+ok   check_schema
+check_site: 165 checks
+ok   check_site
+check_cascade: 328 checks
+ok   check_cascade
+check_show: 53 checks
+ok   check_show
+ok   check_shake
+ok   check_job
+ok   check_src
+ok   check_roll
+ok   check_install
+doccheck: docs/configuration.md: 38 commands, 16 examples
+
+family Z, over libzfs
+warning: cannot send 's2run/zc/s@3': signal received
+warning: cannot send 's2run/zc/s@3': signal received
+warning: cannot send 's2run/zc/s@4': signal received
+warning: cannot send 's2run/zc/s@3': signal received
+ok   Z1 created, a property from its birth
+ok   Z1 children and a sibling
+ok   Z1 a name taken: refused
+ok   Z1 no parent: refused
+ok   Z2 set on it: its value
+ok   Z2 set above it: inherited
+ok   Z2 set nowhere: 1
+ok   Z2 a native property is no user property: 1
+ok   Z2 no such filesystem: refused
+ok   Z3 set locally: each with its value, not where inherited
+ok   Z3 the walk stopped, FN's value returned
+ok   Z4 the filesystems directly below
+ok   Z4 the walk stopped, FN's value returned
+ok   Z4 no such filesystem: refused
+ok   Z5 three at once, a property on each from its birth
+ok   Z5 a snapshot inherits its filesystem's
+ok   Z5 one taken: refused
+ok   Z5 a filesystem missing: refused
+ok   Z5 a name twice: refused
+ok   Z5 a malformed name: refused
+ok   Z5 and none of them taken
+ok   Z5 no such snapshot: refused
+ok   Z6 a second: oldest first
+ok   Z6 its own, not its parent's
+ok   Z6 the walk stopped, FN's value returned
+ok   Z6 no such filesystem: refused
+ok   Z7 m made, mounted, written, snapshotted twice
+ok   Z7 to an older one: refused
+ok   Z7 to one that is not there: refused
+ok   Z7 to the newest, mounted: what came after it gone
+ok   Z7 and still mounted
+ok   Z7 no such filesystem: refused
+ok   Z7 a filesystem with no snapshot: refused
+ok   Z8 mounted there already: nothing to do
+ok   Z8 a child mounted where it inherits
+ok   Z8 a filesystem with one mounted inside: busy
+ok   Z8 unmounted, and again: nothing to do
+ok   Z8 canmount off: refused
+ok   Z8 mountpoint none: refused
+ok   Z8 where a missing one is mounted: refused
+ok   Z9 mounted, with snapshots: refused for the mount
+ok   Z9 unmounted, with children and snapshots: the snapshots
+ok   Z9 its snapshots destroyed
+ok   Z9 with a child: refused
+ok   Z9 the child, then it
+ok   Z9 a filesystem not there: refused
+ok   Z9 a snapshot not there: refused
+ok   Z10 set: its value, and inherited below it
+ok   Z10 set again: replaced
+ok   Z10 inherited: its parent's again
+ok   Z10 inherited where not set there: nothing done
+ok   Z10 inherited with nothing above: none
+ok   Z10 set on no such filesystem: refused
+ok   Z10 inherited on no such filesystem: refused
+ok   Z11 two snapshots: their guids apart, createtxg in order
+ok   Z11 no such snapshot: refused
+ok   Z14 whole: t made, its @1 the source's guid
+ok   Z14 whole onto a filesystem there: refused
+ok   Z14 incremental: t@2 the source's
+ok   Z14 onto a newest snapshot that is no counterpart
+ok   Z14 incremental onto no filesystem: refused
+ok   Z14 a source not there: refused
+ok   Z15 a cut incremental: a receive to resume, t still at @2
+ok   Z15 a fresh stream while it stands: refused
+ok   Z15 resumed: t@3 the source's, nothing to resume
+ok   Z15 nothing to resume: refused
+ok   Z15 a cut whole: w made, a receive to resume on it
+ok   Z15 resumed: w@3 the source's
+ok   Z15 a cut incremental, its source destroyed after
+ok   Z15 its source gone: refused
+ok   Z15 taken away: nothing to resume, t at @3
+ok   Z15 taken away again: refused
+ok   Z15 a cut whole taken away: what it made gone
+ok   Z15 the next stream lands
+ok   Z12 c a clone of s@5, a property from its birth
+ok   Z12 no clone: no origin
+ok   Z12 of no snapshot: refused
+ok   Z12 onto a name taken: refused
+ok   Z12 no parent: refused
+ok   Z9 a snapshot with a clone: refused
+ok   Z14 a clone stream: d a clone of t@5, its @x1 c@x1's
+ok   Z14 onto an origin no counterpart: refused
+ok   Z13 c promoted: s's snapshots to @5 c's, s a clone of c@5
+ok   Z13 no clone: refused
+
+family A, the daemon on real pools
+# zfs set shtetl:space=lake s2lake
+# zfs create -o canmount=off s2lake/foundations
+# zfs create -o mountpoint=/generic s2lake/foundations/generic
+# touch /tmp/shtetl-probes/generic/a
+# zfs snapshot s2lake/foundations/generic@v1
+# touch /tmp/shtetl-probes/generic/b
+# zfs create -o mountpoint=/first s2lake/foundations/first
+# touch /tmp/shtetl-probes/first/a
+# zfs create -o shtetl:stall=build: make exited 2 s2lake/foundations/stalled
+# zfs snapshot s2lake/foundations/stalled@v1
+ok   A1 status
+ok   A2 generic unmounted
+# zfs mount s2lake/foundations/generic
+ok   A2 what came after v1 gone
+# zfs unmount s2lake/foundations/generic
+ok   A3 first, with no version, gone
+ok   A3 and nothing said: no stall
+ok   D10 SIGTERM: exit 0
+ok   D10 the socket gone
+
+family I, the shaken recipe on ZFS, as root
+# zfs create -o mountpoint=/shake s2run/shake
+ok   I9 written schg
+ok   I10 root may not write it
+ok   I10 nor unlink it
+ok   I11 written again: replaced, schg again
+ok   I13 a link planted in the tree
+# zfs snapshot s2run/shake@s1
+ok   I12 read back through the snapshot
+ok   I13 a link on the way in the snapshot: refused
+ok   I14 the live file rewritten: the snapshot's read the same
+
+== 114 ok, 0 failed
