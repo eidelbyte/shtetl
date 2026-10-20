@@ -20,6 +20,16 @@ extern int (*zc_put)(const char *ds, const char *word);
 extern int (*zc_has)(const char *ds, const char *word);
 
 /*
+ * The driver's, for the streams: enough data written into the mounted
+ * filesystem DS that a stream of it can be cut; and the stream of SNAP
+ * (from FROM, onto a clone of ORIGIN, as sh_zfs_send takes them) cut
+ * part way into TO, left to resume. 0, or -1.
+ */
+extern int (*zc_fill)(const char *ds);
+extern int (*zc_cut)(const char *snap, const char *from, const char *to,
+    const char *origin);
+
+/*
  * The cells, under TOP, an empty filesystem with no mountpoint of its
  * own to inherit, each printed to OUT as "ok   Zn what" or "FAIL Zn
  * what". Nothing else on the system may set the user property

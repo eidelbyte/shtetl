@@ -3,6 +3,7 @@
  * the top: "f/usr" is TOP/f/usr.
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +14,8 @@
 
 int (*zc_put)(const char *, const char *);
 int (*zc_has)(const char *, const char *);
+int (*zc_fill)(const char *);
+int (*zc_cut)(const char *, const char *, const char *, const char *);
 
 static struct sh_zfs *z;
 static FILE *out;
@@ -427,6 +430,160 @@ cells_set(void)
 	    "no such filesystem");
 }
 
+/* Whether the snapshots A and B, below the top, share a guid. */
+static int
+same(const char *a, const char *b)
+{
+	uint64_t ga, gb, t;
+
+	return (sh_zfs_snapinfo(z, at(a), &ga, &t, &e) == 0 &&
+	    sh_zfs_snapinfo(z, at(b), &gb, &t, &e) == 0 && ga == gb);
+}
+
+/* REL's snapshots, oldest first, as a walk sees them. */
+static const char *
+snaps(const char *rel)
+{
+	if (walked(0) != 0 || sh_zfs_snapshots(z, at(rel), see, NULL, &e) != 0)
+		return ("(refused)");
+	return (seen);
+}
+
+/* Whether REL is a clone of the snapshot ORIGIN, both below the top. */
+static int
+origin_is(const char *rel, const char *origin)
+{
+	char buf[512];
+
+	return (sh_zfs_origin(z, at(rel), buf, sizeof (buf), &e) == 1 &&
+	    strcmp(buf, at(origin)) == 0);
+}
+
+/*
+ * The streams, last: s written and snapshotted, sent whole and on to
+ * t; streams cut and resumed, taken away; clones, a clone stream, and
+ * a promote.
+ */
+static void
+cells_send(void)
+{
+	static const struct sh_zprop mp = { "mountpoint", "/zc-s" };
+	static const struct sh_zprop cp[] = {
+		{ "shtetl:zcheck", "c" }, { "mountpoint", "/zc-c" }
+	};
+	char why[600], buf[512];
+	uint64_t g1, t1, g2, t2;
+
+	cell("Z11", "two snapshots: their guids apart, createtxg in order",
+	    sh_zfs_create(z, at("s"), &mp, 1, &e) == 0 &&
+	    sh_zfs_mount(z, at("s"), &e) == 0 && zc_fill(at("s")) == 0 &&
+	    snap("s@1", NULL, NULL) == 0 && zc_fill(at("s")) == 0 &&
+	    snap("s@2", NULL, NULL) == 0 &&
+	    sh_zfs_snapinfo(z, at("s@1"), &g1, &t1, &e) == 0 &&
+	    sh_zfs_snapinfo(z, at("s@2"), &g2, &t2, &e) == 0 &&
+	    g1 != g2 && t1 < t2);
+	refused("Z11", "no such snapshot: refused",
+	    sh_zfs_snapinfo(z, at("s@9"), &g1, &t1, &e), "s@9",
+	    "no such snapshot");
+
+	cell("Z14", "whole: t made, its @1 the source's guid",
+	    sh_zfs_send(z, at("s@1"), NULL, at("t@1"), NULL, &e) == 0 &&
+	    same("t@1", "s@1"));
+	refused("Z14", "whole onto a filesystem there: refused",
+	    sh_zfs_send(z, at("s@2"), NULL, at("t@2"), NULL, &e), "t",
+	    "exists");
+	cell("Z14", "incremental: t@2 the source's",
+	    sh_zfs_send(z, at("s@2"), at("s@1"), at("t@2"), NULL, &e) == 0 &&
+	    same("t@2", "s@2"));
+	(void) snprintf(why, sizeof (why), "newest snapshot is not %s's "
+	    "counterpart", at("s@1"));
+	refused("Z14", "onto a newest snapshot that is no counterpart",
+	    sh_zfs_send(z, at("s@2"), at("s@1"), at("t@3"), NULL, &e), "t",
+	    why);
+	refused("Z14", "incremental onto no filesystem: refused",
+	    sh_zfs_send(z, at("s@2"), at("s@1"), at("u@2"), NULL, &e), "u",
+	    "no such filesystem");
+	refused("Z14", "a source not there: refused",
+	    sh_zfs_send(z, at("s@9"), NULL, at("u@9"), NULL, &e), "s@9",
+	    "no such snapshot");
+
+	cell("Z15", "a cut incremental: a receive to resume, t still at @2",
+	    zc_fill(at("s")) == 0 && snap("s@3", NULL, NULL) == 0 &&
+	    zc_cut(at("s@3"), at("s@2"), at("t@3"), NULL) == 0 &&
+	    sh_zfs_resumable(z, at("t"), &e) == 1 &&
+	    strcmp(snaps("t"), "1 2") == 0);
+	refused("Z15", "a fresh stream while it stands: refused",
+	    sh_zfs_send(z, at("s@3"), at("s@2"), at("t@3"), NULL, &e), "t",
+	    "a receive to resume");
+	cell("Z15", "resumed: t@3 the source's, nothing to resume",
+	    sh_zfs_resume(z, at("t"), &e) == 0 && same("t@3", "s@3") &&
+	    sh_zfs_resumable(z, at("t"), &e) == 0);
+	refused("Z15", "nothing to resume: refused",
+	    sh_zfs_resume(z, at("t"), &e), "t", "no receive to resume");
+	cell("Z15", "a cut whole: w made, a receive to resume on it",
+	    zc_cut(at("s@3"), NULL, at("w@3"), NULL) == 0 &&
+	    sh_zfs_resumable(z, at("w"), &e) == 1);
+	cell("Z15", "resumed: w@3 the source's",
+	    sh_zfs_resume(z, at("w"), &e) == 0 && same("w@3", "s@3"));
+	cell("Z15", "a cut incremental, its source destroyed after",
+	    zc_fill(at("s")) == 0 && snap("s@4", NULL, NULL) == 0 &&
+	    zc_cut(at("s@4"), at("s@3"), at("t@4"), NULL) == 0 &&
+	    sh_zfs_destroy(z, at("s@4"), &e) == 0 &&
+	    sh_zfs_resumable(z, at("t"), &e) == 1);
+	refused("Z15", "its source gone: refused",
+	    sh_zfs_resume(z, at("t"), &e), "s@4", "no such snapshot");
+	cell("Z15", "taken away: nothing to resume, t at @3",
+	    sh_zfs_abort(z, at("t"), &e) == 0 &&
+	    sh_zfs_resumable(z, at("t"), &e) == 0 &&
+	    strcmp(snaps("t"), "1 2 3") == 0);
+	refused("Z15", "taken away again: refused",
+	    sh_zfs_abort(z, at("t"), &e), "t", "no receive to resume");
+	cell("Z15", "a cut whole taken away: what it made gone",
+	    zc_cut(at("s@3"), NULL, at("x@3"), NULL) == 0 &&
+	    sh_zfs_abort(z, at("x"), &e) == 0 &&
+	    sh_zfs_resumable(z, at("x"), &e) == -1);
+	hush();
+	cell("Z15", "the next stream lands",
+	    zc_fill(at("s")) == 0 && snap("s@5", NULL, NULL) == 0 &&
+	    sh_zfs_send(z, at("s@5"), at("s@3"), at("t@5"), NULL, &e) == 0 &&
+	    same("t@5", "s@5"));
+
+	cell("Z12", "c a clone of s@5, a property from its birth",
+	    sh_zfs_clone(z, at("s@5"), at("c"), cp, 2, &e) == 0 &&
+	    origin_is("c", "s@5") &&
+	    strcmp(user("c", "shtetl:zcheck"), "c") == 0);
+	cell("Z12", "no clone: no origin",
+	    sh_zfs_origin(z, at("s"), buf, sizeof (buf), &e) == 0);
+	refused("Z12", "of no snapshot: refused",
+	    sh_zfs_clone(z, at("s@9"), at("c2"), NULL, 0, &e), "s@9",
+	    "no such snapshot");
+	refused("Z12", "onto a name taken: refused",
+	    sh_zfs_clone(z, at("s@5"), at("c"), NULL, 0, &e), "c", "exists");
+	refused("Z12", "no parent: refused",
+	    sh_zfs_clone(z, at("s@5"), at("q/c"), NULL, 0, &e), "q/c",
+	    "no parent");
+	refused("Z9", "a snapshot with a clone: refused",
+	    sh_zfs_destroy(z, at("s@5"), &e), "s@5", "has clones");
+
+	cell("Z14", "a clone stream: d a clone of t@5, its @x1 c@x1's",
+	    sh_zfs_mount(z, at("c"), &e) == 0 && zc_fill(at("c")) == 0 &&
+	    snap("c@x1", NULL, NULL) == 0 &&
+	    sh_zfs_send(z, at("c@x1"), at("s@5"), at("d@x1"), at("t@5"),
+	    &e) == 0 && origin_is("d", "t@5") && same("d@x1", "c@x1"));
+	(void) snprintf(why, sizeof (why), "not %s's counterpart", at("s@5"));
+	refused("Z14", "onto an origin no counterpart: refused",
+	    sh_zfs_send(z, at("c@x1"), at("s@5"), at("v@x1"), at("t@3"), &e),
+	    "t@3", why);
+
+	cell("Z13", "c promoted: s's snapshots to @5 c's, s a clone of c@5",
+	    sh_zfs_promote(z, at("c"), &e) == 0 &&
+	    sh_zfs_origin(z, at("c"), buf, sizeof (buf), &e) == 0 &&
+	    origin_is("s", "c@5") && strcmp(snaps("c"), "1 2 3 5 x1") == 0 &&
+	    strcmp(snaps("s"), "") == 0);
+	refused("Z13", "no clone: refused",
+	    sh_zfs_promote(z, at("t"), &e), "t", "not a clone");
+}
+
 int
 zcells(FILE *o, const char *t)
 {
@@ -448,6 +605,7 @@ zcells(FILE *o, const char *t)
 	cells_mount();
 	cells_destroy();
 	cells_set();
+	cells_send();
 	sh_zfs_close(z);
 	(void) fclose(ef);
 	free(ebuf);

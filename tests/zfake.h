@@ -21,6 +21,13 @@ void zfake_pool(const char *pool);
 void zfake_fail(const char *what);
 void zfake_fail_nth(const char *what, int nth);
 
+/*
+ * The next stream sh_zfs_send or sh_zfs_resume receives breaks off
+ * part way: refused, and left on its target to resume, as a stream cut
+ * in a pipe leaves it.
+ */
+void zfake_cut(void);
+
 /* PROP as set on the filesystem DS itself, native or user; or NULL. */
 const char *zfake_local(const char *ds, const char *prop);
 

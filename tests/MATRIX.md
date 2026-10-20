@@ -88,6 +88,32 @@ words. The fake's data is words; the box's are files.
 | Z10 | inherit | not set there | nothing done |
 | Z10 | inherit | set there, nothing above | unset: 1 |
 | Z10 | set, inherit | no such filesystem | "no such filesystem" |
+| Z11 | snapinfo | two snapshots | guids apart, createtxg in order (m4-zfs) |
+| Z11 | snapinfo | no such snapshot | "no such snapshot" |
+| Z12 | clone | a snapshot, a property | a clone, the property from its birth, its origin read back |
+| Z12 | origin | no clone | 0 |
+| Z12 | clone | no such snapshot; the name taken; no parent | "no such snapshot"; "exists"; "no parent" |
+| Z9 | destroy | a snapshot with a clone | "has clones" (m4-zfs) |
+| Z13 | promote | a clone | the origin's snapshots up to the clone's now its, the origin a clone of it |
+| Z13 | promote | no clone | "not a clone" |
+| Z14 | send | whole | the target made, its snapshot the source's guid |
+| Z14 | send | whole onto a filesystem there | "exists" |
+| Z14 | send | incremental | the next snapshot, the source's guid |
+| Z14 | send | incremental onto a newest snapshot that is no counterpart; onto no filesystem; from no snapshot | "newest snapshot is not FROM's counterpart"; "no such filesystem"; "no such snapshot" |
+| Z14 | send | a clone stream | the target a clone of ORIGIN, its snapshot the source's |
+| Z14 | send | a clone stream onto an origin no counterpart | "not FROM's counterpart" |
+| Z15 | send cut | an incremental | a receive to resume; the target's newest as before |
+| Z15 | send | while a receive to resume stands | "a receive to resume" |
+| Z15 | resume | an incremental; a whole | the snapshot the source's; nothing left to resume |
+| Z15 | resume | nothing to resume; the source destroyed | "no receive to resume"; "SNAP: no such snapshot" |
+| Z15 | abort | an incremental; a whole | nothing to resume, the target as before; what the whole made gone |
+| Z15 | abort | nothing to resume | "no receive to resume" |
+| Z15 | send | after an abort | it lands |
+
+The streams' cells cut a stream through the driver (zc_cut): on the
+box as probe P1 cuts it, zfs send into head -c into zfs receive -s;
+in the fake, zfake_cut. A fake whose abort leaves what a whole made
+fails Z15 "a cut whole taken away".
 
 Disposition of every row above: tests/zcells.c, over the fake (make
 check) and over libzfs (tests/box/run.sh). Deferred, with what
@@ -98,8 +124,8 @@ unblocks them:
   user properties (Z10, m3-roll), and libzfs remounts a filesystem
   whose mountpoint it sets, so the cell waits for an issue that
   mounts something itself.
-- destroy of a snapshot "has clones" and "has holds": shtetl makes
-  clones from m4-zfs, which adds the cell; it takes no holds.
+- destroy of a snapshot "has holds": shtetl takes no holds. ("has
+  clones" is Z9's, from m4-zfs.)
 - a walk refused by libzfs part way, and open refused: nothing a cell
   can do makes libzfs fail them; the fake fails them on request
   (zfake_fail) for the tests of their callers.

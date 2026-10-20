@@ -16,6 +16,7 @@
 #define	SH_ZFS_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "core/err.h"
 
@@ -122,5 +123,76 @@ int sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e);
  */
 int sh_zfs_mounted(struct sh_zfs *z, const char *ds, char *path,
     size_t len, struct sh_err *e);
+
+/*
+ * The snapshot NAME's guid, which a snapshot received from it shares,
+ * and createtxg, which orders a filesystem's snapshots. Refused: "no
+ * such snapshot".
+ */
+int sh_zfs_snapinfo(struct sh_zfs *z, const char *name, uint64_t *guid,
+    uint64_t *txg, struct sh_err *e);
+
+/*
+ * The snapshot the filesystem DS is a clone of, into ORIGIN: 1; 0 when
+ * DS is no clone. Refused: "no such filesystem".
+ */
+int sh_zfs_origin(struct sh_zfs *z, const char *ds, char *origin,
+    size_t len, struct sh_err *e);
+
+/*
+ * DS made a clone of the snapshot ORIGIN, PROPS set locally from its
+ * birth; nothing is mounted. Refused: "no such snapshot", "exists",
+ * "no parent".
+ */
+int sh_zfs_clone(struct sh_zfs *z, const char *origin, const char *ds,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e);
+
+/*
+ * DS, a clone, promoted: its origin's snapshots up to the one DS was
+ * cloned from become DS's, and the origin's filesystem a clone of DS's.
+ * Refused: "no such filesystem", "not a clone", "SNAP is the origin's
+ * too" (a name both have).
+ */
+int sh_zfs_promote(struct sh_zfs *z, const char *ds, struct sh_err *e);
+
+/*
+ * The snapshot SNAP sent and received as TO (ds@snap), resumably (plan
+ * 8.1): whole when FROM is NULL, TO's filesystem made by the receive;
+ * incremental from FROM, an earlier snapshot of SNAP's filesystem or
+ * the one it is a clone of, onto TO's filesystem, whose newest
+ * snapshot is FROM's counterpart (the same guid); or, with ORIGIN, a
+ * clone stream from FROM, TO's filesystem made a clone of ORIGIN,
+ * FROM's counterpart. Nothing but the data travels (no -p), and
+ * nothing is mounted. A stream broken off leaves a receive to resume
+ * on TO's filesystem (sh_zfs_resumable), and while it stands no other
+ * stream is taken there. Refused: "no such snapshot" (SNAP, FROM or
+ * ORIGIN); TO's filesystem "exists", or "no such filesystem" for an
+ * incremental; "a receive to resume"; its "newest snapshot is not
+ * FROM's counterpart", or ORIGIN "not FROM's counterpart"; the
+ * system's words.
+ */
+int sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
+    const char *to, const char *origin, struct sh_err *e);
+
+/*
+ * Whether a broken receive stands on DS to be resumed: 1, or 0.
+ * Refused: "no such filesystem".
+ */
+int sh_zfs_resumable(struct sh_zfs *z, const char *ds, struct sh_err *e);
+
+/*
+ * DS's broken receive resumed: the stream sent on from where it broke
+ * off. Refused: "no receive to resume"; the snapshot it sends gone,
+ * "SNAP: no such snapshot", or the one it was sent from, "SNAP: its
+ * base gone"; the system's words.
+ */
+int sh_zfs_resume(struct sh_zfs *z, const char *ds, struct sh_err *e);
+
+/*
+ * DS's broken receive taken away (zfs receive -A): the part received
+ * gone, and DS with it where the stream was making DS. Refused: "no
+ * receive to resume".
+ */
+int sh_zfs_abort(struct sh_zfs *z, const char *ds, struct sh_err *e);
 
 #endif	/* SH_ZFS_H */

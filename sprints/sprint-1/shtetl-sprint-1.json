@@ -568,7 +568,8 @@
     ],
     "provides": "The ZFS calls the beam and the houses need: clone, promote, guid, resumable send and receive, a resume token and its abort.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-10-20: built; Z9 has clones, Z11-Z15 over the fake (check_zfs), drivers zc_fill/zc_cut (box: P1's head -c cut). send synchronous (m4-beam forks it in a job), resumable/resume/abort keep tokens inside the layer; resume via lzc_send_resume with the base found by guid. xcheck, gate. Owed: the cells over libzfs (run.sh). Worklog issue-docs/m4-zfs.md."
   },
   "m4-beam": {
     "description": "The beam (plan 8.1): in origin order, every snapshot a space should hold and lacks is sent, from the newest snapshot of the dataset's history whose guid the receiving space holds, wherever it is there; a dataset new to the receiving space received as a clone of its snapshot of that guid; a foundation's first version a full stream; shtetl:* properties copied after each receive, no send -p. A standing resume token is resumed first; nothing is destroyed on a failure. The actor converges after every snapshot it is told of and on a timer, backs off while a space cannot be reached, and tells the house actors of each foundation version that arrives on zrun. Skeleton rows for run/foundations (canmount=off) and lake/containers, lake/systems. Matrix family B: each shape of history on each side, cut at each stream, a promote before and after. Verify: make check; m4-box.",

@@ -14,10 +14,13 @@
  */
 
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #include <errno.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <libnvpair.h>
 #include <libzfs.h>
@@ -530,4 +533,413 @@ sh_zfs_mounted(struct sh_zfs *z, const char *ds, char *path, size_t len,
 	free(at);
 	zfs_close(zhp);
 	return (r);
+}
+
+int
+sh_zfs_snapinfo(struct sh_zfs *z, const char *name, uint64_t *guid,
+    uint64_t *txg, struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+
+	/* a filesystem's name would open as one */
+	if (strchr(name, '@') == NULL) {
+		sh_errf(e, "%s: no such snapshot", name);
+		return (-1);
+	}
+	if ((zhp = zz_open(z, name, e)) == NULL)
+		return (-1);
+	*guid = zfs_prop_get_int(zhp, ZFS_PROP_GUID);
+	*txg = zfs_prop_get_int(zhp, ZFS_PROP_CREATETXG);
+	zfs_close(zhp);
+	return (0);
+}
+
+/*
+ * The property PROP of ZHP as zfs get prints it, into BUF: 1; 0 for
+ * one it has none of, which zfs get prints "-".
+ */
+static int
+zz_str(zfs_handle_t *zhp, zfs_prop_t prop, char *buf, size_t len)
+{
+	if (zfs_prop_get(zhp, prop, buf, len, NULL, NULL, 0, B_TRUE) != 0 ||
+	    buf[0] == '\0' || strcmp(buf, "-") == 0)
+		return (0);
+	return (1);
+}
+
+int
+sh_zfs_origin(struct sh_zfs *z, const char *ds, char *origin, size_t len,
+    struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	int r;
+
+	if ((zhp = zz_open(z, ds, e)) == NULL)
+		return (-1);
+	r = zz_str(zhp, ZFS_PROP_ORIGIN, origin, len);
+	zfs_close(zhp);
+	return (r);
+}
+
+/*
+ * zfs_clone, not lzc_clone: it takes PROPS as words and gives the
+ * kernel native ones in their own types; like zfs_create it looks for
+ * the parent (EZFS_NOENT), then the name (EZFS_EXISTS).
+ */
+int
+sh_zfs_clone(struct sh_zfs *z, const char *origin, const char *ds,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	nvlist_t *nv;
+	int r;
+
+	if (strchr(origin, '@') == NULL) {
+		sh_errf(e, "%s: no such snapshot", origin);
+		return (-1);
+	}
+	if ((zhp = zz_open(z, origin, e)) == NULL)
+		return (-1);
+	nv = zz_props(props, nprops);
+	r = zfs_clone(zhp, ds, nv);
+	nvlist_free(nv);
+	zfs_close(zhp);
+	if (r == 0)
+		return (0);
+	if (libzfs_errno(z->zz_hdl) == EZFS_NOENT)
+		sh_errf(e, "%s: no parent", ds);
+	else if (libzfs_errno(z->zz_hdl) == EZFS_EXISTS)
+		sh_errf(e, "%s: exists", ds);
+	else
+		zz_err(z, e, ds);
+	return (-1);
+}
+
+int
+sh_zfs_promote(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	char origin[ZFS_MAX_DATASET_NAME_LEN];
+	char conflict[ZFS_MAX_DATASET_NAME_LEN];
+	int r;
+
+	if ((r = sh_zfs_origin(z, ds, origin, sizeof (origin), e)) != 1) {
+		if (r == 0)
+			sh_errf(e, "%s: not a clone", ds);
+		return (-1);
+	}
+	conflict[0] = '\0';
+	if ((r = lzc_promote(ds, conflict, sizeof (conflict))) == 0)
+		return (0);
+	if (r == EEXIST)
+		sh_errf(e, "%s: %s is the origin's too", ds, conflict);
+	else
+		sh_errf(e, "%s: %s", ds, strerror(r));
+	return (-1);
+}
+
+/* FS's receive_resume_token, into TOKEN: 1; 0 for none; -1. */
+static int
+zz_token(struct sh_zfs *z, const char *fs, char *token, size_t len,
+    struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	int r;
+
+	if ((zhp = zz_open(z, fs, e)) == NULL)
+		return (-1);
+	r = zz_str(zhp, ZFS_PROP_RECEIVE_RESUME_TOKEN, token, len);
+	zfs_close(zhp);
+	return (r);
+}
+
+int
+sh_zfs_resumable(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	char token[ZFS_MAXPROPLEN];
+
+	return (zz_token(z, ds, token, sizeof (token), e));
+}
+
+/*
+ * SNAP sent from FROM by lzc_send, or with RESUME by lzc_send_resume
+ * from OBJ and OFF, in a child into a pipe; received as TO here by
+ * lzc_receive_resumable, so a stream broken off leaves its token. The
+ * receiver's errno names the refusal (dmu_recv.c: ENODEV the base not
+ * FROM's counterpart, EEXIST the target there, ETXTBSY changed since
+ * its newest snapshot), else the sender's (EXDEV: FROM no ancestor).
+ */
+static int
+zz_stream(struct sh_zfs *z, const char *snap, const char *from,
+    const char *to, const char *origin, enum lzc_send_flags flags,
+    int resume, uint64_t obj, uint64_t off, struct sh_err *e)
+{
+	int fds[2], st, rr, sr;
+	size_t n = strcspn(to, "@");
+	pid_t pid;
+
+	(void) z;
+	if (pipe(fds) != 0) {
+		sh_errf(e, "pipe: %s", strerror(errno));
+		return (-1);
+	}
+	if ((pid = fork()) == -1) {
+		sh_errf(e, "fork: %s", strerror(errno));
+		(void) close(fds[0]);
+		(void) close(fds[1]);
+		return (-1);
+	}
+	if (pid == 0) {
+		/* a receiver that stops is EPIPE, not a signal */
+		(void) close(fds[0]);
+		(void) signal(SIGPIPE, SIG_IGN);
+		sr = resume ? lzc_send_resume(snap, from, fds[1], flags, obj,
+		    off) : lzc_send(snap, from, fds[1], flags);
+		_exit(sr & 0xff);
+	}
+	(void) close(fds[1]);
+	rr = lzc_receive_resumable(to, NULL, origin, B_FALSE, B_FALSE, fds[0]);
+	(void) close(fds[0]);
+	while (waitpid(pid, &st, 0) == -1 && errno == EINTR)
+		;
+	sr = WIFEXITED(st) ? WEXITSTATUS(st) : EINTR;
+	if (rr == 0 && sr == 0)
+		return (0);
+	if (rr == ENODEV && origin != NULL)
+		sh_errf(e, "%s: not %s's counterpart", origin, from);
+	else if (rr == ENODEV)
+		sh_errf(e, "%.*s: newest snapshot is not %s's counterpart",
+		    (int)n, to, from);
+	else if (rr == EEXIST)
+		sh_errf(e, "%.*s: exists", (int)n, to);
+	else if (rr == ETXTBSY)
+		sh_errf(e, "%.*s: changed since its newest snapshot", (int)n,
+		    to);
+	else if (sr != 0 && sr != EPIPE)
+		sh_errf(e, "%s: %s", snap, strerror(sr));
+	else
+		sh_errf(e, "%s: %s", to, strerror(rr));
+	return (-1);
+}
+
+/* A walk of snapshots: the newest's name into ARG. */
+static int
+zz_last(void *arg, const char *snap)
+{
+	(void) snprintf(arg, ZFS_MAX_DATASET_NAME_LEN, "%s", snap);
+	return (0);
+}
+
+/*
+ * Whether a stream from FROM may go onto FS: with ORIGIN, ORIGIN is
+ * FROM's counterpart (the same guid); without, FS's newest snapshot
+ * is. 1, 0, or -1.
+ */
+static int
+zz_base(struct sh_zfs *z, const char *fs, const char *from,
+    const char *origin, struct sh_err *e)
+{
+	char last[ZFS_MAX_DATASET_NAME_LEN], name[ZFS_MAX_DATASET_NAME_LEN * 2];
+	uint64_t gf, gb, t;
+
+	if (origin != NULL) {
+		(void) snprintf(name, sizeof (name), "%s", origin);
+	} else {
+		last[0] = '\0';
+		if (sh_zfs_snapshots(z, fs, zz_last, last, e) != 0)
+			return (-1);
+		if (last[0] == '\0')
+			return (0);
+		(void) snprintf(name, sizeof (name), "%s@%s", fs, last);
+	}
+	if (sh_zfs_snapinfo(z, from, &gf, &t, e) != 0 ||
+	    sh_zfs_snapinfo(z, name, &gb, &t, e) != 0)
+		return (-1);
+	return (gf == gb);
+}
+
+int
+sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
+    const char *to, const char *origin, struct sh_err *e)
+{
+	const char *const named[] = { snap, from, origin };
+	char fs[ZFS_MAX_DATASET_NAME_LEN], token[ZFS_MAXPROPLEN];
+	const char *at = strchr(to, '@');
+	size_t i;
+	int r;
+
+	for (i = 0; i < 3; i++) {
+		if (named[i] != NULL && !zfs_dataset_exists(z->zz_hdl,
+		    named[i], ZFS_TYPE_SNAPSHOT)) {
+			sh_errf(e, "%s: no such snapshot", named[i]);
+			return (-1);
+		}
+	}
+	if (at == NULL) {
+		sh_errf(e, "%s: not a snapshot's name", to);
+		return (-1);
+	}
+	(void) snprintf(fs, sizeof (fs), "%.*s", (int)(at - to), to);
+	if (zfs_dataset_exists(z->zz_hdl, fs, ZFS_TYPE_FILESYSTEM)) {
+		if ((r = zz_token(z, fs, token, sizeof (token), e)) != 0) {
+			if (r == 1)
+				sh_errf(e, "%s: a receive to resume", fs);
+			return (-1);
+		}
+		if (from == NULL || origin != NULL) {
+			sh_errf(e, "%s: exists", fs);
+			return (-1);
+		}
+	} else if (from != NULL && origin == NULL) {
+		sh_errf(e, "%s: no such filesystem", fs);
+		return (-1);
+	}
+	/* the base, by guid, as the beam's rule names it (plan 8.1) */
+	if (from != NULL && (r = zz_base(z, fs, from, origin, e)) != 1) {
+		if (r == 0 && origin != NULL)
+			sh_errf(e, "%s: not %s's counterpart", origin, from);
+		else if (r == 0)
+			sh_errf(e, "%s: newest snapshot is not %s's "
+			    "counterpart", fs, from);
+		return (-1);
+	}
+	return (zz_stream(z, snap, from, to, origin,
+	    LZC_SEND_FLAG_LARGE_BLOCK | LZC_SEND_FLAG_EMBED_DATA |
+	    LZC_SEND_FLAG_COMPRESS, 0, 0, 0, e));
+}
+
+/* A walk of FS's snapshots for the one whose guid is the search's. */
+struct zz_find {
+	libzfs_handle_t	*zf_hdl;
+	const char	*zf_fs;
+	uint64_t	zf_guid;
+	char		zf_name[ZFS_MAX_DATASET_NAME_LEN];
+};
+
+static int
+zz_find(void *arg, const char *snap)
+{
+	struct zz_find *f = arg;
+	zfs_handle_t *zhp;
+	int found = 0;
+
+	(void) snprintf(f->zf_name, sizeof (f->zf_name), "%s@%s", f->zf_fs,
+	    snap);
+	if ((zhp = zfs_open(f->zf_hdl, f->zf_name, ZFS_TYPE_SNAPSHOT)) !=
+	    NULL) {
+		found = zfs_prop_get_int(zhp, ZFS_PROP_GUID) == f->zf_guid;
+		zfs_close(zhp);
+	}
+	return (found);
+}
+
+/*
+ * The snapshot whose guid is GUID among those of SNAP's filesystem, or
+ * the one that filesystem is a clone of, into F's name: 1, 0, or -1:
+ * what lzc_send_resume needs of a token's fromguid.
+ */
+static int
+zz_byguid(struct sh_zfs *z, const char *snap, uint64_t guid,
+    struct zz_find *f, struct sh_err *e)
+{
+	char fs[ZFS_MAX_DATASET_NAME_LEN];
+	uint64_t g, t;
+	int r;
+
+	(void) snprintf(fs, sizeof (fs), "%.*s", (int)strcspn(snap, "@"), snap);
+	f->zf_hdl = z->zz_hdl;
+	f->zf_fs = fs;
+	f->zf_guid = guid;
+	if ((r = sh_zfs_snapshots(z, fs, zz_find, f, e)) != 0)
+		return (r);
+	if ((r = sh_zfs_origin(z, fs, f->zf_name, sizeof (f->zf_name), e)) !=
+	    1)
+		return (r);
+	if (sh_zfs_snapinfo(z, f->zf_name, &g, &t, e) != 0)
+		return (-1);
+	return (g == guid);
+}
+
+/*
+ * The token decoded (zfs_send_resume_token_to_nvlist), its source
+ * looked for as it was when the stream began (toname with toguid), and
+ * the snapshot it was sent from found by its fromguid; the stream sent
+ * on from object and offset with the flags it began with.
+ */
+int
+sh_zfs_resume(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	char token[ZFS_MAXPROPLEN], to[ZFS_MAX_DATASET_NAME_LEN * 2];
+	enum lzc_send_flags flags = 0;
+	uint64_t toguid, fromguid = 0, obj, off, g, t;
+	struct zz_find f;
+	const char *toname;
+	nvlist_t *nv;
+	int r;
+
+	if ((r = zz_token(z, ds, token, sizeof (token), e)) != 1) {
+		if (r == 0)
+			sh_errf(e, "%s: no receive to resume", ds);
+		return (-1);
+	}
+	if ((nv = zfs_send_resume_token_to_nvlist(z->zz_hdl, token)) ==
+	    NULL) {
+		zz_err(z, e, ds);
+		return (-1);
+	}
+	toname = fnvlist_lookup_string(nv, "toname");
+	toguid = fnvlist_lookup_uint64(nv, "toguid");
+	obj = fnvlist_lookup_uint64(nv, "object");
+	off = fnvlist_lookup_uint64(nv, "offset");
+	(void) nvlist_lookup_uint64(nv, "fromguid", &fromguid);
+	if (nvlist_exists(nv, "largeblockok"))
+		flags |= LZC_SEND_FLAG_LARGE_BLOCK;
+	if (nvlist_exists(nv, "embedok"))
+		flags |= LZC_SEND_FLAG_EMBED_DATA;
+	if (nvlist_exists(nv, "compressok"))
+		flags |= LZC_SEND_FLAG_COMPRESS;
+	if (nvlist_exists(nv, "rawok"))
+		flags |= LZC_SEND_FLAG_RAW;
+	r = -1;
+	if (!zfs_dataset_exists(z->zz_hdl, toname, ZFS_TYPE_SNAPSHOT) ||
+	    sh_zfs_snapinfo(z, toname, &g, &t, e) != 0 || g != toguid)
+		sh_errf(e, "%s: no such snapshot", toname);
+	else if (fromguid != 0 && zz_byguid(z, toname, fromguid, &f, e) != 1)
+		sh_errf(e, "%s: its base gone", toname);
+	else {
+		(void) snprintf(to, sizeof (to), "%s%s", ds,
+		    strchr(toname, '@'));
+		r = zz_stream(z, toname, fromguid != 0 ? f.zf_name : NULL, to,
+		    NULL, flags, 1, obj, off, e);
+	}
+	nvlist_free(nv);
+	return (r);
+}
+
+/*
+ * As zfs receive -A (cmd/zfs/zfs_main.c): the hidden DS/%recv an
+ * incremental was going into destroyed, or, where there is none, DS
+ * itself, which a whole or clone stream was making.
+ */
+int
+sh_zfs_abort(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	char token[ZFS_MAXPROPLEN], recv[ZFS_MAX_DATASET_NAME_LEN + 8];
+	zfs_handle_t *zhp;
+	int r;
+
+	if ((r = zz_token(z, ds, token, sizeof (token), e)) != 1) {
+		if (r == 0)
+			sh_errf(e, "%s: no receive to resume", ds);
+		return (-1);
+	}
+	(void) snprintf(recv, sizeof (recv), "%s/%%recv", ds);
+	if ((zhp = zfs_open(z->zz_hdl, zfs_dataset_exists(z->zz_hdl, recv,
+	    ZFS_TYPE_FILESYSTEM) ? recv : ds, ZFS_TYPE_FILESYSTEM)) == NULL) {
+		zz_err(z, e, ds);
+		return (-1);
+	}
+	if ((r = zfs_destroy(zhp, B_FALSE)) != 0)
+		zz_err(z, e, ds);
+	zfs_close(zhp);
+	return (r != 0 ? -1 : 0);
 }

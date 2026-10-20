@@ -7,6 +7,8 @@
 
 #include <sys/stat.h>
 
+#include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +36,15 @@ struct zf_obj {
 	char		zo_words[ZF_WORDS][32];
 	int		zo_nwords;
 	char		zo_at[ZF_NAME];	/* a filesystem: mounted there, or "" */
+	uint64_t	zo_guid;	/* a snapshot's, or its source's */
+	uint64_t	zo_txg;		/* a snapshot's createtxg */
+	char		zo_origin[ZF_NAME];	/* a clone's snapshot, or "" */
+	/* a filesystem's receive to resume: what it was sent, or "" */
+	char		zo_rsnap[ZF_NAME];
+	uint64_t	zo_rguid;
+	char		zo_rfrom[ZF_NAME];
+	uint64_t	zo_rfguid;
+	int		zo_made;	/* made by that stream */
 };
 
 struct sh_zfs {
@@ -46,6 +57,8 @@ static struct zf_obj zf_snaps[ZF_SNAPS];	/* oldest first */
 static int zf_nsnaps;
 static char zf_failing[32];
 static int zf_failin;		/* calls of zf_failing still to pass */
+static uint64_t zf_txg;		/* the last createtxg given */
+static int zf_cutting;		/* the next stream breaks off */
 static struct sh_zfs zf_handle;
 
 static void
@@ -130,6 +143,8 @@ zfake_reset(void)
 {
 	zf_n = 0;
 	zf_nsnaps = 0;
+	zf_txg = 0;
+	zf_cutting = 0;
 	zf_failing[0] = '\0';
 }
 
@@ -364,25 +379,31 @@ sh_zfs_children(struct sh_zfs *z, const char *ds,
 	return (0);
 }
 
-/* As zfs_create looks: the parent first, then the name. */
-int
-sh_zfs_create(struct sh_zfs *z, const char *ds,
-    const struct sh_zprop *props, size_t nprops, struct sh_err *e)
+/* A guid no snapshot has had. */
+static uint64_t
+zf_guid(void)
+{
+	static uint64_t n;
+
+	return (0x9e3779b97f4a7c15ULL * ++n);
+}
+
+/* As zfs_create and zfs_clone look: the parent first, then the name. */
+static struct zf_obj *
+zf_mkfs(const char *ds, const struct sh_zprop *props, size_t nprops,
+    struct sh_err *e)
 {
 	char parent[ZF_NAME];
 	struct zf_obj *d;
 	size_t i;
 
-	(void) z;
-	if (zf_fails("create", e))
-		return (-1);
 	if (!zf_parent(ds, parent) || zf_fs(parent) == NULL) {
 		sh_errf(e, "zfake: %s: no parent", ds);
-		return (-1);
+		return (NULL);
 	}
 	if (zf_fs(ds) != NULL) {
 		sh_errf(e, "zfake: %s: exists", ds);
-		return (-1);
+		return (NULL);
 	}
 	if (zf_n == ZF_DS)
 		zf_die("too many filesystems", ds);
@@ -391,7 +412,17 @@ sh_zfs_create(struct sh_zfs *z, const char *ds,
 	(void) snprintf(d->zo_name, ZF_NAME, "%s", ds);
 	for (i = 0; i < nprops; i++)
 		zf_put(d, props[i].zp_name, props[i].zp_value);
-	return (0);
+	return (d);
+}
+
+int
+sh_zfs_create(struct sh_zfs *z, const char *ds,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e)
+{
+	(void) z;
+	if (zf_fails("create", e))
+		return (-1);
+	return (zf_mkfs(ds, props, nprops, e) != NULL ? 0 : -1);
 }
 
 /*
@@ -455,6 +486,10 @@ sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
 		(void) snprintf(s->zo_name, ZF_NAME, "%s", names[i]);
 		s->zo_nprops = 0;
 		s->zo_at[0] = '\0';
+		s->zo_origin[0] = '\0';
+		s->zo_rsnap[0] = '\0';
+		s->zo_guid = zf_guid();
+		s->zo_txg = ++zf_txg;
 		for (k = 0; k < nprops; k++)
 			zf_put(s, props[k].zp_name, props[k].zp_value);
 	}
@@ -532,6 +567,12 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 		return (-1);
 	}
 	if (snap) {
+		for (i = 0; i < zf_n; i++) {
+			if (strcmp(zf_ds[i].zo_origin, name) == 0) {
+				sh_errf(e, "zfake: %s: has clones", name);
+				return (-1);
+			}
+		}
 		i = (int)(o - zf_snaps);
 		(void) memmove(o, o + 1, (size_t)(zf_nsnaps - i - 1) *
 		    sizeof (*o));
@@ -662,4 +703,334 @@ sh_zfs_mounted(struct sh_zfs *z, const char *ds, char *path, size_t len,
 		return (0);
 	(void) snprintf(path, len, "%s", d->zo_at);
 	return (1);
+}
+
+void
+zfake_cut(void)
+{
+	zf_cutting = 1;
+}
+
+int
+sh_zfs_snapinfo(struct sh_zfs *z, const char *name, uint64_t *guid,
+    uint64_t *txg, struct sh_err *e)
+{
+	const struct zf_obj *s;
+
+	(void) z;
+	if (zf_fails("snapinfo", e))
+		return (-1);
+	if ((s = zf_snap(name)) == NULL) {
+		sh_errf(e, "zfake: %s: no such snapshot", name);
+		return (-1);
+	}
+	*guid = s->zo_guid;
+	*txg = s->zo_txg;
+	return (0);
+}
+
+/* The filesystem DS, or NULL with "no such filesystem" said. */
+static struct zf_obj *
+zf_fsof(const char *ds, struct sh_err *e)
+{
+	struct zf_obj *d;
+
+	if ((d = zf_fs(ds)) == NULL)
+		sh_errf(e, "zfake: %s: no such filesystem", ds);
+	return (d);
+}
+
+int
+sh_zfs_origin(struct sh_zfs *z, const char *ds, char *origin, size_t len,
+    struct sh_err *e)
+{
+	const struct zf_obj *d;
+
+	(void) z;
+	if (zf_fails("origin", e) || (d = zf_fsof(ds, e)) == NULL)
+		return (-1);
+	if (d->zo_origin[0] == '\0')
+		return (0);
+	(void) snprintf(origin, len, "%s", d->zo_origin);
+	return (1);
+}
+
+/* D's data that of the snapshot S. */
+static void
+zf_data(struct zf_obj *d, const struct zf_obj *s)
+{
+	(void) memcpy(d->zo_words, s->zo_words, sizeof (d->zo_words));
+	d->zo_nwords = s->zo_nwords;
+}
+
+int
+sh_zfs_clone(struct sh_zfs *z, const char *origin, const char *ds,
+    const struct sh_zprop *props, size_t nprops, struct sh_err *e)
+{
+	const struct zf_obj *s;
+	struct zf_obj *d;
+
+	(void) z;
+	if (zf_fails("clone", e))
+		return (-1);
+	if ((s = zf_snap(origin)) == NULL) {
+		sh_errf(e, "zfake: %s: no such snapshot", origin);
+		return (-1);
+	}
+	if ((d = zf_mkfs(ds, props, nprops, e)) == NULL)
+		return (-1);
+	zf_data(d, s);
+	(void) snprintf(d->zo_origin, ZF_NAME, "%s", origin);
+	return (0);
+}
+
+/*
+ * As lzc_promote: the snapshots of the origin's filesystem up to the
+ * one DS was cloned from become DS's, the clones of each following it,
+ * and the origin's filesystem a clone of DS's; a name both have
+ * refuses it before anything moves.
+ */
+int
+sh_zfs_promote(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	struct zf_obj *d, *of;
+	char ofs[ZF_NAME], was[ZF_NAME], name[ZF_NAME * 2];
+	const char *at;
+	uint64_t txg;
+	int i, k, pass;
+
+	(void) z;
+	if (zf_fails("promote", e) || (d = zf_fsof(ds, e)) == NULL)
+		return (-1);
+	if (d->zo_origin[0] == '\0') {
+		sh_errf(e, "zfake: %s: not a clone", ds);
+		return (-1);
+	}
+	txg = zf_snap(d->zo_origin)->zo_txg;
+	(void) snprintf(ofs, sizeof (ofs), "%.*s",
+	    (int)strcspn(d->zo_origin, "@"), d->zo_origin);
+	of = zf_fs(ofs);
+	for (pass = 0; pass < 2; pass++) {
+		for (i = 0; i < zf_nsnaps; i++) {
+			if (!zf_of(&zf_snaps[i], ofs) ||
+			    zf_snaps[i].zo_txg > txg)
+				continue;
+			at = strchr(zf_snaps[i].zo_name, '@');
+			(void) snprintf(name, sizeof (name), "%s%s", ds, at);
+			if (pass == 0 && zf_snap(name) != NULL) {
+				sh_errf(e, "zfake: %s: %s is the origin's too",
+				    ds, at + 1);
+				return (-1);
+			}
+			if (pass == 0)
+				continue;
+			for (k = 0; k < zf_n; k++) {
+				if (strcmp(zf_ds[k].zo_origin,
+				    zf_snaps[i].zo_name) == 0)
+					(void) snprintf(zf_ds[k].zo_origin,
+					    ZF_NAME, "%s", name);
+			}
+			(void) snprintf(zf_snaps[i].zo_name, ZF_NAME, "%s",
+			    name);
+		}
+	}
+	/* DS's origin followed its snapshot to DS: the two swap */
+	(void) snprintf(was, sizeof (was), "%s", of->zo_origin);
+	(void) snprintf(of->zo_origin, ZF_NAME, "%s", d->zo_origin);
+	(void) snprintf(d->zo_origin, ZF_NAME, "%s", was);
+	return (0);
+}
+
+/* The newest snapshot of the filesystem FS, or NULL. */
+static const struct zf_obj *
+zf_newest(const char *fs)
+{
+	int i;
+
+	for (i = zf_nsnaps - 1; i >= 0; i--) {
+		if (zf_of(&zf_snaps[i], fs))
+			return (&zf_snaps[i]);
+	}
+	return (NULL);
+}
+
+/*
+ * The stream of SNAP, from FROM, received into D as TO: taken, the
+ * snapshot with SNAP's guid; or, cut, left to resume, what was sent
+ * recorded on D as a token would record it.
+ */
+static int
+zf_take(struct zf_obj *d, const char *snap, const char *from,
+    const char *to, struct sh_err *e)
+{
+	const struct zf_obj *s = zf_snap(snap);
+	const struct zf_obj *f = from != NULL ? zf_snap(from) : NULL;
+	struct zf_obj *t;
+
+	if (zf_cutting) {
+		zf_cutting = 0;
+		(void) snprintf(d->zo_rsnap, ZF_NAME, "%s", snap);
+		d->zo_rguid = s->zo_guid;
+		(void) snprintf(d->zo_rfrom, ZF_NAME, "%s",
+		    from != NULL ? from : "");
+		d->zo_rfguid = f != NULL ? f->zo_guid : 0;
+		sh_errf(e, "zfake: %s: the stream broken off", to);
+		return (-1);
+	}
+	if (zf_nsnaps == ZF_SNAPS)
+		zf_die("too many snapshots", to);
+	zf_data(d, s);
+	t = &zf_snaps[zf_nsnaps++];
+	(void) memset(t, 0, sizeof (*t));
+	(void) snprintf(t->zo_name, ZF_NAME, "%s", to);
+	zf_data(t, s);
+	t->zo_guid = s->zo_guid;
+	t->zo_txg = ++zf_txg;
+	d->zo_rsnap[0] = '\0';
+	d->zo_made = 0;
+	return (0);
+}
+
+/* As the libzfs layer looks, in its order and its words. */
+int
+sh_zfs_send(struct sh_zfs *z, const char *snap, const char *from,
+    const char *to, const char *origin, struct sh_err *e)
+{
+	const char *const named[] = { snap, from, origin };
+	const char *at = strchr(to, '@');
+	const struct zf_obj *b;
+	char fs[ZF_NAME], parent[ZF_NAME];
+	struct zf_obj *d;
+	size_t i;
+
+	(void) z;
+	if (zf_fails("send", e))
+		return (-1);
+	for (i = 0; i < 3; i++) {
+		if (named[i] != NULL && zf_snap(named[i]) == NULL) {
+			sh_errf(e, "zfake: %s: no such snapshot", named[i]);
+			return (-1);
+		}
+	}
+	if (at == NULL) {
+		sh_errf(e, "zfake: %s: not a snapshot's name", to);
+		return (-1);
+	}
+	(void) snprintf(fs, sizeof (fs), "%.*s", (int)(at - to), to);
+	if ((d = zf_fs(fs)) != NULL) {
+		if (d->zo_rsnap[0] != '\0') {
+			sh_errf(e, "zfake: %s: a receive to resume", fs);
+			return (-1);
+		}
+		if (from == NULL || origin != NULL) {
+			sh_errf(e, "zfake: %s: exists", fs);
+			return (-1);
+		}
+	} else if (from != NULL && origin == NULL) {
+		sh_errf(e, "zfake: %s: no such filesystem", fs);
+		return (-1);
+	}
+	if (from != NULL) {
+		b = origin != NULL ? zf_snap(origin) : zf_newest(fs);
+		if (b == NULL || b->zo_guid != zf_snap(from)->zo_guid) {
+			if (origin != NULL)
+				sh_errf(e, "zfake: %s: not %s's counterpart",
+				    origin, from);
+			else
+				sh_errf(e, "zfake: %s: newest snapshot is not "
+				    "%s's counterpart", fs, from);
+			return (-1);
+		}
+	}
+	if (d == NULL) {
+		if (!zf_parent(fs, parent) || zf_fs(parent) == NULL) {
+			sh_errf(e, "zfake: %s: %s", to, strerror(ENOENT));
+			return (-1);
+		}
+		d = zf_mkfs(fs, NULL, 0, e);
+		d->zo_made = 1;
+		if (origin != NULL)
+			(void) snprintf(d->zo_origin, ZF_NAME, "%s", origin);
+	}
+	return (zf_take(d, snap, from, to, e));
+}
+
+int
+sh_zfs_resumable(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	const struct zf_obj *d;
+
+	(void) z;
+	if (zf_fails("resumable", e) || (d = zf_fsof(ds, e)) == NULL)
+		return (-1);
+	return (d->zo_rsnap[0] != '\0');
+}
+
+/* The snapshot whose guid is GUID among FS's, or FS's origin. */
+static const struct zf_obj *
+zf_byguid(const char *fs, uint64_t guid)
+{
+	const struct zf_obj *d = zf_fs(fs), *o;
+	int i;
+
+	for (i = 0; i < zf_nsnaps; i++) {
+		if (zf_of(&zf_snaps[i], fs) && zf_snaps[i].zo_guid == guid)
+			return (&zf_snaps[i]);
+	}
+	if (d != NULL && d->zo_origin[0] != '\0' &&
+	    (o = zf_snap(d->zo_origin)) != NULL && o->zo_guid == guid)
+		return (o);
+	return (NULL);
+}
+
+int
+sh_zfs_resume(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	const struct zf_obj *s, *f = NULL;
+	char snap[ZF_NAME], fs[ZF_NAME], to[ZF_NAME * 2];
+	struct zf_obj *d;
+
+	(void) z;
+	if (zf_fails("resume", e) || (d = zf_fsof(ds, e)) == NULL)
+		return (-1);
+	if (d->zo_rsnap[0] == '\0') {
+		sh_errf(e, "zfake: %s: no receive to resume", ds);
+		return (-1);
+	}
+	(void) snprintf(snap, sizeof (snap), "%s", d->zo_rsnap);
+	(void) snprintf(fs, sizeof (fs), "%.*s", (int)strcspn(snap, "@"),
+	    snap);
+	if ((s = zf_snap(snap)) == NULL || s->zo_guid != d->zo_rguid) {
+		sh_errf(e, "zfake: %s: no such snapshot", snap);
+		return (-1);
+	}
+	if (d->zo_rfguid != 0 && (f = zf_byguid(fs, d->zo_rfguid)) == NULL) {
+		sh_errf(e, "zfake: %s: its base gone", snap);
+		return (-1);
+	}
+	(void) snprintf(to, sizeof (to), "%s%s", ds, strchr(snap, '@'));
+	return (zf_take(d, snap, f != NULL ? f->zo_name : NULL, to, e));
+}
+
+/* As receive -A: what the stream was making goes with it. */
+int
+sh_zfs_abort(struct sh_zfs *z, const char *ds, struct sh_err *e)
+{
+	struct zf_obj *d;
+	int i;
+
+	(void) z;
+	if (zf_fails("abort", e) || (d = zf_fsof(ds, e)) == NULL)
+		return (-1);
+	if (d->zo_rsnap[0] == '\0') {
+		sh_errf(e, "zfake: %s: no receive to resume", ds);
+		return (-1);
+	}
+	d->zo_rsnap[0] = '\0';
+	if (!d->zo_made)
+		return (0);
+	i = (int)(d - zf_ds);
+	(void) memmove(d, d + 1, (size_t)(zf_n - i - 1) * sizeof (*d));
+	zf_n--;
+	return (0);
 }
