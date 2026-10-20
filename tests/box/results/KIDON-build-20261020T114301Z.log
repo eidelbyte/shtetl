@@ -1,0 +1,60 @@
+shtetl f57133c box build on KIDON 2026-10-20T11:43:01Z
+host: 15.1-RELEASE-p2 amd64
+branch: releng/15.1 from https://git.freebsd.org/src.git
+
+# make -C /home/miri/shtetl install
+install -d /usr/local/sbin /usr/local/etc/rc.d
+install -m 0555 shtetl /usr/local/sbin/shtetl
+install -m 0555 etc/rc.d/shtetl /usr/local/etc/rc.d/shtetl
+# zpool import -d /var/tmp -R /var/tmp/s2box s2box
+# zfs destroy -r s2box/lake/foundations/box
+# rm -rf /var/tmp/s2box/config/foundations /var/tmp/s2box/config/patches /var/tmp/s2box/config/shtetl.conf
+# mkdir -p /var/tmp/s2box/config/foundations /var/tmp/s2box/config/patches/local
+# service shtetl onestart
+Starting shtetl.
+ok   R1 a create roll (F17, GS10)
+ok   R2 every dataset snapshotted, kind create
+ok   R2 shtetl:commit the checkout's
+ok   R2 usr a placeholder
+ok   R3 a world and a kernel (K19)
+ok   R3 the package, in usr/local (X9)
+ok   R3 the command run in the chroot
+ok   R3 no resolv.conf left
+ok   R4 foundation.conf schg (F18)
+ok   R4 the head unmounted
+ok   R5 an update roll
+ok   R5 kind update
+# sed -i  1s/.*/shtetl box a/ /var/tmp/s2box/build/src/README.md
+# git -C /var/tmp/s2box/build/src checkout -q README.md
+# sed -i  1s/.*/shtetl box b/ /var/tmp/s2box/build/src/README.md
+# git -C /var/tmp/s2box/build/src checkout -q README.md
+ok   R6 a conflict: stalled
+ok   R6 shtetl:stall
+ok   R6 at its newest version still
+ok   R6 zbuild reset
+# rm /var/tmp/s2box/config/patches/local/2-b.patch
+ok   R7 asked again: the stall cleared, rolled
+ok   R7 the patch in the checkout
+ok   R7 no stall
+ok   R8 a pkg roll
+ok   R8 kind pkg, the version's commit
+# /usr/local/sbin/shtetl roll box
+# service shtetl onestop
+Stopping shtetl.
+Waiting for PIDS: 89891.
+ok   R9 stopped: devfs left on the head
+ok   R9 and the roll's marker in it
+# service shtetl onestart
+Starting shtetl.
+ok   R9 started again: idle at the newest, no stall
+ok   R9 devfs gone
+ok   R9 the head unmounted
+ok   R9 what the roll wrote gone
+
+syslog, daemon.log from the run's start, the daemon's own:
+Oct 20 04:44:10 KIDON shtetl[89891]: box: version 15.1-releng-2026-10-20T11_44_10Z-create
+Oct 20 04:45:37 KIDON shtetl[89891]: box: version 15.1-releng-2026-10-20T11_45_37Z-update
+Oct 20 04:46:07 KIDON shtetl[89891]: foundation box: patches/local: 2-b.patch: exited 1
+Oct 20 04:47:38 KIDON shtetl[89891]: box: version 15.1-releng-2026-10-20T11_47_38Z-update
+Oct 20 04:48:07 KIDON shtetl[89891]: box: version 15.1-releng-2026-10-20T11_48_07Z-pkg
+== 27 ok, 0 failed
