@@ -452,7 +452,7 @@ up only the streams that need it, its dataset's later ones and the
 copies below one it was making; the rest go on, and the top it is in
 is sent nothing more until the next convergence (ruled 2026-10-20). A
 receive whose stream's snapshot is gone stays for the person's
-receive -A (Q-B1 asks whether the beam should recover it). The beam
+receive -A: the beam never destroys to recover (ruled). The beam
 converges at the daemon's start, when a roll makes a version, and
 hourly; failing, a minute after, doubled with each failure to the
 hour. A failure is said to syslog once, "beam: why", when the
@@ -1004,3 +1004,19 @@ the hour (5). To 6: as built, the first failing stream ended the
 convergence, so F1 held up F2; now a failure holds up only the streams
 that need it (8.1). 7 is Q-B1 in open-questions.md. Prune: run.keep
 must be less than lake.keep, refused otherwise (m4-prune, 8.2).
+
+### 2026-10-20 (Q-B1: the beam destroys nothing to recover)
+
+Asked whether the beam may destroy what blocks it in the two failures
+that never heal by themselves, a receive to resume whose stream's
+snapshot is gone from the owner, and a copy whose newest snapshot is
+newer than the newest it shares with its owner, the author answered:
+
+    no, keep these unrecoverable stalls. Clearly they are an outcome
+    of human intervention and should not be paved over.
+
+So: the beam takes nothing away, neither a receive to resume nor a
+copy's snapshot. Both failures stay, said once to syslog and on a
+line of status, and hold up only the dataset and what needs it, until
+the person who caused them sees to them, with zfs receive -A or by
+destroying the copy's snapshot (8.1).

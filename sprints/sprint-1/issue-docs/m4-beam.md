@@ -194,6 +194,9 @@ That was rebuilt (the commit after 81b4504):
 
 The author asked what a stuck receive means for recovering by itself
 (7). It does not recover: the retries back off to the hour and fail
-the same way. Q-B1 in open-questions.md asks whether the beam may
-destroy what blocks it in that case and one other, and recommends it.
+the same way. Asked (Q-B1) whether the beam may destroy what blocks it
+there and in one other case, recommended yes, the author ruled no:
+"keep these unrecoverable stalls. Clearly they are an outcome of human
+intervention and should not be paved over." As built: the beam
+destroys nothing, and B13 and B14 hold it to that.
 Prune: run.keep must be less than lake.keep (m4-prune).
