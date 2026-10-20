@@ -197,7 +197,13 @@ over the fake on a socket listened on before the fork.
 | D16 | a request and a reply of 256 KiB | both whole, through partial writes | tests/check_daemon.c |
 | D17 | a client that does not read a large reply | another answered meanwhile; the reply whole when read | tests/check_daemon.c |
 | D18 | the rc script | started under daemon(8), stopped by its pidfile | by hand on the box (tests/box/README.md): passed on KIDON, 2026-10-20 |
-| D19 | the lake and the run found; the run not | the beam begun at the start, beam.log made in the log directory, the lake's version beamed, "beam converged" in status after the foundations; no beam and no line (m4-beam) | tests/check_daemon.c |
+| D19 | show | the site's settings, from zconfig where it is mounted, each with its layer | tests/check_daemon.c |
+| D20 | show RECIPE | the recipe, its layers merged | tests/check_daemon.c |
+| D21 | show a refused recipe | its words, nothing shown, 1 | tests/check_daemon.c |
+| D22 | show with two recipes | the usage, 2 | tests/check_daemon.c |
+| D23 | show, zconfig not mounted | "shtetl: ROOT: not mounted", 1 | tests/check_daemon.c |
+| D24 | show, no config space | "shtetl: no config space", 1 | tests/check_daemon.c |
+| D25 | the lake and the run found; the run not | the beam begun at the start, beam.log made in the log directory, the lake's version beamed, "beam converged" in status after the foundations; no beam and no line (m4-beam) | tests/check_daemon.c |
 
 Also run by hand on the mac (not in make check, since leaks(1) hangs
 on a forked child that exits): a live daemon over the fake after 600
