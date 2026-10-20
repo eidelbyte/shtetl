@@ -34,6 +34,14 @@ static size_t nfs;
 static char config[1100], build[1100], resolv[1100];
 static char logdir[1100];
 static char *statusbuf;
+static int made, told;		/* the versions the beam was told of */
+
+static void
+tell(void *arg)
+{
+	(void) arg;
+	made++;
+}
 
 /* One event of the roll's kqueue handled, in 60 s at most. */
 static void
@@ -278,6 +286,7 @@ main(void)
 	env.re_logdir = logdir;
 	env.re_err = &c.c_err;
 	env.re_flags = UF_NODUMP;
+	env.re_made = tell;
 	CHECK(sh_foundations_start(z, FROOT, &fs, &nfs, &c.c_err) == 0);
 
 	/* F1, F14: a first roll, its status while its first child runs */
@@ -288,6 +297,8 @@ main(void)
 	CHECK(strcmp(status(), want) == 0 && strchr(want, ':') != NULL);
 	pump(f);
 	CHECK(f->f_state == SH_F_IDLE && f->f_newest != NULL);
+	/* F20: the beam told of the version, once */
+	CHECK(made == 1);
 	/*
 	 * L1, L5: the log, a line of each step's start and the version at
 	 * the end; syslog hears nothing of a roll that ends well
@@ -398,6 +409,7 @@ main(void)
 	    !there("lake/foundations/r1/usr/lib/debug/boot/kernel"));
 
 	/* F5: an update failing at a patch, after a word was written */
+	told = made;
 	CHECK(sh("printf '%s\\n' 'src_branch = \"releng/15.1\";' "
 	    "'datasets { \"usr/local\" {} var { atime = true; } }' "
 	    "'patches { \"patches/conflict\" {} }' "
@@ -423,6 +435,8 @@ main(void)
 	CHECK(f->f_state == SH_F_STALLED &&
 	    is(zfake_local(ds("r1"), "shtetl:stall"),
 	    "patches/conflict: c5.patch: exited 1"));
+	/* F20: a roll failing tells the beam nothing */
+	CHECK(made == told);
 	CHECK(strcmp(status(), "foundation r1 stalled patches/conflict: "
 	    "c5.patch: exited 1\n") == 0);
 	CHECK(sh_zfs_mount(z, ds("r1"), &c.c_err) == 0 &&

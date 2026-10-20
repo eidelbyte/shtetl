@@ -23,10 +23,14 @@
 #include "core/err.h"
 #include "core/wire.h"
 
-/* What the daemon's kqueue tells it about: a connection, or a job. */
+/*
+ * What the daemon's kqueue tells it about: a connection, a job, or the
+ * beam's timer.
+ */
 enum sh_ev {
 	SH_EV_CONN,
-	SH_EV_JOB
+	SH_EV_JOB,
+	SH_EV_BEAM
 };
 
 struct sh_step;

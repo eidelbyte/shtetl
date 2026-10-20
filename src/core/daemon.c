@@ -22,6 +22,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "core/beam.h"
 #include "core/builder.h"
 #include "core/daemon.h"
 #include "core/err.h"
@@ -54,6 +55,8 @@ struct daemon {
 	size_t			d_nfound;
 	struct sh_builder	d_builder;
 	struct sh_rollenv	d_env;
+	struct sh_beamenv	d_benv;
+	struct sh_beam		*d_beam;	/* with the lake and the run */
 	struct conn		*d_conns;
 };
 
@@ -102,6 +105,8 @@ act_status(struct daemon *d, int argc, char **argv, FILE *out,
 	}
 	for (f = 0; f < d->d_nfound; f++)
 		sh_foundation_status(d->d_found[f], out);
+	if (d->d_beam != NULL)
+		sh_beam_status(d->d_beam, out);
 	return (0);
 }
 
@@ -231,6 +236,16 @@ act(struct daemon *d, struct conn *c, const char *args, size_t len)
 	free(ebuf);
 	free(argv);
 	free(a);
+}
+
+/* A foundation's version made: the beam carries it to the run. */
+static void
+made(void *arg)
+{
+	struct daemon *d = arg;
+
+	if (d->d_beam != NULL)
+		sh_beam_converge(d->d_beam);
 }
 
 /* C's descriptor watched for FILTER, with C told when it fires. */
@@ -387,6 +402,7 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 {
 	struct daemon d;
 	struct kevent ev[3];
+	char path[1024];
 	size_t f, n;
 	int done = 0, r = -1;
 	void *u;
@@ -415,6 +431,13 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 		sh_errf(e, "%s: %s", logdir, strerror(errno));
 		goto out;
 	}
+	(void) snprintf(path, sizeof (path), "%s/beam.log", logdir);
+	if (d.d_sp.ss_root[SH_SP_LAKE] != NULL &&
+	    d.d_sp.ss_root[SH_SP_RUN] != NULL &&
+	    (d.d_benv.be_log = fopen(path, "a")) == NULL) {
+		sh_errf(e, "%s: %s", path, strerror(errno));
+		goto out;
+	}
 	if ((d.d_kq = kqueue()) < 0) {
 		sh_errf(e, "kqueue: %s", strerror(errno));
 		goto out;
@@ -427,6 +450,8 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 	d.d_env.re_logdir = logdir;
 	d.d_env.re_err = e;
 	d.d_env.re_flags = SF_IMMUTABLE;
+	d.d_env.re_made = made;
+	d.d_env.re_marg = &d;
 	/* a signal kqueue watches is recorded even while it is ignored */
 	(void) signal(SIGTERM, SIG_IGN);
 	(void) signal(SIGINT, SIG_IGN);
@@ -439,6 +464,17 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 		goto out;
 	}
 	r = 0;
+	if (d.d_benv.be_log != NULL) {
+		/* a line at a time, as a roll's */
+		(void) setvbuf(d.d_benv.be_log, NULL, _IOLBF, 0);
+		d.d_benv.be_z = z;
+		d.d_benv.be_kq = d.d_kq;
+		d.d_benv.be_lake = d.d_sp.ss_root[SH_SP_LAKE];
+		d.d_benv.be_run = d.d_sp.ss_root[SH_SP_RUN];
+		d.d_benv.be_period = SH_BEAM_PERIOD;
+		d.d_benv.be_retry = SH_BEAM_RETRY;
+		d.d_beam = sh_beam_start(&d.d_benv);
+	}
 	/*
 	 * One event at a time: an event that ends a job or a connection
 	 * frees it, and no other already taken can name it then.
@@ -458,6 +494,8 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 			accepted(&d, sk);
 		else if (*(enum sh_ev *)u == SH_EV_JOB)
 			sh_job_event(u, d.d_kq, &ev[0]);
+		else if (*(enum sh_ev *)u == SH_EV_BEAM)
+			sh_beam_timer(u);
 		else if (ev[0].filter == EVFILT_READ)
 			readable(&d, u);
 		else
@@ -469,6 +507,10 @@ out:
 	/* what a stopped roll leaves, the next start puts back */
 	for (f = 0; f < d.d_nfound; f++)
 		sh_roll_stop(d.d_found[f]);
+	if (d.d_beam != NULL)
+		sh_beam_stop(d.d_beam);
+	if (d.d_benv.be_log != NULL)
+		(void) fclose(d.d_benv.be_log);
 	if (d.d_kq >= 0)
 		(void) close(d.d_kq);
 	(void) unlink(sock);

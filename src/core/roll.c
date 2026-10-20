@@ -640,6 +640,7 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 		f->f_newest = r->r_snap;
 		r->r_snap = NULL;
 		roll_done(r);
+		env->re_made(env->re_marg);
 		return;
 	}
 	/* the one line of a roll syslog hears (ruled 2026-10-20) */

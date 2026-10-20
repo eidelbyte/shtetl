@@ -105,6 +105,21 @@ status(void)
 	return (sht(1, argv));
 }
 
+/* Status, once the beam's convergence under way is over: in 10 s. */
+static int
+settled(void)
+{
+	int i, r = -1;
+
+	for (i = 0; i < 100; i++) {
+		if ((r = status()) != 0 ||
+		    strstr(obuf, "beam converging") == NULL)
+			break;
+		(void) usleep(100000);
+	}
+	return (r);
+}
+
 /* A client of our own, connected. */
 static int
 raw(void)
@@ -139,7 +154,8 @@ main(void)
 	    "space lake tank/lake\n"
 	    "space config tank/config\n"
 	    "space run fast/run\n"
-	    "foundation generic idle v1\n";
+	    "foundation generic idle v1\n"
+	    "beam converged\n";
 	static const char *const v1[] = { "tank/lake/foundations/generic@v1" };
 	static const struct sh_zprop lake = { "shtetl:space", "lake" };
 	static const struct sh_zprop run = { "shtetl:space", "run" };
@@ -198,11 +214,13 @@ main(void)
 	scratch_write("sock", "left\n");
 	up();
 
-	/* D1: status, on standard output, nothing on standard error */
-	CHECK(status() == 0);
+	/* D1, D25: status, the beam's line last, nothing on standard error */
+	CHECK(settled() == 0);
 	CHECK(strcmp(obuf, want) == 0 && strcmp(ebuf, "") == 0);
-	/* L6: the rolls' log directory made at the start */
+	/* L6, D25: the log directory made at the start, beam.log in it */
 	CHECK(stat(logp, &st) == 0 && S_ISDIR(st.st_mode));
+	CHECK(stat(scratch_path("logs/beam.log"), &st) == 0 &&
+	    S_ISREG(st.st_mode));
 
 	/* D14, D15: the pidfile holds the pid; the socket is root's alone */
 	(void) snprintf(wantpid, sizeof (wantpid), "%ld\n", (long)getpid());
@@ -338,6 +356,15 @@ main(void)
 	/* D10: SIGTERM: exit 0, the socket gone */
 	CHECK(down() == 0);
 	CHECK(stat(sockp, &st) != 0);
+	/* D25: the lake's version beamed to the run at the start */
+	{
+		uint64_t g1, g2, t;
+
+		CHECK(sh_zfs_snapinfo(z, "tank/lake/foundations/generic@v1",
+		    &g1, &t, &c.c_err) == 0);
+		CHECK(sh_zfs_snapinfo(z, "fast/run/foundations/generic@v1",
+		    &g2, &t, &c.c_err) == 0 && g1 == g2);
+	}
 
 	/* D23: zconfig not mounted: said, 1 */
 	CHECK(sh_zfs_unmount(z, "tank/config", &c.c_err) == 0);
@@ -354,6 +381,8 @@ main(void)
 	up();
 	CHECK(sht(1, site) == 1 &&
 	    strcmp(ebuf, "shtetl: no config space\n") == 0);
+	/* D25: no run: no beam, and no line of it */
+	CHECK(status() == 0 && strcmp(obuf, "space lake tank/lake\n") == 0);
 	CHECK(down() == 0);
 
 	/* D11: no daemon: the command says what connect said, exit 1 */

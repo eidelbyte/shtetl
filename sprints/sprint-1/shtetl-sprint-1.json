@@ -3,7 +3,7 @@
     "project": "shtetl",
     "sprint": 1,
     "created": "2026-10-18",
-    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 and M2 tested (box run 3, 73 of 73); M3 tested 2026-10-20 (box run 6, 114 of 114; build run 3, 29 of 29), m3-logs with it; m4-zfs tested; next m4-beam.",
+    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 and M2 tested (box run 3, 73 of 73); M3 tested 2026-10-20 (box run 6, 114 of 114; build run 3, 29 of 29), m3-logs with it; m4-zfs tested; m4-beam built and checked on the mac, its box cells owed (run.sh Z16 - Z18, m4-box); next m4-prune.",
     "planning_docs": [
       "sprints/sprint-1/implementation-plan.md",
       "sprints/sprint-1/open-questions.md"
@@ -618,8 +618,8 @@
     ],
     "provides": "The beam actor: every dataset's copy converging to its owner's, foundation versions to zrun and house versions to zlake, resuming where a cut left it, telling each foundation version's arrival.",
     "estimated_size": "large",
-    "completed": "not-started",
-    "note": "2026-10-20: a lake on another host ruled out of scope; m4-lake-remote removed from the tracker."
+    "completed": "testing",
+    "note": "2026-10-20: a lake on another host ruled out of scope; m4-lake-remote removed from the tracker. 2026-10-20: built in five commits (1ff5464 zfs props, 69a4861 sh_job_fork, d3735ed skeleton, 3c5f14c shared fake, then the beam); B1-B27, B29, F20, D25, J13-J16, S12, Z16-Z18 over the fake; 28 mutations caught; gate, xcheck; leaks 0 at exit under lldb for check_beam/zfs/spaces. Owed: run.sh (Z16-Z18 over libzfs), m4-box (B28). Worklog issue-docs/m4-beam.md."
   },
   "m4-prune": {
     "description": "Pruning (plan 8.2): run.keep house versions on zrun, the active one counted; lake.keep on zlake; nothing leaves a space while the other still lacks it; a version pruned by promoting any clone of it (the newer version's own datasets) and destroying it; a foundation version kept while a house version on the same space is cloned from it, its newest always kept. The house actor prunes zrun after a roll, the beam actor the copies it keeps, the foundation actor a version once its last clone is gone. Matrix family P. Verify: make check; m4-box.",
@@ -675,7 +675,8 @@
     ],
     "provides": "shtetl create H: a container's first version on the newest foundation version its ver allows, complete and active.",
     "estimated_size": "large",
-    "completed": "not-started"
+    "completed": "not-started",
+    "note": "2026-10-20: its skeleton row run/containers mountpoint=/containers was made by m4-beam (d3735ed), which walks it."
   },
   "m5-jail": {
     "description": "Stop and start for containers (plan 7.3, probe P2): /etc/jail.conf.d/<house>.conf written whole at each start from the shaken recipe read from the active version's create or update snapshot, never read back; jail -f that file -c, and -r to stop, so jail -r undoes mount.devfs. Main's rulings carried: jexec and pkg -j, digits-only names refused. The daemon starting starts every container's active version. Verify: make check with jail(8) faked as a child; m5-box.",

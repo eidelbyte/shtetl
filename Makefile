@@ -68,7 +68,7 @@ LANG_OBJS = $(BUILD)/err.o $(BUILD)/mem.o $(BUILD)/tree.o \
 CORE_OBJS = $(LANG_OBJS) $(BUILD)/spaces.o $(BUILD)/wire.o \
 	$(BUILD)/daemon.o $(BUILD)/command.o $(BUILD)/foundation.o \
 	$(BUILD)/job.o $(BUILD)/builder.o $(BUILD)/src.o $(BUILD)/roll.o \
-	$(BUILD)/install.o $(BUILD)/commands.o
+	$(BUILD)/install.o $(BUILD)/commands.o $(BUILD)/beam.o
 # src/core/zfs.h has two implementations, picked at the link: the
 # FreeBSD layer over libzfs, and tests/zfake.c for the tests. The mac
 # has no ZFS to link a program against, so the portable flavor
@@ -78,7 +78,7 @@ TEST_OBJS = $(BUILD)/zfake.o $(BUILD)/zcells.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS)
 TESTS = check_mem check_zfs check_spaces check_daemon check_foundation \
 	check_parse check_schema check_site check_cascade check_show \
-	check_shake check_job check_src check_roll check_install
+	check_shake check_job check_src check_roll check_install check_beam
 
 ALL_portable = $(SHTETL_OBJS)
 ALL_freebsd = shtetl $(BUILD)/box_zcheck $(BUILD)/box_shake
@@ -120,7 +120,8 @@ $(BUILD)/main.o: src/main.c src/core/daemon.h src/core/err.h \
 	$(CC) $(CFLAGS) -c -o $@ src/main.c
 $(BUILD)/wire.o: src/core/wire.c src/core/wire.h src/core/mem.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/wire.c
-$(BUILD)/daemon.o: src/core/daemon.c src/core/daemon.h src/core/builder.h \
+$(BUILD)/daemon.o: src/core/daemon.c src/core/daemon.h src/core/beam.h \
+	src/core/builder.h \
 	src/core/err.h src/core/foundation.h src/core/job.h src/core/mem.h \
 	src/core/roll.h src/core/show.h src/core/spaces.h src/core/syntax.h \
 	src/core/wire.h src/core/zfs.h
@@ -143,6 +144,9 @@ $(BUILD)/install.o: src/core/install.c src/core/install.h \
 $(BUILD)/job.o: src/core/job.c src/core/job.h src/core/err.h \
 	src/core/mem.h src/core/wire.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/job.c
+$(BUILD)/beam.o: src/core/beam.c src/core/beam.h src/core/err.h \
+	src/core/job.h src/core/mem.h src/core/wire.h src/core/zfs.h
+	$(CC) $(CFLAGS) -c -o $@ src/core/beam.c
 $(BUILD)/builder.o: src/core/builder.c src/core/builder.h src/core/mem.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/builder.c
 $(BUILD)/src.o: src/core/src.c src/core/src.h src/core/cascade.h \

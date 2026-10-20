@@ -197,6 +197,7 @@ over the fake on a socket listened on before the fork.
 | D16 | a request and a reply of 256 KiB | both whole, through partial writes | tests/check_daemon.c |
 | D17 | a client that does not read a large reply | another answered meanwhile; the reply whole when read | tests/check_daemon.c |
 | D18 | the rc script | started under daemon(8), stopped by its pidfile | by hand on the box (tests/box/README.md): passed on KIDON, 2026-10-20 |
+| D19 | the lake and the run found; the run not | the beam begun at the start, beam.log made in the log directory, the lake's version beamed, "beam converged" in status after the foundations; no beam and no line (m4-beam) | tests/check_daemon.c |
 
 Also run by hand on the mac (not in make check, since leaks(1) hangs
 on a forked child that exits): a live daemon over the fake after 600
@@ -609,6 +610,7 @@ the commit not the src's (F1).
 | F17 | the rc script starting the daemon, git found under service(8) | a roll's git runs | box: tests/box/build.sh R1 |
 | F18 | foundation.conf schg, a roll over libzfs | as F1, on ZFS | box: tests/box/build.sh R1 - R4 |
 | F19 | asked while zbuild is reset after a failure | rolling still: "F: rolling"; stalled only once the reset is over | tests/check_roll.c |
+| F20 | a roll ending well; one failing | the beam told of the version, once; told nothing (m4-beam) | tests/check_roll.c |
 
 ## Family K: the build and the install (m3-install)
 
@@ -735,3 +737,67 @@ syslog one line for each roll that fails.
 | L5 | a roll ending well | syslog nothing | tests/check_roll.c |
 | L6 | the daemon's start | the log directory made | tests/check_daemon.c |
 | L7 | the box: every roll of a run, the log of the last | box: tests/box/build.sh R2, R10 | box |
+
+## Family B: the beam (m4-beam)
+
+Plan 8.1: every dataset's copy converges to its owner's, foundation
+versions from lake/foundations to run/foundations, house versions from
+run/containers and run/systems to lake/containers and lake/systems.
+Each snapshot the copy lacks after the newest of the dataset's history
+whose guid the copy's space holds, wherever it is there, is sent, in
+origin order, oldest first: an incremental onto a copy there, a clone
+stream onto the space's snapshot of that guid for a copy that is not,
+a full stream where no guid of the history is held. A receive to
+resume goes first; nothing is destroyed. The shtetl:* properties of
+each filesystem and snapshot are made the owner's once its version is
+all there, the version's top last: a version whose top snapshot holds
+them has arrived. The actor converges at its start, when told, and on
+a timer, backing off while a convergence fails.
+
+Dimensions: the pair {foundations, containers, systems}; a dataset's
+history on the owner's side {its own snapshots only, a clone of a
+snapshot outside the pair, a clone of one inside it, promoted, its
+origin's filesystem destroyed}; the copy's side {nothing of the
+history, its origin's snapshot only, behind, up to date, a receive to
+resume, its newest no counterpart, promoted, a snapshot pruned}; a cut
+at each stream of a convergence; the properties {a snapshot's, a
+filesystem's, changed or taken away on the owner}; the actor {start,
+told, told while converging, the timer, failing, a space gone, stop};
+what it says {status, the log}.
+
+The cells run over the fake, whose state is shared with the children
+the beam forks for its streams, as ZFS's is in the kernel (Z18); a
+stream is cut by zfake_cut_nth, a space made unreachable by
+zfake_export.
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| B1 | a foundation's first version, the run without it | a full stream of each dataset, a parent before its children; each copy's snapshot the owner's guid; the properties of each copied; "# arrived" the top's copy | tests/check_beam.c |
+| B2 | later versions | an incremental each, oldest first, from the newest the copy holds | tests/check_beam.c |
+| B3 | up to date | nothing sent, nothing logged | tests/check_beam.c |
+| B4 | a version with a dataset new in it | that dataset a full stream, the others incrementals; the version arrived once all of it is there | tests/check_beam.c |
+| B5 | a house version on the run, cloned from a foundation copy | on the lake a clone stream onto the lake's own foundation snapshot of that guid; the house's own dataset a full stream | tests/check_beam.c |
+| B6 | a house's own dataset cloned from the version before's | a clone stream onto the lake's copy of that snapshot | tests/check_beam.c |
+| B7 | a promote on the run before the beam | the promoted clone a clone stream onto the lake's copy of its newest held guid, sent from the owner's snapshot where the promote moved it; nothing else sent | tests/check_beam.c |
+| B8 | a promote on the run after the beam | nothing sent; its next snapshot an incremental | tests/check_beam.c |
+| B9 | the lake's copy promoted | nothing sent again; the owner's next snapshot lands | tests/check_beam.c |
+| B10 | the old version destroyed on the run, before the beam and after | nothing sent, nothing destroyed on the lake | tests/check_beam.c |
+| B11 | a snapshot the copy lacks older than its newest held, pruned there | not sent again | tests/check_beam.c |
+| B12 | a cut at each stream of B1, B2, B4, B5, B6 and B7 | the convergence failing with the stream's words, a receive to resume left, nothing destroyed; the next resuming it first, then going on; converged, every guid and property the owner's, each version arrived once | tests/check_beam.c |
+| B13 | a receive to resume whose stream's snapshot is gone | "SNAP: no such snapshot"; failing; the receive left | tests/check_beam.c |
+| B14 | a copy with a snapshot of its own since | "newest snapshot is not FROM's counterpart"; failing; nothing destroyed; no stream after it | tests/check_beam.c |
+| B15 | a filesystem's properties | the owner's shtetl:* set on the copy; one the owner lets go let go on the copy; any other property of the copy's left | tests/check_beam.c |
+| B16 | a version cut after its top's stream; its properties failing part way | the top's copy without the properties, nothing arrived; both once the rest is there | tests/check_beam.c |
+| B17 | a convergence after an arrival | "# arrived" not again | tests/check_beam.c |
+| B18 | told while converging | converging once more at its end | tests/check_beam.c |
+| B19 | the timer after a convergence ending well | the next after the period; told meanwhile, at once | tests/check_beam.c |
+| B20 | failing again and again, then ending well | the next after the retry, doubled each time to the period; then the period | tests/check_beam.c |
+| B21 | the run's pool exported, then imported | failing with the walk's words; converged once it is back | tests/check_beam.c |
+| B22 | stopped while converging | its child killed and reaped, nothing ended; a beam begun again converges | tests/check_beam.c |
+| B23 | status | "beam converging STEP", "beam converged", "beam failing WHY" | tests/check_beam.c |
+| B24 | the log | "# send SNAP" and "# resume DS" as each stream begins, "# failed: why", "# arrived SNAP"; nothing for a convergence with nothing to do | tests/check_beam.c |
+| B25 | a receive to resume outside the beam's roots | left alone | tests/check_beam.c |
+| B26 | both pairs lacking | the foundations' streams first | tests/check_beam.c |
+| B27 | a system version | as B5, into lake/systems | tests/check_beam.c |
+| B28 | the box: the M3 foundation beamed to a run pool, a stream cut and resumed, a house stand-in beamed back | box: m4-box | box |
+| B29 | a clone the walk finds before its origin's dataset (a top cloned from a deeper one) | the origin's streams first, the clone a clone stream | tests/check_beam.c |

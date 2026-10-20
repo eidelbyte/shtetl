@@ -15,7 +15,9 @@
 
 #define	SH_PIDFILE	"/var/run/shtetl.pid"
 #define	SH_SOCKET	"/var/run/shtetl.sock"
-#define	SH_LOGDIR	"/var/log/shtetl"	/* a roll's log, F.log */
+#define	SH_LOGDIR	"/var/log/shtetl"	/* F.log, beam.log */
+#define	SH_BEAM_PERIOD	3600000		/* ms between convergences */
+#define	SH_BEAM_RETRY	60000		/* ms after a first failure */
 
 /*
  * The daemon's lock and socket. LOCK, a pidfile, is held with flock
@@ -29,10 +31,12 @@ int sh_daemon_listen(const char *lock, const char *sock, int *lk, int *sk,
 
 /*
  * The daemon, on SK, listening at SOCK: the spaces found and their
- * skeleton made, the directory LOGDIR made for the rolls' logs, then
- * the loop until SIGTERM or SIGINT, every roll stopped, and the socket
- * removed. What it has to say goes to E: why it could not start, and
- * a line for each roll that fails. -1 when it never started.
+ * skeleton made, the directory LOGDIR made for the logs, the beam
+ * begun where the lake and the run are both found, its log
+ * LOGDIR/beam.log; then the loop until SIGTERM or SIGINT, every roll
+ * and the beam stopped, and the socket removed. What it has to say
+ * goes to E: why it could not start, and a line for each roll that
+ * fails. -1 when it never started.
  */
 int sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
     const char *logdir, struct sh_err *e);

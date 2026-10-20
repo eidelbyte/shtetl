@@ -48,6 +48,8 @@ struct sh_rollenv {
 	const char		*re_logdir;	/* each foundation's log */
 	struct sh_err		*re_err;	/* a roll's failure, said */
 	unsigned long		re_flags;	/* foundation.conf's: schg */
+	void			(*re_made)(void *);	/* told of a version */
+	void			*re_marg;
 };
 
 /*
@@ -55,7 +57,8 @@ struct sh_rollenv {
  * while F rolls or waits to; its log, F.log in the log directory, made
  * anew, or the ask refused with why; a stall cleared; then F waits for
  * the builder's turn, and rolls. CONFIG and BUILD are where zconfig and
- * zbuild are mounted. ENV outlives the roll.
+ * zbuild are mounted. ENV outlives the roll, and its re_made is told of
+ * each version made, once the roll is over: the beam carries it.
  *
  * The log holds what the roll's programs write, a line "# STEP" as
  * each begins, and what the roll says of itself, "# version SNAP" or

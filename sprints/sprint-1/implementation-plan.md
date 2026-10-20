@@ -433,6 +433,30 @@ beam actor converges after every snapshot and on a timer, and holds
 nobody up. A foundation version's arrival on zrun is what its houses
 roll on.
 
+As built (m4-beam): one actor for the pair, over three roots below
+both spaces' roots: lake/foundations to run/foundations, then
+run/containers and run/systems to lake/containers and lake/systems.
+A convergence is a job of looks and streams. A look reads both spaces
+whole. A receive to resume below a copy's root is resumed first, and
+that look does nothing else; otherwise the copies' shtetl:*
+properties are made their owners', set or let go, on each filesystem
+and on each snapshot of a version all there, and then each dataset's
+lacking snapshots are planned by the rule above, a parent and a
+clone's origin first, each stream a call forked (sh_job_fork). A look
+that sent anything is followed by another. A version's top, the
+root's child it is in, gets its snapshot's properties last, once
+every dataset of the version is there: a version whose top's copy
+holds them has arrived, "# arrived SNAP" in beam.log, and that mark
+is what a house actor starting (M5) reads. A stream that fails ends
+the convergence; a receive whose stream's snapshot is gone stays for
+the person's receive -A. The beam converges at the daemon's start,
+when a roll makes a version, and hourly; failing, a minute after,
+doubled with each failure to the hour. It does not stall, so syslog
+hears nothing of it; status says "beam failing WHY". The copies'
+roots are readonly, inherited, so nothing changes a copy since its
+newest snapshot (main's probe P8: with atime on, a read writes); the
+lake's copies are mountpoint none.
+
 Restore is a beam the other way, by hand: a house version and its
 foundation version from zlake to zrun.
 
