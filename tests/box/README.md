@@ -29,6 +29,26 @@ What runs:
   stopped with SIGTERM. It needs a box with no shtetl space marked and
   no shtetl daemon running, and says so otherwise.
 
+M3 on the box, a real foundation rolled by the daemon (family B):
+
+    git pull
+    make freebsd
+    sudo sh tests/box/build.sh
+
+It installs shtetl (make install) and starts it with service(8), as rc
+would, on the pool s2box: a sparse file in IMGDIR (/var/tmp), imported
+with an altroot beside it for the run and exported after, so it is
+gone from the box between runs and run.sh never meets its spaces. The
+pool keeps zbuild's checkout and the obj cache from run to run, so
+only the first build takes hours; each run destroys the foundation box
+itself and writes zconfig anew. It asks shtetl roll and shtetl pkg as
+a person does, waits on shtetl status, and reads what came of each
+from ZFS and the head. The log is tests/box/results/<host>-build-<UTC
+time>.log, sent as run.sh's is, with the run's lines of
+/var/log/daemon.log at its end. BRANCH, GITURL, IMGDIR and SIZE change
+what it builds and where; `sudo sh tests/box/build.sh --clean` takes
+the pool and its file away, the kept build with them.
+
 By hand, once (tests/MATRIX.md D18), the rc script:
 
     sudo make install
