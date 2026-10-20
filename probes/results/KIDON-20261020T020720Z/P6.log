@@ -1,0 +1,169 @@
+# zfs create -o mountpoint=/w s2run/w
+# zfs create -o mountpoint=/f s2run/f
+# mkdir -p /tmp/shtetl-probes/f/etc /tmp/shtetl-probes/f/bin /tmp/shtetl-probes/f/share
+# zfs snapshot s2run/f@1
+# zfs clone -o mountpoint=/h1 s2run/f@1 s2run/h1
+# zfs snapshot s2run/h1@s1
+# rm /tmp/shtetl-probes/h1/share/a
+# zfs snapshot s2run/h1@s2
+# zfs snapshot s2run/h1@s3
+# chmod 600 /tmp/shtetl-probes/h1/etc/app.conf
+# zfs snapshot s2run/h1@s4
+# zfs snapshot s2run/f@2
+# zfs_rebase -m -o /tmp/shtetl-probes/w/r1 --from s2run/h1@s1 --onto s2run/f@2 --result s2run/h2
+zfs_rebase: s2run/h2: the manifest, 2 actions
+zfs_rebase:   done 2, first /etc/app.conf
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: s2run/h2 is the rebased tree, unmounted; place it with zfs inherit mountpoint s2run/h2 or zfs set mountpoint=PATH s2run/h2
+zfs_rebase: the manifest is /tmp/shtetl-probes/w/r1
+-> exit 0
+P6 ok P6.1 step 1, clone form
+# zfs set readonly=off s2run/h2
+# zfs set mountpoint=/h2 s2run/h2
+# zfs_rebase -m -o /tmp/shtetl-probes/w/r2 -u -b s2run/h1@s1 --from s2run/h1@s2 --onto s2run/h2 --result s1
+zfs_rebase: s2run/h2: the manifest, 2 actions
+zfs_rebase:   done 2, first /etc/b
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: s2run/h2 is the rebased tree, and s2run/h2@s1 is what it was before
+zfs_rebase: the manifest is /tmp/shtetl-probes/w/r2
+-> exit 0
+P6 ok P6.1 step 2, dataset form
+# zfs_rebase -m -o /tmp/shtetl-probes/w/r3 -u -b s2run/h1@s2 --from s2run/h1@s3 --onto s2run/h2 --result s2
+zfs_rebase: 1 conflict; the clean actions are applied and s2run/h2 waits at conflicts
+zfs_rebase: --merge-non-conflict merged 0 names three ways with no conflict; 1 unanswered
+zfs_rebase: 1 name unanswered in the resolution /tmp/shtetl-probes/w/r3.resolution
+zfs_rebase: the manifest is /tmp/shtetl-probes/w/r3
+zfs_rebase: s2run/h2 is kept; zfs_rebase --continue s2run/h2 resumes it; zfs_rebase --abort s2run/h2 removes it
+-> exit 1
+P6 ok P6.2 step 3 stops at its conflict
+P6 ok P6.2 conflicted names
+P6 ok P6.2 the conflict is etc/motd
+# sed -e 's/ conflict \([0-9]*\) -$/ conflict \1 from/' 	    -e 's/^#unanswered [0-9]*$/#unanswered 0/' '/tmp/shtetl-probes/w/r3.resolution' >'/tmp/shtetl-probes/w/r3.resolution.new' &&
+	    mv '/tmp/shtetl-probes/w/r3.resolution.new' '/tmp/shtetl-probes/w/r3.resolution'
+# zfs_rebase --continue s2run/h2@s2
+zfs_rebase: s2run/h2: the manifest, 0 actions
+zfs_rebase:   done 0
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase:   the resolution: done 0
+zfs_rebase:   the resolution: pending 1, first /etc/motd
+zfs_rebase:   the resolution: blocked 0
+zfs_rebase:   the resolution: drifted 0
+zfs_rebase:   the resolution: unchecked 0
+zfs_rebase: s2run/h2: the manifest, 0 actions
+zfs_rebase:   done 0
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase:   the resolution: done 1, first /etc/motd
+zfs_rebase:   the resolution: pending 0
+zfs_rebase:   the resolution: blocked 0
+zfs_rebase:   the resolution: drifted 0
+zfs_rebase:   the resolution: unchecked 0
+zfs_rebase: s2run/h2 is the rebased tree, and s2run/h2@s2 is what it was before
+-> exit 0
+P6 ok P6.3 answered from, --continue
+# zfs_rebase -m -o /tmp/shtetl-probes/w/r4 -u -b s2run/h1@s3 --from s2run/h1@s4 --onto s2run/h2 --result s3
+zfs_rebase: s2run/h2: the manifest, 2 actions
+zfs_rebase:   done 2, first /etc/app.conf
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: s2run/h2 is the rebased tree, and s2run/h2@s3 is what it was before
+zfs_rebase: the manifest is /tmp/shtetl-probes/w/r4
+-> exit 0
+P6 ok P6.4 step 4
+# zfs snapshot -r s2run/h2@update
+P6 answer P6.5 the replay, four saves: 0 seconds
+P6 ok P6.4 the new version's snapshots
+# zfs_rebase -m -o /tmp/shtetl-probes/w/r5 --from s2run/h1@s4 --onto s2run/f@2 --result s2run/h3
+zfs_rebase: 1 conflict; the clean actions are applied and s2run/h3 waits at conflicts
+zfs_rebase: --merge-non-conflict merged 0 names three ways with no conflict; 1 unanswered
+zfs_rebase: 1 name unanswered in the resolution /tmp/shtetl-probes/w/r5.resolution
+zfs_rebase: the manifest is /tmp/shtetl-probes/w/r5
+zfs_rebase: s2run/h3 is kept; zfs_rebase --continue s2run/h3 resumes it; zfs_rebase --abort s2run/h3 removes it
+-> exit 1
+# sed -e 's/ conflict \([0-9]*\) -$/ conflict \1 from/' 	    -e 's/^#unanswered [0-9]*$/#unanswered 0/' '/tmp/shtetl-probes/w/r5.resolution' >'/tmp/shtetl-probes/w/r5.resolution.new' &&
+	    mv '/tmp/shtetl-probes/w/r5.resolution.new' '/tmp/shtetl-probes/w/r5.resolution'
+# zfs_rebase --continue s2run/h3
+zfs_rebase: s2run/h3: the manifest, 4 actions
+zfs_rebase:   done 4, first /etc/app.conf
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase:   the resolution: done 0
+zfs_rebase:   the resolution: pending 1, first /etc/motd
+zfs_rebase:   the resolution: blocked 0
+zfs_rebase:   the resolution: drifted 0
+zfs_rebase:   the resolution: unchecked 0
+zfs_rebase: s2run/h3: the manifest, 4 actions
+zfs_rebase:   done 4, first /etc/app.conf
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase:   the resolution: done 1, first /etc/motd
+zfs_rebase:   the resolution: pending 0
+zfs_rebase:   the resolution: blocked 0
+zfs_rebase:   the resolution: drifted 0
+zfs_rebase:   the resolution: unchecked 0
+zfs_rebase: s2run/h3 is the rebased tree, unmounted; place it with zfs inherit mountpoint s2run/h3 or zfs set mountpoint=PATH s2run/h3
+-> exit 0
+P6 ok P6.6 s4 as one rebase
+# zfs set readonly=off s2run/h3
+# zfs set mountpoint=/h3 s2run/h3
+P6 ok P6.7 stepwise equals one rebase
+P6 answer P6.8 the times agree too: 12c12
+< etc             type=dir mode=0755 time=1792462040.741996000
+---
+> etc             type=dir mode=0755 time=1792462040.804289000
+24c24
+< share           type=dir mode=0755 time=1792462040.707605000
+---
+> share           type=dir mode=0755 time=1792462040.794045000
+no
+P6 ok P6.9 /etc/motd is the house's
+P6 ok P6.9 /bin/tool is f@2's
+P6 ok P6.9 /share/new came
+P6 ok P6.9 /share/a is gone
+P6 ok P6.9 rc.conf has both lines
+P6 ok P6.9 app.conf is s4's, mode 600
