@@ -479,6 +479,8 @@ main(void)
 	CHECK(unsetenv("FAKE_FAIL") == 0);
 	CHECK(has("foundation r7: commands: one: exited 1") &&
 	    f->f_state == SH_F_STALLED);
+	/* the fake rolls back no file: the lent resolv.conf goes, as on ZFS */
+	CHECK(sh("rm lake/foundations/r7/etc/resolv.conf"));
 	f = roll("r7");
 	CHECK(f->f_state == SH_F_IDLE);
 
@@ -507,52 +509,57 @@ main(void)
 	CHECK(strstr(status(), "r2") == NULL);
 
 	/*
-	 * U1, U4: a pkg roll of r1, whose recipe has since given a
-	 * dataset more: F and its version's datasets mounted, not the new
-	 * one; devfs, the resolv.conf lent, pkg upgrade, devfs off;
-	 * nothing built; a -pkg version with its version's commit
+	 * U1, U4: a pkg roll of r7, whose recipe has since given a dataset
+	 * and a package more: F and its version's datasets mounted, not
+	 * the new one; devfs, the resolv.conf lent, pkg upgrade of the
+	 * packages its version's foundation.conf lists, devfs off; nothing
+	 * built; a -pkg version with its version's commit
 	 */
-	CHECK(sh("printf '%s\\n' 'src_branch = \"releng/15.1\";' "
-	    "'datasets { \"usr/local\" {} var { atime = true; } new {} }' "
-	    "> c1/foundations/r1.conf"));
-	f = sh_foundation_find(&fs, &nfs, FROOT, "r1");
-	(void) snprintf(snap, sizeof (snap), "%s@%s", ds("r1"), f->f_newest);
+	CHECK(sh("printf '%s\\n' 'commands { one = \"echo 0\"; }' "
+	    "'pkg = [ \"c\" ];' 'datasets { new {} }' > c1/common/c7.conf"));
+	f = sh_foundation_find(&fs, &nfs, FROOT, "r7");
+	(void) snprintf(snap, sizeof (snap), "%s@%s", ds("r7"), f->f_newest);
 	(void) snprintf(oid, sizeof (oid), "%s", user(snap, "shtetl:commit"));
-	f = asked("r1", 1);
+	f = asked("r7", 1);
 	pump_to(f, "pkg");
-	CHECK(sh_zfs_mounted(z, ds("r1/var"), want, sizeof (want), &c.c_err) ==
-	    1 && sh_zfs_mounted(z, ds("r1/usr/local"), want, sizeof (want),
+	CHECK(sh_zfs_mounted(z, ds("r7/usr/local"), want, sizeof (want),
 	    &c.c_err) == 1);
 	pump(f);
 	(void) snprintf(head, sizeof (head), "%s",
-	    scratch_path("lake/foundations/r1"));
+	    scratch_path("lake/foundations/r7"));
 	(void) snprintf(want, sizeof (want), "mount -t devfs devfs %s/dev\n"
-	    "pkg -c %s upgrade -y (resolv.conf)\numount %s/dev\n", head, head,
-	    head);
+	    "pkg -c %s upgrade -y -- a b (resolv.conf)\numount %s/dev\n", head,
+	    head, head);
 	CHECK(f->f_state == SH_F_IDLE && is(slurp("fake.log"), want));
 	CHECK(strncmp(f->f_newest, "15.1-releng-", 12) == 0 &&
 	    strcmp(f->f_newest + strlen(f->f_newest) - 4, "-pkg") == 0);
-	(void) snprintf(snap, sizeof (snap), "%s@%s", ds("r1/usr/local"),
+	(void) snprintf(snap, sizeof (snap), "%s@%s", ds("r7/usr/local"),
 	    f->f_newest);
 	CHECK(is(user(snap, "shtetl:kind"), "pkg") &&
 	    is(user(snap, "shtetl:commit"), oid));
-	CHECK(sh_zfs_mounted(z, ds("r1/new"), want, sizeof (want), &c.c_err) ==
-	    -1 && !there("lake/foundations/r1/etc/resolv.conf"));
+	CHECK(sh_zfs_mounted(z, ds("r7/new"), want, sizeof (want), &c.c_err) ==
+	    -1 && !there("lake/foundations/r7/etc/resolv.conf"));
+
+	/* U8: a version whose foundation.conf lists no packages: no chroot */
+	f = asked("r1", 1);
+	pump(f);
+	CHECK(f->f_state == SH_F_IDLE && slurp("fake.log") == NULL &&
+	    strcmp(f->f_newest + strlen(f->f_newest) - 4, "-pkg") == 0);
 
 	/* U3: a pkg roll failing: rolled back, stalled, zbuild untouched */
 	CHECK(sh("touch build/src/untouched"));
 	CHECK(setenv("FAKE_FAIL", "pkg", 1) == 0);
-	f = asked("r1", 1);
+	f = asked("r7", 1);
 	pump(f);
 	CHECK(unsetenv("FAKE_FAIL") == 0);
-	CHECK(has("foundation r1: pkg: exited 1") &&
+	CHECK(has("foundation r7: pkg: exited 1") &&
 	    f->f_state == SH_F_STALLED && is(f->f_stall, "pkg: exited 1") &&
 	    there("build/src/untouched"));
 	/* U5: asked of a stalled foundation: the stall cleared */
-	f = asked("r1", 1);
+	f = asked("r7", 1);
 	pump(f);
 	CHECK(f->f_state == SH_F_IDLE &&
-	    zfake_local(ds("r1"), "shtetl:stall") == NULL);
+	    zfake_local(ds("r7"), "shtetl:stall") == NULL);
 	/* U2: no version: refused */
 	g = sh_foundation_find(&fs, &nfs, FROOT, "r2");
 	cap_reset(&c);

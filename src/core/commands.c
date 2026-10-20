@@ -132,10 +132,10 @@ cm_return(struct sh_job *j, void *arg, struct sh_err *e)
 void
 sh_commands_steps(struct sh_job *j, struct sh_commands *cm)
 {
-	const struct sh_node *pkg = NULL, *cmds;
+	const struct sh_node *pkg = cm->cm_pkgs, *cmds = NULL;
 	const char **argv, *words[8];
 	char *root, *name, *dev;
-	size_t i, n = 0;
+	size_t i, n = pkg != NULL ? pkg->sn_obj.ob_n : 0;
 
 	if (!cm->cm_upgrade) {
 		root = cm_cat("SHTETL_ROOT=", cm->cm_head);
@@ -150,12 +150,10 @@ sh_commands_steps(struct sh_job *j, struct sh_commands *cm)
 		cm_pieces(j, cm, "commands-external", "external", words, 7);
 		free(root);
 		free(name);
-		pkg = sh_obj_get(cm->cm_recipe->sr_merged, "pkg");
 		cmds = sh_obj_get(cm->cm_recipe->sr_merged, "commands");
-		n = pkg != NULL ? pkg->sn_obj.ob_n : 0;
-		if (n == 0 && (cmds == NULL || cmds->sn_obj.ob_n == 0))
-			return;
 	}
+	if (n == 0 && (cmds == NULL || cmds->sn_obj.ob_n == 0))
+		return;
 	dev = sh_root_path(cm->cm_head, "dev");
 	words[0] = "mount";
 	words[1] = "-t";
@@ -164,7 +162,7 @@ sh_commands_steps(struct sh_job *j, struct sh_commands *cm)
 	words[4] = dev;
 	words[5] = NULL;
 	sh_job_child(j, "devfs", words);
-	if (cm->cm_upgrade || n > 0) {
+	if (n > 0) {
 		sh_job_call(j, "resolv.conf", cm_lend, cm);
 		argv = sh_calloc(n + 9, sizeof (*argv));
 		argv[0] = "env";
@@ -174,7 +172,7 @@ sh_commands_steps(struct sh_job *j, struct sh_commands *cm)
 		argv[4] = cm->cm_head;
 		argv[5] = cm->cm_upgrade ? "upgrade" : "install";
 		argv[6] = "-y";
-		argv[7] = cm->cm_upgrade ? NULL : "--";
+		argv[7] = "--";
 		for (i = 0; i < n; i++)
 			argv[8 + i] = pkg->sn_obj.ob_v[i].pr_key;
 		sh_job_child(j, "pkg", argv);

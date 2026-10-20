@@ -59,7 +59,8 @@ struct sh_rollenv {
  * With PKG, as shtetl pkg F asks, a pkg roll (plan 6): its newest
  * version's packages upgraded and nothing else, the steps head (F and
  * the datasets that version's foundation.conf gives, mounted), pkg
- * upgrade in a chroot (commands.h) and snapshot,
+ * upgrade of the packages it gives in a chroot (commands.h) and
+ * snapshot,
  * F@<ver>-<date>-pkg with the version's shtetl:commit; its failure
  * rolls back and stalls, and leaves zbuild alone; CONFIG and BUILD
  * may be NULL. Refused, "F: no version", for F with none.

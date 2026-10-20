@@ -291,6 +291,7 @@ roll_obj(struct sh_job *j, void *arg, struct sh_err *e)
 	r->r_commands.cm_head = r->r_head;
 	r->r_commands.cm_name = r->r_f->f_name;
 	r->r_commands.cm_recipe = &r->r_recipe;
+	r->r_commands.cm_pkgs = sh_obj_get(r->r_recipe.sr_merged, "pkg");
 	r->r_commands.cm_resolv = r->r_env->re_resolv;
 	sh_commands_steps(j, &r->r_commands);
 	sh_job_call(j, "inject", roll_inject, r);
@@ -470,8 +471,9 @@ roll_head(struct sh_job *j, void *arg, struct sh_err *e)
 /*
  * A pkg roll's head: F mounted, its newest version's foundation.conf
  * read from it, and the datasets that gives mounted; then pkg upgrade
- * in a chroot (commands.h), and the snapshot. The version is the
- * newest's, VER of its name VER-DATE-KIND, and so is the commit.
+ * of the packages it gives, in a chroot (commands.h), and the
+ * snapshot. The version is the newest's, VER of its name
+ * VER-DATE-KIND, and so is the commit.
  */
 static int
 roll_pkg(struct sh_job *j, void *arg, struct sh_err *e)
@@ -506,6 +508,7 @@ roll_pkg(struct sh_job *j, void *arg, struct sh_err *e)
 	r->r_commands.cm_head = r->r_head;
 	r->r_commands.cm_name = r->r_f->f_name;
 	r->r_commands.cm_resolv = r->r_env->re_resolv;
+	r->r_commands.cm_pkgs = sh_obj_get(r->r_shaken, "pkg");
 	r->r_commands.cm_upgrade = 1;
 	sh_commands_steps(j, &r->r_commands);
 	sh_job_call(j, "snapshot", roll_snapshot, r);

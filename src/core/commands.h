@@ -23,6 +23,7 @@ struct sh_commands {
 	const char		*cm_head;	/* where the head is mounted */
 	const char		*cm_name;	/* the foundation's */
 	const struct sh_recipe	*cm_recipe;	/* none for an upgrade */
+	const struct sh_node	*cm_pkgs;	/* the packages, or NULL */
 	const char		*cm_resolv;	/* the host's resolv.conf */
 	int			cm_upgrade;	/* a pkg roll's: pkg upgrade */
 	int			cm_lent;	/* resolv.conf lent */
@@ -30,7 +31,9 @@ struct sh_commands {
 
 /*
  * CM's steps added to J; CM outlives them. An upgrade's are the
- * chroot's with pkg upgrade in it, and nothing else.
+ * chroot's with pkg upgrade of CM_PKGS in it, the packages the
+ * version's foundation.conf lists (ruled 2026-10-20), and nothing
+ * else; none where it lists none.
  */
 void sh_commands_steps(struct sh_job *j, struct sh_commands *cm);
 

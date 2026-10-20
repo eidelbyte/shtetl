@@ -153,6 +153,7 @@ printf '%s\n' 'src_branch = "stable/14";' > c1/foundations/r5.conf
 mkdir -p c1/common
 echo 'commands { one = "echo 0"; }' > c1/common/c7.conf
 f r7 'import = "common/c7.conf";' 'pkg = [ "a", "b" ];' \
+    'datasets { "usr/local" {} }' \
     'commands { one = "echo 1"; two = "echo 2"; }' \
     'commands-external { ext = <<EOD' \
     'echo "external $SHTETL_NAME $SHTETL_KIND $SHTETL_ROOT" >> "$FAKE_LOG"' \

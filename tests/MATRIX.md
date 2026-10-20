@@ -670,15 +670,16 @@ Dimensions: the foundation {a version, none, stalled}; its recipe
 failing}. Run as family F's, the fakes logging. Mutations caught: a
 failed pkg roll resetting zbuild (U3); kind update (U1); the version's
 datasets not mounted (U1); the commit not the version's (U1); no
-refusal without a version (U2, a crash); install for upgrade, and no
+refusal without a version (U2, a crash); no list given the upgrade, or its names dropped (U1); install for upgrade, and no
 resolv.conf lent for it (U1).
 
 | cell | what | expected | disposition |
 |------|------|----------|-------------|
-| U1 | a pkg roll | F and the datasets its version's foundation.conf gives mounted; devfs, the resolv.conf lent, pkg -c HEAD upgrade -y, devfs off; nothing built; F@<ver>-<date>-pkg on every dataset, kind pkg, the version's shtetl:commit | tests/check_roll.c |
+| U1 | a pkg roll | F and the datasets its version's foundation.conf gives mounted; devfs, the resolv.conf lent, pkg -c HEAD upgrade -y -- the packages that file lists (ruled 2026-10-20), devfs off; nothing built; F@<ver>-<date>-pkg on every dataset, kind pkg, the version's shtetl:commit | tests/check_roll.c |
 | U2 | a foundation with no version | "F: no version" | tests/check_roll.c |
 | U3 | the upgrade failing | "pkg: exited 1"; rolled back, stalled; zbuild untouched | tests/check_roll.c |
-| U4 | the recipe given a dataset since the version | not made, not mounted: the version's recipe is the pkg roll's | tests/check_roll.c |
+| U4 | the recipe given a dataset and a package since the version | neither made nor upgraded: the version's recipe is the pkg roll's | tests/check_roll.c |
+| U8 | a version whose foundation.conf lists no packages | no chroot, no pkg; the -pkg version made | tests/check_roll.c |
 | U5 | asked of a stalled foundation | the stall cleared; it rolls | tests/check_roll.c |
 | U6 | shtetl pkg over the socket: no argument, no such foundation | the usage; "NAME: no such foundation" | tests/check_daemon.c |
 | U7 | a real pkg upgrade | the packages upgraded in a version of kind pkg | box: tests/box/build.sh R8 |
