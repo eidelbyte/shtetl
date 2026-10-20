@@ -3,8 +3,13 @@
  * a test makes a few pools and a few dozen filesystems. Filesystems are
  * walked in the order they were made, which is depth first as long as
  * a parent is made before its children, as ZFS requires.
+ *
+ * Its state is in memory shared with every child the test forks, as
+ * ZFS's is in the kernel: what a forked call changes, as a daemon's
+ * forked send does, every process sees.
  */
 
+#include <sys/mman.h>
 #include <sys/stat.h>
 
 #include <errno.h>
@@ -17,8 +22,8 @@
 #include "core/zfs.h"
 #include "zfake.h"
 
-#define	ZF_DS		64
-#define	ZF_SNAPS	128
+#define	ZF_DS		128
+#define	ZF_SNAPS	256
 #define	ZF_PROPS	16
 #define	ZF_WORDS	8
 #define	ZF_NAME		256
@@ -51,14 +56,18 @@ struct sh_zfs {
 	int	zz_unused;
 };
 
-static struct zf_obj zf_ds[ZF_DS];
-static int zf_n;
-static struct zf_obj zf_snaps[ZF_SNAPS];	/* oldest first */
-static int zf_nsnaps;
-static char zf_failing[32];
-static int zf_failin;		/* calls of zf_failing still to pass */
-static uint64_t zf_txg;		/* the last createtxg given */
-static int zf_cutting;		/* the next stream breaks off */
+static struct zf_state {
+	struct zf_obj	zs_ds[ZF_DS];
+	int		zs_n;
+	struct zf_obj	zs_snaps[ZF_SNAPS];	/* oldest first */
+	int		zs_nsnaps;
+	char		zs_failing[32];
+	int		zs_failin;	/* calls of zs_failing still to pass */
+	uint64_t	zs_txg;		/* the last createtxg given */
+	int		zs_cutting;	/* streams to the one that breaks */
+	char		zs_gone[ZF_NAME];	/* a pool exported, or "" */
+	uint64_t	zs_guids;	/* the guids given */
+} *zf;
 static struct sh_zfs zf_handle;
 
 static void
@@ -68,13 +77,23 @@ zf_die(const char *what, const char *arg)
 	exit(1);
 }
 
+/* Whether NAME is in the pool exported. */
+static int
+zf_away(const char *name)
+{
+	size_t n = strcspn(name, "/@");
+
+	return (zf->zs_gone[0] != '\0' && strlen(zf->zs_gone) == n &&
+	    strncmp(name, zf->zs_gone, n) == 0);
+}
+
 static struct zf_obj *
 zf_find(struct zf_obj *set, int n, const char *name)
 {
 	int i;
 
 	for (i = 0; i < n; i++) {
-		if (strcmp(set[i].zo_name, name) == 0)
+		if (strcmp(set[i].zo_name, name) == 0 && !zf_away(name))
 			return (&set[i]);
 	}
 	return (NULL);
@@ -83,13 +102,13 @@ zf_find(struct zf_obj *set, int n, const char *name)
 static struct zf_obj *
 zf_fs(const char *ds)
 {
-	return (zf_find(zf_ds, zf_n, ds));
+	return (zf_find(zf->zs_ds, zf->zs_n, ds));
 }
 
 static struct zf_obj *
 zf_snap(const char *name)
 {
-	return (zf_find(zf_snaps, zf_nsnaps, name));
+	return (zf_find(zf->zs_snaps, zf->zs_nsnaps, name));
 }
 
 static const char *
@@ -131,30 +150,41 @@ zf_parent(const char *ds, char *buf)
 static int
 zf_fails(const char *what, struct sh_err *e)
 {
-	if (strcmp(zf_failing, what) != 0 || --zf_failin > 0)
+	if (strcmp(zf->zs_failing, what) != 0 || --zf->zs_failin > 0)
 		return (0);
-	zf_failing[0] = '\0';
+	zf->zs_failing[0] = '\0';
 	sh_errf(e, "zfake: %s failed as asked", what);
 	return (1);
+}
+
+/* The state mapped, once, by the first open or reset. */
+static void
+zf_map(void)
+{
+	if (zf == NULL && (zf = mmap(NULL, sizeof (*zf), PROT_READ |
+	    PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0)) == MAP_FAILED)
+		zf_die("mmap", strerror(errno));
 }
 
 void
 zfake_reset(void)
 {
-	zf_n = 0;
-	zf_nsnaps = 0;
-	zf_txg = 0;
-	zf_cutting = 0;
-	zf_failing[0] = '\0';
+	zf_map();
+	zf->zs_n = 0;
+	zf->zs_nsnaps = 0;
+	zf->zs_txg = 0;
+	zf->zs_cutting = 0;
+	zf->zs_gone[0] = '\0';
+	zf->zs_failing[0] = '\0';
 }
 
 void
 zfake_pool(const char *pool)
 {
-	if (zf_n == ZF_DS || zf_fs(pool) != NULL)
+	if (zf->zs_n == ZF_DS || zf_fs(pool) != NULL)
 		zf_die("cannot make pool", pool);
-	(void) memset(&zf_ds[zf_n], 0, sizeof (zf_ds[0]));
-	(void) snprintf(zf_ds[zf_n++].zo_name, ZF_NAME, "%s", pool);
+	(void) memset(&zf->zs_ds[zf->zs_n], 0, sizeof (zf->zs_ds[0]));
+	(void) snprintf(zf->zs_ds[zf->zs_n++].zo_name, ZF_NAME, "%s", pool);
 }
 
 void
@@ -166,8 +196,8 @@ zfake_fail(const char *what)
 void
 zfake_fail_nth(const char *what, int nth)
 {
-	(void) snprintf(zf_failing, sizeof (zf_failing), "%s", what);
-	zf_failin = nth;
+	(void) snprintf(zf->zs_failing, sizeof (zf->zs_failing), "%s", what);
+	zf->zs_failin = nth;
 }
 
 /*
@@ -242,6 +272,7 @@ zfake_has(const char *ds, const char *word)
 int
 sh_zfs_open(struct sh_zfs **zp, struct sh_err *e)
 {
+	zf_map();
 	if (zf_fails("open", e))
 		return (-1);
 	*zp = &zf_handle;
@@ -265,9 +296,10 @@ sh_zfs_local(struct sh_zfs *z, const char *prop,
 	(void) z;
 	if (zf_fails("local", e))
 		return (-1);
-	for (i = 0; i < zf_n; i++) {
-		if ((v = zf_prop(&zf_ds[i], prop)) != NULL &&
-		    (r = fn(arg, zf_ds[i].zo_name, v)) != 0)
+	for (i = 0; i < zf->zs_n; i++) {
+		if (!zf_away(zf->zs_ds[i].zo_name) &&
+		    (v = zf_prop(&zf->zs_ds[i], prop)) != NULL &&
+		    (r = fn(arg, zf->zs_ds[i].zo_name, v)) != 0)
 			return (r);
 	}
 	return (0);
@@ -396,10 +428,10 @@ sh_zfs_children(struct sh_zfs *z, const char *ds,
 		sh_errf(e, "zfake: %s: no such filesystem", ds);
 		return (-1);
 	}
-	for (i = 0; i < zf_n; i++) {
-		if (zf_parent(zf_ds[i].zo_name, parent) &&
+	for (i = 0; i < zf->zs_n; i++) {
+		if (zf_parent(zf->zs_ds[i].zo_name, parent) &&
 		    strcmp(parent, ds) == 0 &&
-		    (r = fn(arg, zf_ds[i].zo_name)) != 0)
+		    (r = fn(arg, zf->zs_ds[i].zo_name)) != 0)
 			return (r);
 	}
 	return (0);
@@ -409,9 +441,7 @@ sh_zfs_children(struct sh_zfs *z, const char *ds,
 static uint64_t
 zf_guid(void)
 {
-	static uint64_t n;
-
-	return (0x9e3779b97f4a7c15ULL * ++n);
+	return (0x9e3779b97f4a7c15ULL * ++zf->zs_guids);
 }
 
 /* As zfs_create and zfs_clone look: the parent first, then the name. */
@@ -431,9 +461,9 @@ zf_mkfs(const char *ds, const struct sh_zprop *props, size_t nprops,
 		sh_errf(e, "zfake: %s: exists", ds);
 		return (NULL);
 	}
-	if (zf_n == ZF_DS)
+	if (zf->zs_n == ZF_DS)
 		zf_die("too many filesystems", ds);
-	d = &zf_ds[zf_n++];
+	d = &zf->zs_ds[zf->zs_n++];
 	(void) memset(d, 0, sizeof (*d));
 	(void) snprintf(d->zo_name, ZF_NAME, "%s", ds);
 	for (i = 0; i < nprops; i++)
@@ -502,12 +532,12 @@ sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
 			}
 		}
 	}
-	if (zf_nsnaps + (int)n > ZF_SNAPS)
+	if (zf->zs_nsnaps + (int)n > ZF_SNAPS)
 		zf_die("too many snapshots", names[0]);
 	for (i = 0; i < n; i++) {
 		(void) snprintf(ds, sizeof (ds), "%.*s",
 		    (int)strcspn(names[i], "@"), names[i]);
-		s = &zf_snaps[zf_nsnaps++];
+		s = &zf->zs_snaps[zf->zs_nsnaps++];
 		*s = *zf_fs(ds);
 		(void) snprintf(s->zo_name, ZF_NAME, "%s", names[i]);
 		s->zo_nprops = 0;
@@ -515,7 +545,7 @@ sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
 		s->zo_origin[0] = '\0';
 		s->zo_rsnap[0] = '\0';
 		s->zo_guid = zf_guid();
-		s->zo_txg = ++zf_txg;
+		s->zo_txg = ++zf->zs_txg;
 		for (k = 0; k < nprops; k++)
 			zf_put(s, props[k].zp_name, props[k].zp_value);
 	}
@@ -544,9 +574,9 @@ sh_zfs_snapshots(struct sh_zfs *z, const char *ds,
 		sh_errf(e, "zfake: %s: no such filesystem", ds);
 		return (-1);
 	}
-	for (i = 0; i < zf_nsnaps; i++) {
-		if (zf_of(&zf_snaps[i], ds) &&
-		    (r = fn(arg, strchr(zf_snaps[i].zo_name, '@') + 1)) != 0)
+	for (i = 0; i < zf->zs_nsnaps; i++) {
+		if (zf_of(&zf->zs_snaps[i], ds) && (r = fn(arg,
+		    strchr(zf->zs_snaps[i].zo_name, '@') + 1)) != 0)
 			return (r);
 	}
 	return (0);
@@ -566,14 +596,16 @@ sh_zfs_rollback(struct sh_zfs *z, const char *ds, const char *snap,
 		sh_errf(e, "zfake: %s: no such filesystem", ds);
 		return (-1);
 	}
-	for (i = zf_nsnaps - 1; i >= 0 && !zf_of(&zf_snaps[i], ds); i--)
+	for (i = zf->zs_nsnaps - 1; i >= 0 && !zf_of(&zf->zs_snaps[i], ds); i--)
 		;
-	if (i < 0 || strcmp(strchr(zf_snaps[i].zo_name, '@') + 1, snap) != 0) {
+	if (i < 0 ||
+	    strcmp(strchr(zf->zs_snaps[i].zo_name, '@') + 1, snap) != 0) {
 		sh_errf(e, "zfake: %s@%s: not the newest snapshot", ds, snap);
 		return (-1);
 	}
-	(void) memcpy(d->zo_words, zf_snaps[i].zo_words, sizeof (d->zo_words));
-	d->zo_nwords = zf_snaps[i].zo_nwords;
+	(void) memcpy(d->zo_words, zf->zs_snaps[i].zo_words,
+	    sizeof (d->zo_words));
+	d->zo_nwords = zf->zs_snaps[i].zo_nwords;
 	return (0);
 }
 
@@ -593,38 +625,38 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 		return (-1);
 	}
 	if (snap) {
-		for (i = 0; i < zf_n; i++) {
-			if (strcmp(zf_ds[i].zo_origin, name) == 0) {
+		for (i = 0; i < zf->zs_n; i++) {
+			if (strcmp(zf->zs_ds[i].zo_origin, name) == 0) {
 				sh_errf(e, "zfake: %s: has clones", name);
 				return (-1);
 			}
 		}
-		i = (int)(o - zf_snaps);
-		(void) memmove(o, o + 1, (size_t)(zf_nsnaps - i - 1) *
+		i = (int)(o - zf->zs_snaps);
+		(void) memmove(o, o + 1, (size_t)(zf->zs_nsnaps - i - 1) *
 		    sizeof (*o));
-		zf_nsnaps--;
+		zf->zs_nsnaps--;
 		return (0);
 	}
 	if (o->zo_at[0] != '\0') {
 		sh_errf(e, "zfake: %s: mounted", name);
 		return (-1);
 	}
-	for (i = 0; i < zf_nsnaps; i++) {
-		if (zf_of(&zf_snaps[i], name)) {
+	for (i = 0; i < zf->zs_nsnaps; i++) {
+		if (zf_of(&zf->zs_snaps[i], name)) {
 			sh_errf(e, "zfake: %s: has snapshots", name);
 			return (-1);
 		}
 	}
-	for (i = 0; i < zf_n; i++) {
-		if (zf_parent(zf_ds[i].zo_name, parent) &&
+	for (i = 0; i < zf->zs_n; i++) {
+		if (zf_parent(zf->zs_ds[i].zo_name, parent) &&
 		    strcmp(parent, name) == 0) {
 			sh_errf(e, "zfake: %s: has children", name);
 			return (-1);
 		}
 	}
-	i = (int)(o - zf_ds);
-	(void) memmove(o, o + 1, (size_t)(zf_n - i - 1) * sizeof (*o));
-	zf_n--;
+	i = (int)(o - zf->zs_ds);
+	(void) memmove(o, o + 1, (size_t)(zf->zs_n - i - 1) * sizeof (*o));
+	zf->zs_n--;
 	return (0);
 }
 
@@ -700,10 +732,10 @@ sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 		return (-1);
 	}
 	len = strlen(d->zo_at);
-	for (i = 0; len > 0 && i < zf_n; i++) {
-		if (&zf_ds[i] != d &&
-		    strncmp(zf_ds[i].zo_at, d->zo_at, len) == 0 &&
-		    (len == 1 || zf_ds[i].zo_at[len] == '/')) {
+	for (i = 0; len > 0 && i < zf->zs_n; i++) {
+		if (&zf->zs_ds[i] != d &&
+		    strncmp(zf->zs_ds[i].zo_at, d->zo_at, len) == 0 &&
+		    (len == 1 || zf->zs_ds[i].zo_at[len] == '/')) {
 			sh_errf(e, "zfake: %s: busy", ds);
 			return (-1);
 		}
@@ -734,7 +766,25 @@ sh_zfs_mounted(struct sh_zfs *z, const char *ds, char *path, size_t len,
 void
 zfake_cut(void)
 {
-	zf_cutting = 1;
+	zfake_cut_nth(1);
+}
+
+void
+zfake_cut_nth(int nth)
+{
+	zf->zs_cutting = nth;
+}
+
+void
+zfake_export(const char *pool)
+{
+	(void) snprintf(zf->zs_gone, ZF_NAME, "%s", pool);
+}
+
+void
+zfake_import(void)
+{
+	zf->zs_gone[0] = '\0';
 }
 
 int
@@ -837,11 +887,11 @@ sh_zfs_promote(struct sh_zfs *z, const char *ds, struct sh_err *e)
 	    (int)strcspn(d->zo_origin, "@"), d->zo_origin);
 	of = zf_fs(ofs);
 	for (pass = 0; pass < 2; pass++) {
-		for (i = 0; i < zf_nsnaps; i++) {
-			if (!zf_of(&zf_snaps[i], ofs) ||
-			    zf_snaps[i].zo_txg > txg)
+		for (i = 0; i < zf->zs_nsnaps; i++) {
+			if (!zf_of(&zf->zs_snaps[i], ofs) ||
+			    zf->zs_snaps[i].zo_txg > txg)
 				continue;
-			at = strchr(zf_snaps[i].zo_name, '@');
+			at = strchr(zf->zs_snaps[i].zo_name, '@');
 			(void) snprintf(name, sizeof (name), "%s%s", ds, at);
 			if (pass == 0 && zf_snap(name) != NULL) {
 				sh_errf(e, "zfake: %s: %s is the origin's too",
@@ -850,13 +900,13 @@ sh_zfs_promote(struct sh_zfs *z, const char *ds, struct sh_err *e)
 			}
 			if (pass == 0)
 				continue;
-			for (k = 0; k < zf_n; k++) {
-				if (strcmp(zf_ds[k].zo_origin,
-				    zf_snaps[i].zo_name) == 0)
-					(void) snprintf(zf_ds[k].zo_origin,
+			for (k = 0; k < zf->zs_n; k++) {
+				if (strcmp(zf->zs_ds[k].zo_origin,
+				    zf->zs_snaps[i].zo_name) == 0)
+					(void) snprintf(zf->zs_ds[k].zo_origin,
 					    ZF_NAME, "%s", name);
 			}
-			(void) snprintf(zf_snaps[i].zo_name, ZF_NAME, "%s",
+			(void) snprintf(zf->zs_snaps[i].zo_name, ZF_NAME, "%s",
 			    name);
 		}
 	}
@@ -873,9 +923,9 @@ zf_newest(const char *fs)
 {
 	int i;
 
-	for (i = zf_nsnaps - 1; i >= 0; i--) {
-		if (zf_of(&zf_snaps[i], fs))
-			return (&zf_snaps[i]);
+	for (i = zf->zs_nsnaps - 1; i >= 0; i--) {
+		if (zf_of(&zf->zs_snaps[i], fs))
+			return (&zf->zs_snaps[i]);
 	}
 	return (NULL);
 }
@@ -893,8 +943,7 @@ zf_take(struct zf_obj *d, const char *snap, const char *from,
 	const struct zf_obj *f = from != NULL ? zf_snap(from) : NULL;
 	struct zf_obj *t;
 
-	if (zf_cutting) {
-		zf_cutting = 0;
+	if (zf->zs_cutting > 0 && --zf->zs_cutting == 0) {
 		(void) snprintf(d->zo_rsnap, ZF_NAME, "%s", snap);
 		d->zo_rguid = s->zo_guid;
 		(void) snprintf(d->zo_rfrom, ZF_NAME, "%s",
@@ -903,15 +952,15 @@ zf_take(struct zf_obj *d, const char *snap, const char *from,
 		sh_errf(e, "zfake: %s: the stream broken off", to);
 		return (-1);
 	}
-	if (zf_nsnaps == ZF_SNAPS)
+	if (zf->zs_nsnaps == ZF_SNAPS)
 		zf_die("too many snapshots", to);
 	zf_data(d, s);
-	t = &zf_snaps[zf_nsnaps++];
+	t = &zf->zs_snaps[zf->zs_nsnaps++];
 	(void) memset(t, 0, sizeof (*t));
 	(void) snprintf(t->zo_name, ZF_NAME, "%s", to);
 	zf_data(t, s);
 	t->zo_guid = s->zo_guid;
-	t->zo_txg = ++zf_txg;
+	t->zo_txg = ++zf->zs_txg;
 	d->zo_rsnap[0] = '\0';
 	d->zo_made = 0;
 	return (0);
@@ -999,9 +1048,10 @@ zf_byguid(const char *fs, uint64_t guid)
 	const struct zf_obj *d = zf_fs(fs), *o;
 	int i;
 
-	for (i = 0; i < zf_nsnaps; i++) {
-		if (zf_of(&zf_snaps[i], fs) && zf_snaps[i].zo_guid == guid)
-			return (&zf_snaps[i]);
+	for (i = 0; i < zf->zs_nsnaps; i++) {
+		if (zf_of(&zf->zs_snaps[i], fs) &&
+		    zf->zs_snaps[i].zo_guid == guid)
+			return (&zf->zs_snaps[i]);
 	}
 	if (d != NULL && d->zo_origin[0] != '\0' &&
 	    (o = zf_snap(d->zo_origin)) != NULL && o->zo_guid == guid)
@@ -1055,8 +1105,8 @@ sh_zfs_abort(struct sh_zfs *z, const char *ds, struct sh_err *e)
 	d->zo_rsnap[0] = '\0';
 	if (!d->zo_made)
 		return (0);
-	i = (int)(d - zf_ds);
-	(void) memmove(d, d + 1, (size_t)(zf_n - i - 1) * sizeof (*d));
-	zf_n--;
+	i = (int)(d - zf->zs_ds);
+	(void) memmove(d, d + 1, (size_t)(zf->zs_n - i - 1) * sizeof (*d));
+	zf->zs_n--;
 	return (0);
 }

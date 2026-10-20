@@ -3,10 +3,14 @@
  * the top: "f/usr" is TOP/f/usr.
  */
 
+#include <sys/types.h>
+#include <sys/wait.h>
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "core/err.h"
 #include "core/zfs.h"
@@ -503,6 +507,23 @@ cells_props(void)
 	    "no such snapshot");
 }
 
+/*
+ * A call in a child forked with the layer open, as the daemon forks a
+ * send (Z18): what it makes, the parent sees.
+ */
+static void
+cells_fork(void)
+{
+	pid_t pid;
+	int st = -1;
+
+	if ((pid = fork()) == 0)
+		_exit(sh_zfs_create(z, at("forked"), NULL, 0, &e) != 0);
+	cell("Z18", "made in a forked child: seen and destroyed by the parent",
+	    pid > 0 && waitpid(pid, &st, 0) == pid && st == 0 &&
+	    sh_zfs_destroy(z, at("forked"), &e) == 0);
+}
+
 /* Whether the snapshots A and B, below the top, share a guid. */
 static int
 same(const char *a, const char *b)
@@ -679,6 +700,7 @@ zcells(FILE *o, const char *t)
 	cells_destroy();
 	cells_set();
 	cells_props();
+	cells_fork();
 	cells_send();
 	sh_zfs_close(z);
 	(void) fclose(ef);

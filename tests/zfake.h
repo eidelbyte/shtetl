@@ -2,7 +2,9 @@
  * The fake ZFS of the tests: tests/zfake.c implements src/core/zfs.h
  * over pools and filesystems held in memory, refusing in the order the
  * real layer does and in its words (tests/zcells.c holds the two to
- * the same cells), with these calls to set it up and look inside.
+ * the same cells), with these calls to set it up and look inside. The
+ * memory is shared with the children a test forks, as the kernel's
+ * state is.
  */
 
 #ifndef	SH_ZFAKE_H
@@ -24,9 +26,17 @@ void zfake_fail_nth(const char *what, int nth);
 /*
  * The next stream sh_zfs_send or sh_zfs_resume receives breaks off
  * part way: refused, and left on its target to resume, as a stream cut
- * in a pipe leaves it.
+ * in a pipe leaves it; zfake_cut_nth, the Nth from now.
  */
 void zfake_cut(void);
+void zfake_cut_nth(int nth);
+
+/*
+ * The pool POOL exported, as far as the calls can tell: nothing in it
+ * is there; zfake_import, back as it was.
+ */
+void zfake_export(const char *pool);
+void zfake_import(void);
 
 /* PROP as set on the filesystem DS itself, native or user; or NULL. */
 const char *zfake_local(const char *ds, const char *prop);

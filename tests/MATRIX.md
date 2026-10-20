@@ -118,6 +118,7 @@ words. The fake's data is words; the box's are files.
 | Z17 | props | nothing set there | nothing |
 | Z17 | props | FN stops | FN's value returned |
 | Z17 | props | no such filesystem; no such snapshot | "no such filesystem"; "no such snapshot" |
+| Z18 | create, children | made in a forked child, the layer opened before the fork | seen by the parent: the state is the kernel's, the fake's shared as it is (m4-beam) |
 
 The streams' cells cut a stream through the driver (zc_cut): on the
 box as probe P1 cuts it, zfs send into head -c into zfs receive -s;
