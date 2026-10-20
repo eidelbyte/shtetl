@@ -21,15 +21,28 @@ static const char *const sp_names[SH_SP_N] = {
 
 /*
  * What each space keeps below its root, made when the daemon starts,
- * so that nothing later asks whether a parent is there.
+ * so that nothing later asks whether a parent is there (plan 4). Where
+ * the beam receives (8.1), the copies below inherit readonly, so
+ * nothing changes one since its newest snapshot and its next stream
+ * lands; the lake's copies are never mounted either, as nothing reads
+ * them in place: a restore beams one back.
  */
 static const struct {
 	enum sh_space	sk_space;
 	const char	*sk_name;
-	struct sh_zprop	sk_prop;
+	struct sh_zprop	sk_props[2];
+	size_t		sk_n;
 } sp_skeleton[] = {
-	{ SH_SP_LAKE, "foundations", { "canmount", "off" } },
-	{ SH_SP_LAKE, "foundation-builds", { "canmount", "off" } }
+	{ SH_SP_LAKE, "foundations", { { "canmount", "off" } }, 1 },
+	{ SH_SP_LAKE, "foundation-builds", { { "canmount", "off" } }, 1 },
+	{ SH_SP_LAKE, "containers",
+	    { { "mountpoint", "none" }, { "readonly", "on" } }, 2 },
+	{ SH_SP_LAKE, "systems",
+	    { { "mountpoint", "none" }, { "readonly", "on" } }, 2 },
+	{ SH_SP_RUN, "foundations",
+	    { { "canmount", "off" }, { "readonly", "on" } }, 2 },
+	{ SH_SP_RUN, "containers", { { "mountpoint", "/containers" } }, 1 },
+	{ SH_SP_RUN, "systems", { { "canmount", "off" } }, 1 }
 };
 
 /* Every root of every space the walk found, before the rules. */
@@ -157,8 +170,8 @@ sh_spaces_skeleton(struct sh_zfs *z, const struct sh_spaces *sp,
 		(void) snprintf(name, sizeof (name), "%s/%s", root,
 		    sp_skeleton[i].sk_name);
 		if ((r = sh_zfs_children(z, root, sp_is, name, e)) < 0 ||
-		    (r == 0 && sh_zfs_create(z, name, &sp_skeleton[i].sk_prop,
-		    1, e) != 0))
+		    (r == 0 && sh_zfs_create(z, name, sp_skeleton[i].sk_props,
+		    sp_skeleton[i].sk_n, e) != 0))
 			return (-1);
 	}
 	return (0);

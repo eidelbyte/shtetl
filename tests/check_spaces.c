@@ -36,6 +36,15 @@ find(struct sh_spaces *sp)
 	return (sh_spaces_find(z, sp, &c.c_err));
 }
 
+/* Whether PROP is set on DS itself to VALUE. */
+static int
+is(const char *ds, const char *prop, const char *value)
+{
+	const char *v = zfake_local(ds, prop);
+
+	return (v != NULL && strcmp(v, value) == 0);
+}
+
 int
 main(void)
 {
@@ -108,6 +117,16 @@ main(void)
 	    "off") == 0);
 	CHECK(strcmp(zfake_local("tank/lake/foundation-builds", "canmount"),
 	    "off") == 0);
+
+	/* S12: the beam's rows, where it receives readonly */
+	CHECK(is("tank/lake/containers", "mountpoint", "none") &&
+	    is("tank/lake/containers", "readonly", "on") &&
+	    is("tank/lake/systems", "mountpoint", "none") &&
+	    is("tank/lake/systems", "readonly", "on") &&
+	    is("fast/run/foundations", "canmount", "off") &&
+	    is("fast/run/foundations", "readonly", "on") &&
+	    is("fast/run/containers", "mountpoint", "/containers") &&
+	    is("fast/run/systems", "canmount", "off"));
 
 	/* S9: there already: left as it is, nothing said */
 	CHECK(sh_spaces_skeleton(z, &sp, &c.c_err) == 0);

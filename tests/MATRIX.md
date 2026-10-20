@@ -156,10 +156,11 @@ there or not, its making refused or not.
 | S5 | a value no space has | "DS: invalid shtetl:space \"V\""; none taken | tests/check_spaces.c |
 | S6 | a root inside another's | "DS: run root inside lake root R" | tests/check_spaces.c |
 | S7 | the walk refused | its words; none taken | tests/check_spaces.c |
-| S8 | a row's dataset missing | made, its property from birth | tests/check_spaces.c |
+| S8 | a row's dataset missing | made, its properties from birth | tests/check_spaces.c |
 | S9 | there already | left, nothing said | tests/check_spaces.c |
 | S10 | the row's space absent | nothing made | tests/check_spaces.c |
 | S11 | making it refused | its words | tests/check_spaces.c |
+| S12 | the beam's rows (m4-beam), lake and run found | lake/containers and lake/systems, mountpoint none and readonly; run/foundations canmount off and readonly; run/containers mountpoint /containers; run/systems canmount off | tests/check_spaces.c |
 
 On the box, discovery and the skeleton run inside the daemon's start,
 which m1-foundation-start's box cells exercise; the ZFS calls under
