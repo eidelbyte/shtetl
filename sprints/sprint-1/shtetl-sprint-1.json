@@ -3,7 +3,7 @@
     "project": "shtetl",
     "sprint": 1,
     "created": "2026-10-18",
-    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 and M2 tested (box run 3, 73 of 73); M3 tested 2026-10-20 (box run 5, 114 of 114; build run 2, 27 of 27); m4-zfs tested; next m3-logs (ruled: each roll's output in /var/log/shtetl/F.log, syslog one error per stall), then m4-beam.",
+    "note": "The second history of shtetl, branch v2: foundations and houses (containers and systems alike) as actors in one C daemon over ZFS. A foundation is one dataset in zlake whose builds are snapshots, beamed to zrun; when a version reaches zrun each house on that foundation rolls onto it: stop, final save, replay into a new version named for the foundation snapshot, swap, start. A failed roll stalls that one object; copies converge to their owner's; old versions are pruned by count once the beam is consistent. The plan is implementation-plan.md beside this file, the author's words its section 18; open-questions.md holds what waits on the author. Paths are relative to the shtetl repository root. Drive this file with tools/tracker.py (its default file). STATE 2026-10-20: every question ruled (plan 18), none open; P1, P2, P5, P6 tested on the box, P3 and P4 wait on a VM; M1 and M2 tested (box run 3, 73 of 73); M3 tested 2026-10-20 (box run 6, 114 of 114; build run 3, 29 of 29), m3-logs with it; m4-zfs tested; next m4-beam.",
     "planning_docs": [
       "sprints/sprint-1/implementation-plan.md",
       "sprints/sprint-1/open-questions.md"
@@ -577,8 +577,8 @@
     ],
     "provides": "A roll's output in a file of its foundation; syslog one error per stall.",
     "estimated_size": "small",
-    "completed": "testing",
-    "note": "2026-10-20: built; L1-L6 (check_roll, check_daemon), J3 retired, A3 nothing said, four mutations caught, gate, xcheck. Owed: build.sh R2/R10, run.sh A3. Worklog issue-docs/m3-logs.md."
+    "completed": "tested",
+    "note": "2026-10-20: built; L1-L6 (check_roll, check_daemon), J3 retired, A3 nothing said, four mutations caught, gate, xcheck. Owed: build.sh R2/R10, run.sh A3. Worklog issue-docs/m3-logs.md. 2026-10-20 box run 6 (2cba564) 114/114, build run 3 (b6cccde) 29/29: R2, R10 ok. Tested."
   },
   "m4-zfs": {
     "description": "Layer calls (plan 8.1, probe P1, P5): clone with properties; promote; a snapshot's guid and createtxg; send from a snapshot whole, incremental, or as a clone stream received with -o origin= (lzc_send into lzc_receive_resumable in a forked child, as main's sh_zfs_send forked lzc_send); the receive_resume_token of a filesystem, decoded to an nvlist with zfs_send_resume_token_to_nvlist, and a send resumed from it (lzc_send_resume); a token taken away (receive -A). The fake models a cut stream and its token. Matrix family Z cells for each, on the box and the fake. Verify: make check; tests/box/run.sh.",
