@@ -1,0 +1,76 @@
+shtetl d8b82aa box on KIDON 2026-10-20T03:25:02Z
+host: 15.1-RELEASE-p2 amd64
+zfs: zfs-2.4.2-1-FreeBSD_g6330a45b0 zfs-kmod-2.4.2-1-FreeBSD_g6330a45b0 
+
+family Z, over libzfs
+ok   Z1 created, a property from its birth
+ok   Z1 children and a sibling
+ok   Z1 a name taken: refused
+ok   Z1 no parent: refused
+ok   Z2 set on it: its value
+ok   Z2 set above it: inherited
+ok   Z2 set nowhere: 1
+ok   Z2 a native property is no user property: 1
+ok   Z2 no such filesystem: refused
+ok   Z3 set locally: each with its value, not where inherited
+ok   Z3 the walk stopped, FN's value returned
+ok   Z4 the filesystems directly below
+ok   Z4 the walk stopped, FN's value returned
+ok   Z4 no such filesystem: refused
+ok   Z5 three at once, a property on each from its birth
+ok   Z5 a snapshot inherits its filesystem's
+ok   Z5 one taken: refused
+ok   Z5 a filesystem missing: refused
+ok   Z5 a name twice: refused
+ok   Z5 a malformed name: refused
+ok   Z5 and none of them taken
+ok   Z5 no such snapshot: refused
+ok   Z6 a second: oldest first
+ok   Z6 its own, not its parent's
+ok   Z6 the walk stopped, FN's value returned
+ok   Z6 no such filesystem: refused
+ok   Z7 m made, mounted, written, snapshotted twice
+ok   Z7 to an older one: refused
+ok   Z7 to one that is not there: refused
+ok   Z7 to the newest, mounted: what came after it gone
+ok   Z7 and still mounted
+ok   Z7 no such filesystem: refused
+ok   Z7 a filesystem with no snapshot: refused
+ok   Z8 mounted there already: nothing to do
+ok   Z8 a child mounted where it inherits
+ok   Z8 a filesystem with one mounted inside: busy
+ok   Z8 unmounted, and again: nothing to do
+ok   Z8 canmount off: refused
+ok   Z8 mountpoint none: refused
+ok   Z8 where a missing one is mounted: refused
+ok   Z9 mounted, with snapshots: refused for the mount
+ok   Z9 unmounted, with children and snapshots: the snapshots
+ok   Z9 its snapshots destroyed
+ok   Z9 with a child: refused
+ok   Z9 the child, then it
+ok   Z9 a filesystem not there: refused
+ok   Z9 a snapshot not there: refused
+
+family A, the daemon on real pools
+# zfs set shtetl:space=lake s2lake
+# zfs create -o canmount=off s2lake/foundations
+# zfs create -o mountpoint=/generic s2lake/foundations/generic
+# touch /tmp/shtetl-probes/generic/a
+# zfs snapshot s2lake/foundations/generic@v1
+# touch /tmp/shtetl-probes/generic/b
+# zfs create -o mountpoint=/first s2lake/foundations/first
+# touch /tmp/shtetl-probes/first/a
+# zfs create -o shtetl:stall=build: make exited 2 s2lake/foundations/stalled
+# zfs snapshot s2lake/foundations/stalled@v1
+shtetl 294 - - foundation first: a first build undone
+ok   A1 status
+ok   A2 generic unmounted
+# zfs mount s2lake/foundations/generic
+ok   A2 what came after v1 gone
+# zfs unmount s2lake/foundations/generic
+ok   A3 first, with no version, gone
+ok   A3 and logged
+ok   D10 SIGTERM: exit 0
+ok   D10 the socket gone
+
+== 54 ok, 0 failed
