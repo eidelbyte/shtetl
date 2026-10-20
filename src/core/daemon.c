@@ -468,6 +468,7 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 		/* a line at a time, as a roll's */
 		(void) setvbuf(d.d_benv.be_log, NULL, _IOLBF, 0);
 		d.d_benv.be_z = z;
+		d.d_benv.be_err = e;
 		d.d_benv.be_kq = d.d_kq;
 		d.d_benv.be_lake = d.d_sp.ss_root[SH_SP_LAKE];
 		d.d_benv.be_run = d.d_sp.ss_root[SH_SP_RUN];

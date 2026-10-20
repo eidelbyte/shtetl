@@ -447,15 +447,20 @@ that sent anything is followed by another. A version's top, the
 root's child it is in, gets its snapshot's properties last, once
 every dataset of the version is there: a version whose top's copy
 holds them has arrived, "# arrived SNAP" in beam.log, and that mark
-is what a house actor starting (M5) reads. A stream that fails ends
-the convergence; a receive whose stream's snapshot is gone stays for
-the person's receive -A. The beam converges at the daemon's start,
-when a roll makes a version, and hourly; failing, a minute after,
-doubled with each failure to the hour. It does not stall, so syslog
-hears nothing of it; status says "beam failing WHY". The copies'
-roots are readonly, inherited, so nothing changes a copy since its
-newest snapshot (main's probe P8: with atime on, a read writes); the
-lake's copies are mountpoint none.
+is what a house actor starting (M5) reads. A stream that fails holds
+up only the streams that need it, its dataset's later ones and the
+copies below one it was making; the rest go on, and the top it is in
+is sent nothing more until the next convergence (ruled 2026-10-20). A
+receive whose stream's snapshot is gone stays for the person's
+receive -A (Q-B1 asks whether the beam should recover it). The beam
+converges at the daemon's start, when a roll makes a version, and
+hourly; failing, a minute after, doubled with each failure to the
+hour. A failure is said to syslog once, "beam: why", when the
+convergence before did not fail so; status has a line "beam failing
+WHY" for each. The copies' roots are readonly, inherited: an
+incremental receive refuses a copy changed since its base (dmu_recv.c,
+"there must be no changes since fromsnap"), and with atime on a read
+is a change (main's probe P8); the lake's copies are mountpoint none.
 
 Restore is a beam the other way, by hand: a house version and its
 foundation version from zlake to zrun.
@@ -962,3 +967,40 @@ goes to /var/log/shtetl/F.log, the foundation's, replaced when a roll
 of it is asked (7.4). Syslog gets one line for each roll that fails,
 "foundation F: STEP: why", and nothing else of a roll; a daemon that
 cannot start or runs out of memory still says so there (10). m3-logs.
+
+### 2026-10-20 (the beam's first review)
+
+Told of m4-beam's decisions, the author answered:
+
+    1. received copies being read only is good, but I can't imagine
+    that reading from a dataset actually causes an incremental to fail.
+    Doesn't it use snapshots as increment points anyway which are
+    intrinsically readonly?
+    2. ok that works
+    3. you're using far too few words here for me to make sense of, but
+    it seems correct
+    4. Oh, a failing beam can write to syslog too. I'm just saying
+    syslog should be a minimal amount of errors, but it should be our
+    errors.
+    5. Yes, exponential backoff sounds great.
+    6. what? Does this mean failing to beam F1 stops F2 from beaming?
+    or just F1->increment2?
+    7. what does this mean for automatic recovery as in 5?
+
+    RE: prune respect: Yes, archive-zrun and archive-zlake are
+    different (whatever the actual keys are), and archive-zrun <
+    archive-zlake or else there's a problem.
+
+So: the receiving roots stay readonly (1): the increment point is a
+snapshot, but the stream lands on the copy's live filesystem, which
+must not have changed since that snapshot (dmu_recv.c,
+recv_begin_check_existing_impl, without force), and with atime on a
+read writes the access times. A version's arrival is the mark on its
+top's copy (2), and the copies' shtetl:* properties are made their
+owners' in every look (3). A failing beam says so to syslog (4), its
+own errors and few: each failure once, when the convergence before did
+not fail so. The retries back off exponentially, a minute doubled to
+the hour (5). To 6: as built, the first failing stream ended the
+convergence, so F1 held up F2; now a failure holds up only the streams
+that need it (8.1). 7 is Q-B1 in open-questions.md. Prune: run.keep
+must be less than lake.keep, refused otherwise (m4-prune, 8.2).

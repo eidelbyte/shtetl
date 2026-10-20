@@ -63,18 +63,18 @@ forked call, the skeleton, the fake, and the beam.
   copy's shtetl:* are made the owner's, set or let go. A stall set on
   a foundation and then cleared reaches the copy both times. Only
   shtetl:* is touched, so a property of the copy's own is left alone.
-- The beam never says anything to syslog. Ruled 2026-10-20, syslog
-  hears one line per stall, and the beam does not stall: a
-  convergence that fails is a beam not yet converged (8.1). Its words
-  are in beam.log and status, "beam failing WHY". m7-notifier may want
-  a beam that fails for long; that is a question for then.
+- Syslog (changed by the review, below): first built to hear
+  nothing of the beam, since it does not stall; ruled that it hears
+  the beam's own errors, few. Each failure is said once, "beam: why",
+  when the convergence before did not fail so.
 - The timer: hourly after a convergence that ends well
   (SH_BEAM_PERIOD); after one that fails, a minute (SH_BEAM_RETRY),
   doubled with each failure after it, up to the hour. The plan named
   no numbers.
-- The first failing stream ends a convergence. A copy that cannot
-  take its stream (a snapshot of its own on it, say) holds up the
-  streams after it until the person sees to it; status names it.
+- A failing stream (changed by the review, below): first built to
+  end the convergence, so a copy that could not take its stream held
+  up every stream after it, other foundations' too. Now it holds up
+  only the streams that need it.
 - A receive to resume whose stream's snapshot is gone is left
   standing ("nothing is destroyed on a failure"). Resuming it fails
   until the person runs receive -A. Pruning waits for the beam, so
@@ -148,3 +148,52 @@ forked call, the skeleton, the fake, and the beam.
 
 1ff5464, 69a4861, d3735ed, 3c5f14c, and "beam: every dataset's copy
 converging to its owner's".
+
+## Box run 7 and build run 4
+
+Box run 7: KIDON, 2026-10-20, run.sh at d3a5193 (results 4fb25d7):
+127 ok, 0 failed. make check-freebsd ran all 16 programs, check_beam
+among them, on FreeBSD's kqueue and fork. Z16 - Z18 passed over
+libzfs: a snapshot's properties set and inherited, a name's own
+listed, and a filesystem made in a forked child seen by its parent.
+Build run 4: build.sh at 4fb25d7 (results 81b4504): 29 ok, 0 failed;
+R10, syslog one line, the stall. Its daemon found a run space and
+beamed. The log shows neither the run pool nor beam.log, so that is
+m4-box's to check (B28).
+
+## The first review (2026-10-20, plan 18)
+
+The author kept the readonly roots, the arrival mark, the properties
+converging and the backoff. The author ruled that syslog hears the
+beam's own errors, few. The author asked whether a failing F1 stops
+F2. As built it did: the first failing stream ended the convergence.
+That was rebuilt (the commit after 81b4504):
+
+- A convergence is looks, each followed by a pass of the streams it
+  planned, each stream a job of one forked call.
+- A planned stream knows the streams it needs: the one landing its
+  base, and, for a copy not there yet, the one making the copy's
+  parent. Their marks are on the look's picture of the receiving
+  space (bs_by, bf_by).
+- A stream that fails is said. One needing a stream that failed is not
+  run. Every other stream is.
+- A look follows each pass, and a top that failed is planned nothing
+  more in that convergence, so it ends with the first look that plans
+  nothing.
+- A receive to resume no longer holds up the whole look: only its own
+  top waits for it.
+- Status has a line per failure. Syslog hears each failure once
+  (be_err, the daemon's sink).
+- Cells B30 and B31, and B14, B16, B18 and B23 restated. 25 mutations
+  of the rebuilt beam caught, among them the need of the parent's
+  stream (B18, exactly one failure: without the need, a parent's
+  failed stream would bring failures of every child).
+- A stream may land a child under a parent whose own stream was cut:
+  ZFS holds the parent as it is (dmu_recv.c, dsl_dataset_hold of the
+  parent), and the fake does the same.
+
+The author asked what a stuck receive means for recovering by itself
+(7). It does not recover: the retries back off to the hour and fail
+the same way. Q-B1 in open-questions.md asks whether the beam may
+destroy what blocks it in that case and one other, and recommends it.
+Prune: run.keep must be less than lake.keep (m4-prune).

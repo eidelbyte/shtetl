@@ -754,7 +754,8 @@ whose guid the copy's space holds, wherever it is there, is sent, in
 origin order, oldest first: an incremental onto a copy there, a clone
 stream onto the space's snapshot of that guid for a copy that is not,
 a full stream where no guid of the history is held. A receive to
-resume goes first; nothing is destroyed. The shtetl:* properties of
+resume goes first in its top; nothing is destroyed, and a failure
+holds up only the streams that need it. The shtetl:* properties of
 each filesystem and snapshot are made the owner's once its version is
 all there, the version's top last: a version whose top snapshot holds
 them has arrived. The actor converges at its start, when told, and on
@@ -791,19 +792,21 @@ zfake_export.
 | B11 | a snapshot the copy lacks older than its newest held, pruned there | not sent again | tests/check_beam.c |
 | B12 | a cut at each stream of B1, B2, B4, B5, B6 and B7 | the convergence failing with the stream's words, a receive to resume left, nothing destroyed; the next resuming it first, then going on; converged, every guid and property the owner's, each version arrived once | tests/check_beam.c |
 | B13 | a receive to resume whose stream's snapshot is gone | "SNAP: no such snapshot"; failing; the receive left | tests/check_beam.c |
-| B14 | a copy with a snapshot of its own since | "newest snapshot is not FROM's counterpart"; failing; nothing destroyed; no stream after it | tests/check_beam.c |
+| B14 | a copy with a snapshot of its own since | "newest snapshot is not FROM's counterpart"; failing; nothing destroyed; the version not arrived, the other datasets' streams sent | tests/check_beam.c |
 | B15 | a filesystem's properties | the owner's shtetl:* set on the copy; one the owner lets go let go on the copy; any other property of the copy's left | tests/check_beam.c |
-| B16 | a version cut after its top's stream; its properties failing part way | the top's copy without the properties, nothing arrived; both once the rest is there | tests/check_beam.c |
+| B16 | a version cut after its top's stream; its properties failing part way | the streams not needing the cut one sent; the top's copy without the properties, nothing arrived; both once the rest is there | tests/check_beam.c |
 | B17 | a convergence after an arrival | "# arrived" not again | tests/check_beam.c |
 | B18 | told while converging | converging once more at its end | tests/check_beam.c |
 | B19 | the timer after a convergence ending well | the next after the period; told meanwhile, at once | tests/check_beam.c |
 | B20 | failing again and again, then ending well | the next after the retry, doubled each time to the period; then the period | tests/check_beam.c |
 | B21 | the run's pool exported, then imported | failing with the walk's words; converged once it is back | tests/check_beam.c |
 | B22 | stopped while converging | its child killed and reaped, nothing ended; a beam begun again converges | tests/check_beam.c |
-| B23 | status | "beam converging STEP", "beam converged", "beam failing WHY" | tests/check_beam.c |
+| B23 | status | "beam converging STEP", "beam converged", a line "beam failing WHY" for each failure | tests/check_beam.c |
 | B24 | the log | "# send SNAP" and "# resume DS" as each stream begins, "# failed: why", "# arrived SNAP"; nothing for a convergence with nothing to do | tests/check_beam.c |
 | B25 | a receive to resume outside the beam's roots | left alone | tests/check_beam.c |
 | B26 | both pairs lacking | the foundations' streams first | tests/check_beam.c |
 | B27 | a system version | as B5, into lake/systems | tests/check_beam.c |
 | B28 | the box: the M3 foundation beamed to a run pool, a stream cut and resumed, a house stand-in beamed back | box: m4-box | box |
 | B29 | a clone the walk finds before its origin's dataset (a top cloned from a deeper one) | the origin's streams first, the clone a clone stream | tests/check_beam.c |
+| B30 | a stream failing, another foundation lacking a version | only the streams that need the failed one held back (its dataset's later ones, the copies below one it was making); the other foundation beamed and arrived in the same convergence; the failed top sent nothing more until the next (ruled 2026-10-20: a failure holds up only what needs it) | tests/check_beam.c |
+| B31 | syslog | a failure said once, "beam: why"; failing so again, nothing; a new failure said; nothing when it is over (ruled 2026-10-20) | tests/check_beam.c |

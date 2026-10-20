@@ -31,6 +31,7 @@
 #define	RS	RUN "/systems"
 
 static struct cap c;
+static struct cap sys;		/* the beam's error sink, syslog's */
 static struct sh_zfs *z;
 static struct sh_beamenv env;
 static struct sh_beam *b;
@@ -65,6 +66,19 @@ count(const char *s)
 	while ((p = strstr(p, s)) != NULL) {
 		n++;
 		p++;
+	}
+	return (n);
+}
+
+/* How many times S is in TEXT. */
+static int
+count_in(const char *text, const char *s)
+{
+	int n = 0;
+
+	while ((text = strstr(text, s)) != NULL) {
+		n++;
+		text++;
 	}
 	return (n);
 }
@@ -499,6 +513,7 @@ main(void)
 	int i;
 
 	cap_open(&c);
+	cap_open(&sys);
 	CHECK((logf = open_memstream(&logbuf, &loglen)) != NULL);
 	CHECK(sh_zfs_open(&z, &c.c_err) == 0);
 	CHECK((env.be_kq = kqueue()) >= 0);
@@ -506,6 +521,7 @@ main(void)
 	env.be_lake = LAKE;
 	env.be_run = RUN;
 	env.be_log = logf;
+	env.be_err = &sys.c_err;
 	env.be_period = 60000;
 	env.be_retry = 60000;
 
@@ -573,7 +589,10 @@ main(void)
 	CHECK(is(again(), "beam converged\n") && is(since(), "") &&
 	    !there(RF "/g@v1"));
 
-	/* B16: a version cut after its top's stream: not arrived */
+	/*
+	 * B16: a version cut after its top's stream: the streams not
+	 * needing the cut one sent, the version not arrived; then resumed
+	 */
 	take(LF "/g", "v5", "update");
 	zfake_cut_nth(2);
 	mark();
@@ -581,12 +600,12 @@ main(void)
 	    RF "/g/usr@v5: the stream broken off\n"));
 	CHECK(count("# failed: send " LF "/g/usr@v5: zfake: ") == 1 &&
 	    count("# arrived ") == 0);
-	CHECK(there(RF "/g@v5") && is(user(RF "/g@v5", "shtetl:kind"),
+	CHECK(there(RF "/g@v5") && there(RF "/g/var@v5") &&
+	    there(RF "/g/usr/local@v5") && is(user(RF "/g@v5", "shtetl:kind"),
 	    "(unset)") && sh_zfs_resumable(z, RF "/g/usr", &c.c_err) == 1);
-	CHECK(is(again(), "beam converged\n"));
-	CHECK(before("# resume " RF "/g/usr\n", "# send " LF "/g/var@v5\n"));
-	CHECK(before("# send " LF "/g/usr/local@v5\n",
-	    "# arrived " RF "/g@v5\n"));
+	mark();
+	CHECK(is(again(), "beam converged\n") && count("# send ") == 0);
+	CHECK(before("# resume " RF "/g/usr\n", "# arrived " RF "/g@v5\n"));
 	CHECK(is(user(RF "/g@v5", "shtetl:kind"), "update") &&
 	    count("# arrived " RF "/g@v5\n") == 1);
 
@@ -609,23 +628,79 @@ main(void)
 	CHECK(is(again(), "beam failing resume " RF "/g: zfake: " LF
 	    "/g@v6: no such snapshot\n"));
 	CHECK(sh_zfs_resumable(z, RF "/g", &c.c_err) == 1);
-	/* the person's receive -A: then it converges */
+	/*
+	 * the person's receive -A, and the copies of the version they
+	 * destroyed taken away: then it converges
+	 */
 	CHECK(sh_zfs_abort(z, RF "/g", &c.c_err) == 0);
+	unsnap(RF "/g", "v6");
 	CHECK(is(again(), "beam converged\n"));
 
-	/* B14: a copy with a snapshot of its own: refused, nothing more */
+	/*
+	 * B14: a copy with a snapshot of its own: refused, nothing
+	 * destroyed; the others' streams sent, the version not arrived
+	 */
 	{
 		const char *mine[] = { RF "/g@mine" };
 
 		CHECK(sh_zfs_snapshot(z, mine, 1, NULL, 0, &c.c_err) == 0);
 	}
 	take(LF "/g", "v7", "update");
+	mark();
 	CHECK(is(again(), "beam failing send " LF "/g@v7: zfake: " RF
 	    "/g: newest snapshot is not " LF "/g@v8's counterpart\n"));
-	CHECK(!there(RF "/g/var@v7") && there(RF "/g@mine"));
+	CHECK(there(RF "/g/var@v7") && there(RF "/g@mine") &&
+	    count("# arrived ") == 0);
 	CHECK(sh_zfs_destroy(z, RF "/g@mine", &c.c_err) == 0);
 	CHECK(is(again(), "beam converged\n") &&
 	    same(LF "/g/var@v7", RF "/g/var@v7"));
+	done();
+
+	/*
+	 * B30, B31: a failing stream holds up only the streams that need
+	 * it: another foundation beamed and arrived in the same
+	 * convergence. Syslog hears a failure once, a new one when it
+	 * comes, nothing when it is over.
+	 */
+	beamed();
+	mk(LF "/h");
+	take(LF "/h", "v1", "create");
+	{
+		const char *mine[] = { RF "/g@mine" };
+
+		CHECK(sh_zfs_snapshot(z, mine, 1, NULL, 0, &c.c_err) == 0);
+	}
+	take(LF "/g", "v3", "update");
+	mark();
+	cap_reset(&sys);
+	CHECK(is(again(), "beam failing send " LF "/g@v3: zfake: " RF
+	    "/g: newest snapshot is not " LF "/g@v2's counterpart\n"));
+	CHECK(same(LF "/h@v1", RF "/h@v1") &&
+	    count("# arrived " RF "/h@v1\n") == 1 &&
+	    same(LF "/g/var@v3", RF "/g/var@v3"));
+	CHECK(is(cap_text(&sys), "beam: send " LF "/g@v3: zfake: " RF
+	    "/g: newest snapshot is not " LF "/g@v2's counterpart\n"));
+	cap_reset(&sys);
+	CHECK(strncmp(again(), "beam failing send ", 18) == 0 &&
+	    is(cap_text(&sys), ""));
+	{
+		const char *mine[] = { RF "/h@mine" };
+
+		CHECK(sh_zfs_snapshot(z, mine, 1, NULL, 0, &c.c_err) == 0);
+	}
+	take(LF "/h", "v2", "update");
+	/* B23: a line for each failure */
+	CHECK(is(again(), "beam failing send " LF "/g@v3: zfake: " RF
+	    "/g: newest snapshot is not " LF "/g@v2's counterpart\n"
+	    "beam failing send " LF "/h@v2: zfake: " RF
+	    "/h: newest snapshot is not " LF "/h@v1's counterpart\n"));
+	CHECK(is(cap_text(&sys), "beam: send " LF "/h@v2: zfake: " RF
+	    "/h: newest snapshot is not " LF "/h@v1's counterpart\n"));
+	CHECK(sh_zfs_destroy(z, RF "/g@mine", &c.c_err) == 0 &&
+	    sh_zfs_destroy(z, RF "/h@mine", &c.c_err) == 0);
+	cap_reset(&sys);
+	CHECK(is(again(), "beam converged\n") && is(cap_text(&sys), "") &&
+	    mirrored(LF, RUN));
 	done();
 
 	/* B12: a cut at each stream of B1, B2 and B4 */
@@ -738,7 +813,7 @@ main(void)
 	sh_beam_converge(b);
 	CHECK(is(settle(), "beam converged\n") && same(LF "/g@v1", RF "/g@v1"));
 	CHECK(count("# failed: send " LF "/g@v1: zfake: send failed as "
-	    "asked\n") == 1);
+	    "asked\n") == 1 && count("# failed: ") == 1);
 	done();
 
 	/* B19: the timer, after the period; told meanwhile, at once */
@@ -769,6 +844,7 @@ main(void)
 	foundation();
 	take(LF "/g", "v1", "create");
 	zfake_export("fast");
+	cap_reset(&sys);
 	(void) clock_gettime(CLOCK_MONOTONIC, &t0);
 	b = sh_beam_start(&env);
 	CHECK(is(status(), "beam failing look: zfake: " RUN
@@ -787,6 +863,8 @@ main(void)
 			    0);
 		}
 	}
+	/* B31: said once, however often it fails so */
+	CHECK(count_in(cap_text(&sys), "beam: look: ") == 1);
 	zfake_import();
 	while (timers == 5)
 		CHECK(one(5000));
