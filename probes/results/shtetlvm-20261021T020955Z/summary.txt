@@ -1,0 +1,12 @@
+shtetl 3ae9d48 probes on shtetlvm 2026-10-21T02:09:55Z
+host: 15.1-RELEASE amd64
+zfs: zfs-2.4.2-1-FreeBSD_g6330a45b0 zfs-kmod-2.4.2-1-FreeBSD_g6330a45b0 
+zfs_rebase: none
+
+P4 a system stops into outer space, switches there, comes back
+P4 ok P4.8 booted from
+P4 ok P4.8 s2os
+P4 ok P4.8 the rc script
+P4 stage 3 of 3: done
+
+== 3 ok, 0 failed

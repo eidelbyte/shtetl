@@ -1,0 +1,15 @@
+shtetl 3ae9d48 probes on shtetlvm 2026-10-21T02:08:20Z
+host: 15.1-RELEASE amd64
+zfs: zfs-2.4.2-1-FreeBSD_g6330a45b0 zfs-kmod-2.4.2-1-FreeBSD_g6330a45b0 
+zfs_rebase: none
+
+P4 a system stops into outer space, switches there, comes back
+P4 ok P4.3 / in outer space
+P4 ok P4.4 a snapshot of the disk pool from outer space
+P4 ok P4.4 the snapshot
+P4 ok P4.5 bootfs from outer space
+P4 ok P4.6 booted from
+P4 answer P4.7 hw.usermem in outer space: 7561158656
+P4 stage 2 of 3: reboot, then run P4 again
+
+== 5 ok, 0 failed

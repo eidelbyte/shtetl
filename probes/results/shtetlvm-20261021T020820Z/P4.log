@@ -1,0 +1,8 @@
+P4 ok P4.3 / in outer space
+P4 ok P4.4 a snapshot of the disk pool from outer space
+P4 ok P4.4 the snapshot
+P4 ok P4.5 bootfs from outer space
+P4 ok P4.6 booted from
+P4 answer P4.7 hw.usermem in outer space: 7561158656
+# zpool set bootfs=zroot/ROOT/default zroot
+P4 stage 2 of 3: reboot, then run P4 again

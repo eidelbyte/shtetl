@@ -1,0 +1,16 @@
+shtetl 3ae9d48 probes on shtetlvm 2026-10-21T02:06:16Z
+host: 15.1-RELEASE amd64
+zfs: zfs-2.4.2-1-FreeBSD_g6330a45b0 zfs-kmod-2.4.2-1-FreeBSD_g6330a45b0 
+zfs_rebase: none
+
+P3 a system's versions are boot environments, switched by bootfs
+P3 ok P3.1 booted from
+P3 ok P3.2 /'s marker
+P3 ok P3.2 /var's marker
+P3 ok P3.2 /usr/local's marker
+P3 ok P3.3 the other version's datasets mounted
+P3 answer P3.4 mounted at /var and below: zroot/s2sys/v2/var /var;zroot/var/mail /var/mail;zroot/var/crash /var/crash;zroot/var/log /var/log;zroot/var/tmp /var/tmp;zroot/var/audit /var/audit;
+P3 ok P3.5 bectl list
+P3 stage 3 of 4: reboot, then run P3 again
+
+== 6 ok, 0 failed

@@ -1,0 +1,10 @@
+P3 ok P3.1 booted from
+P3 ok P3.2 /'s marker
+P3 ok P3.2 /var's marker
+P3 ok P3.2 /usr/local's marker
+P3 ok P3.3 the other version's datasets mounted
+P3 answer P3.4 mounted at /var and below: zroot/s2sys/v1/var /var;zroot/var/audit /var/audit;zroot/var/crash /var/crash;zroot/var/log /var/log;zroot/var/mail /var/mail;zroot/var/tmp /var/tmp;
+P3 ok P3.5 bectl list
+# zfs set s2probe:v1=checked zroot/s2sys
+# zpool set bootfs=zroot/s2sys/v2 zroot
+P3 stage 2 of 4: reboot (look at the loader's boot environment menu), then run P3 again

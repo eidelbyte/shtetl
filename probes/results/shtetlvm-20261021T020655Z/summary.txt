@@ -1,0 +1,12 @@
+shtetl 3ae9d48 probes on shtetlvm 2026-10-21T02:06:55Z
+host: 15.1-RELEASE amd64
+zfs: zfs-2.4.2-1-FreeBSD_g6330a45b0 zfs-kmod-2.4.2-1-FreeBSD_g6330a45b0 
+zfs_rebase: none
+
+P3 a system's versions are boot environments, switched by bootfs
+P3 ok P3.7 booted from
+P3 ok P3.7 /'s marker
+P3 ok P3.7 s2sys
+P3 stage 4 of 4: done; say whether the loader's menu listed v1 and v2 (P3.6)
+
+== 3 ok, 0 failed

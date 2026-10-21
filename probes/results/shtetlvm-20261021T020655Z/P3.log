@@ -1,0 +1,6 @@
+P3 ok P3.7 booted from
+P3 ok P3.7 /'s marker
+# zfs destroy -r zroot/s2sys
+# zfs destroy zroot/ROOT/default@s2p3
+P3 ok P3.7 s2sys
+P3 stage 4 of 4: done; say whether the loader's menu listed v1 and v2 (P3.6)

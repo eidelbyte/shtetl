@@ -1,0 +1,13 @@
+shtetl 3ae9d48 probes on shtetlvm 2026-10-21T02:07:32Z
+host: 15.1-RELEASE amd64
+zfs: zfs-2.4.2-1-FreeBSD_g6330a45b0 zfs-kmod-2.4.2-1-FreeBSD_g6330a45b0 
+zfs_rebase: none
+
+P4 a system stops into outer space, switches there, comes back
+P4 answer P4.1 the memory disk: 7g for a root of 3288547328 bytes
+P4 answer P4.1 the send: 3 seconds
+P4 ok P4.1 the root on the memory pool
+P4 ok P4.2 vfs.root.mountfrom
+P4 stage 1 of 3 set up: sudo reboot -r; outer space reboots for real by itself; then run P4 again
+
+== 2 ok, 0 failed

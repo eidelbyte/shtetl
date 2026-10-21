@@ -1,0 +1,15 @@
+# rm -f /usr/local/etc/rc.d/s2outer
+# zfs create -o mountpoint=none -o canmount=off -o s2probe:home=zroot/ROOT/default zroot/s2os
+# chmod 555 /usr/local/etc/rc.d/s2outer
+# zfs snapshot zroot/ROOT/default@s2p4
+# zfs clone -o mountpoint=/ -o canmount=noauto zroot/ROOT/default@s2p4 zroot/s2os/v1
+P4 answer P4.1 the memory disk: 7g for a root of 3288547328 bytes
+# zpool create -o cachefile=none -O mountpoint=none s2zram /dev/md0
+# zfs create s2zram/root
+# zfs send zroot/ROOT/default@s2p4 | zfs receive -u s2zram/root/default
+P4 answer P4.1 the send: 3 seconds
+P4 ok P4.1 the root on the memory pool
+# kenv vfs.root.mountfrom=zfs:s2zram/root/default
+vfs.root.mountfrom="zfs:s2zram/root/default"
+P4 ok P4.2 vfs.root.mountfrom
+P4 stage 1 of 3 set up: sudo reboot -r; outer space reboots for real by itself; then run P4 again
