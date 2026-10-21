@@ -143,25 +143,29 @@ vm_console() {
 	cu -l "${CONS}B" -s 115200
 }
 
+# The VM's result directories not here yet copied here, and sent:
+# those, and nothing else the checkout holds.
 vm_results() {
 	vm_open
-	_n=0
 	_ok=0
 	_bad=0
+	set --
 	for _d in "$VALT/home/shtetl/probes/results"/*; do
 		_b=$(basename "$_d")
 		[ -d "$_d" ] && [ ! -e "$PD/results/$_b" ] || continue
 		cp -Rp "$_d" "$PD/results/$_b" || continue
-		set -- $(sed -n 's/^== \([0-9]*\) ok, \([0-9]*\) failed$/\1 \2/p' \
-		    "$_d/summary.txt") 0 0
-		_n=$((_n + 1))
-		_ok=$((_ok + $1))
-		_bad=$((_bad + $2))
-		say "$_b: $1 ok, $2 failed"
+		set -- "$@" "$PD/results/$_b"
+		_o=$(awk '/^== [0-9]+ ok, [0-9]+ failed$/ { print $2 }' \
+		    "$_d/summary.txt")
+		_f=$(awk '/^== [0-9]+ ok, [0-9]+ failed$/ { print $4 }' \
+		    "$_d/summary.txt")
+		_ok=$((_ok + ${_o:-0}))
+		_bad=$((_bad + ${_f:-0}))
+		say "$_b: ${_o:-0} ok, ${_f:-0} failed"
 	done
 	vm_close
-	[ "$_n" -gt 0 ] || fail "no results in the VM that are not here"
-	send "$PD/results" "VM: $_n runs, $_ok ok, $_bad failed"
+	[ $# -gt 0 ] || fail "no results in the VM that are not here"
+	send "VM: $# runs, $_ok ok, $_bad failed" "$@"
 }
 
 vm_destroy() {

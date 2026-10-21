@@ -121,5 +121,5 @@ done
 ok=$(grep -c '^P[0-9]* ok ' "$SUMMARY")
 failed=$(grep -c '^P[0-9]* failed' "$SUMMARY")
 echo "== $ok ok, $failed failed" | tee -a "$SUMMARY"
-send "$OUT" "$ok ok, $failed failed"
+send "$ok ok, $failed failed" "$OUT"
 [ "$failed" = 0 ]

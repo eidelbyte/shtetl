@@ -112,26 +112,32 @@ pools_down() {
 
 # ---- sending the results back ----------------------------------------
 
-# The run's results committed and pushed by the person who ran the
-# script through sudo, with their identity and credentials (su, which
-# root takes without a password). SEND=no keeps them local. SENDER
-# names whose they are: the probes', or tests/box's.
-send() {	# PATH SUMMARYLINE
+# The run's results, the PATHs and nothing else of the checkout,
+# committed and pushed by the person who ran the script through sudo,
+# with their identity and credentials (su, which root takes without a
+# password). SEND=no keeps them local. SENDER names whose they are:
+# the probes', or tests/box's.
+send() {	# SUMMARYLINE PATH...
 	_u=${SUDO_USER:-}
 	_s=${SENDER:-probes}
+	_msg="$_s: $(hostname -s): $1"
+	shift
 	if [ "${SEND:-yes}" = no ]; then
-		echo "$_s: SEND=no: $1 not sent"
+		echo "$_s: SEND=no: $* not sent"
 		return 0
 	fi
 	if [ -z "$_u" ]; then
-		echo "$_s: not run through sudo: $1 not sent"
+		echo "$_s: not run through sudo: $* not sent"
 		return 1
 	fi
-	chown -R "$_u" "$1"
+	chown -R "$_u" "$@"
+	_p=
+	for _f in "$@"; do
+		_p="$_p '$_f'"
+	done
 	_g="git -C '$TOP'"
-	_msg="$_s: $(hostname -s): $2"
-	if ! su "$_u" -c "$_g add -- '$1' && $_g commit -q -m '$_msg' -- '$1'"; then
-		echo "$_s: $1 not committed"
+	if ! su "$_u" -c "$_g add --$_p && $_g commit -q -m '$_msg' --$_p"; then
+		echo "$_s: $* not committed"
 		return 1
 	fi
 	if su "$_u" -c "$_g pull -q --rebase --autostash && $_g push -q"; then

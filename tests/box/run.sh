@@ -149,5 +149,5 @@ ok=$(grep -c '^ok ' "$OUT")
 failed=$(grep -c '^FAIL ' "$OUT")
 echo "== $ok ok, $failed failed" >>"$OUT"
 cat "$OUT"
-send "$OUT" "$ok ok, $failed failed"
+send "$ok ok, $failed failed" "$OUT"
 [ "$failed" = 0 ]
