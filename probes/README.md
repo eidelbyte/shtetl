@@ -64,7 +64,13 @@ network; the results come back through its disk.
 
     git pull
     sudo sh probes/vm.sh make       fetched, checked, the checkout in it
-    sudo sh probes/vm.sh run        its console on this terminal
+    sudo sh probes/vm.sh run        booted; its console on this terminal
+
+The console is a null modem that cu attaches to. Leave it with ~. (~~.
+through ssh, whose own ~. ends the session), and the VM runs on; come
+back to it with
+
+    sudo sh probes/vm.sh console
 
 Log in as root (no password) on that console, and run the probes,
 SEND=no, since the VM cannot push:
@@ -79,8 +85,9 @@ SEND=no, since the VM cannot push:
     and run it a third time
     poweroff
 
-vm.sh run boots the VM again after each reboot and ends when it powers
-off. Then, back on the host:
+The VM is booted again after each reboot, until it powers off (its
+boot loop's words are in /var/tmp/shtetl-vm/boot.log). Then, on the
+host:
 
     sudo sh probes/vm.sh results    copied into probes/results, pushed
     sudo sh probes/vm.sh destroy    when it is no longer wanted
