@@ -93,3 +93,22 @@ canmount=noauto with /home a dataset of its own, is the image's
 Verified: sh -n, gate. Not run: there is no bhyve here; the author's
 first make and run on KIDON is its test.
 
+## vm.sh's first run, and send (2026-10-21)
+
+On KIDON the checksum's name was wrong (3ae9d48: CHECKSUM.SHA256), the
+console was the terminal that ran bhyve and could not be come back to
+(1d19568: a null modem, cu, the boot loop under daemon(8)), and P3's
+note said reboot where a plain one was meant (f551fb7). Then P3 and P4
+ran, 25 of 25 (eb1e88b).
+
+That commit also took 39 files the checkout held untracked, the
+compressed install logs of main's probes P6, P12 and P15 from
+2026-10-11 and 10-12 (main has their folders, not these files): vm.sh
+gave send the results directory whole. They stay: they are in v2's
+history now, and taking them out would delete the box's only copies at
+its next pull. send now takes the summary line first and then the
+paths, commits those and nothing else, and vm.sh gives it the
+directories it copied; run.sh, tests/box/run.sh and build.sh give
+theirs. Checked against a scratch repository with su a function: the
+two directories given committed and pushed, a stray one left
+untracked.

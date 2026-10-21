@@ -695,6 +695,29 @@ on zfs_rebase 69d8223: 16 ok, 0 failed.
   of the two directories the replay wrote in (etc, share) differ,
   being the moments of the two runs (P6.8). 7.2 stands.
 
+VM run 1: shtetlvm, FreeBSD's 15.1-RELEASE ZFS VM image under bhyve on
+KIDON (probes/vm.sh), 2026-10-21, at 3ae9d48 (results eb1e88b), P3 and
+P4: 25 ok, 0 failed. zfs-2.4.2.
+
+- P3, 15 of 15: two versions under zroot/s2sys, each a clone of the
+  booted environment with var and usr/local of its own, roots
+  mountpoint=/ and everything canmount=noauto. Set as bootfs, each
+  booted with its own /, /var and /usr/local, none of the other's
+  datasets mounted; bectl listed both; bootfs set back, the machine came
+  up where it started, the probe's datasets gone. P3.6, the loader's
+  boot environment menu, is the author's to say. Answer (P3.4): below
+  the version's own /var, the image's zroot/var/audit, crash, log, mail
+  and tmp are mounted, the pool's, outside every boot environment, so
+  shared by all of a system's versions. 7.3 stands; m6-boot-envs is to
+  say which of a system's /var is its version's.
+- P4, 10 of 10: the root, 3.3 GB referenced, sent into a 7g swap-backed
+  memory pool in 3 seconds; vfs.root.mountfrom pointed at it and
+  reboot -r; in outer space / was the memory pool's root, a dataset of
+  the disk pool took a snapshot, and bootfs was set; the rc script's
+  real reboot came up on the new bootfs; set back and cleaned up.
+  Answer (P4.7): 7.56 GB of user memory in outer space, of the VM's
+  8G. 7.3 stands.
+
 
 ## 15. Verification
 

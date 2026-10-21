@@ -36,3 +36,15 @@ sh -n, dash -n. A VM run is owed (FreeBSD 15.1, root on ZFS).
 ## Commit
 
 3b62deb
+
+## VM run 1
+
+shtetlvm, FreeBSD's 15.1-RELEASE ZFS VM image under bhyve on KIDON
+(probes/vm.sh), 2026-10-21, at 3ae9d48 (results eb1e88b): 15 of 15, in
+three runs after the setup's (whose summary was not kept: it checks
+nothing). A first try at stage 2 after reboot -r stopped, rightly, on
+the environment it started from, bootfs being the loader's (f551fb7
+says so in the probe's words now); that run's results were removed in
+the VM before they were collected. P3.4: the image's zroot/var/audit,
+crash, log, mail and tmp mount below each version's own /var, shared by
+every version. P3.6 is the author's to say: tested once said.

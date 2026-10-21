@@ -36,3 +36,11 @@ sh -n. A VM run is owed, after P3.
 ## Commit
 
 720760e
+
+## VM run 1
+
+shtetlvm, as P3's, 2026-10-21, at 3ae9d48 (results eb1e88b): 10 of 10,
+in three runs. P4.1: a root of 3,288,547,328 bytes sent into a 7g
+memory pool in 3 seconds. P4.7: 7,561,158,656 bytes of user memory in
+outer space. The rc script reached the disk pool there, snapshotted
+s2os/v1, set bootfs and rebooted; the machine came up on v1. Tested.
