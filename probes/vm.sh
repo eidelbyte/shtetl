@@ -70,9 +70,10 @@ vm_make() {
 	[ -e "$DISK" ] && fail "$DISK is there: sudo sh probes/vm.sh destroy"
 	[ -e "$FW" ] || fail "no UEFI firmware: pkg install bhyve-firmware"
 	mkdir -p "$VMDIR" || exit 2
-	fetch -o "$VMDIR/$_img.xz" "$_url/$_img.xz" ||
+	# -m: an image a run before fetched is not fetched again
+	fetch -m -o "$VMDIR/$_img.xz" "$_url/$_img.xz" ||
 	    fail "$_url/$_img.xz not fetched"
-	fetch -o "$VMDIR/CHECKSUM" "$_url/CHECKSUM.SHA256-FreeBSD-$REL-$ARCH" ||
+	fetch -o "$VMDIR/CHECKSUM" "$_url/CHECKSUM.SHA256" ||
 	    fail "its checksum not fetched"
 	_want=$(awk -v f="($_img.xz)" '$2 == f { print $4 }' "$VMDIR/CHECKSUM")
 	[ -n "$_want" ] && [ "$(sha256 -q "$VMDIR/$_img.xz")" = "$_want" ] ||
