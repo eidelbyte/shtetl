@@ -167,7 +167,7 @@
     "provides": "Evidence for section 7.4: a system's versions are boot environments and its switch is bootfs.",
     "estimated_size": "medium",
     "completed": "code",
-    "note": "2026-10-18 3b62deb: P3.1-P3.7, four runs over three reboots, stage from ZFS; version children canmount=noauto (zfsbe before zfs mount -a). VM run owed. Worklog issue-docs/probe-boot-envs.md."
+    "note": "2026-10-18 3b62deb: P3.1-P3.7, four runs over three reboots, stage from ZFS; version children canmount=noauto (zfsbe before zfs mount -a). VM run owed. Worklog issue-docs/probe-boot-envs.md. 2026-10-20: the VM to run it in, probes/vm.sh (make, run, results, destroy) on a bhyve host; see probes/README.md and issue-docs/probe-harness.md."
   },
   "probe-outer-space": {
     "description": "P4, on the P3 VM: the outer space protocol as ruled 2026-10-15 (a swap-backed memory disk made a pool, the current root sent into it, vfs.root.mountfrom set, reboot -r); an rc script in the sent root that, finding / on the memory pool, snapshots a dataset of the disk pool, sets bootfs to the other version and reboots for real; the machine comes up on the new bootfs. Records how long the send and the reroot take and how large the memory disk had to be. Verify: the probe's cells green on the VM.",
@@ -183,7 +183,7 @@
     "provides": "Evidence for section 7.4: a system stops into outer space, switches there, and comes back on the new version.",
     "estimated_size": "medium",
     "completed": "code",
-    "note": "2026-10-18 720760e: P4.1-P4.8, three runs; outer space reports through s2probe:* properties on the disk pool; stage 1 always starts over. VM run owed. Worklog issue-docs/probe-outer-space.md."
+    "note": "2026-10-18 720760e: P4.1-P4.8, three runs; outer space reports through s2probe:* properties on the disk pool; stage 1 always starts over. VM run owed. Worklog issue-docs/probe-outer-space.md. 2026-10-20: run in the VM probes/vm.sh makes, after P3; see probes/README.md."
   },
   "rulings-1": {
     "description": "The M0 ruling. The author's answers to the fourteen questions are in (plan section 18, 2026-10-18); what is left: the probes' results folded into the plan where they confirm or overturn a section (each PROPOSAL marker settled one way or the other), the answers to the four questions now in open-questions.md, and the issues of M1 to M7 written into this file with requires, files and verification, in C. Verify: the author reads the folded plan and says go.",

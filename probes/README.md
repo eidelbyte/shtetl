@@ -53,16 +53,41 @@ P3 and P4 change the boot pool's bootfs and reboot, so they want a
 scratch FreeBSD 15.1 VM with root on ZFS (the installer's layout), at
 least twice the root's size in RAM and swap for P4's memory disk, and
 this checkout under /home (outside the boot environment, or a stage's
-results would stay behind in it) with credentials to push. Each is
-run again after each reboot it asks for and finds its stage from ZFS:
+results would stay behind in it). Each is run again after each reboot
+it asks for and finds its stage from ZFS.
 
-    sudo SCRATCH_VM=yes sh probes/run.sh P3    four runs, three reboots
-    sudo SCRATCH_VM=yes sh probes/run.sh P4    three runs; the first
-                                               reboot is `reboot -r`
+probes/vm.sh makes that VM on a FreeBSD host with bhyve (vmm, and the
+UEFI firmware: pkg install bhyve-firmware): FreeBSD's own ZFS VM image
+of the host's release, 20G, 8G of memory, this checkout cloned into
+its /home/shtetl, git-lite for the summaries' commit line. It has no
+network; the results come back through its disk.
+
+    git pull
+    sudo sh probes/vm.sh make       fetched, checked, the checkout in it
+    sudo sh probes/vm.sh run        its console on this terminal
+
+Log in as root (no password) on that console, and run the probes,
+SEND=no, since the VM cannot push:
+
+    cd /home/shtetl
+    SCRATCH_VM=yes SEND=no sh probes/run.sh P3     then reboot
+    ... four runs in all, three reboots: each run says the next step;
+    at the second reboot, watch the loader's menu: P3.6 is whether its
+    boot environments list v1 and v2
+    SCRATCH_VM=yes SEND=no sh probes/run.sh P4     then reboot -r
+    ... outer space reboots for real by itself; run P4 again, reboot,
+    and run it a third time
+    poweroff
+
+vm.sh run boots the VM again after each reboot and ends when it powers
+off. Then, back on the host:
+
+    sudo sh probes/vm.sh results    copied into probes/results, pushed
+    sudo sh probes/vm.sh destroy    when it is no longer wanted
 
 If P4's second run finds nothing recorded from outer space, the rc
 script could not reach the disk pool there; what it printed is on
-the console.
+the console. Say with the results what the loader's menu showed.
 
 ## Writing one
 
