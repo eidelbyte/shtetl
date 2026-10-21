@@ -1,0 +1,87 @@
+shtetl 6bc6171 box build on KIDON 2026-10-21T09:24:07Z
+host: 15.1-RELEASE-p2 amd64
+branch: releng/15.1 from https://git.freebsd.org/src.git
+
+# make -C /home/miri/shtetl install
+install -d /usr/local/sbin /usr/local/etc/rc.d
+install -m 0555 shtetl /usr/local/sbin/shtetl
+install -m 0555 etc/rc.d/shtetl /usr/local/etc/rc.d/shtetl
+# zpool import -d /var/tmp -R /var/tmp/s2box s2box
+cannot mount '/var/tmp/s2box/run/foundations/box/usr/local': failed to create mountpoint: Read-only file system
+Import was successful, but unable to mount some datasets
+# zfs destroy -r s2box/lake/foundations/box
+# rm -rf /var/tmp/s2box/config/foundations /var/tmp/s2box/config/patches /var/tmp/s2box/config/shtetl.conf
+# mkdir -p /var/tmp/s2box/config/foundations /var/tmp/s2box/config/patches/local
+# service shtetl onestart
+Starting shtetl.
+ok   R1 a create roll (F17, GS10)
+ok   R2 every dataset snapshotted, kind create
+ok   R2 shtetl:commit the checkout's
+ok   R2 usr a placeholder
+ok   R2 its log: the build's step, the version
+ok   R3 a world and a kernel (K19)
+ok   R3 the package, in usr/local (X9)
+ok   R3 the command run in the chroot
+ok   R3 no resolv.conf left
+ok   R4 foundation.conf schg (F18)
+ok   R4 the head unmounted
+ok   R5 an update roll
+ok   R5 kind update
+# sed -i  1s/.*/shtetl box a/ /var/tmp/s2box/build/src/README.md
+# git -C /var/tmp/s2box/build/src checkout -q README.md
+# sed -i  1s/.*/shtetl box b/ /var/tmp/s2box/build/src/README.md
+# git -C /var/tmp/s2box/build/src checkout -q README.md
+ok   R6 a conflict: stalled
+ok   R6 shtetl:stall
+ok   R6 at its newest version still
+ok   R6 zbuild reset
+# rm /var/tmp/s2box/config/patches/local/2-b.patch
+ok   R7 asked again: the stall cleared, rolled
+ok   R7 the patch in the checkout
+ok   R7 no stall
+ok   R8 a pkg roll
+ok   R8 kind pkg, the version's commit
+# /usr/local/sbin/shtetl roll box
+# service shtetl onestop
+Stopping shtetl.
+Waiting for PIDS: 58182.
+ok   R9 stopped: devfs left on the head
+ok   R9 and the roll's marker in it
+# service shtetl onestart
+Starting shtetl.
+ok   R9 started again: idle at the newest, no stall
+ok   R9 devfs gone
+ok   R9 the head unmounted
+ok   R9 what the roll wrote gone
+FAIL R10 syslog: one line, the stall: got [beam: send s2box/lake/foundations/box@15.1-releng-2026-10-21T09_25_16Z-create: s2box/run/foundations/box: exists
+beam: send s2box/lake/foundations/box/usr@15.1-releng-2026-10-21T09_25_16Z-create: s2box/run/foundations/box/usr: exists
+beam: send s2box/lake/foundations/box/usr/local@15.1-releng-2026-10-21T09_25_16Z-create: s2box/run/foundations/box/usr/local: exists
+foundation box: patches/local: 2-b.patch: exited 1
+beam: send s2box/lake/foundations/box@15.1-releng-2026-10-21T09_25_16Z-create: s2box/run/foundations/box: exists
+beam: send s2box/lake/foundations/box/usr@15.1-releng-2026-10-21T09_25_16Z-create: s2box/run/foundations/box/usr: exists
+beam: send s2box/lake/foundations/box/usr/local@15.1-releng-2026-10-21T09_25_16Z-create: s2box/run/foundations/box/usr/local: exists], wanted [foundation box: patches/local: 2-b.patch: exited 1]
+
+syslog, daemon.log from the run's start:
+Oct 21 02:25:16 KIDON shtetl[58182]: beam: send s2box/lake/foundations/box@15.1-releng-2026-10-21T09_25_16Z-create: s2box/run/foundations/box: exists
+Oct 21 02:25:16 KIDON shtetl[58182]: beam: send s2box/lake/foundations/box/usr@15.1-releng-2026-10-21T09_25_16Z-create: s2box/run/foundations/box/usr: exists
+Oct 21 02:25:16 KIDON shtetl[58182]: beam: send s2box/lake/foundations/box/usr/local@15.1-releng-2026-10-21T09_25_16Z-create: s2box/run/foundations/box/usr/local: exists
+Oct 21 02:27:14 KIDON shtetl[58182]: foundation box: patches/local: 2-b.patch: exited 1
+Oct 21 02:31:13 KIDON shtetl[77936]: beam: send s2box/lake/foundations/box@15.1-releng-2026-10-21T09_25_16Z-create: s2box/run/foundations/box: exists
+Oct 21 02:31:13 KIDON shtetl[77936]: beam: send s2box/lake/foundations/box/usr@15.1-releng-2026-10-21T09_25_16Z-create: s2box/run/foundations/box/usr: exists
+Oct 21 02:31:13 KIDON shtetl[77936]: beam: send s2box/lake/foundations/box/usr/local@15.1-releng-2026-10-21T09_25_16Z-create: s2box/run/foundations/box/usr/local: exists
+
+the last roll's log, /var/log/shtetl/box.log, its step lines:
+# src: init
+# src: fetch
+# src: reset
+# src: clean
+# build
+# delete-old
+# installworld
+# installkernel
+# distribution
+# external: mark
+# devfs
+# pkg
+# commands: slow
+== 28 ok, 1 failed
