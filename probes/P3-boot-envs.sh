@@ -10,7 +10,8 @@
 #
 # Run it, reboot, run it again, four times: each run finds its stage
 # from ZFS (which environment is booted, whether s2sys is there, its
-# s2probe:* properties) and says when to reboot.
+# s2probe:* properties) and says when to reboot. The reboot is a real
+# one: bootfs is read by the loader, and reboot -r keeps the root.
 #
 #   P3.1  booted from the version bootfs named
 #   P3.2  its / /var and /usr/local are its own (a marker in each)
@@ -70,7 +71,8 @@ probe() {
 		version v1
 		version v2
 		m zpool set bootfs="$S/v1" "$POOL"
-		note "stage 1 of 4 set up: reboot, then run P3 again"
+		note "stage 1 of 4 set up: reboot (not reboot -r: the" \
+		    "loader reads bootfs), then run P3 again"
 		return
 	fi
 	HOME_BE=$(prop s2probe:home "$S")
@@ -90,8 +92,9 @@ probe() {
 		;;
 	"$HOME_BE")
 		[ "$(prop s2probe:v2 "$S")" = checked ] ||
-		    die "bootfs is $(zpool get -H -o value bootfs "$POOL"):" \
-		    "reboot, then run P3 again"
+		    die "$HOME_BE booted, but bootfs is" \
+		    "$(zpool get -H -o value bootfs "$POOL"): reboot for" \
+		    "real (reboot -r keeps the root), then run P3 again"
 		check P3.7 "booted from" "$(booted)" "$HOME_BE"
 		check P3.7 "/'s marker" "$(marker /)" none
 		m zfs destroy -r "$S"

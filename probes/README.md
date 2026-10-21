@@ -77,7 +77,9 @@ SEND=no, since the VM cannot push:
 
     cd /home/shtetl
     SCRATCH_VM=yes SEND=no sh probes/run.sh P3     then reboot
-    ... four runs in all, three reboots: each run says the next step;
+    ... four runs in all, three reboots, each a plain reboot, since the
+    loader reads bootfs and reboot -r keeps the root; each run says
+    the next step;
     at the second reboot, watch the loader's menu: P3.6 is whether its
     boot environments list v1 and v2
     SCRATCH_VM=yes SEND=no sh probes/run.sh P4     then reboot -r
