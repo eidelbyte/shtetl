@@ -442,8 +442,12 @@ nobody up. A foundation version's arrival on zrun is what its houses
 roll on.
 
 As built (m4-beam): one actor for the pair, over three roots below
-both spaces' roots: lake/foundations to run/foundations, then
-run/containers and run/systems to lake/containers and lake/systems.
+both spaces' roots: lake/foundations to the foundations
+run/foundations holds, then run/containers and run/systems to
+lake/containers and lake/systems. A foundation is on zrun only while
+a house there relies on it (8.2): the beam brings a copy there up to
+date and makes none; a house's pull makes one, from the version it
+needs on (M5).
 A convergence is a job of looks and streams. A look reads both spaces
 whole. A receive to resume below a copy's root is resumed first, and
 that look does nothing else; otherwise the copies' shtetl:*
@@ -479,23 +483,48 @@ foundation version from zlake to zrun.
 Counts, not ages:
 
 - run.keep: versions of each house kept on zrun, the active one
-  counted (PROPOSAL: 2, the active and the previous);
-- lake.keep: versions of each house kept on zlake (PROPOSAL: 5);
+  counted (2 built in, the active and the previous), less than
+  lake.keep (ruled);
+- lake.keep: versions of each house kept on zlake (5 built in);
 - roll.depth: the saves a roll replays, a count or an age (the
   author: "a date length or count length").
 
-Pruning waits for beaming to be consistent (ruled): nothing leaves a
-space while the other space still lacks it. A foundation version is
-kept while a house version on the same space is cloned from it, and
-its newest is always kept; there is no setting (PROPOSAL). A version
-is pruned by promoting any clone of it (the newer version's own
-datasets, 7.1) and destroying it. Saves on an active version are not
-pruned; they go with the version, and a roll carries roll.depth of
-them forward.
+Pruning waits for beaming (ruled): a version leaves a space only
+when the other space no longer needs it there. What each keeps:
 
-The house actor prunes zrun after a roll, the beam actor prunes the
-copies it keeps, and the foundation actor prunes a version once its
-last clone is gone.
+- zrun, a house's versions: the newest run.keep complete ones, the
+  active counted; an older one goes once its copy on zlake has
+  arrived at its newest snapshot. A version not complete is its
+  roll's.
+- zlake, the copies of a house's versions: the newest lake.keep that
+  have arrived; an older one goes once zrun no longer holds the
+  version, or the beam would send it back.
+- zrun, a foundation: held only while a house there relies on it
+  (ruled 2026-11-03). Its copy keeps every version from the oldest
+  one a filesystem on zrun is a clone of, since a house rolls through
+  each in order (7.2); with none, the copy goes whole. So a house
+  needing an old version pulls it into a run that holds nothing of
+  the foundation, and rolls forward from it.
+- zlake, a foundation's versions: its newest; any a filesystem in
+  either space is a clone of, by guid; any not older than the newest
+  zrun's copy holds, the base of that copy's next stream. Older ones
+  go: only the latest of what nothing relies on is kept (ruled
+  2026-11-03).
+
+A house version is pruned by promoting every filesystem of its space
+that is a clone of one of its snapshots (the newer version's own
+datasets, 7.1) and destroying it, children first; a foundation's
+version is its snapshot on every dataset of the foundation. Versions
+are ordered by createtxg, a house version by its origin's, never by
+name. Saves on an active version are not pruned; they go with the
+version, and a roll carries roll.depth of them forward.
+
+The house actor prunes zrun after a roll; the beam prunes the copies
+after each convergence, and then each idle foundation actor its
+versions. Each version pruned is a line of beam.log, "# prune NAME";
+a refusal is said as the beam's failures are, once to syslog,
+"prune: why", and as a line of status while it fails (ruled
+2026-11-03).
 
 
 ## 9. Actors
@@ -1085,3 +1114,29 @@ in VM run 1, the author answered:
 
 So P3.6 is taken as passed and stays open to be looked at again on a
 later VM run; probe-boot-envs is tested on the rest.
+
+### 2026-11-03 (Q-P1 and Q-P2: a foundation's keep, the prune's account)
+
+Asked (Q-P1) whether a foundation no house is on keeps only its
+newest version, the author answered:
+
+    I like that answer, yes, we only keep the latest version of a
+    foundation nothing relies on, but we should be even more
+    aggressive. Let's delete unused foundations. This way if we need
+    an old version of the foundation we can pull from that version
+    forward later. Eg if a container we build at time T requires
+    foundation@T-3, we can sync T-3. if we kept tracking T only, we'd
+    have to do some weird stuff to get T-3..T
+
+and of Q-P2, each version pruned a line of beam.log and a refusal
+said once to syslog and in status: "Q-P2 sounds great".
+
+So (8.2): on zlake, where a foundation is built, it keeps its latest
+version and the ones something relies on. On zrun a foundation is
+held only while a house there relies on it; with none, its copy is
+destroyed whole, and the beam no longer carries a foundation to zrun
+by itself (5cce65b). A house that needs a version, at its creation or
+a restore, pulls the foundation from that version on (M5), into a run
+that holds nothing of it, so an older version comes as easily as the
+newest. That reading is the implementer's; the words above are the
+ruling.

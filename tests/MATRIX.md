@@ -838,20 +838,21 @@ beyond 8.2's words are marked (+):
   arrived copies of each house kept; an older one pruned once zrun no
   longer holds the version, or the beam would send it back (+). A copy
   not arrived is not counted and not pruned.
-- zrun, a foundation version's copy (the beam's): the copy's newest
-  kept, and every version not older than the oldest one a filesystem
-  on zrun is a clone of: a house rolls through every foundation
-  version in order (7.2, ruled), so one stalled or frozen on an old
-  version keeps every later one for its rolls (+). Older ones pruned.
+- zrun, a foundation's copy (the beam's): held only while a house
+  there relies on it (ruled 2026-11-03): every version not older than
+  the oldest one a filesystem on zrun is a clone of, since a house
+  rolls through every foundation version in order (7.2, ruled), so
+  one stalled or frozen on an old version keeps every later one for
+  its rolls (+); older ones pruned, and with no clone the copy
+  destroyed whole. The beam makes no foundation copy (B1).
 - zlake, a foundation version (the foundation actor's): its newest
   kept; one a filesystem in either space is a clone of, by guid, kept,
   so a house version on zrun not yet beamed keeps its clone stream's
   origin on zlake (+); one not older than the newest version zrun's
   copy holds kept, the base of the next stream, or the copy would
   stall on "exists" for good (Q-B1) (+). Older ones pruned, the
-  version's snapshot on every dataset of the foundation.
-- A foundation version no house uses: only its newest kept, in both
-  spaces (8.2, PROPOSAL, open as Q-P1).
+  version's snapshot on every dataset of the foundation: only the
+  latest of what nothing relies on is kept (ruled 2026-11-03).
 
 Versions are ordered by createtxg, a house version by its origin's,
 never by name. The beam prunes the copies after each convergence, and
@@ -879,10 +880,10 @@ the trigger {a convergence, a roll's end}.
 | P5 | zlake: a copy beyond lake.keep, zrun no longer holding the version | promoted, destroyed | tests/check_prune.c |
 | P6 | zlake: a copy beyond lake.keep, zrun still holding the version | kept | tests/check_prune.c |
 | P7 | zlake: a copy not arrived | neither counted nor pruned | tests/check_prune.c |
-| P8 | zrun: a foundation copy older than every origin there, not the newest | destroyed on every dataset | tests/check_prune.c |
+| P8 | zrun: a foundation copy's version older than every origin there | destroyed on every dataset | tests/check_prune.c |
 | P9 | zrun: a foundation copy a house version there is a clone of | kept | tests/check_prune.c |
 | P10 | zrun: a foundation copy newer than a stalled house's origin, no clone of it | kept: the house rolls through it | tests/check_prune.c |
-| P11 | zrun: no house at all | only the copy's newest kept (Q-P1) | tests/check_prune.c |
+| P11 | zrun: a foundation copy no filesystem there is a clone of | the copy destroyed whole, its newest too (ruled 2026-11-03) | tests/check_prune.c |
 | P12 | zlake: a foundation's newest | kept | tests/check_prune.c |
 | P13 | zlake: a foundation version a copy on zlake is a clone of | kept | tests/check_prune.c |
 | P14 | zlake: a foundation version a house version on zrun is a clone of (by guid), its copy not on zlake yet | kept | tests/check_prune.c |
@@ -893,6 +894,6 @@ the trigger {a convergence, a roll's end}.
 | P19 | two houses on one foundation | each counted alone; a version of one pruned leaves the other's | tests/check_prune.c |
 | P20 | a refusal part way (a destroy or a promote) | said; what is left stays; the next prune takes it up from what ZFS shows | tests/check_prune.c |
 | P21 | the trigger | the beam prunes its copies after each convergence, then each idle foundation its versions; a rolling foundation after its roll's convergence | tests/check_beam.c, tests/check_daemon.c |
-| P22 | what it says | each version pruned in beam.log, "# prune NAME"; a failure as the beam's own (Q-P2) | tests/check_beam.c |
+| P22 | what it says | each version pruned in beam.log, "# prune NAME"; a refusal once to syslog, "prune: why", and a line of status while it fails (ruled 2026-11-03) | tests/check_beam.c |
 | P23 | the house actor's prune after a roll | m5-roll calls it; its rules are P1 - P4 | deferred: m5-roll (the house actor) |
 | P24 | the box: a foundation rolled twice, its first version pruned in both spaces; a house stand-in kept | box: m4-box | box |
