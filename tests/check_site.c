@@ -292,6 +292,25 @@ test_load(void)
 	CHECK(sh_site_load(root, &s, &c.c_err) == -1);
 	CHECK(s.ss_merged == NULL);
 	CHECK(cap_has(&c, "shtetl.conf: lake.keep: must be 1 or more"));
+	/* CS16: run.keep less than lake.keep, whichever layer sets them */
+	(void) scratch_write("six/shtetl.conf", "run { keep = 5; }\n");
+	(void) snprintf(root, sizeof (root), "%s", scratch_path("six"));
+	cap_reset(&c);
+	CHECK(sh_site_load(root, &s, &c.c_err) == -1);
+	CHECK(s.ss_merged == NULL);
+	CHECK(cap_has(&c, "shtetl.conf: run.keep: must be less than "
+	    "lake.keep"));
+	(void) scratch_write("six/shtetl.conf", "lake { keep = 2; }\n");
+	cap_reset(&c);
+	CHECK(sh_site_load(root, &s, &c.c_err) == -1);
+	CHECK(cap_has(&c, "shtetl.conf: run.keep: must be less than "
+	    "lake.keep"));
+	(void) scratch_write("six/shtetl.conf",
+	    "run { keep = 6; }\nlake { keep = 7; }\n");
+	cap_reset(&c);
+	CHECK(sh_site_load(root, &s, &c.c_err) == 0);
+	CHECK(c.c_err.se_count == 0);
+	sh_site_free(&s);
 	/* CS11: the default recipe beside the settings, out of their view */
 	(void) scratch_write("four/shtetl.conf",
 	    "build { make_jobs = 2; }\nver = \">=15.1\";\n"

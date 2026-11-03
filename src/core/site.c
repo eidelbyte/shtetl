@@ -298,10 +298,18 @@ sh_site_builtins(struct sh_err *e)
 	return (built);
 }
 
+/* The checked keep of SECTION, run or lake, in the merged settings. */
+static int64_t
+keep(const struct sh_node *merged, const char *section)
+{
+	return (sh_obj_get(sh_obj_get(merged, section), "keep")->sn_int);
+}
+
 int
 sh_site_load(const char *root, struct sh_site *s, struct sh_err *e)
 {
 	struct sh_node *built, *conf;
+	struct sh_path p;
 	int missing;
 
 	s->ss_merged = NULL;
@@ -322,6 +330,19 @@ sh_site_load(const char *root, struct sh_site *s, struct sh_err *e)
 		site_merge(built, conf, 1);
 	s->ss_has_conf = conf != NULL;
 	sh_node_free(conf);
+	/*
+	 * zlake keeps deeper than zrun (ruled, plan 8.2): a house version
+	 * the lake pruned while the run held it would be beamed back. The
+	 * built-in keeps hold to it, so only shtetl.conf can break it.
+	 */
+	if (keep(built, "run") >= keep(built, "lake")) {
+		sh_path_init(&p);
+		(void) sh_path_push(&p, "run");
+		(void) sh_path_push(&p, "keep");
+		sh_err_at(e, sh_site_conf, &p, "must be less than lake.keep");
+		sh_node_free(built);
+		return (-1);
+	}
 	s->ss_merged = built;
 	return (0);
 }

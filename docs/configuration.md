@@ -203,7 +203,7 @@ setting shtetl.conf gives replaces the built-in one, key by key.
 | `properties.lake`, `.run`, `.config`, `.build` | ZFS properties | none | one space's, each over `properties.default`'s of the same name |
 | `build.make_jobs` | a count | `0` | make's `-j` for a foundation's build; 0 is `hw.ncpu` |
 | `roll.depth` | 0, a count or an interval | `0` | the saves a house's roll replays (plan 8.2); 0 is every save its active version holds |
-| `run.keep` | a count, 1 or more | `2` | the versions of each house zrun keeps, the active one counted (plan 8.2) |
+| `run.keep` | a count, 1 or more, less than `lake.keep` | `2` | the versions of each house zrun keeps, the active one counted (plan 8.2) |
 | `lake.keep` | a count, 1 or more | `5` | the versions of each house zlake keeps (plan 8.2) |
 | `remotes.src` | a remote | `"https://git.freebsd.org/src.git"` | the FreeBSD src repository foundations are built from |
 | `remotes.recipes` | names, each a remote | none | the recipe repositories, each cloned into the directory of zconfig of its name (section 1) |
