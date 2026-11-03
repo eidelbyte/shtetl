@@ -47,4 +47,7 @@ the environment it started from, bootfs being the loader's (f551fb7
 says so in the probe's words now); that run's results were removed in
 the VM before they were collected. P3.4: the image's zroot/var/audit,
 crash, log, mail and tmp mount below each version's own /var, shared by
-every version. P3.6 is the author's to say: tested once said.
+every version. P3.6, the loader's boot environment menu: the author
+found it unresponsive and could not open it, and ruled, 2026-11-03,
+to take it as passed and look again on a later VM run (plan 18).
+Tested.

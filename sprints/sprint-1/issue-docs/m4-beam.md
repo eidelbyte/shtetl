@@ -200,3 +200,51 @@ there and in one other case, recommended yes, the author ruled no:
 intervention and should not be paved over." As built: the beam
 destroys nothing, and B13 and B14 hold it to that.
 Prune: run.keep must be less than lake.keep (m4-prune).
+
+## Box run 8 and build run 5
+
+Box run 8: 2026-10-21, run.sh at ca0080c (results 6bc6171): 127 ok,
+0 failed; check_beam ok on FreeBSD after the rework (5c6341b).
+Build run 5: 2026-10-21, build.sh at 6bc6171 (results 46d8a10): 28
+ok, 1 failed. R10: syslog heard "beam: send ...: s2box/run/
+foundations/box: exists" for box, usr and usr/local, once at each
+daemon start. build.sh destroys the lake's box at each run and builds
+a new one; build run 4 had beamed the old one to the run space, and
+the new box shares nothing with that copy, which the beam leaves
+standing as Q-B1 rules. A harness fault: pool_up destroys the copy
+too (c21c0a2).
+
+The same log's import said "cannot mount
+.../run/foundations/box/usr/local: failed to create mountpoint:
+Read-only file system". The copies came in canmount=on, so the import
+mounted box and its empty usr placeholder read-only, and usr/local
+had nowhere to go. On a host that would be an error at every boot.
+
+## Unmounted by default (2026-11-03)
+
+Asked, the author ruled: "everything is unmounted by default" (plan
+4, 18). aef72be: sh_zfs_send receives as receive -o canmount=noauto
+(lzc_receive_with_cmdprops, resumable), set on TO's filesystem before
+the data lands, so a cut whole has it and a resume sets it again.
+
+- Local, not received. A filesystem's first received properties take
+  its local ones for received ones and clear them
+  (dsl_prop_get_received): every copy there is now would lose the
+  shtetl:* properties the beam set on it. Z19 holds a copy's own user
+  property through an incremental.
+- An index in the kernel's type, a uint64. A string is refused into
+  the receive's errors list and the receive succeeds anyway, so a
+  wrong type would leave canmount=on without a word. Z19 over libzfs
+  is what would see it.
+- Z19 reads the property through a new driver hook, zc_local: the
+  fake's zfake_local, and on the box zfs get -s local, apart from the
+  layer, which reads no native property it does not need. B32 maps to
+  Z19: every copy is made by sh_zfs_send.
+- The roll's datasets too (719d2fe, m3-roll's worklog).
+
+Verified: make check, gate and xcheck-freebsd clean; three mutants of
+the fake caught (nothing set, canmount=on, a user property dropped).
+Owed: run.sh for Z19 over libzfs; build.sh for R10 and R2. The first
+build.sh after these still imports the copy build run 4 made, which
+is canmount=on, before pool_up destroys it, so the "cannot mount"
+line goes only in the run after.

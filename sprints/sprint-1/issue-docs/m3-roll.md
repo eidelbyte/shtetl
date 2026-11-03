@@ -119,3 +119,16 @@ Build run 1: 2026-10-20, tests/box/build.sh at b55fa79 (results
 onestart) found git and rolled (R1). F18: foundation.conf schg, 0444,
 on ZFS (R4). An update (R5), a stall and the roll asked again (R6, R7),
 the stop and the start (R9). Tested.
+
+## Unmounted by default (2026-11-03)
+
+719d2fe: every dataset a roll makes, F, the datasets its recipe gives
+and its obj cache, is canmount=noauto, the last of the properties
+roll_props gives it; a placeholder stays canmount=off. The author
+ruled "everything is unmounted by default" (plan 4, 18): they had been
+canmount=on, so an import or a boot mounted the lake's foundations,
+though a roll mounts what it reads itself. A recipe cannot set
+canmount (sh_syn_prop). F1 and K17 check it, and the mutant without
+it fails F1; make check and gate clean. Owed: build.sh, R2 on the
+box. The box's kept obj cache predates it and stays canmount=on until
+it is made anew (build.sh --clean).

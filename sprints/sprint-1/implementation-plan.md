@@ -116,6 +116,14 @@ it (built, m1-spaces).
 - zrun: where houses run and are owned, and the copies of the
   foundation versions their houses are on.
 
+Everything is unmounted by default (ruled 2026-11-03). Every
+filesystem shtetl makes or receives is canmount=noauto, a placeholder
+canmount=off, so an import or a boot mounts none of them; shtetl
+mounts what a step needs. A foundation is mounted by its roll, and its
+copy on zrun, a clone source, by nothing but what zfs_rebase needs
+(M5). One system is mounted at a time, the boot environment it runs
+as, and every running container's active version.
+
     <lake root>/
         foundations/
             generic/                    built here; @15.1-releng-<date>-create,
@@ -461,6 +469,7 @@ WHY" for each. The copies' roots are readonly, inherited: an
 incremental receive refuses a copy changed since its base (dmu_recv.c,
 "there must be no changes since fromsnap"), and with atime on a read
 is a change (main's probe P8); the lake's copies are mountpoint none.
+Every copy is canmount=noauto, set by the receive that makes it (4).
 
 Restore is a beam the other way, by hand: a house version and its
 foundation version from zlake to zrun.
@@ -705,7 +714,9 @@ P4: 25 ok, 0 failed. zfs-2.4.2.
   booted with its own /, /var and /usr/local, none of the other's
   datasets mounted; bectl listed both; bootfs set back, the machine came
   up where it started, the probe's datasets gone. P3.6, the loader's
-  boot environment menu, is the author's to say. Answer (P3.4): below
+  boot environment menu: the author found the menu unresponsive and
+  could not open it; assumed to list both, to be looked at again
+  (ruled 2026-11-03, 18). Answer (P3.4): below
   the version's own /var, the image's zroot/var/audit, crash, log, mail
   and tmp are mounted, the pool's, outside every boot environment, so
   shared by all of a system's versions. 7.3 stands; m6-boot-envs is to
@@ -1043,3 +1054,34 @@ copy's snapshot. Both failures stay, said once to syslog and on a
 line of status, and hold up only the dataset and what needs it, until
 the person who caused them sees to them, with zfs receive -A or by
 destroying the copy's snapshot (8.1).
+
+### 2026-11-03 (unmounted by default)
+
+Build run 5's import mounted the beam's copy of box on the run space,
+read-only, its empty usr placeholder with it, and failed on usr/local:
+the copies came in canmount=on, the default. Asked whether a copy on
+the run space should be mounted at all, the author answered:
+
+    foundations in zrun/foundations don't ever need to be mounted
+    except possibly for the internals of zfs_rebase. otherwise
+    there's no good reason to have foundations mounted. they're just
+    clone sources. one system is mounted at a time and all running
+    containers are mounted. everything is unmounted by default.
+
+So (4): every filesystem a receive makes is canmount=noauto, set
+locally (aef72be), and so is every dataset a roll makes, the lake's
+foundation, its datasets and its obj cache (719d2fe). A placeholder
+stays canmount=off.
+
+### 2026-11-03 (P3.6, the loader's menu)
+
+Asked whether the loader's boot environment menu listed both versions
+in VM run 1, the author answered:
+
+    sorry, I don't remember. I think the loader menu was pretty
+    unresponsive if I remember correctly, so I couldn't click into
+    it. let's circle back to that and just assume everything is OK
+    there.
+
+So P3.6 is taken as passed and stays open to be looked at again on a
+later VM run; probe-boot-envs is tested on the rest.
