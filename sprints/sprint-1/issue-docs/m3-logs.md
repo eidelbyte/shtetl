@@ -58,7 +58,7 @@ log; syslog one line per failed roll".
 
 ## Box run 6 and build run 3
 
-Box run 6: KIDON, 2026-10-20, run.sh at 5ff2662 (results 2cba564):
+Box run 6: 2026-10-20, run.sh at 5ff2662 (results 2cba564):
 114 ok, 0 failed; A3, nothing said of a first build undone. Build run
 3: build.sh at 2cba564 (results b6cccde): 29 ok, 0 failed. R2: the
 log holds the build's step line and the version's. R10: over every

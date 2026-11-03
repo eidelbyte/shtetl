@@ -70,7 +70,7 @@ written schg, read from a snapshot".
 
 ## Box run 3
 
-KIDON, 2026-10-20, at 230f87d (results c8df572): 73 ok, 0 failed.
+The box, 2026-10-20, at 230f87d (results c8df572): 73 ok, 0 failed.
 Family I as root on ZFS: I9 - I14 ok. schg holds against root (no
 write, no unlink), the file is replaced and schg again, read back
 through the snapshot's .zfs view, a link in the snapshot is refused,

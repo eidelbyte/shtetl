@@ -51,7 +51,7 @@ The commit after a06997d, "box: M3 on the box, build.sh".
 
 ## Box run 4 and build run 1
 
-Build run 1: KIDON, 2026-10-20, tests/box/build.sh at b55fa79 (results
+Build run 1: 2026-10-20, tests/box/build.sh at b55fa79 (results
 39daa4e): 25 ok, 1 failed. R1 - R8 ok. R9 "what the roll wrote gone"
 read written after the rollback: 1K, not 0, though the start had
 rolled the head back (idle at the newest, no stall, devfs gone,
@@ -63,7 +63,7 @@ Testing: the next build.sh owed.
 
 ## Box run 5 and build run 2
 
-Build run 2: KIDON, 2026-10-20, build.sh at f57133c (results
+Build run 2: 2026-10-20, build.sh at f57133c (results
 86c8ac0): 27 ok, 0 failed. R9 by its marker: there at the stop,
 gone after the start. The incremental rolls took about a minute and
 a half each. The log is 60 lines. Tested.

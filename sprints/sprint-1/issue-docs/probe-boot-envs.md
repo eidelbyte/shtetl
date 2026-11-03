@@ -39,7 +39,7 @@ sh -n, dash -n. A VM run is owed (FreeBSD 15.1, root on ZFS).
 
 ## VM run 1
 
-shtetlvm, FreeBSD's 15.1-RELEASE ZFS VM image under bhyve on KIDON
+shtetlvm, FreeBSD's 15.1-RELEASE ZFS VM image under bhyve on the box
 (probes/vm.sh), 2026-10-21, at 3ae9d48 (results eb1e88b): 15 of 15, in
 three runs after the setup's (whose summary was not kept: it checks
 nothing). A first try at stage 2 after reboot -r stopped, rightly, on

@@ -196,7 +196,7 @@ over the fake on a socket listened on before the fork.
 | D15 | the socket | mode 0600 | tests/check_daemon.c |
 | D16 | a request and a reply of 256 KiB | both whole, through partial writes | tests/check_daemon.c |
 | D17 | a client that does not read a large reply | another answered meanwhile; the reply whole when read | tests/check_daemon.c |
-| D18 | the rc script | started under daemon(8), stopped by its pidfile | by hand on the box (tests/box/README.md): passed on KIDON, 2026-10-20 |
+| D18 | the rc script | started under daemon(8), stopped by its pidfile | by hand on the box (tests/box/README.md): passed on the box, 2026-10-20 |
 | D19 | show | the site's settings, from zconfig where it is mounted, each with its layer | tests/check_daemon.c |
 | D20 | show RECIPE | the recipe, its layers merged | tests/check_daemon.c |
 | D21 | show a refused recipe | its words, nothing shown, 1 | tests/check_daemon.c |

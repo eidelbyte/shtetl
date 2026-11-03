@@ -88,7 +88,7 @@ the new model's".
 
 ## Box run 3
 
-KIDON, 2026-10-20, at 230f87d (results c8df572): 73 ok, 0 failed.
+The box, 2026-10-20, at 230f87d (results c8df572): 73 ok, 0 failed.
 make check-freebsd, now in the box run: every unit test linked against
 the textproc/libucl port, the parse cells among them, ok; doccheck ran
 there too, 38 commands. Tested.

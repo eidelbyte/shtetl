@@ -77,7 +77,7 @@ shows".
 
 ## Box run 1
 
-KIDON, 2026-10-20, at 48050c7 (results 7b6513e), tests/box/run.sh: 53
+The box, 2026-10-20, at 48050c7 (results 7b6513e), tests/box/run.sh: 53
 ok, 1 failed (Z6, m1-zfs's).
 Family A on a real lake pool: A1 status as written, A2 the file
 written after v1 gone and the head unmounted, A3 the first build

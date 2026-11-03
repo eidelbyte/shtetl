@@ -65,7 +65,7 @@ The commit after 146d446, "commands: the packages and the commands".
 
 ## Box run 4 and build run 1
 
-Build run 1: KIDON, 2026-10-20, tests/box/build.sh at b55fa79 (results
+Build run 1: 2026-10-20, tests/box/build.sh at b55fa79 (results
 39daa4e): 25 ok, 1 failed. X9: the package (tree) installed
 into usr/local by pkg -c, the command's motd written in the chroot, no
 resolv.conf left (R3). X8: the daemon stopped in a command left devfs

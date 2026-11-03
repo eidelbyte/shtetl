@@ -47,7 +47,7 @@ d6d8a22 (the symlink probe), 5011677 (rewritten)
 
 ## Box run 1
 
-KIDON, 2026-10-19, at 68bc7f8 (results 1c23d85).
+The box, 2026-10-19, at 68bc7f8 (results 1c23d85).
 P2.1 - P2.4 ok: canmount=noauto versions stay unmounted through an
 export and import; setting a noauto dataset's mountpoint does not
 mount it (P2.2's answer: no); two versions mount side by side at their
@@ -65,7 +65,7 @@ Rerun owed.
 
 ## Box run 2
 
-KIDON, 2026-10-19, at 422bf9c (results 7e9be07).
+The box, 2026-10-19, at 422bf9c (results 7e9be07).
 P2.1 - P2.7, 13 of 13 ok with the jail made from its block. Answers:
 setting the mountpoint of a version mounted at its own path moves it
 and its var to /containers/H by itself (P2.5), so the swap needs no

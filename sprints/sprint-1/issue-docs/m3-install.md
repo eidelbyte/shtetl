@@ -77,19 +77,19 @@ The commit after d58acd9, "install: the build and the install".
 
 ## Box run 4 and build run 1
 
-Box run 4: KIDON, 2026-10-20, run.sh at 0d4768e (results
+Box run 4: 2026-10-20, run.sh at 0d4768e (results
 b55fa79): 113 ok, 1 failed. check_install FAIL: K7 set uchg as the
 user, and FreeBSD's ZFS has no uchg (as m2-shake found of the shaken
 recipe). Fixed in 942c699: nodump, a user's flag; the clearing of
 schg is R5's, as root.
-Build run 1: KIDON, 2026-10-20, tests/box/build.sh at b55fa79 (results
+Build run 1: 2026-10-20, tests/box/build.sh at b55fa79 (results
 39daa4e): 25 ok, 1 failed. K19: a world and a kernel in the head (R3), the
 update over the obj cache the first build left (R5), installworld's
 schg backups removed. Testing: check_install's next run.sh owed.
 
 ## Box run 5 and build run 2
 
-Box run 5: KIDON, 2026-10-20, run.sh at 26d3903 (results
-f57133c): 114 ok, 0 failed. check_install ok with nodump. Build run 2: KIDON, 2026-10-20, build.sh at f57133c (results
+Box run 5: 2026-10-20, run.sh at 26d3903 (results
+f57133c): 114 ok, 0 failed. check_install ok with nodump. Build run 2: 2026-10-20, build.sh at f57133c (results
 86c8ac0): 27 ok, 0 failed.
 K19 again (R3, R5). Tested.

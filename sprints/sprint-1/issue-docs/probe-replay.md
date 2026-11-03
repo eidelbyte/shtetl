@@ -50,25 +50,25 @@ d414712 (the roll while live), 83c3634 (rewritten)
 
 ## Box run 1
 
-KIDON, 2026-10-19, at 68bc7f8 (results 1c23d85).
-Did not run: KIDON's /usr/local/sbin/zfs_rebase answers `unknown
+The box, 2026-10-19, at 68bc7f8 (results 1c23d85).
+Did not run: the box's /usr/local/sbin/zfs_rebase answers `unknown
 option "-m"`, so it predates 69d8223. GitHub's main is 69d8223, so a
 pull, make freebsd and install of zfs_rebase_tool on the box is the
 next step; then a rerun.
 
 ## Box run 2
 
-KIDON, 2026-10-19, at 422bf9c (results 7e9be07).
+The box, 2026-10-19, at 422bf9c (results 7e9be07).
 Again not run: /usr/local/sbin/zfs_rebase still refuses -m. A build
 that has it prints [--merge-non-conflict] in its usage:
 `zfs_rebase 2>&1 | grep merge-non-conflict`.
 
 ## Box run 3
 
-KIDON, 2026-10-20, at 7e9be07 (results 388144a), on zfs_rebase 69d8223.
-P6.1 - P6.9, 16 of 16 ok. The clone form, then three dataset forms;
-step 3 stops at its conflict over etc/motd, the resolution answered
-from with the sed, --continue takes the pre-apply snapshot's name and
+The box, 2026-10-20, at 7e9be07 (results 388144a), on zfs_rebase
+69d8223. P6.1 - P6.9, 16 of 16 ok. The clone form, then three
+dataset forms; step 3 stops at its conflict over etc/motd, the
+resolution answered from with the sed, --continue takes the pre-apply snapshot's name and
 goes through; the new version holds s1 s2 s3 update in that order.
 Answers: the four steps took under a second here (P6.5), so the
 figure for a real house comes from the M5 box run; file times agree

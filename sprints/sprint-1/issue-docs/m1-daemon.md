@@ -82,7 +82,7 @@ the command".
 
 ## Box run 1
 
-KIDON, 2026-10-20, at 48050c7 (results 7b6513e), tests/box/run.sh: 53
+The box, 2026-10-20, at 48050c7 (results 7b6513e), tests/box/run.sh: 53
 ok, 1 failed (Z6, m1-zfs's).
 The daemon (./shtetl daemon) started on the box, answered status over
 its socket and stopped on SIGTERM with exit 0, its socket removed
@@ -93,7 +93,7 @@ message alone. D18, the rc script by hand, is still owed.
 
 ## Box run 2
 
-KIDON, 2026-10-20, at d8b82aa (results 898e804): 54 ok, 0 failed.
+The box, 2026-10-20, at d8b82aa (results 898e804): 54 ok, 0 failed.
 D10 again. And D18 by hand the same day: make install; service
 shtetl onestart; shtetl status, which printed nothing, the box having
 no space marked; service shtetl onestatus, "shtetl is running as pid

@@ -77,7 +77,7 @@ was hidden by a pipe); the next commit rewrites that loop to fit.
 
 ## Box run 4 and build run 1
 
-Box run 4: KIDON, 2026-10-20, run.sh at 0d4768e (results
+Box run 4: 2026-10-20, run.sh at 0d4768e (results
 b55fa79): 113 ok, 1 failed. check_job ok under make check-freebsd:
 EVFILT_PROC, the child gone before it is watched, and the process
 groups behave on FreeBSD's kqueue as on the mac's. The daemon ran

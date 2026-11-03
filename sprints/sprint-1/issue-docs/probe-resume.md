@@ -29,5 +29,5 @@ sh -n, dash -n. Box run owed.
 
 ## Box run 1
 
-KIDON, 2026-10-19, at 68bc7f8 (results 1c23d85).
+The box, 2026-10-19, at 68bc7f8 (results 1c23d85).
 P1.1 - P1.10, 14 of 14 ok. Tested.

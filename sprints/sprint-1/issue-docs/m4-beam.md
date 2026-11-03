@@ -151,7 +151,7 @@ converging to its owner's".
 
 ## Box run 7 and build run 4
 
-Box run 7: KIDON, 2026-10-20, run.sh at d3a5193 (results 4fb25d7):
+Box run 7: 2026-10-20, run.sh at d3a5193 (results 4fb25d7):
 127 ok, 0 failed. make check-freebsd ran all 16 programs, check_beam
 among them, on FreeBSD's kqueue and fork. Z16 - Z18 passed over
 libzfs: a snapshot's properties set and inherited, a name's own

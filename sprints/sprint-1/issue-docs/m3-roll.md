@@ -111,10 +111,10 @@ its stall, and shtetl roll".
 
 ## Box run 4 and build run 1
 
-Box run 4: KIDON, 2026-10-20, run.sh at 0d4768e (results
+Box run 4: 2026-10-20, run.sh at 0d4768e (results
 b55fa79): 113 ok, 1 failed. check_roll ok on FreeBSD; Z10 over libzfs
 ok.
-Build run 1: KIDON, 2026-10-20, tests/box/build.sh at b55fa79 (results
+Build run 1: 2026-10-20, tests/box/build.sh at b55fa79 (results
 39daa4e): 25 ok, 1 failed. F17: the daemon rc started (make install, service
 onestart) found git and rolled (R1). F18: foundation.conf schg, 0444,
 on ZFS (R4). An update (R5), a stall and the roll asked again (R6, R7),

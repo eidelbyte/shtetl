@@ -136,7 +136,7 @@ it (built, m1-spaces).
                 var/
                 www/                    the house's own
         systems/                        the boot environment root
-            15.1-releng-2026-10-18T09_30_12Z-kidon/
+            15.1-releng-2026-10-18T09_30_12Z-box/
 
 A house version is named for the foundation snapshot it was cloned
 from, its kind left off, and then the house (ruled):
@@ -638,7 +638,7 @@ issues of M1 to M7 written.
 
 ### 14.1 Results
 
-Box run 1, KIDON, 2026-10-19, at 68bc7f8 (results 1c23d85): 31 ok, 4
+Box run 1, 2026-10-19, at 68bc7f8 (results 1c23d85): 31 ok, 4
 failed. FreeBSD 15.1-RELEASE-p2, zfs-2.4.2.
 
 - P1, 14 of 14: a full stream, an incremental and a clone stream,
@@ -666,7 +666,7 @@ The harness itself worked end to end: the summary, the cleanup after
 P2's failed setup (its devfs mount taken away before the pools), and
 the send.
 
-Box run 2, KIDON, 2026-10-19, at 422bf9c (results 7e9be07), P2 and P6:
+Box run 2, 2026-10-19, at 422bf9c (results 7e9be07), P2 and P6:
 13 ok, 2 failed.
 
 - P2, 13 of 13, with the jail made from its block: jail -r takes
@@ -680,7 +680,7 @@ Box run 2, KIDON, 2026-10-19, at 422bf9c (results 7e9be07), P2 and P6:
   `zfs_rebase 2>&1 | grep merge-non-conflict` prints the usage line of
   a build that has it.
 
-Box run 3, KIDON, 2026-10-20, at 7e9be07 (results 388144a), P6 alone
+Box run 3, 2026-10-20, at 7e9be07 (results 388144a), P6 alone
 on zfs_rebase 69d8223: 16 ok, 0 failed.
 
 - P6, 16 of 16: four saves replayed onto the next foundation version
@@ -696,7 +696,7 @@ on zfs_rebase 69d8223: 16 ok, 0 failed.
   being the moments of the two runs (P6.8). 7.2 stands.
 
 VM run 1: shtetlvm, FreeBSD's 15.1-RELEASE ZFS VM image under bhyve on
-KIDON (probes/vm.sh), 2026-10-21, at 3ae9d48 (results eb1e88b), P3 and
+the box (probes/vm.sh), 2026-10-21, at 3ae9d48 (results eb1e88b), P3 and
 P4: 25 ok, 0 failed. zfs-2.4.2.
 
 - P3, 15 of 15: two versions under zroot/s2sys, each a clone of the
@@ -729,7 +729,7 @@ P4: 25 ok, 0 failed. zfs-2.4.2.
   real layer does, and a box cell for each behavior the fake claims.
 - Every act is killed at each of its steps in a test, and the actor
   started again must land in a state the matrix names.
-- The box: KIDON for foundations and containers; a VM for systems.
+- The box for foundations and containers; a VM for systems.
 
 
 ## 16. Risks

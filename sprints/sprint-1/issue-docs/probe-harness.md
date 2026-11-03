@@ -50,7 +50,7 @@ d0cd4e0
 
 ## Box run 1
 
-KIDON, 2026-10-19, at 68bc7f8 (results 1c23d85).
+The box, 2026-10-19, at 68bc7f8 (results 1c23d85).
 The whole harness on the box: the summary, the cleanup after a probe's
 failed setup (P2 left a devfs mount under the altroot, which
 pools_down took away before destroying the pools, and P5 then ran on
@@ -91,11 +91,11 @@ canmount=noauto with /home a dataset of its own, is the image's
 15 and in CURRENT.
 
 Verified: sh -n, gate. Not run: there is no bhyve here; the author's
-first make and run on KIDON is its test.
+first make and run on the box is its test.
 
 ## vm.sh's first run, and send (2026-10-21)
 
-On KIDON the checksum's name was wrong (3ae9d48: CHECKSUM.SHA256), the
+On the box the checksum's name was wrong (3ae9d48: CHECKSUM.SHA256), the
 console was the terminal that ran bhyve and could not be come back to
 (1d19568: a null modem, cu, the boot loop under daemon(8)), and P3's
 note said reboot where a plain one was meant (f551fb7). Then P3 and P4

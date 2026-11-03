@@ -98,7 +98,7 @@ is its own commit, since 0486a19 was pushed.
 
 ## Box run 1
 
-KIDON, 2026-10-20, at 48050c7 (results 7b6513e): family Z 46 of 47.
+The box, 2026-10-20, at 48050c7 (results 7b6513e): family Z 46 of 47.
 Z6 "the walk stopped, FN's value returned" failed: libzfs's
 zfs_iter_snapshots_sorted_v2 calls the callback for every snapshot
 whatever it returns (it ORs the returns), so the second call wrote
@@ -110,6 +110,6 @@ layer now does too. A rerun of Z6 is owed.
 
 ## Box run 2
 
-KIDON, 2026-10-20, at d8b82aa (results 898e804): 54 ok, 0 failed.
+The box, 2026-10-20, at d8b82aa (results 898e804): 54 ok, 0 failed.
 Z6 passes with the guard of 0e5bb61: every Z cell holds on libzfs.
 Tested.
