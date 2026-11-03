@@ -638,7 +638,7 @@
     "provides": "Versions pruned by count once the beam is consistent; a foundation version kept while a house version is cloned from it.",
     "estimated_size": "medium",
     "completed": "not-started",
-    "note": "2026-10-20 ruled: run.keep must be less than lake.keep, refused otherwise. The beam sends what a copy lacks after the newest it shares with the owner: the lake must not prune a house version the run still holds."
+    "note": "2026-10-20 ruled: run.keep must be less than lake.keep, refused otherwise. The beam sends what a copy lacks after the newest it shares with the owner: the lake must not prune a house version the run still holds. 2026-11-03: 882c4dc site.c refuses run.keep >= lake.keep after the merge (CS16). Family P written in tests/MATRIX.md with the rules from 8.2, 7.2 and 8.1 (beyond 8.2: zrun keeps every foundation version from the oldest a house there is on, as houses roll through each; zlake keeps a foundation version a house version in either space is a clone of, and every one not older than zrun's copy's newest; zlake copies wait until zrun no longer holds the version). Asked Q-P1 (a foundation no house is on keeps only its newest?) and Q-P2 (where prune says what it did). Prune code waits for the rulings."
   },
   "m4-box": {
     "description": "The box run of M4: the M3 foundation beamed to a run pool, a stream cut part way and resumed by the next convergence, a house version stand-in beamed back, run.keep and lake.keep pruning only once the other side holds what it prunes. Verify: the box log.",
