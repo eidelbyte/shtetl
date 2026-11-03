@@ -317,6 +317,10 @@ main(void)
 	    is(zfake_local(ds("r1"), "atime"), "off"));
 	CHECK(is(zfake_local(ds("r1/usr"), "canmount"), "off"));
 	CHECK(is(zfake_local(ds("r1/var"), "atime"), "on"));
+	/* F1: unmounted by default, F and every dataset made (plan 4) */
+	CHECK(is(zfake_local(ds("r1"), "canmount"), "noauto") &&
+	    is(zfake_local(ds("r1/usr/local"), "canmount"), "noauto") &&
+	    is(zfake_local(ds("r1/var"), "canmount"), "noauto"));
 	CHECK(sh_src_commit(scratch_path("build/src"), oid, sizeof (oid),
 	    &c.c_err) == 0);
 	(void) snprintf(snap, sizeof (snap), "%s@%s", ds("r1/usr/local"),
@@ -375,6 +379,7 @@ main(void)
 	    "WITHOUT_LIB32=yes\n"));
 	/* K17: the obj cache made, mounted; the scratch directory gone */
 	CHECK(is(zfake_local(OROOT "/r1", "compression"), "zstd-9") &&
+	    is(zfake_local(OROOT "/r1", "canmount"), "noauto") &&
 	    sh_zfs_mounted(z, OROOT "/r1", want, sizeof (want), &c.c_err) ==
 	    1 && !there("lake/foundation-builds/r1/kernel-install"));
 

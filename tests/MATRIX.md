@@ -600,7 +600,7 @@ the commit not the src's (F1).
 
 | cell | what | expected | disposition |
 |------|------|----------|-------------|
-| F1 | a first roll ending well | F made with the site's properties, lake's over default's; usr a placeholder, canmount off; usr/local; var with its atime; every dataset snapshotted at once, <ver>-<date>-create, shtetl:kind create and shtetl:commit the src commit; foundation.conf in the head, the record over the shaken recipe; F idle at it, unmounted; the builder free | tests/check_roll.c |
+| F1 | a first roll ending well | F made with the site's properties, lake's over default's, F and every dataset made canmount=noauto (ruled 2026-11-03); usr a placeholder, canmount off; usr/local; var with its atime; every dataset snapshotted at once, <ver>-<date>-create, shtetl:kind create and shtetl:commit the src commit; foundation.conf in the head, the record over the shaken recipe; F idle at it, unmounted; the builder free | tests/check_roll.c |
 | F2 | an update ending well | a new version, -update, kind update | tests/check_roll.c |
 | F3 | asked while it rolls | "F: rolling" | tests/check_roll.c |
 | F4 | asked while stalled | the stall inherited away; it rolls | tests/check_roll.c |
@@ -660,7 +660,7 @@ kernconf's lines or buildopts left out.
 | K14 | make_jobs | -jN from the site | tests/check_roll.c |
 | K15 | a make failing | "installworld: exited 2"; make's words in the foundation's log; rolled back and stalled | tests/check_roll.c |
 | K16 | stopped in the build; started again | the head at its newest version | tests/check_roll.c |
-| K17 | the obj cache | made on a first roll with the site's properties, mounted; the scratch directory gone after | tests/check_roll.c |
+| K17 | the obj cache | made on a first roll with the site's properties and canmount=noauto, mounted; the scratch directory gone after | tests/check_roll.c |
 | K18 | an update's kernel | synced into the head: the kernel replaced, a.ko kept, b.ko and the debug files gone, c.ko new | tests/check_roll.c |
 | K19 | a real build and install | a FreeBSD world and kernel in the head | box: tests/box/build.sh R3 |
 
@@ -722,7 +722,7 @@ to the box are these.
 | cell | what | expected | disposition |
 |------|------|----------|-------------|
 | R1 | shtetl roll box, a first roll, the daemon rc's (F17, GS10) | idle at <ver>-<date>-create | tests/box/build.sh |
-| R2 | the version | every dataset kind create; shtetl:commit zbuild's HEAD; usr a placeholder; its log, /var/log/shtetl/box.log, the build's step line and the version's | tests/box/build.sh |
+| R2 | the version | every dataset kind create; shtetl:commit zbuild's HEAD; usr a placeholder; box and usr/local canmount=noauto, set there; its log, /var/log/shtetl/box.log, the build's step line and the version's | tests/box/build.sh |
 | R3 | the head (K19, X9) | bin/sh and boot/kernel/kernel; the package in usr/local; the command's motd; no resolv.conf left | tests/box/build.sh |
 | R4 | foundation.conf on ZFS (F18) | schg, 0444; the head unmounted | tests/box/build.sh |
 | R5 | an update | idle at -update, kind update | tests/box/build.sh |

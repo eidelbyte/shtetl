@@ -206,6 +206,9 @@ rolls() {
 	cell R2 "shtetl:commit the checkout's" \
 	    "$(prop shtetl:commit "$_v")" "$(git -C "$SRCD" rev-parse HEAD)"
 	cell R2 "usr a placeholder" "$(prop canmount $FD/usr)" off
+	cell R2 "box and usr/local canmount noauto, set there" \
+	    "$(zfs get -H -s local -o value canmount $FD $FD/usr/local |
+	    tr '\n' ' ')" "noauto noauto "
 	cell R2 "its log: the build's step, the version" \
 	    "$(grep -c -e '^# build$' -e "^# version ${_v#*@}\$" \
 	    "/var/log/shtetl/$F.log")" 2

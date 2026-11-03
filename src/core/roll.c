@@ -119,8 +119,11 @@ roll_value(const struct sh_node *v)
 }
 
 /*
- * The properties of DEF, those of OVER in place of the same names, and
- * OVER's others, into a new array of *N; either may be no object.
+ * The properties of DEF, those of OVER in place of the same names,
+ * OVER's others, and canmount=noauto, into a new array of *N; either
+ * may be no object. Nothing a roll makes is mounted but by a roll:
+ * everything is unmounted by default (plan 4), and canmount is no
+ * recipe's to set.
  */
 static struct sh_zprop *
 roll_props(const struct sh_node *def, const struct sh_node *over, size_t *n)
@@ -147,6 +150,8 @@ roll_props(const struct sh_node *def, const struct sh_node *over, size_t *n)
 			p[(*n)++].zp_value = roll_value(pr->pr_val);
 		}
 	}
+	p[*n].zp_name = "canmount";
+	p[(*n)++].zp_value = "noauto";
 	return (p);
 }
 
