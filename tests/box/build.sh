@@ -15,7 +15,7 @@
 # What a run keeps for the next: the pool's file in IMGDIR, the pool
 # exported between runs, holding zbuild's checkout and box's obj cache,
 # so later builds are incremental. Each run destroys box itself and
-# writes zconfig anew. The daemon runs from /usr/local/sbin, put there
+# the beam's copy of it, and writes zconfig anew. The daemon runs from /usr/local/sbin, put there
 # by make install, and by service(8), as rc runs it.
 #
 # Settings, from the environment:
@@ -108,8 +108,10 @@ cell() {	# CELL WHAT GOT WANT
 	fi
 }
 
-# The pool, made the first time, imported after; box gone, zconfig
-# written anew, zbuild and the obj caches kept.
+# The pool, made the first time, imported after; box gone, and its
+# copy on the run space, which a new box shares nothing with and the
+# beam leaves standing (plan 8.1); zconfig written anew, zbuild and
+# the obj caches kept.
 pool_up() {
 	if [ ! -f "$IMG" ]; then
 		x truncate -s "$SIZE" "$IMG" &&
@@ -122,9 +124,11 @@ pool_up() {
 	else
 		x zpool import -d "$IMGDIR" -R "$BALT" $P || return 1
 	fi
-	if zfs list -H -o name $FD >/dev/null 2>&1; then
-		x zfs destroy -r $FD || return 1
-	fi
+	for _d in $FD $P/run/foundations/$F; do
+		if zfs list -H -o name $_d >/dev/null 2>&1; then
+			x zfs destroy -r $_d || return 1
+		fi
+	done
 	CONF=$(dir $P/config)
 	SRCD=$(dir $P/build)/src
 	x rm -rf "$CONF/foundations" "$CONF/patches" "$CONF/shtetl.conf" &&
