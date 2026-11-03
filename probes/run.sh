@@ -7,7 +7,7 @@
 #   sh probes/run.sh --list          what there is
 #   sudo sh probes/run.sh --clean    what a crash left
 #
-# The log of a run is probes/results/<host>-<UTC time>/: summary.txt
+# The log of a run is probes/results/<UTC time>/: summary.txt
 # (the commit it ran at, every check, "== N ok, M failed") and one log
 # per probe. It is committed and pushed as the person behind sudo;
 # SEND=no keeps it local. ZFS_REBASE names zfs_rebase if PATH has none.
@@ -70,7 +70,7 @@ if [ -z "$FILES" ]; then
 fi
 
 ZR=${ZFS_REBASE:-$(command -v zfs_rebase 2>/dev/null)}
-OUT=$PD/results/$(hostname -s)-$(date -u +%Y%m%dT%H%M%SZ)
+OUT=$PD/results/$(date -u +%Y%m%dT%H%M%SZ)
 mkdir -p "$OUT" || exit 2
 SUMMARY=$OUT/summary.txt
 {

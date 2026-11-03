@@ -20,7 +20,7 @@ refuses to start while either pool exists.
 
 ## The log
 
-probes/results/<host>-<UTC time>/ holds summary.txt and one log per
+probes/results/<UTC time>/ holds summary.txt and one log per
 probe, the full transcript of every command. summary.txt opens with
 the shtetl commit it ran at and ends with
 
@@ -38,7 +38,9 @@ fails is `failed setup` and ends that probe.
 
 The run commits its directory and pushes it as the person behind
 sudo (su to SUDO_USER: their git identity and credentials). SEND=no
-keeps it local.
+keeps it local. What it sends names neither the box nor its person:
+in every file the checkout's path becomes ".", the host's name "box"
+and the person's name "user".
 
 ## What a probe needs
 

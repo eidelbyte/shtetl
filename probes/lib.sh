@@ -116,11 +116,13 @@ pools_down() {
 # committed and pushed by the person who ran the script through sudo,
 # with their identity and credentials (su, which root takes without a
 # password). SEND=no keeps them local. SENDER names whose they are:
-# the probes', or tests/box's.
+# the probes', or tests/box's. What is sent names neither the box nor
+# its person: in every file the checkout's path is ".", the host's
+# name "box" and the person's "user", whatever tool printed them.
 send() {	# SUMMARYLINE PATH...
 	_u=${SUDO_USER:-}
 	_s=${SENDER:-probes}
-	_msg="$_s: $(hostname -s): $1"
+	_msg="$_s: $1"
 	shift
 	if [ "${SEND:-yes}" = no ]; then
 		echo "$_s: SEND=no: $* not sent"
@@ -130,6 +132,9 @@ send() {	# SUMMARYLINE PATH...
 		echo "$_s: not run through sudo: $* not sent"
 		return 1
 	fi
+	find "$@" -type f -exec sed -i '' -e "s|$TOP|.|g" \
+	    -e "s/[[:<:]]$(hostname -s)[[:>:]]/box/g" \
+	    -e "s/[[:<:]]$_u[[:>:]]/user/g" {} +
 	chown -R "$_u" "$@"
 	_p=
 	for _f in "$@"; do

@@ -296,12 +296,12 @@ rolls() {
 }
 
 mkdir -p "$BD/results" || exit 2
-OUT=$BD/results/$(hostname -s)-build-$(date -u +%Y%m%dT%H%M%SZ).log
+OUT=$BD/results/build-$(date -u +%Y%m%dT%H%M%SZ).log
 LOGFROM=$(($(cat /var/log/daemon.log 2>/dev/null | wc -l) + 1))
 trap 'pool_down; exit 130' INT TERM
 {
 	echo "shtetl $(git -C "$TOP" rev-parse --short HEAD 2>/dev/null)" \
-	    "box build on $(hostname -s) $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+	    "build on $(hostname -s) $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "host: $(uname -rm)"
 	echo "branch: $BRANCH from $GITURL"
 	echo

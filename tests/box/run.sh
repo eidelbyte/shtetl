@@ -9,7 +9,7 @@
 #   make freebsd && sudo sh tests/box/run.sh
 #   sudo sh tests/box/run.sh --clean     what a crash left
 #
-# The log is tests/box/results/<host>-<UTC time>.log: its first line
+# The log is tests/box/results/<UTC time>.log: its first line
 # the commit it ran at, its last "== N ok, M failed". It is committed
 # and pushed as the person behind sudo; SEND=no keeps it local.
 set -u
@@ -107,11 +107,11 @@ foundation stalled stalled build: make exited 2"
 }
 
 mkdir -p "$BD/results" || exit 2
-OUT=$BD/results/$(hostname -s)-$(date -u +%Y%m%dT%H%M%SZ).log
+OUT=$BD/results/$(date -u +%Y%m%dT%H%M%SZ).log
 trap 'pools_down; exit 130' INT TERM
 {
 	echo "shtetl $(git -C "$TOP" rev-parse --short HEAD 2>/dev/null)" \
-	    "box on $(hostname -s) $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+	    "on $(hostname -s) $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 	echo "host: $(uname -rm)"
 	echo "zfs: $(zfs version 2>/dev/null | tr '\n' ' ')"
 	echo

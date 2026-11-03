@@ -606,7 +606,7 @@ the M0 ruling.
 
 Box scripts on throwaway md pools, like main's M0: `probes/run.sh`, a
 shared `lib.sh`, results committed back under
-`probes/results/<host>-<time>/`. Each probe's cells, listed in its
+`probes/results/<time>/`. Each probe's cells, listed in its
 header, are its matrix.
 
 - P1 resume. A full send, an incremental and a clone stream between

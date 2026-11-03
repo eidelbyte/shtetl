@@ -11,10 +11,11 @@ the probes do (probes/lib.sh), and destroys them after. It will not
 start while a pool of its names exists; `sudo sh tests/box/run.sh
 --clean` removes what a crash left.
 
-The log is tests/box/results/<host>-<UTC time>.log. Its first line
+The log is tests/box/results/<UTC time>.log. Its first line
 names the commit it ran at, and its last says "== N ok, M failed".
 The script commits and pushes it as the person behind sudo; `SEND=no`
-keeps it local.
+keeps it local. What it sends names neither the box nor its person
+(probes/README.md).
 
 What runs:
 
@@ -43,7 +44,7 @@ pool keeps zbuild's checkout and the obj cache from run to run, so
 only the first build takes hours; each run destroys the foundation box
 itself and writes zconfig anew. It asks shtetl roll and shtetl pkg as
 a person does, waits on shtetl status, and reads what came of each
-from ZFS and the head. The log is tests/box/results/<host>-build-<UTC
+from ZFS and the head. The log is tests/box/results/build-<UTC
 time>.log, sent as run.sh's is, with the run's lines of
 /var/log/daemon.log at its end. BRANCH, GITURL, IMGDIR and SIZE change
 what it builds and where; `sudo sh tests/box/build.sh --clean` takes
