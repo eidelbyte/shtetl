@@ -29,8 +29,10 @@
 #include "core/foundation.h"
 #include "core/job.h"
 #include "core/mem.h"
+#include "core/prune.h"
 #include "core/roll.h"
 #include "core/show.h"
+#include "core/site.h"
 #include "core/spaces.h"
 #include "core/syntax.h"
 #include "core/wire.h"
@@ -236,6 +238,29 @@ act(struct daemon *d, struct conn *c, const char *args, size_t len)
 	free(ebuf);
 	free(argv);
 	free(a);
+}
+
+/*
+ * A convergence of the beam over: what neither space needs pruned, by
+ * the keeps shtetl.conf gives now (plan 8.2), each version pruned in
+ * beam.log.
+ */
+static int
+pruned(void *arg, struct sh_err *e)
+{
+	struct daemon *d = arg;
+	struct sh_site s;
+	char path[1024];
+	int r;
+
+	if (mounted(d, SH_SP_CONFIG, path, sizeof (path), e) != 0 ||
+	    sh_site_load(path, &s, e) != 0)
+		return (-1);
+	r = sh_prune(d->d_zfs, d->d_benv.be_lake, d->d_benv.be_run,
+	    sh_site_keep(&s, "run"), sh_site_keep(&s, "lake"),
+	    d->d_benv.be_log, e);
+	sh_site_free(&s);
+	return (r);
 }
 
 /* A foundation's version made: the beam carries it to the run. */
@@ -474,6 +499,8 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 		d.d_benv.be_run = d.d_sp.ss_root[SH_SP_RUN];
 		d.d_benv.be_period = SH_BEAM_PERIOD;
 		d.d_benv.be_retry = SH_BEAM_RETRY;
+		d.d_benv.be_done = pruned;
+		d.d_benv.be_darg = &d;
 		d.d_beam = sh_beam_start(&d.d_benv);
 	}
 	/*

@@ -39,6 +39,8 @@ static FILE *logf;
 static char *logbuf;
 static size_t loglen, logmark;
 static int timers;		/* the timer's events handed to the beam */
+static int prunes;		/* convergences that told the prune */
+static const char *refuse;	/* what the next prune is refused with */
 static struct timespec fired;	/* when the last was */
 
 /* The log from here on is what since() reads. */
@@ -407,6 +409,19 @@ done(void)
 	b = NULL;
 }
 
+/* The prune the beam tells at each convergence's end: counted. */
+static int
+pruned(void *arg, struct sh_err *e)
+{
+	(void) arg;
+	prunes++;
+	if (refuse == NULL)
+		return (0);
+	sh_errf(e, "%s", refuse);
+	refuse = NULL;
+	return (-1);
+}
+
 /* g on the lake, as a foundation roll makes it. */
 static void
 foundation(void)
@@ -539,6 +554,7 @@ main(void)
 	env.be_err = &sys.c_err;
 	env.be_period = 60000;
 	env.be_retry = 60000;
+	env.be_done = pruned;
 
 	/*
 	 * B1: a foundation the run does not hold: nothing sent, as no
@@ -917,6 +933,24 @@ main(void)
 	CHECK((env.be_kq = kqueue()) >= 0);
 	begin();
 	CHECK(is(status(), "beam converged\n") && mirrored(LF, RUN));
+	done();
+
+	/*
+	 * P21: the prune told once at the end of each convergence; P22:
+	 * its refusal a failure of it, said once to syslog and in status,
+	 * and in the log; the next ending well, converged
+	 */
+	beamed();
+	prunes = 0;
+	CHECK(is(again(), "beam converged\n") && prunes == 1);
+	refuse = "tank/x: busy";
+	cap_reset(&sys);
+	mark();
+	CHECK(is(again(), "beam failing prune: tank/x: busy\n") &&
+	    prunes == 2);
+	CHECK(is(cap_text(&sys), "beam: prune: tank/x: busy\n") &&
+	    count("# failed: prune: tank/x: busy\n") == 1);
+	CHECK(is(again(), "beam converged\n") && prunes == 3);
 	done();
 
 	(void) close(env.be_kq);

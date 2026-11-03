@@ -298,11 +298,16 @@ sh_site_builtins(struct sh_err *e)
 	return (built);
 }
 
-/* The checked keep of SECTION, run or lake, in the merged settings. */
 static int64_t
 keep(const struct sh_node *merged, const char *section)
 {
 	return (sh_obj_get(sh_obj_get(merged, section), "keep")->sn_int);
+}
+
+int64_t
+sh_site_keep(const struct sh_site *s, const char *section)
+{
+	return (keep(s->ss_merged, section));
 }
 
 int

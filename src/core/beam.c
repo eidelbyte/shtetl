@@ -689,15 +689,31 @@ static void beam_go(struct sh_beam *b);
 static void beam_look(struct sh_beam *b);
 
 /*
- * The convergence over: the next one's wait, and the next, at once
- * when B was told meanwhile.
+ * The convergence over: the prune, its refusal a failure of it; the
+ * next one's wait, and the next, at once when B was told meanwhile.
  */
 static void
 beam_end(struct sh_beam *b)
 {
 	const struct sh_beamenv *env = b->b_env;
+	char *buf = NULL, *why;
 	struct kevent ev;
+	struct sh_err e;
+	size_t len = 0;
+	FILE *f;
+	int rc;
 
+	f = sh_memstream(&buf, &len);
+	sh_err_init(&e, f, "");
+	rc = env->be_done(env->be_darg, &e);
+	(void) fclose(f);
+	if (rc != 0) {
+		buf[strcspn(buf, "\n")] = '\0';
+		why = join("prune: ", buf, "");
+		fail(b, "", why);
+		free(why);
+	}
+	free(buf);
 	b->b_busy = 0;
 	if (b->b_now.bl_n == 0)
 		b->b_wait = env->be_period;

@@ -156,6 +156,7 @@ main(void)
 	    "space run fast/run\n"
 	    "foundation generic idle v1\n"
 	    "beam converged\n";
+	static const char *const v0[] = { "tank/lake/foundations/generic@v0" };
 	static const char *const v1[] = { "tank/lake/foundations/generic@v1" };
 	static const struct sh_zprop lake = { "shtetl:space", "lake" };
 	static const struct sh_zprop run = { "shtetl:space", "run" };
@@ -208,6 +209,7 @@ main(void)
 	    &c.c_err) == 0);
 	CHECK(sh_zfs_create(z, "tank/lake/foundations/generic", NULL, 0,
 	    &c.c_err) == 0);
+	CHECK(sh_zfs_snapshot(z, v0, 1, NULL, 0, &c.c_err) == 0);
 	CHECK(sh_zfs_snapshot(z, v1, 1, NULL, 0, &c.c_err) == 0);
 
 	/* D12: a socket's path holding what a dead daemon left */
@@ -221,6 +223,25 @@ main(void)
 	CHECK(stat(logp, &st) == 0 && S_ISDIR(st.st_mode));
 	CHECK(stat(scratch_path("logs/beam.log"), &st) == 0 &&
 	    S_ISREG(st.st_mode));
+	/*
+	 * P21: the convergence over, the prune: v0, nothing's and older
+	 * than the newest, gone, and said in beam.log
+	 */
+	{
+		char text[4096];
+		uint64_t g, t;
+		size_t n;
+		FILE *f;
+
+		CHECK(sh_zfs_snapinfo(z, v0[0], &g, &t, &c.c_err) == -1);
+		cap_reset(&c);
+		CHECK((f = fopen(scratch_path("logs/beam.log"), "r")) != NULL);
+		n = fread(text, 1, sizeof (text) - 1, f);
+		text[n] = '\0';
+		(void) fclose(f);
+		CHECK(strstr(text, "# prune tank/lake/foundations/"
+		    "generic@v0\n") != NULL);
+	}
 
 	/* D14, D15: the pidfile holds the pid; the socket is root's alone */
 	(void) snprintf(wantpid, sizeof (wantpid), "%ld\n", (long)getpid());

@@ -62,6 +62,13 @@ struct sh_beamenv {
 	struct sh_err	*be_err;	/* a failure, said once */
 	long		be_period;	/* ms from a convergence to the next */
 	long		be_retry;	/* ms after a first failure */
+	/*
+	 * Told that a convergence is over: what neither space needs is
+	 * pruned (prune.h), the daemon's. Its refusal, said to E with -1,
+	 * is a failure of the convergence, "prune: why".
+	 */
+	int		(*be_done)(void *arg, struct sh_err *e);
+	void		*be_darg;
 };
 
 struct sh_beam;

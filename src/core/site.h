@@ -41,6 +41,9 @@ void sh_site_free(struct sh_site *s);
  */
 const char **sh_site_repos(const struct sh_site *s);
 
+/* The keep of SECTION, "run" or "lake", in S's settings (plan 8.2). */
+int64_t sh_site_keep(const struct sh_site *s, const char *section);
+
 /* The built-in settings alone (the caller frees them), or NULL. */
 struct sh_node *sh_site_builtins(struct sh_err *e);
 

@@ -519,11 +519,15 @@ are ordered by createtxg, a house version by its origin's, never by
 name. Saves on an active version are not pruned; they go with the
 version, and a roll carries roll.depth of them forward.
 
-The house actor prunes zrun after a roll; the beam prunes the copies
-after each convergence, and then each idle foundation actor its
-versions. Each version pruned is a line of beam.log, "# prune NAME";
-a refusal is said as the beam's failures are, once to syslog,
-"prune: why", and as a line of status while it fails (ruled
+The beam prunes, at the end of each convergence, with both spaces
+read anew (built, m4-prune: one pruner where this plan had three). A
+roll, a foundation's or a house's, tells the beam of its version, so
+what the new version frees goes at the convergence that carries it;
+the house actor and the foundation actor prune nothing themselves. A
+roll only adds a newest version, which no prune takes. Each version
+pruned is a line of beam.log, "# prune NAME"; a refusal is a failure
+of the convergence, said as the beam's are, once to syslog, "beam:
+prune: why", and as a line of status while it fails (ruled
 2026-11-03).
 
 

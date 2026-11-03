@@ -254,13 +254,13 @@ rolls() {
 	cell R7 "the patch in the checkout" \
 	    "$(head -1 "$SRCD/README.md")" "shtetl box a"
 	cell R7 "no stall" "$(prop shtetl:stall $FD)" -
-	_v=$(newest $FD)
-
-	# R8: a pkg roll (U7)
+	# R8: a pkg roll (U7); the version before it read first, as the
+	# prune takes it once the beam has carried the new one
+	_c=$(prop shtetl:commit "$(newest $FD)")
 	cell R8 "a pkg roll" "$(ask pkg)" "foundation $F idle $V-DATE-pkg"
 	cell R8 "kind pkg, the version's commit" \
 	    "$(prop shtetl:kind "$(newest $FD)") $(prop shtetl:commit \
-	    "$(newest $FD)")" "pkg $(prop shtetl:commit "$_v")"
+	    "$(newest $FD)")" "pkg $_c"
 	_v=$(newest $FD)
 
 	# R9: stopped in a command, devfs mounted, the head written (a

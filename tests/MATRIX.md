@@ -855,11 +855,11 @@ beyond 8.2's words are marked (+):
   latest of what nothing relies on is kept (ruled 2026-11-03).
 
 Versions are ordered by createtxg, a house version by its origin's,
-never by name. The beam prunes the copies after each convergence, and
-then each idle foundation actor prunes its versions; a foundation
-rolling prunes after its roll's convergence. The house actor's prune
-is built and held to its cells here; the house actor calling it after
-a roll is m5-roll's.
+never by name. The beam prunes all four at the end of each
+convergence, with both spaces read anew (sh_prune, told through
+be_done, the daemon's): a roll tells the beam of its version, so what
+it frees goes at the convergence that carries it, and no other actor
+prunes.
 
 Dimensions: the object {a house version on zrun, its copy on zlake, a
 foundation version on zlake, its copy on zrun}; the count {within the
@@ -893,7 +893,7 @@ the trigger {a convergence, a roll's end}.
 | P18 | a system's versions | as a container's, under systems | tests/check_prune.c |
 | P19 | two houses on one foundation | each counted alone; a version of one pruned leaves the other's | tests/check_prune.c |
 | P20 | a refusal part way (a destroy or a promote) | said; what is left stays; the next prune takes it up from what ZFS shows | tests/check_prune.c |
-| P21 | the trigger | the beam prunes its copies after each convergence, then each idle foundation its versions; a rolling foundation after its roll's convergence | tests/check_beam.c, tests/check_daemon.c |
+| P21 | the trigger | told once at the end of each convergence (check_beam); the daemon's prune by shtetl.conf's keeps, a foundation's older version gone and in beam.log (check_daemon) | tests/check_beam.c, tests/check_daemon.c |
 | P22 | what it says | each version pruned in beam.log, "# prune NAME"; a refusal once to syslog, "prune: why", and a line of status while it fails (ruled 2026-11-03) | tests/check_beam.c |
-| P23 | the house actor's prune after a roll | m5-roll calls it; its rules are P1 - P4 | deferred: m5-roll (the house actor) |
+| P23 | a house's roll | its old versions pruned at the convergence that carries its new one, by P1 - P4; the house actor prunes nothing | mapped to P1 - P4 and P21; the roll's tell is m5-roll's |
 | P24 | the box: a foundation rolled twice, its first version pruned in both spaces; a house stand-in kept | box: m4-box | box |
