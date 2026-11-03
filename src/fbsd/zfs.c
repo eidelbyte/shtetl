@@ -685,11 +685,17 @@ sh_zfs_resumable(struct sh_zfs *z, const char *ds, struct sh_err *e)
 
 /*
  * SNAP sent from FROM by lzc_send, or with RESUME by lzc_send_resume
- * from OBJ and OFF, in a child into a pipe; received as TO here by
- * lzc_receive_resumable, so a stream broken off leaves its token. The
- * receiver's errno names the refusal (dmu_recv.c: ENODEV the base not
- * FROM's counterpart, EEXIST the target there, ETXTBSY changed since
- * its newest snapshot), else the sender's (EXDEV: FROM no ancestor).
+ * from OBJ and OFF, in a child into a pipe; received as TO here,
+ * resumably, so a stream broken off leaves its token, and as receive
+ * -o canmount=noauto, set locally on TO's filesystem before the data
+ * lands (zfs_ioctl.c). Local, not received: the first received
+ * properties of a filesystem take its local ones for received ones
+ * and clear them (dsl_prop_get_received), the beam's shtetl:* among
+ * them. The kernel takes an index in its own type, and a wrong one is
+ * no refusal of the receive. The receiver's errno names the refusal
+ * (dmu_recv.c: ENODEV the base not FROM's counterpart, EEXIST the
+ * target there, ETXTBSY changed since its newest snapshot), else the
+ * sender's (EXDEV: FROM no ancestor).
  */
 static int
 zz_stream(struct sh_zfs *z, const char *snap, const char *from,
@@ -698,6 +704,7 @@ zz_stream(struct sh_zfs *z, const char *snap, const char *from,
 {
 	int fds[2], st, rr, sr;
 	size_t n = strcspn(to, "@");
+	nvlist_t *lp;
 	pid_t pid;
 
 	(void) z;
@@ -720,7 +727,12 @@ zz_stream(struct sh_zfs *z, const char *snap, const char *from,
 		_exit(sr & 0xff);
 	}
 	(void) close(fds[1]);
-	rr = lzc_receive_resumable(to, NULL, origin, B_FALSE, B_FALSE, fds[0]);
+	lp = fnvlist_alloc();
+	fnvlist_add_uint64(lp, zfs_prop_to_name(ZFS_PROP_CANMOUNT),
+	    ZFS_CANMOUNT_NOAUTO);
+	rr = lzc_receive_with_cmdprops(to, NULL, lp, NULL, 0, origin, B_FALSE,
+	    B_TRUE, B_FALSE, fds[0], NULL, -1, NULL, NULL, NULL, NULL);
+	fnvlist_free(lp);
 	(void) close(fds[0]);
 	while (waitpid(pid, &st, 0) == -1 && errno == EINTR)
 		;

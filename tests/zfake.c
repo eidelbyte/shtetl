@@ -931,9 +931,10 @@ zf_newest(const char *fs)
 }
 
 /*
- * The stream of SNAP, from FROM, received into D as TO: taken, the
- * snapshot with SNAP's guid; or, cut, left to resume, what was sent
- * recorded on D as a token would record it.
+ * The stream of SNAP, from FROM, received into D as TO, D made
+ * canmount=noauto first, as the receive sets it before the data lands:
+ * taken, the snapshot with SNAP's guid; or, cut, left to resume, what
+ * was sent recorded on D as a token would record it.
  */
 static int
 zf_take(struct zf_obj *d, const char *snap, const char *from,
@@ -943,6 +944,8 @@ zf_take(struct zf_obj *d, const char *snap, const char *from,
 	const struct zf_obj *f = from != NULL ? zf_snap(from) : NULL;
 	struct zf_obj *t;
 
+	zf_drop(d, "canmount");
+	zf_put(d, "canmount", "noauto");
 	if (zf->zs_cutting > 0 && --zf->zs_cutting == 0) {
 		(void) snprintf(d->zo_rsnap, ZF_NAME, "%s", snap);
 		d->zo_rguid = s->zo_guid;

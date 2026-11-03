@@ -1,6 +1,7 @@
 /*
  * Family Z on the box: tests/zcells.c's cells over libzfs, on the pool
- * tests/box/run.sh makes. A word is a file in the mounted filesystem.
+ * tests/box/run.sh makes. A word is a file in the mounted filesystem;
+ * a property set there is what zfs get says.
  *
  * usage: box_zcheck POOL/DATASET   (empty, with no mountpoint to
  *        inherit; run.sh makes it)
@@ -11,6 +12,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "core/err.h"
@@ -96,6 +98,26 @@ cut(const char *snap, const char *from, const char *to, const char *origin)
 	return (0);
 }
 
+/* PROP as zfs get says DS sets it itself, or NULL. */
+static const char *
+local(const char *ds, const char *prop)
+{
+	static char v[256];
+	char cmd[1100];
+	size_t n;
+	FILE *p;
+
+	(void) snprintf(cmd, sizeof (cmd), "zfs get -H -s local -o value %s "
+	    "%s", prop, ds);
+	if ((p = popen(cmd, "r")) == NULL)
+		return (NULL);
+	n = fread(v, 1, sizeof (v) - 1, p);
+	(void) pclose(p);
+	v[n] = '\0';
+	v[strcspn(v, "\n")] = '\0';
+	return (n > 0 ? v : NULL);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -110,5 +132,6 @@ main(int argc, char **argv)
 	zc_has = has;
 	zc_fill = fill;
 	zc_cut = cut;
+	zc_local = local;
 	return (zcells(stdout, argv[1]) != 0);
 }

@@ -48,6 +48,7 @@ main(void)
 	zc_has = zfake_has;
 	zc_fill = fill;
 	zc_cut = cut;
+	zc_local = zfake_local;
 	CHECK((o = open_memstream(&buf, &len)) != NULL);
 	failed = zcells(o, "tank/zc");
 	(void) fclose(o);

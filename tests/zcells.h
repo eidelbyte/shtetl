@@ -30,6 +30,13 @@ extern int (*zc_cut)(const char *snap, const char *from, const char *to,
     const char *origin);
 
 /*
+ * The driver's: the property PROP as set on DS itself, native or
+ * user, or NULL; looked at apart from the layer, which reads no native
+ * property it does not need.
+ */
+extern const char *(*zc_local)(const char *ds, const char *prop);
+
+/*
  * The cells, under TOP, an empty filesystem with no mountpoint of its
  * own to inherit, each printed to OUT as "ok   Zn what" or "FAIL Zn
  * what". Nothing else on the system may set the user property

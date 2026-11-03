@@ -119,6 +119,9 @@ words. The fake's data is words; the box's are files.
 | Z17 | props | FN stops | FN's value returned |
 | Z17 | props | no such filesystem; no such snapshot | "no such filesystem"; "no such snapshot" |
 | Z18 | create, children | made in a forked child, the layer opened before the fork | seen by the parent: the state is the kernel's, the fake's shared as it is (m4-beam) |
+| Z19 | send | whole; a clone stream | the filesystem made canmount=noauto, set there, so nothing mounts it at import (ruled 2026-11-03) |
+| Z19 | send, resume | a whole cut, resumed | canmount=noauto, set there: on the box the cut's own receive did not set it |
+| Z19 | send | incremental onto a filesystem with a user property of its own | the property kept: canmount is set locally, not received, as a first received set clears the local properties (dsl_prop_get_received) |
 
 The streams' cells cut a stream through the driver (zc_cut): on the
 box as probe P1 cuts it, zfs send into head -c into zfs receive -s;
@@ -810,3 +813,4 @@ zfake_export.
 | B29 | a clone the walk finds before its origin's dataset (a top cloned from a deeper one) | the origin's streams first, the clone a clone stream | tests/check_beam.c |
 | B30 | a stream failing, another foundation lacking a version | only the streams that need the failed one held back (its dataset's later ones, the copies below one it was making); the other foundation beamed and arrived in the same convergence; the failed top sent nothing more until the next (ruled 2026-10-20: a failure holds up only what needs it) | tests/check_beam.c |
 | B31 | syslog | a failure said once, "beam: why"; failing so again, nothing; a new failure said; nothing when it is over (ruled 2026-10-20) | tests/check_beam.c |
+| B32 | every copy the beam makes | canmount=noauto: nothing mounts it but shtetl (ruled 2026-11-03) | mapped to Z19: every copy is made by sh_zfs_send, which sets it |

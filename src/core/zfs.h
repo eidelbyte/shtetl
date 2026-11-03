@@ -174,7 +174,9 @@ int sh_zfs_promote(struct sh_zfs *z, const char *ds, struct sh_err *e);
  * snapshot is FROM's counterpart (the same guid); or, with ORIGIN, a
  * clone stream from FROM, TO's filesystem made a clone of ORIGIN,
  * FROM's counterpart. Nothing but the data travels (no -p), and
- * nothing is mounted. A stream broken off leaves a receive to resume
+ * nothing is mounted: TO's filesystem is canmount=noauto, set there
+ * locally before the data lands, so that only sh_zfs_mount mounts a
+ * copy (plan 8.1). A stream broken off leaves a receive to resume
  * on TO's filesystem (sh_zfs_resumable), and while it stands no other
  * stream is taken there. Refused: "no such snapshot" (SNAP, FROM or
  * ORIGIN); TO's filesystem "exists", or "no such filesystem" for an
@@ -193,8 +195,9 @@ int sh_zfs_resumable(struct sh_zfs *z, const char *ds, struct sh_err *e);
 
 /*
  * DS's broken receive resumed: the stream sent on from where it broke
- * off. Refused: "no receive to resume"; the snapshot it sends gone,
- * "SNAP: no such snapshot", or the one it was sent from, "SNAP: its
+ * off, DS canmount=noauto as sh_zfs_send leaves it. Refused: "no
+ * receive to resume"; the snapshot it sends gone, "SNAP: no such
+ * snapshot", or the one it was sent from, "SNAP: its
  * base gone"; the system's words.
  */
 int sh_zfs_resume(struct sh_zfs *z, const char *ds, struct sh_err *e);

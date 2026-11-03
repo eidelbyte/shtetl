@@ -20,6 +20,7 @@ int (*zc_put)(const char *, const char *);
 int (*zc_has)(const char *, const char *);
 int (*zc_fill)(const char *);
 int (*zc_cut)(const char *, const char *, const char *, const char *);
+const char *(*zc_local)(const char *, const char *);
 
 static struct sh_zfs *z;
 static FILE *out;
@@ -163,6 +164,15 @@ user(const char *rel, const char *prop)
 	    &e)) != 0)
 		return (r == 1 ? "(unset)" : "(refused)");
 	return (val[n]);
+}
+
+/* Whether REL is canmount=noauto, set on it itself (plan 8.1). */
+static int
+noauto(const char *rel)
+{
+	const char *v = zc_local(at(rel), "canmount");
+
+	return (v != NULL && strcmp(v, "noauto") == 0);
 }
 
 /* Where REL is mounted, below the altroot: "" when it is not. */
@@ -583,12 +593,16 @@ cells_send(void)
 	cell("Z14", "whole: t made, its @1 the source's guid",
 	    sh_zfs_send(z, at("s@1"), NULL, at("t@1"), NULL, &e) == 0 &&
 	    same("t@1", "s@1"));
+	cell("Z19", "whole: t canmount noauto, set there", noauto("t") &&
+	    sh_zfs_set(z, at("t"), "shtetl:zcheck", "t", &e) == 0);
 	refused("Z14", "whole onto a filesystem there: refused",
 	    sh_zfs_send(z, at("s@2"), NULL, at("t@2"), NULL, &e), "t",
 	    "exists");
 	cell("Z14", "incremental: t@2 the source's",
 	    sh_zfs_send(z, at("s@2"), at("s@1"), at("t@2"), NULL, &e) == 0 &&
 	    same("t@2", "s@2"));
+	cell("Z19", "incremental: t's own user property kept",
+	    strcmp(user("t", "shtetl:zcheck"), "t") == 0);
 	(void) snprintf(why, sizeof (why), "newest snapshot is not %s's "
 	    "counterpart", at("s@1"));
 	refused("Z14", "onto a newest snapshot that is no counterpart",
@@ -619,6 +633,7 @@ cells_send(void)
 	    sh_zfs_resumable(z, at("w"), &e) == 1);
 	cell("Z15", "resumed: w@3 the source's",
 	    sh_zfs_resume(z, at("w"), &e) == 0 && same("w@3", "s@3"));
+	cell("Z19", "a cut whole resumed: w canmount noauto", noauto("w"));
 	cell("Z15", "a cut incremental, its source destroyed after",
 	    zc_fill(at("s")) == 0 && snap("s@4", NULL, NULL) == 0 &&
 	    zc_cut(at("s@4"), at("s@3"), at("t@4"), NULL) == 0 &&
@@ -664,6 +679,7 @@ cells_send(void)
 	    snap("c@x1", NULL, NULL) == 0 &&
 	    sh_zfs_send(z, at("c@x1"), at("s@5"), at("d@x1"), at("t@5"),
 	    &e) == 0 && origin_is("d", "t@5") && same("d@x1", "c@x1"));
+	cell("Z19", "a clone stream: d canmount noauto", noauto("d"));
 	(void) snprintf(why, sizeof (why), "not %s's counterpart", at("s@5"));
 	refused("Z14", "onto an origin no counterpart: refused",
 	    sh_zfs_send(z, at("c@x1"), at("s@5"), at("v@x1"), at("t@3"), &e),
