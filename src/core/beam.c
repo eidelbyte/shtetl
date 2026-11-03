@@ -469,11 +469,12 @@ plan(struct sh_beam *b, const struct bspace *s, struct bspace *r,
 /*
  * The streams that bring each copy below RROOT, in R, to its owner's
  * below SROOT, in S, a parent and an origin first; none for a top
- * that failed in this convergence or has a receive to resume.
+ * that failed in this convergence or has a receive to resume, and,
+ * with HELD, none for a top R does not hold.
  */
 static void
 streams(struct sh_beam *b, struct bspace *s, struct bspace *r,
-    const char *pair, const char *sroot, const char *rroot)
+    const char *pair, const char *sroot, const char *rroot, int held)
 {
 	struct bfs *f;
 	char *key, *to, *top;
@@ -491,7 +492,8 @@ streams(struct sh_beam *b, struct bspace *s, struct bspace *r,
 			key = topkey(pair, f->bf_name, sroot);
 			to = join(rroot, f->bf_name + strlen(sroot), "");
 			top = join(rroot, key + strlen(pair), "");
-			if (!failed(b, key) && !resuming(r, top))
+			if (!failed(b, key) && !resuming(r, top) &&
+			    (!held || fs_of(r, top) != NULL))
 				plan(b, s, r, f, key, to);
 			free(key);
 			free(to);
@@ -799,9 +801,11 @@ beam_look(struct sh_beam *b)
 		if (props(b, &sp[o], &sp[!o], own[i], copy[i], &e) != 0)
 			goto out;
 	}
+	/* a foundation is on the run only while a house there needs it */
 	for (i = 0; i < NPAIRS; i++) {
 		o = pairs[i].bp_lake;
-		streams(b, &sp[o], &sp[!o], pairs[i].bp_name, own[i], copy[i]);
+		streams(b, &sp[o], &sp[!o], pairs[i].bp_name, own[i], copy[i],
+		    o);
 	}
 	rc = 0;
 out:

@@ -356,14 +356,13 @@ main(void)
 	/* D10: SIGTERM: exit 0, the socket gone */
 	CHECK(down() == 0);
 	CHECK(stat(sockp, &st) != 0);
-	/* D25: the lake's version beamed to the run at the start */
+	/* D25: the lake's foundation not beamed: no house on the run */
 	{
-		uint64_t g1, g2, t;
+		uint64_t g, t;
 
-		CHECK(sh_zfs_snapinfo(z, "tank/lake/foundations/generic@v1",
-		    &g1, &t, &c.c_err) == 0);
 		CHECK(sh_zfs_snapinfo(z, "fast/run/foundations/generic@v1",
-		    &g2, &t, &c.c_err) == 0 && g1 == g2);
+		    &g, &t, &c.c_err) == -1);
+		cap_reset(&c);
 	}
 
 	/* D23: zconfig not mounted: said, 1 */

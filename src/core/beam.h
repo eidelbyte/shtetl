@@ -1,10 +1,13 @@
 /*
  * The beam (plan 8.1, 9): one actor for the lake and the run of this
  * host, every dataset's copy converging to its owner's. Foundation
- * versions go from <lake>/foundations to <run>/foundations, house
- * versions from <run>/containers and <run>/systems to <lake>/containers
- * and <lake>/systems, in that order: a foundation version before any
- * house version cloned from it.
+ * versions go from <lake>/foundations to the foundations
+ * <run>/foundations holds, house versions from <run>/containers and
+ * <run>/systems to <lake>/containers and <lake>/systems, in that
+ * order: a foundation version before any house version cloned from
+ * it. A foundation is on the run only while a house there needs it
+ * (ruled 2026-11-03): the beam brings a copy there up to date and
+ * makes none; a pull from a version on, a house's, does.
  *
  * A convergence is looks, each followed by a pass of the streams it
  * planned. A look reads both spaces. Each receive to resume below a

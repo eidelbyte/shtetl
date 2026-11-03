@@ -206,7 +206,7 @@ over the fake on a socket listened on before the fork.
 | D22 | show with two recipes | the usage, 2 | tests/check_daemon.c |
 | D23 | show, zconfig not mounted | "shtetl: ROOT: not mounted", 1 | tests/check_daemon.c |
 | D24 | show, no config space | "shtetl: no config space", 1 | tests/check_daemon.c |
-| D25 | the lake and the run found; the run not | the beam begun at the start, beam.log made in the log directory, the lake's version beamed, "beam converged" in status after the foundations; no beam and no line (m4-beam) | tests/check_daemon.c |
+| D25 | the lake and the run found; the run not | the beam begun at the start, beam.log made in the log directory, the lake's foundation not beamed (no house on the run), "beam converged" in status after the foundations; no beam and no line (m4-beam) | tests/check_daemon.c |
 
 Also run by hand on the mac (not in make check, since leaks(1) hangs
 on a forked child that exits): a live daemon over the fake after 600
@@ -751,7 +751,9 @@ syslog one line for each roll that fails.
 ## Family B: the beam (m4-beam)
 
 Plan 8.1: every dataset's copy converges to its owner's, foundation
-versions from lake/foundations to run/foundations, house versions from
+versions from lake/foundations to the foundations run/foundations
+holds (one is there only while a house there needs it, so the beam
+makes none: a house's pull does, ruled 2026-11-03), house versions from
 run/containers and run/systems to lake/containers and lake/systems.
 Each snapshot the copy lacks after the newest of the dataset's history
 whose guid the copy's space holds, wherever it is there, is sent, in
@@ -783,7 +785,7 @@ zfake_export.
 
 | cell | what | expected | disposition |
 |------|------|----------|-------------|
-| B1 | a foundation's first version, the run without it | a full stream of each dataset, a parent before its children; each copy's snapshot the owner's guid; the properties of each copied; "# arrived" the top's copy | tests/check_beam.c |
+| B1 | a foundation the run does not hold; then its copy pulled whole at a version, as a house's pull makes it | nothing sent, as no house there needs it (ruled 2026-11-03); the pulled copy's properties made the owner's, "# arrived" its top's, nothing sent | tests/check_beam.c |
 | B2 | later versions | an incremental each, oldest first, from the newest the copy holds | tests/check_beam.c |
 | B3 | up to date | nothing sent, nothing logged | tests/check_beam.c |
 | B4 | a version with a dataset new in it | that dataset a full stream, the others incrementals; the version arrived once all of it is there | tests/check_beam.c |
@@ -794,7 +796,7 @@ zfake_export.
 | B9 | the lake's copy promoted | nothing sent again; the owner's next snapshot lands | tests/check_beam.c |
 | B10 | the old version destroyed on the run, before the beam and after | nothing sent, nothing destroyed on the lake | tests/check_beam.c |
 | B11 | a snapshot the copy lacks older than its newest held, pruned there | not sent again | tests/check_beam.c |
-| B12 | a cut at each stream of B1, B2, B4, B5, B6 and B7 | the convergence failing with the stream's words, a receive to resume left, nothing destroyed; the next resuming it first, then going on; converged, every guid and property the owner's, each version arrived once | tests/check_beam.c |
+| B12 | a cut at each stream of B2, B4, B5, B6 and B7 (a foundation's first copy is a pull's, M5) | the convergence failing with the stream's words, a receive to resume left, nothing destroyed; the next resuming it first, then going on; converged, every guid and property the owner's, each version arrived once | tests/check_beam.c |
 | B13 | a receive to resume whose stream's snapshot is gone | "SNAP: no such snapshot"; failing; the receive left | tests/check_beam.c |
 | B14 | a copy with a snapshot of its own since | "newest snapshot is not FROM's counterpart"; failing; nothing destroyed; the version not arrived, the other datasets' streams sent | tests/check_beam.c |
 | B15 | a filesystem's properties | the owner's shtetl:* set on the copy; one the owner lets go let go on the copy; any other property of the copy's left | tests/check_beam.c |

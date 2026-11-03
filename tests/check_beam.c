@@ -243,6 +243,29 @@ take(const char *top, const char *snap, const char *kind)
 	names_free(&t);
 }
 
+/*
+ * The run's copy of the foundation F made whole at SNAP, a parent
+ * first, as a house's pull will make it: the beam makes no foundation
+ * copy (B1).
+ */
+static void
+pull(const char *f, const char *snap)
+{
+	char from[300], to[300];
+	struct names t;
+	size_t i;
+
+	(void) snprintf(from, sizeof (from), "%s/%s", LF, f);
+	tree(from, &t);
+	for (i = 0; i < t.n; i++) {
+		(void) snprintf(from, sizeof (from), "%s@%s", t.v[i], snap);
+		(void) snprintf(to, sizeof (to), "%s%s@%s", RF,
+		    t.v[i] + strlen(LF), snap);
+		CHECK(sh_zfs_send(z, from, NULL, to, NULL, &c.c_err) == 0);
+	}
+	names_free(&t);
+}
+
 /* TOP's tree destroyed, its snapshots first, children before parents. */
 static void
 destroy(const char *top)
@@ -421,13 +444,14 @@ house2(void)
 	take(RC "/V2", "u", "update");
 }
 
-/* The foundation g with versions v1 and v2, beamed. */
+/* The foundation g with versions v1 and v2, pulled at v1, beamed. */
 static void
 beamed(void)
 {
 	fresh();
 	foundation();
 	take(LF "/g", "v1", "create");
+	pull("g", "v1");
 	take(LF "/g", "v2", "update");
 	begin();
 	CHECK(is(status(), "beam converged\n"));
@@ -457,15 +481,6 @@ cuts(void (*setup)(void), int n, const char *own, const char *recv,
 }
 
 /* The fixtures B12 cuts. */
-static void
-first_v1(void)
-{
-	fresh();
-	foundation();
-	begin();
-	take(LF "/g", "v1", "create");
-}
-
 static void
 later(void)
 {
@@ -525,23 +540,24 @@ main(void)
 	env.be_period = 60000;
 	env.be_retry = 60000;
 
-	/* B1, B23, B24: a foundation's first version, full streams */
+	/*
+	 * B1: a foundation the run does not hold: nothing sent, as no
+	 * house there needs it (ruled 2026-11-03); B24: its copy pulled
+	 * whole at v1, the beam makes its properties the owner's, arrived
+	 */
 	fresh();
 	foundation();
 	take(LF "/g", "v1", "create");
-	b = sh_beam_start(&env);
-	CHECK(is(status(), "beam converging send " LF "/g@v1\n"));
-	CHECK(is(settle(), "beam converged\n"));
-	CHECK(same(LF "/g@v1", RF "/g@v1") &&
-	    same(LF "/g/usr@v1", RF "/g/usr@v1") &&
-	    same(LF "/g/usr/local@v1", RF "/g/usr/local@v1") &&
-	    same(LF "/g/var@v1", RF "/g/var@v1"));
-	CHECK(is(origin(RF "/g"), "") && is(origin(RF "/g/var"), ""));
+	begin();
+	CHECK(is(status(), "beam converged\n") && is(since(), "") &&
+	    !there(RF "/g"));
+	pull("g", "v1");
+	mark();
+	CHECK(is(again(), "beam converged\n") && count("# send ") == 0);
+	CHECK(same(LF "/g/usr/local@v1", RF "/g/usr/local@v1") &&
+	    is(origin(RF "/g"), "") && is(origin(RF "/g/var"), ""));
 	CHECK(is(user(RF "/g/var@v1", "shtetl:kind"), "create") &&
 	    is(user(RF "/g@v1", "shtetl:commit"), "v1"));
-	CHECK(before("# send " LF "/g@v1\n", "# send " LF "/g/usr@v1\n") &&
-	    before("# send " LF "/g/usr@v1\n",
-	    "# send " LF "/g/usr/local@v1\n"));
 	CHECK(count("# arrived " RF "/g@v1\n") == 1 &&
 	    count("# arrived ") == 1);
 
@@ -665,6 +681,8 @@ main(void)
 	beamed();
 	mk(LF "/h");
 	take(LF "/h", "v1", "create");
+	pull("h", "v1");
+	take(LF "/h", "v2", "update");
 	{
 		const char *mine[] = { RF "/g@mine" };
 
@@ -675,8 +693,8 @@ main(void)
 	cap_reset(&sys);
 	CHECK(is(again(), "beam failing send " LF "/g@v3: zfake: " RF
 	    "/g: newest snapshot is not " LF "/g@v2's counterpart\n"));
-	CHECK(same(LF "/h@v1", RF "/h@v1") &&
-	    count("# arrived " RF "/h@v1\n") == 1 &&
+	CHECK(same(LF "/h@v2", RF "/h@v2") &&
+	    count("# arrived " RF "/h@v2\n") == 1 &&
 	    same(LF "/g/var@v3", RF "/g/var@v3"));
 	CHECK(is(cap_text(&sys), "beam: send " LF "/g@v3: zfake: " RF
 	    "/g: newest snapshot is not " LF "/g@v2's counterpart\n"));
@@ -688,14 +706,14 @@ main(void)
 
 		CHECK(sh_zfs_snapshot(z, mine, 1, NULL, 0, &c.c_err) == 0);
 	}
-	take(LF "/h", "v2", "update");
+	take(LF "/h", "v3", "update");
 	/* B23: a line for each failure */
 	CHECK(is(again(), "beam failing send " LF "/g@v3: zfake: " RF
 	    "/g: newest snapshot is not " LF "/g@v2's counterpart\n"
-	    "beam failing send " LF "/h@v2: zfake: " RF
-	    "/h: newest snapshot is not " LF "/h@v1's counterpart\n"));
-	CHECK(is(cap_text(&sys), "beam: send " LF "/h@v2: zfake: " RF
-	    "/h: newest snapshot is not " LF "/h@v1's counterpart\n"));
+	    "beam failing send " LF "/h@v3: zfake: " RF
+	    "/h: newest snapshot is not " LF "/h@v2's counterpart\n"));
+	CHECK(is(cap_text(&sys), "beam: send " LF "/h@v3: zfake: " RF
+	    "/h: newest snapshot is not " LF "/h@v2's counterpart\n"));
 	CHECK(sh_zfs_destroy(z, RF "/g@mine", &c.c_err) == 0 &&
 	    sh_zfs_destroy(z, RF "/h@mine", &c.c_err) == 0);
 	cap_reset(&sys);
@@ -703,8 +721,7 @@ main(void)
 	    mirrored(LF, RUN));
 	done();
 
-	/* B12: a cut at each stream of B1, B2 and B4 */
-	cuts(first_v1, 4, LF, RUN, 1);
+	/* B12: a cut at each stream of B2 and B4 */
 	cuts(later, 8, LF, RUN, 2);
 	cuts(newer_dataset, 5, LF, RUN, 1);
 
@@ -807,12 +824,14 @@ main(void)
 	fresh();
 	foundation();
 	take(LF "/g", "v1", "create");
+	pull("g", "v1");
+	take(LF "/g", "v2", "update");
 	zfake_fail("send");
 	mark();
 	b = sh_beam_start(&env);
 	sh_beam_converge(b);
-	CHECK(is(settle(), "beam converged\n") && same(LF "/g@v1", RF "/g@v1"));
-	CHECK(count("# failed: send " LF "/g@v1: zfake: send failed as "
+	CHECK(is(settle(), "beam converged\n") && same(LF "/g@v2", RF "/g@v2"));
+	CHECK(count("# failed: send " LF "/g@v2: zfake: send failed as "
 	    "asked\n") == 1 && count("# failed: ") == 1);
 	done();
 
@@ -843,6 +862,8 @@ main(void)
 	fresh();
 	foundation();
 	take(LF "/g", "v1", "create");
+	pull("g", "v1");
+	take(LF "/g", "v2", "update");
 	zfake_export("fast");
 	cap_reset(&sys);
 	(void) clock_gettime(CLOCK_MONOTONIC, &t0);
@@ -868,7 +889,7 @@ main(void)
 	zfake_import();
 	while (timers == 5)
 		CHECK(one(5000));
-	CHECK(is(settle(), "beam converged\n") && same(LF "/g@v1", RF "/g@v1"));
+	CHECK(is(settle(), "beam converged\n") && same(LF "/g@v2", RF "/g@v2"));
 	(void) clock_gettime(CLOCK_MONOTONIC, &t0);
 	while (timers == 6)
 		CHECK(one(5000));
@@ -884,6 +905,8 @@ main(void)
 	fresh();
 	foundation();
 	take(LF "/g", "v1", "create");
+	pull("g", "v1");
+	take(LF "/g", "v2", "update");
 	mark();
 	b = sh_beam_start(&env);
 	CHECK(strncmp(status(), "beam converging send ", 21) == 0);
