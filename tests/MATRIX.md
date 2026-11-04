@@ -1011,7 +1011,7 @@ log, the sink}.
 | N12 | the actor's start | every house's active version's jail started; "house H starting STEP" meanwhile, then "house H active VERSION" | tests/check_house.c |
 | N13 | the actor's start, one house's jail failing | said, "house H: jail: why", in H.log too; it active still; the others started | tests/check_house.c |
 | N14 | a start finding the jail running already | -cm: it runs on, nothing run in it again | box: m5-box (the fake jail runs nothing) |
-| N15 | the daemon's start and stop | the houses started with their jails, the blocks in the daemon's directory for them; at its stop no jail stopped (Q-J1 asked) | tests/check_daemon.c |
+| N15 | the daemon's start and stop | the houses started with their jails, the blocks in the daemon's directory for them; at its stop no jail stopped (ruled 2026-11-05, Q-J1) | tests/check_daemon.c |
 | N16 | a name of digits only | refused: "containers/123: invalid recipe name: digits only", create's "123: invalid name: digits only", a requires entry | tests/check_cascade.c, tests/check_daemon.c, tests/check_schema.c |
 | N17 | the box: a real jail from the block | made, devfs at path/dev, jexec H and pkg -j H reach it; jail -r takes devfs away | box: m5-box |
 | N18 | the fake keeping files (zfake_files) | a snapshot of a mounted filesystem shows its files, not a child's, at MOUNT/.zfs/snapshot/SNAP; a mounted filesystem a mountpoint set moves takes its files along | tests/check_house.c, through N7, N8, N10; the real ones held on the box by I12, I14 and Z20 |

@@ -82,3 +82,39 @@ just keep required + forward" (plan 18).
   prune takes a copy nothing on zrun is a clone of, so the pull and
   the house's clone must leave no convergence's end between them, or
   the pull is marked in ZFS as relied on.
+
+## Container dependencies (ruled 2026-11-05)
+
+The author: "We need to create a dependency startup tree however. Put
+this in future work with the rest of the containers dependency work"
+(plan 18). A container's recipe names the containers it needs with
+`requires` (docs/configuration.md 4). Today that is a check of the
+language and nothing more: each entry is a container recipe, and not
+the container itself. Nothing reads it when a container is made or
+started, and the daemon's start starts every container's jail at once
+(m5-jail).
+
+To flesh out:
+
+- The startup tree: the containers started in the order `requires`
+  gives, a required container's jail started before the jails of the
+  containers that require it, and those with nothing between them at
+  once.
+- A cycle, a container that requires another that requires it in
+  turn: refused where the recipes are read, as a container requiring
+  itself is now.
+- A required container whose jail does not start: whether the
+  containers that require it are left unstarted, and said, or started
+  anyway.
+- Stopping in the reverse order, a container before what it requires.
+  The daemon's stop stops no jail (ruled 2026-11-05, Q-J1), so who
+  stops the containers when the host shuts down, and in that order, is
+  to be asked.
+- A roll of a required container: whether the jails of those that
+  require it are stopped and started around its swap, or left
+  running.
+- A create checking that each of `requires` is a container on zrun
+  already, as main's create did (ruled 2026-10-14 on main: that it is
+  there, not that it runs).
+- One container mounting another's data, left for later on main
+  (2026-10-14).

@@ -380,7 +380,8 @@ of its own. Start is jail -cm, not -c: it makes the jail, and leaves
 one that runs already as it is, so a start after a crash, or after a
 restart of the daemon, is a first start. A create starts the jail
 last, and the daemon's start starts every container; the daemon's
-stop stops none, until Q-J1 is ruled.
+stop stops none, and the containers outlive it (ruled 2026-11-05,
+Q-J1).
 
 Systems (PROPOSAL, probes P3, P4). A system's versions are boot
 environments under zrun/systems: each version's root has
@@ -1210,4 +1211,25 @@ needs, and every foundation that meets them is available to it; the
 person picks one of those as they make it, `--on F`, the check
 refusing one that does not meet them. Rebasing a container onto
 another foundation during an update is doable, and future work
+(sprints/future-work.md).
+
+### 2026-11-05 (Q-J1: the jails outlive the daemon; a startup tree)
+
+Asked whether the daemon's stop should stop every container's jail
+(Q-J1, recommended for the host's shutdown), and told that a docs
+example started a service in a container's commands, which run in a
+chroot before its jail starts, the author answered:
+
+    no, stopping the daemon shouldn't stop the jails.
+    and yes, drop the line. We need to create a dependency startup
+    tree however. Put this in future work with the rest of the
+    containers dependency work
+
+So the daemon's stop leaves every jail running, as built (m5-jail),
+and its next start finds them running and leaves them so (jail -cm).
+The example's `service nginx start` is gone from the docs: a
+container's commands set things up and start nothing, and the jail's
+rc starts what rc.conf enables. The containers are to start in the
+order their dependencies give, a tree; that is future work, with the
+rest of what a container's `requires` is to mean
 (sprints/future-work.md).

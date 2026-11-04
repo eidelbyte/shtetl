@@ -59,9 +59,9 @@ writes whole at each start (plan 7.3; tests/MATRIX.md family N):
   block a person keeps under the same name is not taken away by a
   create that failed before its start.
 - he_lake, set by the daemon and read by nothing, is gone.
-- The daemon's stop stops no jail. The issue does not say, and the
-  choice is asked: Q-J1, open-questions.md, recommending the daemon's
-  stop stop every jail, for the host's shutdown.
+- The daemon's stop stops no jail. The issue did not say; asked as
+  Q-J1, and ruled 2026-11-05: "stopping the daemon shouldn't stop the
+  jails" (plan 18). The containers outlive the daemon.
 - The block's comment line and its fixed lines are main's, word for
   word; persist is not set, as on main (the P2 probe's block had it,
   for a jail with no rc).
@@ -119,11 +119,16 @@ writes whole at each start (plan 7.3; tests/MATRIX.md family N):
   key at once" example has `service nginx start` in a container's
   commands; with rc starting what rc.conf enables at the jail's start,
   that line is not needed, and on this model it is wrong. Raised with
-  the author, not changed here.
-- Q-J1's answer, if (b), is the daemon's stop running each house's
-  sh_jail_stop and waiting for them before it exits.
+  the author and dropped, as ruled 2026-11-05 (98212c9), the docs
+  saying the commands start nothing.
+- The containers are to start in the order `requires` gives, a
+  dependency startup tree (ruled 2026-11-05); that, and the rest of
+  what `requires` is to mean, is future work (sprints/future-work.md,
+  Container dependencies). Until then the daemon's start starts every
+  container at once.
 
 ## Commits
 
 7fa83e8 (matrix, Q-J1), ae2e46c (digits only), 899ab58 (the block and
-the steps), b9aec30 (the start, the daemon), and the worklog's.
+the steps), b9aec30 (the start, the daemon), a1cc52a (the worklog);
+after the ruling, 98212c9 (the docs) and the ruling's record.
