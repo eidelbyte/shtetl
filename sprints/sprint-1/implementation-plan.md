@@ -1182,6 +1182,22 @@ author answered:
 So `--on F` is the design, not a stopgap: the person picks a
 container's foundation as they make it, and the container's
 requirements are a compatibility check against the pick, not a way to
-choose one; its ver is the check built (m5-create). A container is not
-bound to its foundation for good ("lock you into a container" read as
-a foundation): moving one is future work (sprints/future-work.md).
+choose one; its ver is the check built (m5-create).
+
+### 2026-11-04 (the foundations available to a container)
+
+Told that "lock you into a container" was read as a container bound to
+its foundation for good, the author answered:
+
+    oh huh, I guess you could rebase a container onto a different
+    foundation during an update. strange, but totally doable. I just
+    meant that a container config file won't define a foundation by
+    name, just by needed constraint. Any foundation that meets those
+    constraints will be available for the container.
+
+So a container's recipe names no foundation, only the constraints it
+needs, and every foundation that meets them is available to it; the
+person picks one of those as they make it, `--on F`, the check
+refusing one that does not meet them. Rebasing a container onto
+another foundation during an update is doable, and future work
+(sprints/future-work.md).

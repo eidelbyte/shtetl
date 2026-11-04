@@ -6,13 +6,15 @@ it would touch. An item moves into a sprint's plan when it is ruled.
 ## Container requirements (asked 2026-11-03)
 
 The author: "containers shouldn't pin foundation names, just
-requirements like version and kernel options", and then "containers
-will never lock you into a [foundation], it's just that we'll run a
-compatibility check between the container and the picked foundation.
-I guess the user will have to pick a foundation during picking a
-container" (plan 18). So the person picks a container's foundation,
-`shtetl create H --on F`, and the container's requirements are checked
-against it; they choose nothing. Today a house recipe states only
+requirements like version and kernel options"; "we'll run a
+compatibility check between the container and the picked foundation";
+and "a container config file won't define a foundation by name, just
+by needed constraint. Any foundation that meets those constraints will
+be available for the container" (plan 18). So a container's recipe
+states constraints and names no foundation; every foundation that
+meets them is available to it, and the person picks one as they make
+the container, `shtetl create H --on F`, the check refusing one that
+does not meet them. Today a house recipe states only
 `ver` constraints (docs/configuration.md 4), held against the picked
 foundation's branch (m5-create). Nothing a container states can ask
 for a kernel option, a build option or a point on a foundation's
@@ -31,8 +33,12 @@ To flesh out:
 - What the check says when the picked foundation does not meet them:
   the create refused with the requirement it fails, as a ver that
   does not hold is now.
-- A container not locked to its foundation: moving one to another,
-  a pick again and the check, then a roll onto it. Plan 17 holds
+- The foundations available to a container: those its constraints
+  allow, for a picker to list (shtetl create H with no --on, or the
+  TUI).
+- A container rebased onto another foundation during an update, a pick
+  again and the check, then the roll's replay onto the new foundation's
+  version: "strange, but totally doable" (the author). Plan 17 holds
   moving a house to another foundation recipe out of scope; this
   would bring it in.
 - What a house does when its foundation's next version stops meeting
