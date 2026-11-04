@@ -422,6 +422,34 @@ pruned(void *arg, struct sh_err *e)
 	return (-1);
 }
 
+/* What a pull's asker was told, and the prunes counted by then. */
+static int told_n, told_prunes;
+static char told_copy[300], told_why[300];
+
+static void
+told(void *arg, const char *copy, const char *why)
+{
+	(void) arg;
+	told_n++;
+	told_prunes = prunes;
+	(void) snprintf(told_copy, sizeof (told_copy), "%s",
+	    copy != NULL ? copy : "");
+	(void) snprintf(told_why, sizeof (told_why), "%s",
+	    why != NULL ? why : "");
+}
+
+/* A pull of SNAP asked, and the convergence it starts run to its end. */
+static const char *
+pull_of(const char *snap)
+{
+	told_n = 0;
+	prunes = 0;
+	sh_beam_pull(b, snap, told, NULL);
+	if (strncmp(status(), "beam converging", 15) != 0)
+		CHECK(one(5000));
+	return (settle());
+}
+
 /* g on the lake, as a foundation roll makes it. */
 static void
 foundation(void)
@@ -933,6 +961,80 @@ main(void)
 	CHECK((env.be_kq = kqueue()) >= 0);
 	begin();
 	CHECK(is(status(), "beam converged\n") && mirrored(LF, RUN));
+	done();
+
+	/*
+	 * B33: a pull of g@v2, the run holding none of g: full streams of
+	 * v2, a parent first, none of v1; the asker told once, the copy
+	 * arrived, before the convergence's prune; from then on the copy
+	 * is the beam's
+	 */
+	fresh();
+	foundation();
+	take(LF "/g", "v1", "create");
+	take(LF "/g", "v2", "update");
+	begin();
+	mark();
+	CHECK(is(pull_of(LF "/g@v2"), "beam converged\n"));
+	CHECK(told_n == 1 && is(told_copy, RF "/g@v2") && is(told_why, "") &&
+	    told_prunes == 0 && prunes == 1);
+	CHECK(same(LF "/g@v2", RF "/g@v2") &&
+	    same(LF "/g/usr/local@v2", RF "/g/usr/local@v2") &&
+	    same(LF "/g/var@v2", RF "/g/var@v2") && !there(RF "/g@v1"));
+	CHECK(before("# send " LF "/g@v2\n", "# send " LF "/g/usr@v2\n") &&
+	    count("# arrived " RF "/g@v2\n") == 1);
+	take(LF "/g", "v3", "update");
+	CHECK(is(again(), "beam converged\n") && same(LF "/g@v3", RF "/g@v3") &&
+	    told_n == 1);
+	done();
+
+	/* B34: a pull of a version the run's copy is behind: brought to it */
+	fresh();
+	foundation();
+	take(LF "/g", "v1", "create");
+	pull("g", "v1");
+	begin();
+	take(LF "/g", "v2", "update");
+	CHECK(is(pull_of(LF "/g@v2"), "beam converged\n"));
+	CHECK(told_n == 1 && is(told_copy, RF "/g@v2") &&
+	    same(LF "/g@v2", RF "/g@v2"));
+	/* a version the copy holds: told from the loop, never in the call */
+	told_n = 0;
+	sh_beam_pull(b, LF "/g@v2", told, NULL);
+	CHECK(told_n == 0 && one(5000) && is(settle(), "beam converged\n") &&
+	    told_n == 1 && is(told_copy, RF "/g@v2"));
+	done();
+
+	/*
+	 * B35: a pull whose stream fails: told the failure, once, nothing
+	 * left; a pull asked while converging, taken in that convergence
+	 * or the next
+	 */
+	fresh();
+	foundation();
+	take(LF "/g", "v1", "create");
+	begin();
+	zfake_fail("send");
+	CHECK(strncmp(pull_of(LF "/g@v1"), "beam failing send ", 18) == 0);
+	CHECK(told_n == 1 && is(told_copy, "") &&
+	    strstr(told_why, "send failed as asked") != NULL &&
+	    !there(RF "/g"));
+	done();
+	fresh();
+	foundation();
+	take(LF "/g", "v1", "create");
+	pull("g", "v1");
+	mk(LF "/h");
+	take(LF "/h", "v1", "create");
+	begin();
+	take(LF "/g", "v2", "update");
+	told_n = 0;
+	sh_beam_converge(b);
+	CHECK(strncmp(status(), "beam converging send ", 21) == 0);
+	sh_beam_pull(b, LF "/h@v1", told, NULL);
+	CHECK(is(settle(), "beam converged\n") && told_n == 1 &&
+	    is(told_copy, RF "/h@v1") && same(LF "/h@v1", RF "/h@v1") &&
+	    same(LF "/g@v2", RF "/g@v2"));
 	done();
 
 	/*

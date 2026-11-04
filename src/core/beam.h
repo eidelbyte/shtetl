@@ -79,6 +79,19 @@ struct sh_beam *sh_beam_start(const struct sh_beamenv *env);
 /* Told of a snapshot: B converges. */
 void sh_beam_converge(struct sh_beam *b);
 
+/*
+ * A pull (m5-create, m5-restore): the run's copy of the foundation
+ * version SNAP, <lake>/foundations/F@v, made from it on where the run
+ * holds none of F, or brought to it where the copy is behind; from then
+ * on the copy is the beam's as any other. DONE is told with ARG once,
+ * at the end of a convergence and before its prune, with the copy's
+ * snapshot of the version once it holds it, arrived, or with why when
+ * its top or the look failed. B converges at once, or after the
+ * convergence under way.
+ */
+void sh_beam_pull(struct sh_beam *b, const char *snap,
+    void (*done)(void *arg, const char *copy, const char *why), void *arg);
+
 /* B's timer, the event of the kqueue whose udata is B: B converges. */
 void sh_beam_timer(struct sh_beam *b);
 

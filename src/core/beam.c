@@ -74,6 +74,14 @@ struct bstream {
 	struct bstream	*bt_next;	/* the pass's, in order */
 };
 
+/* A pull asked for: the lake's version SNAP, and whom to tell. */
+struct bpull {
+	char		*bp_snap;
+	void		(*bp_done)(void *, const char *, const char *);
+	void		*bp_arg;
+	struct bpull	*bp_next;
+};
+
 /* A convergence's failures: each one's top, and why. */
 struct bfails {
 	char	**bl_key;
@@ -94,6 +102,7 @@ struct sh_beam {
 	struct bstream		**b_tail;
 	struct bstream		*b_cur;		/* the stream under way */
 	struct sh_err		b_lerr;		/* what it says, in its log */
+	struct bpull		*b_pulls;	/* not yet told */
 };
 
 /* The roots below both spaces' roots, the owner's space named. */
@@ -430,11 +439,13 @@ resumes(struct sh_beam *b, const struct bspace *r, const char *pair,
 /*
  * The streams that bring F's copy TO, in R, to F, in S, of the top
  * KEY: added to the pass, and to R as the copies they make, with what
- * each needs.
+ * each needs. With PULLED, "@v", where R holds nothing of F's history,
+ * from F's snapshot of that name on.
  */
 static void
 plan(struct sh_beam *b, const struct bspace *s, struct bspace *r,
-    const struct bfs *f, const char *key, const char *to)
+    const struct bfs *f, const char *key, const char *to,
+    const char *pulled)
 {
 	const struct bsnap *from, *at;
 	struct bstream *t;
@@ -443,6 +454,10 @@ plan(struct sh_beam *b, const struct bspace *s, struct bspace *r,
 	size_t i, own;
 
 	from = base(s, f, r, &own);
+	for (i = 0; from == NULL && pulled != NULL && i < f->bf_n; i++) {
+		if (strcmp(strchr(f->bf_snaps[i].bs_name, '@'), pulled) == 0)
+			own = i;
+	}
 	for (i = own; i < f->bf_n; i++) {
 		name = join(to, strchr(f->bf_snaps[i].bs_name, '@'), "");
 		c = fs_of(r, to);
@@ -466,16 +481,34 @@ plan(struct sh_beam *b, const struct bspace *s, struct bspace *r,
 	}
 }
 
+/* The version, "@v", a pull asks of the foundations' top KEY, or NULL. */
+static const char *
+pulled(const struct sh_beam *b, const char *key)
+{
+	const char *lake = b->b_env->be_lake, *rel;
+	const struct bpull *p;
+	size_t n;
+
+	for (p = b->b_pulls; p != NULL; p = p->bp_next) {
+		rel = p->bp_snap + strlen(lake) + 1;
+		n = strcspn(rel, "@");
+		if (strncmp(rel, key, n) == 0 && key[n] == '\0')
+			return (rel + n);
+	}
+	return (NULL);
+}
+
 /*
  * The streams that bring each copy below RROOT, in R, to its owner's
  * below SROOT, in S, a parent and an origin first; none for a top
  * that failed in this convergence or has a receive to resume, and,
- * with HELD, none for a top R does not hold.
+ * with HELD, none for a top R does not hold that no pull asks for.
  */
 static void
 streams(struct sh_beam *b, struct bspace *s, struct bspace *r,
     const char *pair, const char *sroot, const char *rroot, int held)
 {
+	const char *pull;
 	struct bfs *f;
 	char *key, *to, *top;
 	size_t k, placed;
@@ -492,9 +525,11 @@ streams(struct sh_beam *b, struct bspace *s, struct bspace *r,
 			key = topkey(pair, f->bf_name, sroot);
 			to = join(rroot, f->bf_name + strlen(sroot), "");
 			top = join(rroot, key + strlen(pair), "");
+			pull = held && fs_of(r, top) == NULL ? pulled(b, key) :
+			    NULL;
 			if (!failed(b, key) && !resuming(r, top) &&
-			    (!held || fs_of(r, top) != NULL))
-				plan(b, s, r, f, key, to);
+			    (!held || fs_of(r, top) != NULL || pull != NULL))
+				plan(b, s, r, f, key, to, pull);
 			free(key);
 			free(to);
 			free(top);
@@ -688,9 +723,67 @@ beam_resume(struct sh_job *j, void *arg, struct sh_err *e)
 static void beam_go(struct sh_beam *b);
 static void beam_look(struct sh_beam *b);
 
+/* Why the top KEY, or the look, failed in this convergence, or NULL. */
+static const char *
+failure(const struct sh_beam *b, const char *key)
+{
+	size_t i;
+
+	for (i = 0; i < b->b_now.bl_n; i++) {
+		if (strcmp(b->b_now.bl_key[i], key) == 0 ||
+		    b->b_now.bl_key[i][0] == '\0')
+			return (b->b_now.bl_why[i]);
+	}
+	return (NULL);
+}
+
 /*
- * The convergence over: the prune, its refusal a failure of it; the
- * next one's wait, and the next, at once when B was told meanwhile.
+ * Each pull told whose copy has arrived, its snapshot holding its
+ * owner's shtetl:kind, or whose top or look failed; the rest wait for
+ * the next convergence.
+ */
+static void
+pulls(struct sh_beam *b)
+{
+	const struct sh_beamenv *env = b->b_env;
+	struct bpull **pp = &b->b_pulls, *p;
+	char *buf = NULL, *copy, *key, *root, v[64];
+	const char *why;
+	struct sh_err e;
+	size_t len = 0;
+	int arrived;
+	FILE *f;
+
+	/* a copy not there yet says so: nobody hears it */
+	f = sh_memstream(&buf, &len);
+	sh_err_init(&e, f, "");
+	root = join(env->be_lake, "/foundations", "");
+	while ((p = *pp) != NULL) {
+		copy = join(env->be_run, p->bp_snap + strlen(env->be_lake), "");
+		key = topkey("foundations", p->bp_snap, root);
+		arrived = sh_zfs_user(env->be_z, copy, "shtetl:kind", v,
+		    sizeof (v), &e) == 0;
+		why = arrived ? NULL : failure(b, key);
+		if (arrived || why != NULL) {
+			*pp = p->bp_next;
+			p->bp_done(p->bp_arg, arrived ? copy : NULL, why);
+			free(p->bp_snap);
+			free(p);
+		} else {
+			pp = &p->bp_next;
+		}
+		free(key);
+		free(copy);
+	}
+	free(root);
+	(void) fclose(f);
+	free(buf);
+}
+
+/*
+ * The convergence over: the pulls told, then the prune, its refusal a
+ * failure of it; the next one's wait, and the next, at once when B was
+ * told meanwhile or a pull waits.
  */
 static void
 beam_end(struct sh_beam *b)
@@ -703,6 +796,7 @@ beam_end(struct sh_beam *b)
 	FILE *f;
 	int rc;
 
+	pulls(b);
 	f = sh_memstream(&buf, &len);
 	sh_err_init(&e, f, "");
 	rc = env->be_done(env->be_darg, &e);
@@ -710,7 +804,7 @@ beam_end(struct sh_beam *b)
 	if (rc != 0) {
 		buf[strcspn(buf, "\n")] = '\0';
 		why = join("prune: ", buf, "");
-		fail(b, "", why);
+		fail(b, "prune", why);
 		free(why);
 	}
 	free(buf);
@@ -878,6 +972,28 @@ sh_beam_converge(struct sh_beam *b)
 }
 
 void
+sh_beam_pull(struct sh_beam *b, const char *snap,
+    void (*done)(void *arg, const char *copy, const char *why), void *arg)
+{
+	struct bpull *p = sh_calloc(1, sizeof (*p));
+	struct kevent ev;
+
+	p->bp_snap = sh_strdup(snap);
+	p->bp_done = done;
+	p->bp_arg = arg;
+	p->bp_next = b->b_pulls;
+	b->b_pulls = p;
+	/* from the loop, so that DONE is never told inside this call */
+	if (b->b_busy) {
+		b->b_again = 1;
+	} else {
+		EV_SET(&ev, (uintptr_t)b, EVFILT_TIMER, EV_ADD | EV_ONESHOT, 0,
+		    1, b);
+		(void) kevent(b->b_env->be_kq, &ev, 1, NULL, 0, NULL);
+	}
+}
+
+void
 sh_beam_timer(struct sh_beam *b)
 {
 	/* one under way sets the timer again at its end */
@@ -904,9 +1020,16 @@ sh_beam_stop(struct sh_beam *b)
 {
 	struct kevent ev;
 
+	struct bpull *p;
+
 	if (b->b_busy)
 		sh_job_stop(&b->b_job);
 	pass_free(b);
+	while ((p = b->b_pulls) != NULL) {
+		b->b_pulls = p->bp_next;
+		free(p->bp_snap);
+		free(p);
+	}
 	EV_SET(&ev, (uintptr_t)b, EVFILT_TIMER, EV_DELETE, 0, 0, NULL);
 	(void) kevent(b->b_env->be_kq, &ev, 1, NULL, 0, NULL);
 	fails_free(&b->b_now);
