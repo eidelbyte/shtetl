@@ -697,7 +697,8 @@
     ],
     "provides": "A container stopped and started: its jail made and removed from the block the host writes from its active version's create or update snapshot.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-11-05: built. sh_jail_write (main's block, ruled 2026-10-14, then jailconf), sh_jail_start (jail -f F -cm H) and sh_jail_stop (-r); a start reads house.conf from the active version's create or update snapshot through the dataset holding var/db/shtetl; create starts the jail last (a failed start fails the create); the actor's start starts every house; a name of digits only refused. Beyond the plan: -cm, not -c (a start after a crash or a daemon restart is a first start); the holding dataset by mount paths; the actor owns its job and log; the daemon's stop stops no jail (Q-J1 asked). check_jail N1-N6, check_house N7-N13/N18, check_daemon N7/N15/N16; zfake_files; mutants caught. Owed: run.sh (check_house, check_jail, check_daemon on FreeBSD), m5-box (N14, N17). Worklog issue-docs/m5-jail.md."
   },
   "m5-save-pkg": {
     "description": "A house's own snapshots (plan 7.1): `shtetl save H` snapshots -r the active version, kind save; `shtetl pkg H` runs pkg -j upgrade in the running jail and snapshots it, kind pkg. Each told to the beam. Verify: make check; m5-box.",
@@ -807,7 +808,8 @@
     ],
     "provides": "A real jail rolled across two foundation versions on the box, with a conflict stalled, a freeze, and the roll timed.",
     "estimated_size": "medium",
-    "completed": "not-started"
+    "completed": "not-started",
+    "note": "2026-11-05 (m5-jail): also N14 (jail -cm on a running jail: it runs on, nothing run again) and N17 (a real jail from the block: devfs at path/dev, jexec H and pkg -j H reach it, jail -r takes devfs away)."
   },
   "m6-boot-envs": {
     "description": "Systems (plan 7.3, probe P3): a system's versions under run/systems, the root mountpoint=/, root and children canmount=noauto; create as for a container with the system's own commands chrooted before its first boot; the swap is zpool set bootfs; the active version is the one bootfs names. Skeleton row run/systems. Needs P3's VM result first. Verify: make check; m6-vm.",

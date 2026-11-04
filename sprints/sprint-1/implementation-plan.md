@@ -372,6 +372,16 @@ run 2, P2.5). ZFS mounts a second dataset over the same path without a
 word (P2.7), so keeping one version mounted is shtetl's to do: the
 swap unmounts the old one first.
 
+As built (m5-jail): the block holds what main's did (ruled 2026-10-14
+on main) and then the house's jailconf; the shaken recipe is read
+through the snapshot of the dataset that holds var/db/shtetl, the one
+mounted nearest above it, since a foundation's var is often a dataset
+of its own. Start is jail -cm, not -c: it makes the jail, and leaves
+one that runs already as it is, so a start after a crash, or after a
+restart of the daemon, is a first start. A create starts the jail
+last, and the daemon's start starts every container; the daemon's
+stop stops none, until Q-J1 is ruled.
+
 Systems (PROPOSAL, probes P3, P4). A system's versions are boot
 environments under zrun/systems: each version's root has
 `mountpoint=/`, and its root and children `canmount=noauto`, so that

@@ -555,8 +555,11 @@ and not the container itself (section 7).
 
 ### jailconf
 
-Text: the jail's options. shtetl writes the jail's block in jail.conf
-itself, `X { ... }`, with these inside it:
+Text: the jail's options. shtetl writes the jail's block itself,
+`X { ... }`, whole to `/etc/jail.conf.d/X.conf` each time the
+container starts: its path, its hostname X, rc's start and stop,
+`exec.clean`, `mount.devfs` with `devfs_ruleset = 4` and the host's
+network inherited, then these, each line a tab in:
 
     jailconf = <<EOD
     allow.raw_sockets;
@@ -564,7 +567,9 @@ itself, `X { ... }`, with these inside it:
     EOD
 
 An option given twice, in two files, is jail(8)'s to settle, not
-shtetl's.
+shtetl's. The block is written from the recipe as the container's
+version was made, so a change to `jailconf` reaches a container at
+its next roll.
 
 ### Every key at once
 
