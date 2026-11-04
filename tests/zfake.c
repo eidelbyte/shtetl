@@ -12,11 +12,14 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
+#include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "core/err.h"
 #include "core/zfs.h"
@@ -69,6 +72,7 @@ static struct zf_state {
 	uint64_t	zs_guids;	/* the guids given */
 } *zf;
 static struct sh_zfs zf_handle;
+static int zf_files;		/* zfake_files */
 
 static void
 zf_die(const char *what, const char *arg)
@@ -429,8 +433,13 @@ zf_remount(const char *ds)
 		if (mp[0] == '/' && (d->zo_at[0] != '\0' || cm == NULL ||
 		    strcmp(cm, "on") == 0) && (cm == NULL ||
 		    strcmp(cm, "off") != 0)) {
-			(void) snprintf(d->zo_at, ZF_NAME, "%s", mp);
 			zf_mkdirs(mp);
+			/* its files with it, unless they moved with a parent */
+			if (zf_files && d->zo_at[0] != '\0' &&
+			    strcmp(d->zo_at, mp) != 0 &&
+			    access(d->zo_at, F_OK) == 0)
+				(void) rename(d->zo_at, mp);
+			(void) snprintf(d->zo_at, ZF_NAME, "%s", mp);
 		} else {
 			d->zo_at[0] = '\0';
 		}
@@ -584,10 +593,79 @@ zf_why(const char *const *names, size_t i, int asked)
 	return (NULL);
 }
 
+void
+zfake_files(void)
+{
+	zf_files = 1;
+}
+
+/* Whether a filesystem of the fake is mounted at PATH. */
+static int
+zf_mount_at(const char *path)
+{
+	int i;
+
+	for (i = 0; i < zf->zs_n; i++) {
+		if (strcmp(zf->zs_ds[i].zo_at, path) == 0)
+			return (1);
+	}
+	return (0);
+}
+
+/*
+ * The files of the directory SRC copied into DST, as a snapshot of the
+ * filesystem mounted at SRC shows them: not .zfs, and not what another
+ * filesystem mounted inside holds.
+ */
+static void
+zf_copy(const char *src, const char *dst)
+{
+	char s[1024], d[1024], buf[8192];
+	struct dirent *de;
+	struct stat st;
+	ssize_t n;
+	DIR *dir;
+	int in, out;
+
+	if ((dir = opendir(src)) == NULL)
+		return;
+	(void) mkdir(dst, 0755);
+	while ((de = readdir(dir)) != NULL) {
+		if (strcmp(de->d_name, ".") == 0 ||
+		    strcmp(de->d_name, "..") == 0 ||
+		    strcmp(de->d_name, ".zfs") == 0)
+			continue;
+		(void) snprintf(s, sizeof (s), "%s/%s", src, de->d_name);
+		(void) snprintf(d, sizeof (d), "%s/%s", dst, de->d_name);
+		if (lstat(s, &st) != 0)
+			continue;
+		if (S_ISDIR(st.st_mode) && !zf_mount_at(s)) {
+			zf_copy(s, d);
+		} else if (S_ISLNK(st.st_mode)) {
+			if ((n = readlink(s, buf, sizeof (buf) - 1)) >= 0) {
+				buf[n] = '\0';
+				(void) symlink(buf, d);
+			}
+		} else if (S_ISREG(st.st_mode)) {
+			if ((in = open(s, O_RDONLY)) < 0)
+				continue;
+			if ((out = open(d, O_WRONLY | O_CREAT | O_TRUNC,
+			    st.st_mode & 07777)) >= 0) {
+				while ((n = read(in, buf, sizeof (buf))) > 0)
+					(void) write(out, buf, (size_t)n);
+				(void) close(out);
+			}
+			(void) close(in);
+		}
+	}
+	(void) closedir(dir);
+}
+
 int
 sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
     const struct sh_zprop *props, size_t nprops, struct sh_err *e)
 {
+	char view[1024];
 	struct zf_obj *s;
 	char ds[ZF_NAME];
 	const char *why;
@@ -621,6 +699,13 @@ sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
 		s->zo_txg = ++zf->zs_txg;
 		for (k = 0; k < nprops; k++)
 			zf_put(s, props[k].zp_name, props[k].zp_value);
+		if (zf_files && zf_fs(ds)->zo_at[0] != '\0') {
+			(void) snprintf(view, sizeof (view),
+			    "%s/.zfs/snapshot/%s", zf_fs(ds)->zo_at,
+			    names[i] + strlen(ds) + 1);
+			zf_mkdirs(view);
+			zf_copy(zf_fs(ds)->zo_at, view);
+		}
 	}
 	return (0);
 }

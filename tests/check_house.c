@@ -1,10 +1,13 @@
 /*
- * Family H of tests/MATRIX.md: a house made (src/core/house.h) over the
- * fake ZFS, its chroot's programs tests/bin's, which log their words.
- * The beam's pull is the test's to deliver, as the beam would: the
- * copy made whole and arrived, then the asker told. The fake keeps no
- * files in a clone, so the foundation.conf a version holds is laid
- * where the version mounts at its own path, as a clone would show it.
+ * Families H and N of tests/MATRIX.md: a house made and its jail
+ * started (src/core/house.h) over the fake ZFS, the chroot's programs
+ * and jail(8) tests/bin's, which log their words. The beam's pull is
+ * the test's to deliver, as the beam would: the copy made whole and
+ * arrived, then the asker told. The fake keeps no files in a clone, so
+ * the foundation.conf a version holds is laid where the version mounts
+ * at its own path, as a clone would show it; it keeps a mounted
+ * filesystem's files for a snapshot's view and a move (zfake_files),
+ * which the start reads house.conf through.
  */
 
 #include <sys/types.h>
@@ -35,6 +38,7 @@ static struct sh_houseenv env;
 static struct sh_house **hs;
 static size_t nh;
 static char config[1024], conts[1024], logdir[1024], resolv[1024];
+static char jails[1024];
 
 /* The pull asked, for the test to deliver. */
 static struct {
@@ -196,13 +200,57 @@ status(void)
 	return (buf != NULL ? buf : "");
 }
 
-/* Every create run to its end: the houses' status. */
+/* Every create and start run to its end: the houses' status. */
 static const char *
 settle(void)
 {
-	while (strstr(status(), " creating ") != NULL)
+	while (strstr(status(), " creating ") != NULL ||
+	    strstr(status(), " starting ") != NULL)
 		CHECK(one(20000));
 	return (status());
+}
+
+/* The name after the @ of DS's one snapshot, into SNAP. */
+static void
+only_snap(const char *ds, char *snap, size_t len)
+{
+	struct names s;
+
+	s.n = 0;
+	CHECK(sh_zfs_snapshots(z, ds, name_add, &s, &c.c_err) == 0 &&
+	    s.n == 1);
+	(void) snprintf(snap, len, "%s", s.v[0]);
+	names_free(&s);
+}
+
+/* The houses started again from ZFS, as the daemon's start does. */
+static void
+restart(void)
+{
+	sh_houses_free(hs, nh);
+	cap_reset(&c);
+	CHECK(sh_houses_start(&env, &hs, &nh, &c.c_err) == 0);
+}
+
+/* The jail's block of the house H, whole; NULL if none. */
+static const char *
+block(const char *h)
+{
+	char rel[300];
+
+	(void) snprintf(rel, sizeof (rel), "jails/%s.conf", h);
+	return (slurp(rel));
+}
+
+/* A file under the scratch containers, laid anew with TEXT. */
+static void
+relay(const char *rel, const char *text)
+{
+	char path[1024];
+
+	(void) snprintf(path, sizeof (path), "containers/%s", rel);
+	(void) unlink(scratch_path(path));
+	(void) scratch_write(path, text);
 }
 
 static int
@@ -283,8 +331,9 @@ lay(const char *vn)
 
 /*
  * The lake and the run, their skeleton, the run's containers below the
- * scratch directory; g on the lake at V, its usr a placeholder; the
- * houses none; the fake programs' log anew.
+ * scratch directory, emptied with the jails' blocks; g on the lake at
+ * V, its usr a placeholder, its var a dataset of its own, which holds
+ * var/db/shtetl (N8); the houses none; the fake programs' log anew.
  */
 static void
 fresh(void)
@@ -293,10 +342,13 @@ fresh(void)
 	static const struct sh_zprop run = { "shtetl:space", "run" };
 	static const struct sh_zprop off = { "canmount", "off" };
 	struct sh_spaces sp;
+	char cmd[2200];
 
 	sh_houses_free(hs, nh);
 	hs = NULL;
 	nh = 0;
+	(void) snprintf(cmd, sizeof (cmd), "rm -rf '%s' '%s'", conts, jails);
+	CHECK(system(cmd) == 0 && mkdir(jails, 0755) == 0);
 	zfake_reset();
 	zfake_pool("tank");
 	zfake_pool("fast");
@@ -311,6 +363,7 @@ fresh(void)
 	CHECK(sh_zfs_create(z, LF "/g", NULL, 0, &c.c_err) == 0);
 	CHECK(sh_zfs_create(z, LF "/g/usr", &off, 1, &c.c_err) == 0);
 	CHECK(sh_zfs_create(z, LF "/g/usr/local", NULL, 0, &c.c_err) == 0);
+	CHECK(sh_zfs_create(z, LF "/g/var", NULL, 0, &c.c_err) == 0);
 	take(LF "/g", V, "create");
 	(void) unlink(scratch_path("fake.log"));
 	memset(&pull, 0, sizeof (pull));
@@ -327,7 +380,7 @@ create(const char *name)
 int
 main(void)
 {
-	char path[1024], cwd[1024];
+	char path[1024], cwd[1024], want[2048], snap[128];
 	const char *text;
 	struct stat st;
 
@@ -341,24 +394,30 @@ main(void)
 	(void) scratch_write("config/containers/web.conf",
 	    "ver = \"<16\";\npkg = [ \"nginx\" ];\n"
 	    "datasets { www { compression = \"lz4\"; } }\n"
-	    "commands { site = \"echo web\"; }\n");
+	    "commands { site = \"echo web\"; }\n"
+	    "jailconf = \"allow.raw_sockets;\";\n");
+	(void) scratch_write("config/containers/app.conf",
+	    "pkg = [ \"x\" ];\n");
 	(void) scratch_write("config/containers/old.conf", "ver = \"<15\";\n");
 	(void) scratch_write("resolv.conf", "nameserver 127.0.0.1\n");
 	(void) snprintf(config, sizeof (config), "%s", scratch_path("config"));
 	(void) snprintf(conts, sizeof (conts), "%s",
 	    scratch_path("containers"));
+	(void) snprintf(jails, sizeof (jails), "%s", scratch_path("jails"));
 	CHECK(mkdir(scratch_path("logs"), 0755) == 0);
 	CHECK((env.he_kq = kqueue()) >= 0);
 	env.he_z = z;
-	env.he_lake = LAKE;
 	env.he_run = RUN;
 	(void) snprintf(resolv, sizeof (resolv), "%s",
 	    scratch_path("resolv.conf"));
 	(void) snprintf(logdir, sizeof (logdir), "%s", scratch_path("logs"));
 	env.he_resolv = resolv;
 	env.he_logdir = logdir;
+	env.he_jails = jails;
 	env.he_err = &sys.c_err;
 	env.he_pull = asked;
+	/* N18: the snapshot's view the start reads house.conf through */
+	zfake_files();
 
 	/*
 	 * H2, H1, H5 - H7, H15: web made on g, the run holding none of
@@ -392,12 +451,10 @@ main(void)
 	CHECK(strstr(text, "echo web") != NULL &&
 	    strstr(text, "echo base") == NULL);
 	/* H7: house.conf in the version, the shaken house recipe, 0444 */
-	(void) snprintf(path, sizeof (path), "containers/%s/var/db/shtetl/"
-	    "house.conf", VWEB);
-	CHECK(stat(scratch_path(path), &st) == 0 &&
-	    (st.st_mode & 0777) == 0444);
-	CHECK((text = slurp(path)) != NULL &&
-	    strstr(text, "nginx") != NULL);
+	CHECK(stat(scratch_path("containers/web/var/db/shtetl/house.conf"),
+	    &st) == 0 && (st.st_mode & 0777) == 0444);
+	CHECK((text = slurp("containers/web/var/db/shtetl/house.conf")) !=
+	    NULL && strstr(text, "nginx") != NULL);
 	/* H1: the create snapshot on every dataset, kind create */
 	{
 		struct names t, s;
@@ -412,32 +469,74 @@ main(void)
 			(void) snprintf(path, sizeof (path), "%s@%s", t.v[i],
 			    s.v[0]);
 			kinds += is(user(path, "shtetl:kind"), "create");
+			(void) snprintf(snap, sizeof (snap), "%s", s.v[0]);
 			names_free(&s);
 		}
-		CHECK(kinds == (int)t.n && t.n == 4);
+		CHECK(kinds == (int)t.n && t.n == 5);
 		names_free(&t);
 	}
 	/* placed: mounted at <containers>/web, its children below */
 	CHECK(is(where(RC "/" VWEB), "/web") &&
 	    is(where(RC "/" VWEB "/usr/local"), "/web/usr/local") &&
 	    is(where(RC "/" VWEB "/usr"), ""));
+	/*
+	 * N10, N1, N8: the block written after the place, its path the
+	 * version's mount, the recipe's jailconf in it, read through the
+	 * create snapshot of var, which holds var/db/shtetl, the root's
+	 * holding none of it; jail -cm the last step
+	 */
+	(void) snprintf(want, sizeof (want), "\tpath = \"%s/web\";\n", conts);
+	CHECK((text = block("web")) != NULL && strstr(text, want) != NULL &&
+	    strstr(text, "\tallow.raw_sockets;\n}\n") != NULL);
+	(void) snprintf(want, sizeof (want), "jail -f %s/web.conf -cm web\n",
+	    jails);
+	CHECK((text = slurp("fake.log")) != NULL &&
+	    strlen(text) > strlen(want) &&
+	    strcmp(text + strlen(text) - strlen(want), want) == 0);
+	(void) snprintf(path, sizeof (path), "containers/web/.zfs/snapshot/"
+	    "%s/var/db", snap);
+	CHECK(stat(scratch_path(path), &st) != 0);
+	(void) snprintf(path, sizeof (path), "containers/web/var/.zfs/"
+	    "snapshot/%s/db/shtetl/house.conf", snap);
+	CHECK(stat(scratch_path(path), &st) == 0);
 
 	/* H10: web a house already; a recipe not there */
 	CHECK(create("web") == -1 && is(cap_text(&c), "web: exists\n"));
 	CHECK(create("nope") == -1 && strstr(cap_text(&c), "nope") != NULL &&
 	    nh == 1);
 
-	/* H12: started again: web active, mounted; unmounted, mounted */
-	sh_houses_free(hs, nh);
-	CHECK(sh_houses_start(z, RUN, &hs, &nh, &c.c_err) == 0 && nh == 1 &&
-	    is(status(), "house web active " VWEB "\n"));
+	/*
+	 * H12, N12, N7: started again: web active, mounted, starting until
+	 * its jail is; the block from the create snapshot, not the live
+	 * tree, whose house.conf's directory was renamed and another
+	 * planted in its place
+	 */
+	(void) snprintf(path, sizeof (path), "%s",
+	    scratch_path("containers/web/var/db/shtetl"));
+	(void) snprintf(want, sizeof (want), "%s.old", path);
+	CHECK(rename(path, want) == 0);
+	relay("web/var/db/shtetl/house.conf",
+	    "jailconf { x = \"allow.mount;\"; }\n");
+	(void) unlink(scratch_path("fake.log"));
+	restart();
+	CHECK(nh == 1 && is(status(), "house web starting jail\n"));
+	CHECK(is(settle(), "house web active " VWEB "\n") &&
+	    is(cap_text(&sys), ""));
+	CHECK((text = block("web")) != NULL &&
+	    strstr(text, "\tallow.raw_sockets;\n") != NULL &&
+	    strstr(text, "allow.mount") == NULL);
+	(void) snprintf(want, sizeof (want), "jail -f %s/web.conf -cm web\n",
+	    jails);
+	CHECK(is(slurp("fake.log"), want));
+	/* H12: unmounted, mounted again at the start */
 	CHECK(sh_zfs_unmount(z, RC "/" VWEB "/usr/local", &c.c_err) == 0 &&
 	    sh_zfs_unmount(z, RC "/" VWEB "/www", &c.c_err) == 0 &&
+	    sh_zfs_unmount(z, RC "/" VWEB "/var", &c.c_err) == 0 &&
 	    sh_zfs_unmount(z, RC "/" VWEB, &c.c_err) == 0);
-	sh_houses_free(hs, nh);
-	CHECK(sh_houses_start(z, RUN, &hs, &nh, &c.c_err) == 0 && nh == 1 &&
-	    is(where(RC "/" VWEB), "/web") &&
+	restart();
+	CHECK(nh == 1 && is(where(RC "/" VWEB), "/web") &&
 	    is(where(RC "/" VWEB "/www"), "/web/www"));
+	CHECK(is(settle(), "house web active " VWEB "\n"));
 
 	/*
 	 * H13: an incomplete version, a create a crash cut short:
@@ -447,10 +546,55 @@ main(void)
 	    &c.c_err) == 0 &&
 	    sh_zfs_set(z, RC "/cut-web", "shtetl:house", "web",
 	    &c.c_err) == 0);
-	sh_houses_free(hs, nh);
-	CHECK(sh_houses_start(z, RUN, &hs, &nh, &c.c_err) == 0 && nh == 1 &&
-	    !there(RC "/cut-web") &&
-	    is(status(), "house web active " VWEB "\n"));
+	restart();
+	CHECK(nh == 1 && !there(RC "/cut-web") &&
+	    is(settle(), "house web active " VWEB "\n"));
+
+	/*
+	 * N13, N9: two houses started again, web's house.conf gone from
+	 * its create snapshot: web's start refused, said, and in its log;
+	 * web active still, and app's jail started
+	 */
+	fresh();
+	CHECK(create("web") == 0);
+	lay(VWEB);
+	deliver(NULL);
+	CHECK(is(settle(), "house web active " VWEB "\n"));
+	CHECK(create("app") == 0);
+	lay("15.1-releng-T-app");
+	deliver(NULL);
+	CHECK(is(settle(), "house app active 15.1-releng-T-app\n"
+	    "house web active " VWEB "\n"));
+	only_snap(RC "/" VWEB "/var", snap, sizeof (snap));
+	(void) snprintf(path, sizeof (path), "containers/web/var/.zfs/"
+	    "snapshot/%s/db/shtetl/house.conf", snap);
+	CHECK(unlink(scratch_path(path)) == 0);
+	(void) unlink(scratch_path("fake.log"));
+	cap_reset(&sys);
+	restart();
+	CHECK(is(settle(), "house app active 15.1-releng-T-app\n"
+	    "house web active " VWEB "\n"));
+	CHECK(strncmp(cap_text(&sys), "house web: block: ", 18) == 0 &&
+	    strstr(cap_text(&sys), "house.conf") != NULL);
+	(void) snprintf(want, sizeof (want), "jail -f %s/app.conf -cm app\n",
+	    jails);
+	CHECK(is(slurp("fake.log"), want));
+	CHECK((text = slurp("logs/web.log")) != NULL &&
+	    strstr(text, "# failed: block: ") != NULL);
+
+	/*
+	 * N11: a create whose jail does not start: said; the version and
+	 * the block it wrote destroyed, the house gone
+	 */
+	fresh();
+	CHECK(setenv("FAKE_FAIL", "jail", 1) == 0);
+	CHECK(create("web") == 0);
+	lay(VWEB);
+	deliver(NULL);
+	CHECK(is(settle(), "") && nh == 0 && !there(RC "/" VWEB));
+	CHECK(is(cap_text(&sys), "house web: jail: exited 1\n") &&
+	    block("web") == NULL);
+	CHECK(unsetenv("FAKE_FAIL") == 0);
 
 	/* H11: a second create of a house being made */
 	fresh();
@@ -484,7 +628,8 @@ main(void)
 	lay(VWEB);
 	deliver(NULL);
 	CHECK(is(settle(), "") && nh == 0 && !there(RC "/" VWEB));
-	CHECK(strstr(cap_text(&sys), "house web: pkg: ") != NULL);
+	CHECK(strstr(cap_text(&sys), "house web: pkg: ") != NULL &&
+	    block("web") == NULL);
 	CHECK(unsetenv("FAKE_FAIL") == 0);
 	fresh();
 	CHECK(create("web") == 0);

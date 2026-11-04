@@ -48,7 +48,7 @@ main(int argc, char **argv)
 	sh_err_init(&e, log, "");
 	if (sh_daemon_listen(SH_PIDFILE, SH_SOCKET, &lk, &sk, &e) != 0 ||
 	    sh_zfs_open(&z, &e) != 0 ||
-	    sh_daemon_run(sk, SH_SOCKET, z, SH_LOGDIR, &e) != 0)
+	    sh_daemon_run(sk, SH_SOCKET, z, SH_LOGDIR, SH_JAILDIR, &e) != 0)
 		return (1);
 	return (0);
 }

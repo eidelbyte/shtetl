@@ -34,7 +34,7 @@ static const char usage[] =
 
 static struct sh_zfs *z;
 static struct cap c;
-static char lockp[1024], sockp[1024], logp[1024];
+static char lockp[1024], sockp[1024], logp[1024], jailp[1024];
 static pid_t pid;
 
 /* What the last command wrote. */
@@ -62,7 +62,7 @@ up(void)
 	CHECK((pid = fork()) >= 0);
 	if (pid == 0) {
 		sh_err_init(&e, stderr, "daemon: ");
-		_exit(sh_daemon_run(sk, sockp, z, logp, &e) != 0);
+		_exit(sh_daemon_run(sk, sockp, z, logp, jailp, &e) != 0);
 	}
 	(void) close(sk);
 	(void) close(lk);
@@ -106,7 +106,30 @@ status(void)
 	return (sht(1, argv));
 }
 
-/* Status, once the beam's convergence under way is over: in 10 s. */
+/* The file PATH whole, until the next call; NULL if none. */
+static const char *
+slurp(const char *path)
+{
+	static char *text;
+	size_t n = 0;
+	FILE *in;
+
+	free(text);
+	text = NULL;
+	if ((in = fopen(path, "r")) == NULL)
+		return (NULL);
+	if (getdelim(&text, &n, '\0', in) < 0) {
+		free(text);
+		text = NULL;
+	}
+	(void) fclose(in);
+	return (text);
+}
+
+/*
+ * Status, once the beam's convergence and the houses' starts under way
+ * are over: in 10 s.
+ */
 static int
 settled(void)
 {
@@ -114,7 +137,8 @@ settled(void)
 
 	for (i = 0; i < 100; i++) {
 		if ((r = status()) != 0 ||
-		    strstr(obuf, "beam converging") == NULL)
+		    (strstr(obuf, "beam converging") == NULL &&
+		    strstr(obuf, " starting ") == NULL))
 			break;
 		(void) usleep(100000);
 	}
@@ -156,6 +180,7 @@ main(void)
 	    "space config tank/config\n"
 	    "space run fast/run\n"
 	    "foundation generic idle v1\n"
+	    "house db active v2-db\n"
 	    "house web active v1-web\n"
 	    "beam converged\n";
 	static const char *const v0[] = { "tank/lake/foundations/generic@v0" };
@@ -188,11 +213,17 @@ main(void)
 	static const struct sh_zprop house[] = {
 		{ "shtetl:house", "web" }, { "canmount", "noauto" }
 	};
+	static const struct sh_zprop dbhouse[] = {
+		{ "shtetl:house", "db" }, { "canmount", "noauto" }
+	};
 	static const struct sh_zprop created = { "shtetl:kind", "create" };
+	static const struct sh_zprop updated = { "shtetl:kind", "update" };
 	static const char *const made[] = { "fast/run/containers/v1-web@c" };
+	static const char *const rolled[] = { "fast/run/containers/v2-db@u" };
 	struct sh_zprop conts = { "mountpoint", NULL };
 	char *big;
-	char buf[64], wantpid[32], zconfig[1024];
+	char buf[64], wantpid[32], zconfig[1024], path[2048], cwd[1024];
+	char other[1024];
 	size_t len;
 	int fd, lk, sk, kind, got;
 
@@ -201,6 +232,13 @@ main(void)
 	(void) snprintf(lockp, sizeof (lockp), "%s", scratch_path("pid"));
 	(void) snprintf(sockp, sizeof (sockp), "%s", scratch_path("sock"));
 	(void) snprintf(logp, sizeof (logp), "%s", scratch_path("logs"));
+	(void) snprintf(jailp, sizeof (jailp), "%s", scratch_path("jails"));
+	CHECK(mkdir(jailp, 0755) == 0);
+	/* jail(8) the fake's, which logs its words, never the host's */
+	(void) snprintf(path, sizeof (path), "%s/tests/bin:%s",
+	    getcwd(cwd, sizeof (cwd)), getenv("PATH"));
+	CHECK(setenv("PATH", path, 1) == 0);
+	CHECK(setenv("FAKE_LOG", scratch_path("fake.log"), 1) == 0);
 	/* zconfig, the files show reads, where the fake mounts it */
 	(void) scratch_write("zconfig/shtetl.conf", "run { keep = 3; }\n");
 	(void) scratch_write("zconfig/containers/web.conf",
@@ -225,8 +263,10 @@ main(void)
 	CHECK(sh_zfs_snapshot(z, v0, 1, NULL, 0, &c.c_err) == 0);
 	CHECK(sh_zfs_snapshot(z, v1, 1, NULL, 0, &c.c_err) == 0);
 	/*
-	 * H16: a house with a complete version, the run's containers below
-	 * the scratch directory: started with the daemon, active, placed
+	 * H16, N15: a house with a complete version, the run's containers
+	 * below the scratch directory: started with the daemon, active,
+	 * placed, its jail started; its create snapshot's house.conf laid
+	 * where the fake keeps none, var/db/shtetl in its root
 	 */
 	conts.zp_value = scratch_path("containers");
 	CHECK(sh_zfs_create(z, "fast/run/containers", &conts, 1,
@@ -234,6 +274,20 @@ main(void)
 	CHECK(sh_zfs_create(z, "fast/run/containers/v1-web", house, 2,
 	    &c.c_err) == 0);
 	CHECK(sh_zfs_snapshot(z, made, 1, &created, 1, &c.c_err) == 0);
+	(void) scratch_write("containers/web/.zfs/snapshot/c/var/db/shtetl/"
+	    "house.conf", "pkg { nginx = true; }\n");
+	/*
+	 * N7: a house whose version holds an update snapshot: the block
+	 * from it, not from the live tree's house.conf
+	 */
+	CHECK(sh_zfs_create(z, "fast/run/containers/v2-db", dbhouse, 2,
+	    &c.c_err) == 0);
+	CHECK(sh_zfs_snapshot(z, rolled, 1, &updated, 1, &c.c_err) == 0);
+	(void) scratch_write("containers/db/.zfs/snapshot/u/var/db/shtetl/"
+	    "house.conf", "jailconf { \"containers/db.conf\" = "
+	    "\"allow.sysvipc;\"; }\n");
+	(void) scratch_write("containers/db/var/db/shtetl/house.conf",
+	    "jailconf { x = \"allow.mount;\"; }\n");
 
 	/* D12: a socket's path holding what a dead daemon left */
 	scratch_write("sock", "left\n");
@@ -242,6 +296,24 @@ main(void)
 	/* D1, D25: status, the beam's line last, nothing on standard error */
 	CHECK(settled() == 0);
 	CHECK(strcmp(obuf, want) == 0 && strcmp(ebuf, "") == 0);
+	/*
+	 * N15, N7: both jails started, their blocks in the daemon's place;
+	 * the two children run at once, so in either order
+	 */
+	(void) snprintf(path, sizeof (path), "jail -f %s/db.conf -cm db\n",
+	    jailp);
+	(void) snprintf(other, sizeof (other), "jail -f %s/web.conf -cm web\n",
+	    jailp);
+	CHECK((p = slurp(scratch_path("fake.log"))) != NULL &&
+	    strstr(p, path) != NULL && strstr(p, other) != NULL &&
+	    strlen(p) == strlen(path) + strlen(other));
+	(void) snprintf(path, sizeof (path), "\tpath = \"%s\";\n",
+	    scratch_path("containers/web"));
+	CHECK((p = slurp(scratch_path("jails/web.conf"))) != NULL &&
+	    strstr(p, path) != NULL);
+	CHECK((p = slurp(scratch_path("jails/db.conf"))) != NULL &&
+	    strstr(p, "\tallow.sysvipc;\n}\n") != NULL &&
+	    strstr(p, "allow.mount") == NULL);
 	/* L6, D25: the log directory made at the start, beam.log in it */
 	CHECK(stat(logp, &st) == 0 && S_ISDIR(st.st_mode));
 	CHECK(stat(scratch_path("logs/beam.log"), &st) == 0 &&
@@ -413,6 +485,9 @@ main(void)
 	/* D10: SIGTERM: exit 0, the socket gone */
 	CHECK(down() == 0);
 	CHECK(stat(sockp, &st) != 0);
+	/* N15: and no jail stopped (Q-J1) */
+	CHECK((p = slurp(scratch_path("fake.log"))) != NULL &&
+	    strstr(p, " -r ") == NULL);
 	/* D25: the lake's foundation not beamed: no house on the run */
 	{
 		uint64_t g, t;
@@ -450,7 +525,7 @@ main(void)
 	CHECK(sh_zfs_create(z, "fast/lake", &lake, 1, &c.c_err) == 0);
 	cap_reset(&c);
 	CHECK(sh_daemon_listen(lockp, sockp, &lk, &sk, &c.c_err) == 0);
-	CHECK(sh_daemon_run(sk, sockp, z, logp, &c.c_err) == -1);
+	CHECK(sh_daemon_run(sk, sockp, z, logp, jailp, &c.c_err) == -1);
 	CHECK(cap_has(&c, "two lake roots: fast/lake and tank/lake"));
 	CHECK(stat(sockp, &st) != 0);
 	(void) close(sk);

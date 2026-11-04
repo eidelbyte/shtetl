@@ -1,12 +1,16 @@
 /*
- * The houses: their start from ZFS, and a container's first version
- * made (m5-create). A create is a pull, then, when the beam tells it
- * the foundation's copy holds the version, the version's clones made at
- * once, inside that telling and so before the convergence's prune; then
- * a job: the version mounted at its own path, the house's recipe
- * stacked on the shaken foundation recipe read from the clone, its own
- * datasets, its packages and command pieces, house.conf, the create
- * snapshot, and the version placed at <containers>/<house>.
+ * The houses: their start from ZFS, a container's first version made
+ * (m5-create), and its jail started (m5-jail). A create is a pull,
+ * then, when the beam tells it the foundation's copy holds the version,
+ * the version's clones made at once, inside that telling and so before
+ * the convergence's prune; then a job: the version mounted at its own
+ * path, the house's recipe stacked on the shaken foundation recipe read
+ * from the clone, its own datasets, its packages and command pieces,
+ * house.conf, the create snapshot, the version placed at
+ * <containers>/<house>, and the start. A start is the jail's block
+ * written from the shaken recipe in the active version's create or
+ * update snapshot, then jail -cm; the actor's start runs one for each
+ * house.
  */
 
 #include <sys/types.h>
@@ -17,11 +21,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "core/cascade.h"
 #include "core/commands.h"
 #include "core/err.h"
 #include "core/house.h"
+#include "core/jail.h"
 #include "core/job.h"
 #include "core/mem.h"
 #include "core/shake.h"
@@ -32,24 +38,21 @@
 
 /* A create under way. */
 struct sh_hmake {
-	struct sh_house			*hm_h;
-	struct sh_house			***hm_list;	/* the houses, */
-	size_t				*hm_n;		/* to leave */
-	const struct sh_houseenv	*hm_env;
-	FILE				*hm_log;
-	struct sh_err			hm_lerr;	/* to the log, "# " */
-	struct sh_job			hm_job;
-	int				hm_pulling;
-	char				*hm_fds;	/* the lake's F */
-	char				*hm_newest;	/* its version */
-	char				*hm_config;
-	struct sh_site			hm_site;
-	const char			**hm_repos;
-	char				*hm_root;	/* the version's */
-	char				*hm_head;	/* where it is */
-	struct sh_node			*hm_under;	/* foundation.conf */
-	struct sh_recipe		hm_recipe;
-	struct sh_commands		hm_cm;
+	struct sh_house		*hm_h;
+	struct sh_house		***hm_list;	/* the houses, */
+	size_t			*hm_n;		/* to leave */
+	int			hm_pulling;
+	int			hm_block;	/* the jail's block written */
+	char			*hm_fds;	/* the lake's F */
+	char			*hm_newest;	/* its version */
+	char			*hm_config;
+	struct sh_site		hm_site;
+	const char		**hm_repos;
+	char			*hm_root;	/* the version's */
+	char			*hm_head;	/* where it is */
+	struct sh_node		*hm_under;	/* foundation.conf */
+	struct sh_recipe	hm_recipe;
+	struct sh_commands	hm_cm;
 };
 
 /* Names, as a walk finds them. */
@@ -163,25 +166,31 @@ tree_destroy(struct sh_zfs *z, const char *root, struct sh_err *e)
 	return (r);
 }
 
-/* Whether a snapshot of DS holds shtetl:kind create or update: 1, 0, -1. */
+/*
+ * Whether a snapshot of DS holds shtetl:kind create or update, its name
+ * after the @ into SNAP: 1, 0, -1.
+ */
 static int
-complete(struct sh_zfs *z, const char *ds, struct sh_err *e)
+complete(struct sh_zfs *z, const char *ds, char *snap, size_t len,
+    struct sh_err *e)
 {
 	struct names s = { NULL, 0 };
-	char *snap, kind[16];
+	char *name, kind[16];
 	size_t k;
 	int r, got = 0;
 
 	r = sh_zfs_snapshots(z, ds, name_add, &s, e);
 	for (k = 0; r == 0 && !got && k < s.n_n; k++) {
-		snap = join(ds, "@", s.n_v[k]);
-		if ((r = sh_zfs_user(z, snap, "shtetl:kind", kind,
-		    sizeof (kind), e)) == 1)
+		name = join(ds, "@", s.n_v[k]);
+		if ((r = sh_zfs_user(z, name, "shtetl:kind", kind,
+		    sizeof (kind), e)) == 1) {
 			r = 0;
-		else if (r == 0)
-			got = strcmp(kind, "create") == 0 ||
-			    strcmp(kind, "update") == 0;
-		free(snap);
+		} else if (r == 0 && (strcmp(kind, "create") == 0 ||
+		    strcmp(kind, "update") == 0)) {
+			got = 1;
+			(void) snprintf(snap, len, "%s", s.n_v[k]);
+		}
+		free(name);
 	}
 	names_free(&s);
 	return (r < 0 ? -1 : got);
@@ -216,12 +225,14 @@ house_of(struct sh_house **h, size_t n, const char *name)
 
 /* A house NAME added to *HP in its place by name. */
 static struct sh_house *
-house_add(struct sh_house ***hp, size_t *np, const char *name)
+house_add(struct sh_house ***hp, size_t *np, const char *name,
+    const struct sh_houseenv *env)
 {
 	struct sh_house *h = sh_calloc(1, sizeof (*h));
 	size_t i;
 
 	h->h_name = sh_strdup(name);
+	h->h_env = env;
 	*hp = sh_realloc(*hp, (*np + 1) * sizeof (**hp));
 	for (i = *np; i > 0 && strcmp((*hp)[i - 1]->h_name, name) > 0; i--)
 		(*hp)[i] = (*hp)[i - 1];
@@ -236,6 +247,152 @@ house_free(struct sh_house *h)
 	free(h->h_name);
 	free(h->h_active);
 	free(h);
+}
+
+/* H taken out of *HP, and freed. */
+static void
+house_drop(struct sh_house ***hp, size_t *np, struct sh_house *h)
+{
+	size_t i;
+
+	for (i = 0; (*hp)[i] != h; i++)
+		;
+	(void) memmove(&(*hp)[i], &(*hp)[i + 1],
+	    (*np - i - 1) * sizeof (**hp));
+	(*np)--;
+	house_free(h);
+}
+
+/* H's log, <logdir>/H.log, opened with MODE for an act. */
+static int
+house_log(struct sh_house *h, const char *mode, struct sh_err *e)
+{
+	char path[1024];
+
+	(void) snprintf(path, sizeof (path), "%s/%s.log", h->h_env->he_logdir,
+	    h->h_name);
+	if ((h->h_log = fopen(path, mode)) == NULL) {
+		sh_errf(e, "%s: %s", path, strerror(errno));
+		return (-1);
+	}
+	(void) setvbuf(h->h_log, NULL, _IOLBF, 0);
+	sh_err_init(&h->h_lerr, h->h_log, "# ");
+	return (0);
+}
+
+/* H's act over: its log closed. */
+static void
+act_over(struct sh_house *h)
+{
+	(void) fclose(h->h_log);
+	h->h_log = NULL;
+}
+
+/* Where H's jail's block is: <jails>/H.conf, into BUF. */
+static void
+block_path(const struct sh_house *h, char *buf, size_t len)
+{
+	(void) snprintf(buf, len, "%s/%s.conf", h->h_env->he_jails,
+	    h->h_name);
+}
+
+/*
+ * The jail's block written from the active version's shaken recipe,
+ * read from its create or update snapshot, which nothing in the jail
+ * could have written (plan 5): through the snapshot of the dataset
+ * holding var/db/shtetl, the one mounted nearest above it.
+ */
+static int
+start_block(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	struct sh_house *h = arg;
+	struct sh_zfs *z = h->h_env->he_z;
+	char snap[256], root[1024], at[1024], best[1024], want[1100];
+	char file[1024], *layer;
+	struct sh_node *n;
+	struct names t;
+	size_t i, k, len;
+	int r;
+
+	(void) j;
+	snap[0] = '\0';
+	if (complete(z, h->h_active, snap, sizeof (snap), e) < 0 ||
+	    (r = sh_zfs_mounted(z, h->h_active, root, sizeof (root), e)) < 0)
+		return (-1);
+	if (r == 0) {
+		sh_errf(e, "%s: not mounted", h->h_active);
+		return (-1);
+	}
+	(void) snprintf(want, sizeof (want), "%s/%s", root, SH_SHAKEN_HOUSE);
+	(void) snprintf(best, sizeof (best), "%s", root);
+	len = strlen(root);
+	r = tree(z, h->h_active, &t, e);
+	for (i = 1; r == 0 && i < t.n_n; i++) {
+		if ((r = sh_zfs_mounted(z, t.n_v[i], at, sizeof (at),
+		    e)) == 1 && (k = strlen(at)) > len &&
+		    strncmp(want, at, k) == 0 && want[k] == '/') {
+			(void) snprintf(best, sizeof (best), "%s", at);
+			len = k;
+		}
+		r = r < 0 ? -1 : 0;
+	}
+	names_free(&t);
+	if (r != 0)
+		return (-1);
+	/* the tree's layer, which outlives it */
+	layer = join(h->h_active, "@", snap);
+	r = -1;
+	if ((n = sh_shaken_read(best, snap, want + len + 1, layer,
+	    e)) != NULL) {
+		block_path(h, file, sizeof (file));
+		r = sh_jail_write(file, h->h_name, root,
+		    sh_obj_get(n, "jailconf"), e);
+		if (r == 0 && h->h_make != NULL)
+			h->h_make->hm_block = 1;
+		sh_node_free(n);
+	}
+	free(layer);
+	return (r);
+}
+
+/* A start's steps added to H's job: the block, then jail -cm. */
+static void
+start_steps(struct sh_house *h)
+{
+	char file[1024];
+
+	block_path(h, file, sizeof (file));
+	sh_job_call(&h->h_job, "block", start_block, h);
+	sh_jail_start(&h->h_job, file, h->h_name);
+}
+
+/* The start over: the house active, WHY said where it failed. */
+static void
+start_end(struct sh_job *j, const char *why, void *arg)
+{
+	struct sh_house *h = arg;
+
+	(void) j;
+	h->h_state = SH_H_ACTIVE;
+	if (why != NULL) {
+		sh_errf(h->h_env->he_err, "house %s: %s", h->h_name, why);
+		sh_errf(&h->h_lerr, "failed: %s", why);
+	}
+	act_over(h);
+}
+
+/* H's jail started from its active version, a job of its own. */
+static void
+house_start(struct sh_house *h)
+{
+	const struct sh_houseenv *env = h->h_env;
+
+	if (house_log(h, "a", env->he_err) != 0)
+		return;
+	h->h_state = SH_H_STARTING;
+	sh_job_init(&h->h_job, h->h_log, start_end, h);
+	start_steps(h);
+	sh_job_run(&h->h_job, env->he_kq);
 }
 
 /* What a house's start found of one version. */
@@ -268,10 +425,12 @@ activate(struct sh_zfs *z, const char *run, struct sh_house *h,
 }
 
 int
-sh_houses_start(struct sh_zfs *z, const char *run, struct sh_house ***hp,
+sh_houses_start(const struct sh_houseenv *env, struct sh_house ***hp,
     size_t *np, struct sh_err *e)
 {
-	char *c = join(run, "/containers", ""), house[256], o[1024];
+	char *c = join(env->he_run, "/containers", ""), house[256], o[1024];
+	char snap[256];
+	struct sh_zfs *z = env->he_z;
 	struct names tops = { NULL, 0 };
 	struct hver *v = NULL;
 	struct sh_house *h;
@@ -288,7 +447,8 @@ sh_houses_start(struct sh_zfs *z, const char *run, struct sh_house ***hp,
 			r = 0;
 			continue;
 		}
-		if (r != 0 || (r = complete(z, tops.n_v[i], e)) < 0)
+		if (r != 0 || (r = complete(z, tops.n_v[i], snap,
+		    sizeof (snap), e)) < 0)
 			break;
 		if (r == 0) {
 			/* a create a crash cut short */
@@ -304,7 +464,7 @@ sh_houses_start(struct sh_zfs *z, const char *run, struct sh_house ***hp,
 		v[n].hv_house = sh_strdup(house);
 		v[n++].hv_txg = txg;
 		if ((h = house_of(*hp, *np, house)) == NULL)
-			(void) house_add(hp, np, house);
+			(void) house_add(hp, np, house, env);
 	}
 	for (i = 0; r == 0 && i < *np; i++) {
 		h = (*hp)[i];
@@ -314,7 +474,9 @@ sh_houses_start(struct sh_zfs *z, const char *run, struct sh_house ***hp,
 			    (best < 0 || v[k].hv_txg > v[best].hv_txg))
 				best = (int)k;
 		}
-		r = activate(z, run, h, v[best].hv_root, e);
+		if ((r = activate(z, env->he_run, h, v[best].hv_root,
+		    e)) == 0)
+			house_start(h);
 	}
 	for (k = 0; k < n; k++) {
 		free(v[k].hv_root);
@@ -350,42 +512,41 @@ make_free(struct sh_hmake *m)
 	free(m->hm_head);
 	sh_node_free(m->hm_under);
 	sh_recipe_free(&m->hm_recipe);
-	(void) fclose(m->hm_log);
 	free(m);
 }
 
 /*
- * The create over: the house active, or the version destroyed and the
- * house taken away again, WHY said.
+ * The create over: the house active and its jail started, or the
+ * version and the block it wrote destroyed and the house taken away
+ * again, WHY said.
  */
 static void
 make_end(struct sh_job *j, const char *why, void *arg)
 {
 	struct sh_hmake *m = arg;
-	const struct sh_houseenv *env = m->hm_env;
-	struct sh_house *h = m->hm_h, **v = *m->hm_list;
-	size_t i, n = *m->hm_n;
+	struct sh_house *h = m->hm_h;
+	const struct sh_houseenv *env = h->h_env;
+	char file[1024];
 
 	(void) j;
 	h->h_make = NULL;
 	if (why == NULL) {
-		sh_errf(&m->hm_lerr, "version %s", m->hm_root);
+		sh_errf(&h->h_lerr, "version %s", h->h_active);
 		h->h_state = SH_H_ACTIVE;
-		h->h_active = m->hm_root;
-		m->hm_root = NULL;
+		act_over(h);
 		make_free(m);
 		return;
 	}
 	sh_errf(env->he_err, "house %s: %s", h->h_name, why);
-	sh_errf(&m->hm_lerr, "failed: %s", why);
+	sh_errf(&h->h_lerr, "failed: %s", why);
+	block_path(h, file, sizeof (file));
+	if (m->hm_block && unlink(file) != 0)
+		sh_errf(&h->h_lerr, "%s: %s", file, strerror(errno));
 	if (m->hm_root != NULL &&
-	    tree_destroy(env->he_z, m->hm_root, &m->hm_lerr) != 0)
-		sh_errf(&m->hm_lerr, "not destroyed");
-	for (i = 0; i < n && v[i] != h; i++)
-		;
-	(void) memmove(&v[i], &v[i + 1], (n - i - 1) * sizeof (*v));
-	(*m->hm_n)--;
-	house_free(h);
+	    tree_destroy(env->he_z, m->hm_root, &h->h_lerr) != 0)
+		sh_errf(&h->h_lerr, "not destroyed");
+	act_over(h);
+	house_drop(m->hm_list, m->hm_n, h);
 	make_free(m);
 }
 
@@ -421,7 +582,7 @@ make_datasets(struct sh_job *j, void *arg, struct sh_err *e)
 {
 	static const struct sh_zprop off = { "canmount", "off" };
 	struct sh_hmake *m = arg;
-	struct sh_zfs *z = m->hm_env->he_z;
+	struct sh_zfs *z = m->hm_h->h_env->he_z;
 	const struct sh_node *dss;
 	const struct sh_pair *pr;
 	struct sh_zprop *p;
@@ -475,7 +636,7 @@ make_inject(struct sh_job *j, void *arg, struct sh_err *e)
 	sh_show_recipe(f, &m->hm_recipe);
 	(void) fclose(f);
 	r = sh_shaken_write(m->hm_head, SH_SHAKEN_HOUSE, buf, len,
-	    m->hm_env->he_flags, e);
+	    m->hm_h->h_env->he_flags, e);
 	free(buf);
 	return (r);
 }
@@ -486,7 +647,7 @@ make_snapshot(struct sh_job *j, void *arg, struct sh_err *e)
 {
 	static const struct sh_zprop kind = { "shtetl:kind", "create" };
 	struct sh_hmake *m = arg;
-	struct sh_zfs *z = m->hm_env->he_z;
+	struct sh_zfs *z = m->hm_h->h_env->he_z;
 	struct names t, s = { NULL, 0 };
 	char date[32], name[1100];
 	time_t now = time(NULL);
@@ -511,19 +672,24 @@ make_snapshot(struct sh_job *j, void *arg, struct sh_err *e)
 	return (r);
 }
 
-/* The version placed at <containers>/<house>, moved there mounted. */
+/*
+ * The version placed at <containers>/<house>, moved there mounted: the
+ * house's active version, which its start reads.
+ */
 static int
 make_place(struct sh_job *j, void *arg, struct sh_err *e)
 {
 	struct sh_hmake *m = arg;
-	const struct sh_houseenv *env = m->hm_env;
+	const struct sh_houseenv *env = m->hm_h->h_env;
 	char want[1024];
 
 	(void) j;
 	if (place(env->he_z, env->he_run, m->hm_h->h_name, want,
-	    sizeof (want), e) != 0)
+	    sizeof (want), e) != 0 ||
+	    sh_zfs_set(env->he_z, m->hm_root, "mountpoint", want, e) != 0)
 		return (-1);
-	return (sh_zfs_set(env->he_z, m->hm_root, "mountpoint", want, e));
+	m->hm_h->h_active = sh_strdup(m->hm_root);
+	return (0);
 }
 
 /*
@@ -535,7 +701,7 @@ static int
 make_recipe(struct sh_job *j, void *arg, struct sh_err *e)
 {
 	struct sh_hmake *m = arg;
-	const struct sh_houseenv *env = m->hm_env;
+	const struct sh_houseenv *env = m->hm_h->h_env;
 	const struct sh_node *branch;
 	struct sh_branch b;
 	char target[512];
@@ -570,6 +736,7 @@ make_recipe(struct sh_job *j, void *arg, struct sh_err *e)
 	sh_job_call(j, "house.conf", make_inject, m);
 	sh_job_call(j, "snapshot", make_snapshot, m);
 	sh_job_call(j, "place", make_place, m);
+	start_steps(m->hm_h);
 	return (0);
 }
 
@@ -578,7 +745,7 @@ static int
 make_mount(struct sh_job *j, void *arg, struct sh_err *e)
 {
 	struct sh_hmake *m = arg;
-	struct sh_zfs *z = m->hm_env->he_z;
+	struct sh_zfs *z = m->hm_h->h_env->he_z;
 	char path[1024];
 
 	if (tree_mount(z, m->hm_root, e) != 0 ||
@@ -598,7 +765,7 @@ make_mount(struct sh_job *j, void *arg, struct sh_err *e)
 static int
 make_clone(struct sh_hmake *m, const char *copy, struct sh_err *e)
 {
-	const struct sh_houseenv *env = m->hm_env;
+	const struct sh_houseenv *env = m->hm_h->h_env;
 	struct sh_zfs *z = env->he_z;
 	struct sh_zprop p[2];
 	struct names t;
@@ -655,6 +822,7 @@ static void
 make_pulled(void *arg, const char *copy, const char *why)
 {
 	struct sh_hmake *m = arg;
+	struct sh_house *h = m->hm_h;
 	char *buf = NULL, *w;
 	struct sh_err e;
 	size_t len = 0;
@@ -662,10 +830,10 @@ make_pulled(void *arg, const char *copy, const char *why)
 	int r;
 
 	m->hm_pulling = 0;
-	sh_job_init(&m->hm_job, m->hm_log, make_end, m);
+	sh_job_init(&h->h_job, h->h_log, make_end, m);
 	if (why != NULL) {
 		w = join("pull: ", why, "");
-		make_end(&m->hm_job, w, m);
+		make_end(&h->h_job, w, m);
 		free(w);
 		return;
 	}
@@ -676,14 +844,14 @@ make_pulled(void *arg, const char *copy, const char *why)
 	if (r != 0) {
 		buf[strcspn(buf, "\n")] = '\0';
 		w = join("clone: ", buf, "");
-		make_end(&m->hm_job, w, m);
+		make_end(&h->h_job, w, m);
 		free(w);
 		free(buf);
 		return;
 	}
 	free(buf);
-	sh_job_call(&m->hm_job, "mount", make_mount, m);
-	sh_job_run(&m->hm_job, m->hm_env->he_kq);
+	sh_job_call(&h->h_job, "mount", make_mount, m);
+	sh_job_run(&h->h_job, h->h_env->he_kq);
 }
 
 int
@@ -695,7 +863,6 @@ sh_house_create(struct sh_house ***hp, size_t *np, const char *name,
 	struct sh_hmake *m;
 	struct sh_house *h;
 	char path[1024], *snap;
-	FILE *log;
 	int r;
 
 	if ((h = house_of(*hp, *np, name)) != NULL) {
@@ -713,32 +880,28 @@ sh_house_create(struct sh_house ***hp, size_t *np, const char *name,
 	r = sh_recipe_resolve(config, m->hm_repos, path, NULL, &check, e,
 	    NULL);
 	sh_recipe_free(&check);
-	(void) snprintf(path, sizeof (path), "%s/%s.log", env->he_logdir,
-	    name);
-	if (r != 0 || (log = fopen(path, "w")) == NULL) {
-		if (r == 0)
-			sh_errf(e, "%s: %s", path, strerror(errno));
+	if (r == 0) {
+		h = house_add(hp, np, name, env);
+		if ((r = house_log(h, "w", e)) != 0)
+			house_drop(hp, np, h);
+	}
+	if (r != 0) {
 		free(m->hm_repos);
 		sh_site_free(&m->hm_site);
 		free(m);
 		return (-1);
 	}
-	(void) setvbuf(log, NULL, _IOLBF, 0);
-	m->hm_log = log;
-	sh_err_init(&m->hm_lerr, log, "# ");
-	m->hm_env = env;
 	m->hm_list = hp;
 	m->hm_n = np;
 	m->hm_fds = sh_strdup(fds);
 	m->hm_newest = sh_strdup(newest);
 	m->hm_config = sh_strdup(config);
 	m->hm_pulling = 1;
-	h = house_add(hp, np, name);
 	h->h_state = SH_H_CREATING;
 	h->h_make = m;
 	m->hm_h = h;
 	snap = join(fds, "@", newest);
-	sh_errf(&m->hm_lerr, "pull %s", snap);
+	sh_errf(&h->h_lerr, "pull %s", snap);
 	env->he_pull(env->he_parg, snap, make_pulled, m);
 	free(snap);
 	return (0);
@@ -749,24 +912,27 @@ sh_house_status(const struct sh_house *h, FILE *out)
 {
 	const char *step;
 
-	if (h->h_state == SH_H_CREATING) {
-		step = h->h_make->hm_pulling ? "pull" :
-		    sh_job_step(&h->h_make->hm_job);
-		(void) fprintf(out, "house %s creating %s\n", h->h_name,
-		    step != NULL ? step : "");
+	if (h->h_state == SH_H_ACTIVE) {
+		(void) fprintf(out, "house %s active %s\n", h->h_name,
+		    strrchr(h->h_active, '/') + 1);
 		return;
 	}
-	(void) fprintf(out, "house %s active %s\n", h->h_name,
-	    strrchr(h->h_active, '/') + 1);
+	step = h->h_make != NULL && h->h_make->hm_pulling ? "pull" :
+	    sh_job_step(&h->h_job);
+	(void) fprintf(out, "house %s %s %s\n", h->h_name,
+	    h->h_state == SH_H_CREATING ? "creating" : "starting",
+	    step != NULL ? step : "");
 }
 
 void
 sh_house_stop(struct sh_house *h)
 {
-	if (h->h_make == NULL)
+	if (h->h_state == SH_H_ACTIVE)
 		return;
-	if (!h->h_make->hm_pulling)
-		sh_job_stop(&h->h_make->hm_job);
-	make_free(h->h_make);
+	if (h->h_make == NULL || !h->h_make->hm_pulling)
+		sh_job_stop(&h->h_job);
+	if (h->h_make != NULL)
+		make_free(h->h_make);
 	h->h_make = NULL;
+	act_over(h);
 }

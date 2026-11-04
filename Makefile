@@ -124,7 +124,8 @@ $(BUILD)/wire.o: src/core/wire.c src/core/wire.h src/core/mem.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/wire.c
 $(BUILD)/daemon.o: src/core/daemon.c src/core/daemon.h src/core/beam.h \
 	src/core/builder.h \
-	src/core/err.h src/core/foundation.h src/core/job.h src/core/mem.h \
+	src/core/err.h src/core/foundation.h src/core/house.h src/core/job.h \
+	src/core/mem.h \
 	src/core/prune.h src/core/roll.h src/core/show.h src/core/site.h \
 	src/core/spaces.h src/core/syntax.h \
 	src/core/wire.h src/core/zfs.h
@@ -151,7 +152,8 @@ $(BUILD)/beam.o: src/core/beam.c src/core/beam.h src/core/err.h \
 	src/core/job.h src/core/mem.h src/core/wire.h src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/beam.c
 $(BUILD)/house.o: src/core/house.c src/core/house.h src/core/cascade.h \
-	src/core/commands.h src/core/err.h src/core/job.h src/core/mem.h \
+	src/core/commands.h src/core/err.h src/core/jail.h src/core/job.h \
+	src/core/mem.h \
 	src/core/shake.h src/core/show.h src/core/site.h src/core/syntax.h \
 	src/core/tree.h src/core/zfs.h
 	$(CC) $(CFLAGS) -c -o $@ src/core/house.c

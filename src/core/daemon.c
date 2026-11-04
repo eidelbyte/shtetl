@@ -485,7 +485,7 @@ fail:
 
 int
 sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
-    const char *logdir, struct sh_err *e)
+    const char *logdir, const char *jaildir, struct sh_err *e)
 {
 	struct daemon d;
 	struct kevent ev[3];
@@ -514,10 +514,6 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 		    &d.d_nfound, e) != 0)
 			goto out;
 	}
-	if (d.d_sp.ss_root[SH_SP_RUN] != NULL &&
-	    sh_houses_start(z, d.d_sp.ss_root[SH_SP_RUN], &d.d_houses,
-	    &d.d_nhouses, e) != 0)
-		goto out;
 	if (mkdir(logdir, 0755) != 0 && errno != EEXIST) {
 		sh_errf(e, "%s: %s", logdir, strerror(errno));
 		goto out;
@@ -543,6 +539,21 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 	d.d_env.re_flags = SF_IMMUTABLE;
 	d.d_env.re_made = made;
 	d.d_env.re_marg = &d;
+	if (d.d_sp.ss_root[SH_SP_RUN] != NULL) {
+		d.d_henv.he_z = z;
+		d.d_henv.he_kq = d.d_kq;
+		d.d_henv.he_run = d.d_sp.ss_root[SH_SP_RUN];
+		d.d_henv.he_resolv = "/etc/resolv.conf";
+		d.d_henv.he_logdir = logdir;
+		d.d_henv.he_jails = jaildir;
+		d.d_henv.he_err = e;
+		d.d_henv.he_flags = SF_IMMUTABLE;
+		d.d_henv.he_pull = pull;
+		d.d_henv.he_parg = &d;
+		if (sh_houses_start(&d.d_henv, &d.d_houses, &d.d_nhouses,
+		    e) != 0)
+			goto out;
+	}
 	/* a signal kqueue watches is recorded even while it is ignored */
 	(void) signal(SIGTERM, SIG_IGN);
 	(void) signal(SIGINT, SIG_IGN);
@@ -568,16 +579,6 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 		d.d_benv.be_done = pruned;
 		d.d_benv.be_darg = &d;
 		d.d_beam = sh_beam_start(&d.d_benv);
-		d.d_henv.he_z = z;
-		d.d_henv.he_kq = d.d_kq;
-		d.d_henv.he_lake = d.d_benv.be_lake;
-		d.d_henv.he_run = d.d_benv.be_run;
-		d.d_henv.he_resolv = "/etc/resolv.conf";
-		d.d_henv.he_logdir = logdir;
-		d.d_henv.he_err = e;
-		d.d_henv.he_flags = SF_IMMUTABLE;
-		d.d_henv.he_pull = pull;
-		d.d_henv.he_parg = &d;
 	}
 	/*
 	 * One event at a time: an event that ends a job or a connection
@@ -611,7 +612,10 @@ out:
 	/* what a stopped roll leaves, the next start puts back */
 	for (f = 0; f < d.d_nfound; f++)
 		sh_roll_stop(d.d_found[f]);
-	/* and a stopped create: its version, not complete, destroyed */
+	/*
+	 * and a stopped create: its version, not complete, destroyed; a
+	 * stopped start's jail made or left by -cm; no jail stopped (Q-J1)
+	 */
 	sh_houses_free(d.d_houses, d.d_nhouses);
 	if (d.d_beam != NULL)
 		sh_beam_stop(d.d_beam);
