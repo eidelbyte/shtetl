@@ -306,6 +306,9 @@ test_requires_patches(void)
 	    "is illegal");
 	bad("requires = [ \"a.b\" ];", C, "requires[0]: invalid container "
 	    "name: only letters, digits, - and _ allowed");
+	/* N16 */
+	bad("requires = [ \"123\" ];", C, "requires[0]: invalid container "
+	    "name: digits only");
 	bad("requires { db { x = 1; } }", C, "requires.db: must be true");
 
 	ok("patches = [ \"github.com/eidelbyte/freebsd-patches\", "

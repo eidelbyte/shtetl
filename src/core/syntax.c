@@ -35,6 +35,7 @@ const char *
 sh_syn_name(const char *s)
 {
 	const char *p;
+	int digits = 1;
 
 	if (*s == '\0')
 		return ("empty");
@@ -45,8 +46,10 @@ sh_syn_name(const char *s)
 	for (p = s; *p != '\0'; p++) {
 		if (!syn_alnum(*p) && *p != '-' && *p != '_')
 			return ("only letters, digits, - and _ allowed");
+		digits = digits && syn_digit(*p);
 	}
-	return (NULL);
+	/* jail(8) takes digits for a jail's id (ruled 2026-10-14 on main) */
+	return (digits ? "digits only" : NULL);
 }
 
 /*

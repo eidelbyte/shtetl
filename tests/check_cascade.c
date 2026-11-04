@@ -589,6 +589,9 @@ test_targets(void)
 	refused(root, "containers/web/nginx", "invalid recipe name");
 	refused(root, "containers/", "containers/: invalid recipe name: "
 	    "empty");
+	/* N16: jail(8) would take it for a jail's id */
+	refused(root, "containers/123", "containers/123: invalid recipe "
+	    "name: digits only");
 	refused(root, "containers/nope", "containers/nope.conf: no such "
 	    "file");
 	refused(root, "foundations/x", "foundations/x.conf: no such file");

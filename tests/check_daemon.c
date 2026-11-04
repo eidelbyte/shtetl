@@ -182,6 +182,7 @@ main(void)
 	char *pkgnope[] = { "pkg", "nope" };
 	char *create[] = { "create", "web" };
 	char *createbad[] = { "create", "bad/name", "--on", "generic" };
+	char *create123[] = { "create", "123", "--on", "generic" };
 	char *createnope[] = { "create", "web2", "--on", "nope" };
 	char *createweb[] = { "create", "web", "--on", "generic" };
 	static const struct sh_zprop house[] = {
@@ -400,6 +401,9 @@ main(void)
 	CHECK(sht(4, createbad) == 1 && strncmp(ebuf, "shtetl: bad/name: "
 	    "invalid name: ", sizeof ("shtetl: bad/name: invalid name: ") -
 	    1) == 0);
+	/* N16: a name jail(8) would take for a jail's id */
+	CHECK(sht(4, create123) == 1 &&
+	    strcmp(ebuf, "shtetl: 123: invalid name: digits only\n") == 0);
 	CHECK(sht(4, createnope) == 1 &&
 	    strcmp(ebuf, "shtetl: nope: no such foundation\n") == 0);
 	CHECK(sht(4, createweb) == 1 &&

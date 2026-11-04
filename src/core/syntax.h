@@ -12,7 +12,8 @@
  * A recipe's name (the F of foundations/F.conf, a container, a
  * system), a name in requires, update.suffix: one dataset component
  * that is also a jail name and a file name. Letters, digits, '-' and
- * '_', beginning with a letter or a digit.
+ * '_', beginning with a letter or a digit, and not digits only, which
+ * jail(8) takes for a jail's id.
  */
 const char *sh_syn_name(const char *s);
 

@@ -49,8 +49,10 @@ too): `foundations/generic`, `containers/nginx`, `systems/router`.
 Its directory says its kind; its name, the file's name without
 `.conf`, takes letters, digits, `-` and `_`, and begins with a letter
 or a digit, since it is a dataset's name, a jail's name and a file's
-name at once. Files in other directories are not recipes; a recipe
-names them in `import`, by their path in the root, `.conf` included.
+name at once; a name of digits only is refused, since jail(8) takes
+it for a jail's id. Files in other directories are not recipes; a
+recipe names them in `import`, by their path in the root, `.conf`
+included.
 
 The top holds the site's own recipes. Each recipe repository
 `remotes.recipes` names (section 3) is a directory of zconfig named
