@@ -502,7 +502,9 @@ value of an entry is `true`.
 sh(1) text run once when the recipe is made, after its packages,
 keyed by a label of letters, digits, `-`, `_` and `.`. A piece added
 to the recipe later runs once, at the house's next roll (plan 7.2);
-none runs twice:
+none runs twice. A container's run in a chroot of its new version,
+before its jail ever starts, so they set things up and start
+nothing: the jail's rc starts what rc.conf enables.
 
     commands {
         nginx = <<EOD
@@ -619,7 +621,6 @@ datasets {
 commands {
     nginx = <<EOD
 sysrc nginx_enable=YES
-service nginx start
 EOD
 }
 jailconf = <<EOD
@@ -693,10 +694,7 @@ datasets {
 }
 commands {
     nginx {  # containers/nginx.conf
-        "containers/nginx.conf" = <<EOD
-sysrc nginx_enable=YES
-service nginx start
-EOD
+        "containers/nginx.conf" = "sysrc nginx_enable=YES";
     }
 }
 jailconf {
@@ -1315,8 +1313,8 @@ like a nearer file's would: a package more, a commands label a piece
 of its own, and a one-value key given again overrides the file's with
 a warning. A block holds its kind's keys only, and no `import`.
 
-A container's commands run in its jail when it is made, but not a
-piece its foundation ran (plan 5): shtetl.conf's own commands reach
+A container's commands run in a chroot of it when it is made, but
+not a piece its foundation ran (plan 5): shtetl.conf's own commands reach
 the foundation, which runs them, so the container leaves them out;
 its block's reach no foundation, and run in every container.
 

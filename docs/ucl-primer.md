@@ -64,7 +64,6 @@ Elements are separated by commas; a trailing comma is allowed.
     commands {
         nginx = <<EOD
     sysrc nginx_enable=YES
-    service nginx start
     EOD
     }
 
