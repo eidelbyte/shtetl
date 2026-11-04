@@ -180,6 +180,28 @@ sh_zfs_user(struct sh_zfs *z, const char *name, const char *prop,
 	return (v != NULL ? 0 : 1);
 }
 
+/*
+ * zfs_prop_get gives a mountpoint path with the pool's altroot before
+ * it, always (lib/libzfs/libzfs_dataset.c, ZFS_PROP_MOUNTPOINT), an
+ * altroot of / left out; taken off again here, the path is the
+ * property's own, what sh_zfs_set and sh_zfs_create take.
+ */
+static void
+zz_unroot(zfs_handle_t *zhp, char *val)
+{
+	char root[ZFS_MAXPROPLEN];
+	size_t n;
+
+	if (val[0] != '/' || zpool_get_prop(zfs_get_pool_handle(zhp),
+	    ZPOOL_PROP_ALTROOT, root, sizeof (root), NULL, B_FALSE) != 0 ||
+	    strcmp(root, "-") == 0 || strcmp(root, "/") == 0)
+		return;
+	n = strlen(root);
+	(void) memmove(val, val + n, strlen(val + n) + 1);
+	if (val[0] == '\0')
+		(void) strcpy(val, "/");
+}
+
 int
 sh_zfs_native(struct sh_zfs *z, const char *name, const char *prop,
     char *val, size_t len, struct sh_err *e)
@@ -194,10 +216,13 @@ sh_zfs_native(struct sh_zfs *z, const char *name, const char *prop,
 	}
 	if ((zhp = zz_open(z, name, e)) == NULL)
 		return (-1);
-	if (zfs_prop_get(zhp, p, val, len, NULL, NULL, 0, B_FALSE) == 0)
+	if (zfs_prop_get(zhp, p, val, len, NULL, NULL, 0, B_FALSE) == 0) {
+		if (p == ZFS_PROP_MOUNTPOINT)
+			zz_unroot(zhp, val);
 		r = 0;
-	else
+	} else {
 		zz_err(z, e, name);
+	}
 	zfs_close(zhp);
 	return (r);
 }

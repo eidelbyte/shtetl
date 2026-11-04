@@ -121,7 +121,8 @@ words. The fake's data is words; the box's are files.
 | Z18 | create, children | made in a forked child, the layer opened before the fork | seen by the parent: the state is the kernel's, the fake's shared as it is (m4-beam) |
 | Z20 | set | a mountpoint on a mounted filesystem with a mounted child | both mounted again below the new place (libzfs's changelist; P2.5) (m5-create) |
 | Z20 | set | a mountpoint on one not mounted, canmount noauto; canmount on | left unmounted; mounted |
-| Z21 | native | canmount set, canmount not set, a mountpoint inherited; no such filesystem | its value, "on", the parent's below it; "no such filesystem" (m5-create) |
+| Z21 | native | canmount set, canmount not set, a mountpoint inherited; no such filesystem | its value, "on", the parent's below it, exactly, no altroot before it; "no such filesystem" (m5-create) |
+| Z22 | native, set | a mountpoint read and set back, on a pool with an altroot (the box's) | the same read again, mounted where it was: the altroot not set into the property (build run 9 placed s2web at the altroot twice) |
 | Z19 | send | whole; a clone stream | the filesystem made canmount=noauto, set there, so nothing mounts it at import (ruled 2026-11-03) |
 | Z19 | send, resume | a whole cut, resumed | canmount=noauto, set there: on the box the cut's own receive did not set it |
 | Z19 | send | incremental onto a filesystem with a user property of its own | the property kept: canmount is set locally, not received, as a first received set clears the local properties (dsl_prop_get_received) |
