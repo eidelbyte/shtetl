@@ -504,6 +504,7 @@ house() {
 	    "$(pkg -j $J query %n tree 2>&1)" tree
 	# N15: the daemon stopped, the jail runs on (ruled 2026-11-05)
 	_jid=$(jls -j $J jid 2>&1)
+	_from=$(($(wc -l </var/log/daemon.log) + 1))
 	x service shtetl onestop
 	cell N15 "the daemon stopped: the jail runs on" \
 	    "$(jls -j $J name jid 2>&1)" "$J $_jid"
@@ -515,9 +516,9 @@ house() {
 	cell N14 "the same jail, devfs mounted there once" \
 	    "$(jls -j $J jid 2>&1) $(mount -p | awk -v d="$_p/dev" \
 	    '$2 == d' | wc -l | tr -d ' ')" "$_jid 1"
-	cell N14 "syslog: no line of s2web's" \
-	    "$(tail -n "+$LOGFROM" /var/log/daemon.log |
-	    grep -c "shtetl\[[0-9]*\]: house $J:")" 0
+	# any line: build run 9's start failed in ZFS, not as the house
+	cell N14 "syslog: nothing from the daemon's stop and start" \
+	    "$(tail -n "+$_from" /var/log/daemon.log | grep -c 'shtetl\[')" 0
 	# N17: removed from its block, devfs with it
 	x jail -f "$JC" -r $J
 	_rc=$?
