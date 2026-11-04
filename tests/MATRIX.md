@@ -909,11 +909,11 @@ the trigger {a convergence, a roll's end}.
 Plan 4, 7.1: `shtetl create H --on F`, a container's first version,
 the person naming the foundation until a container's requirements
 choose it (sprints/future-work.md). The version is cloned from F's
-newest version, on zrun's copy of F: where zrun holds that version
-the clone is made at once; where not, the beam pulls F from it on
-(B33) and the clone is made when it is told the copy has arrived,
-before that convergence's prune (P), so a pulled copy is never
-nothing's clone. The version's name is F's snapshot name without its
+newest version, on zrun's copy of F: the create always asks the beam
+to pull F from it on (B33), and the clone is made when it is told the
+copy has arrived, before that convergence's prune (P), so a pulled
+copy is never nothing's clone; where zrun holds the version already,
+the next convergence's end tells it at once. The version's name is F's snapshot name without its
 kind, then the house: 15.1-releng-<date>-nginx, below run/containers.
 Its root and every dataset are clones of F's, each canmount=noauto, a
 placeholder canmount=off; the root has shtetl:house H. The shaken
@@ -941,20 +941,20 @@ reply}.
 
 | cell | what | expected | disposition |
 |------|------|----------|-------------|
-| H1 | create on F, zrun holding F's newest | the version cloned at once: its name, shtetl:house, every dataset a clone of F's, canmount=noauto, the placeholder off; the create snapshot -r, kind create; mounted at /containers/H | tests/check_house.c |
+| H1 | create on F, the copy told arrived | the version cloned then: its name, shtetl:house, every dataset a clone of the copy's, canmount=noauto, the placeholder off as the lake's owner is; the create snapshot -r, kind create; mounted at <containers>/H, the placeholder not | tests/check_house.c |
 | H2 | zrun holding none of F | the beam pulls F from its newest on; the clone made when told, the copy kept by the prune that follows | tests/check_house.c |
-| H3 | zrun's copy behind F's newest | the pull brings the version onto the copy; then as H2 | tests/check_house.c |
+| H3 | zrun's copy behind F's newest | the pull brings the version onto the copy; then as H2 | mapped to B34: the house sees only the pull told |
 | H4 | the pull failing | the create refused, "H: pull: why"; no version | tests/check_house.c |
 | H5 | the house's own datasets | made below the version with the recipe's properties, canmount=noauto | tests/check_house.c |
 | H6 | the recipe stacked on the shaken foundation recipe | its packages and the command pieces F did not run run in a chroot of the version; F's pieces not again | tests/check_house.c |
 | H7 | house.conf | the shaken house recipe, schg, 0444, in the version | tests/check_house.c |
 | H8 | ver not held by F's version | refused, the recipe's words; the version destroyed | tests/check_house.c |
-| H9 | a step failing, at each step | refused with why; the version destroyed, the copy pruned at the next convergence | tests/check_house.c |
-| H10 | H a house already; no recipe; F no foundation; F no version | "H: exists"; the recipe's words; "F: no such foundation"; "F: no version" | tests/check_house.c |
+| H9 | a step failing: a package, the snapshot | said, "house H: STEP: why"; the version destroyed, the house gone; the copy pruned at the next convergence (P11) | tests/check_house.c |
+| H10 | H a house already; no recipe | "H: exists"; the recipe's words | tests/check_house.c |
 | H11 | a second create of H while one is under way | "H: creating" | tests/check_house.c |
 | H12 | the actor at its start: one complete version | active, mounted at /containers/H, mounted already left | tests/check_house.c |
 | H13 | the actor at its start: an incomplete version | destroyed; the newest complete one active | tests/check_house.c |
-| H14 | the actor at its start: two complete versions | the newest by its origin's createtxg active | tests/check_house.c |
+| H14 | the actor at its start: two complete versions | the newest by its origin's createtxg active; the others unmounted and put back to their own paths | deferred: m5-roll, which makes a second version and the swap that puts the old one back |
 | H15 | status | "house H active VERSION", "house H creating STEP" | tests/check_house.c |
-| H16 | the daemon: shtetl create H --on F | the reply when the version is complete; the house's line in status | tests/check_daemon.c |
+| H16 | the daemon: shtetl create H --on F | the reply at once, the create the daemon's; the usage, an invalid name, "F: no such foundation", "H: exists"; a house with a complete version started with the daemon, its line in status | tests/check_daemon.c |
 | H17 | the box: a container made on the M3 foundation, pulled | box: m5-box | box |
