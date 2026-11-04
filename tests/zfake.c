@@ -368,6 +368,36 @@ zf_named(const char *name, struct sh_err *e)
 
 static void zf_mkdirs(const char *);
 
+/* The two native properties the callers read: as libzfs gives them. */
+int
+sh_zfs_native(struct sh_zfs *z, const char *name, const char *prop,
+    char *val, size_t len, struct sh_err *e)
+{
+	const struct zf_obj *d;
+	char mp[ZF_NAME];
+	const char *v;
+
+	(void) z;
+	if (strcmp(prop, "canmount") != 0 && strcmp(prop, "mountpoint") != 0) {
+		sh_errf(e, "zfake: %s: no such property", prop);
+		return (-1);
+	}
+	if (zf_fails("native", e))
+		return (-1);
+	if ((d = zf_fs(name)) == NULL) {
+		sh_errf(e, "zfake: %s: no such filesystem", name);
+		return (-1);
+	}
+	if (strcmp(prop, "mountpoint") == 0) {
+		zf_mountpoint(name, mp);
+		v = mp;
+	} else if ((v = zf_prop(d, "canmount")) == NULL) {
+		v = "on";
+	}
+	(void) snprintf(val, len, "%s", v);
+	return (0);
+}
+
 /*
  * The filesystems that take DS's mountpoint, DS and those below it
  * inheriting it, mounted again where they were, and where canmount is

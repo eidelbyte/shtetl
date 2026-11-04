@@ -175,6 +175,23 @@ noauto(const char *rel)
 	return (v != NULL && strcmp(v, "noauto") == 0);
 }
 
+/*
+ * Whether REL's native PROP is WANT; a mountpoint's from its first
+ * "/zc-" on, as a pool imported with an altroot puts it below that.
+ */
+static int
+native(const char *rel, const char *prop, const char *want)
+{
+	char v[1024];
+	const char *tail;
+
+	if (sh_zfs_native(z, at(rel), prop, v, sizeof (v), &e) != 0)
+		return (0);
+	tail = strcmp(prop, "mountpoint") == 0 && strstr(v, "/zc-") != NULL ?
+	    strstr(v, "/zc-") : v;
+	return (strcmp(tail, want) == 0);
+}
+
 /* Where REL is mounted, below the altroot: "" when it is not. */
 static const char *
 where(const char *rel)
@@ -415,6 +432,13 @@ cells_mount(void)
 	    strcmp(where("on"), "") == 0 &&
 	    sh_zfs_set(z, at("on"), "mountpoint", "/zc-ow", &e) == 0 &&
 	    strcmp(where("on"), "/zc-ow") == 0);
+	cell("Z21", "native: canmount noauto, on by default; a mountpoint "
+	    "inherited", native("mv/k", "canmount", "noauto") &&
+	    native("on", "canmount", "on") &&
+	    native("mv/k", "mountpoint", "/zc-mw/k"));
+	refused("Z21", "native of no such filesystem: refused",
+	    sh_zfs_native(z, at("nope"), "canmount", seen, sizeof (seen), &e),
+	    "nope", "no such filesystem");
 	(void) sh_zfs_unmount(z, at("mv/k"), &e);
 	(void) sh_zfs_unmount(z, at("mv"), &e);
 	(void) sh_zfs_unmount(z, at("on"), &e);

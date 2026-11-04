@@ -181,6 +181,28 @@ sh_zfs_user(struct sh_zfs *z, const char *name, const char *prop,
 }
 
 int
+sh_zfs_native(struct sh_zfs *z, const char *name, const char *prop,
+    char *val, size_t len, struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+	zfs_prop_t p;
+	int r = -1;
+
+	if ((p = zfs_name_to_prop(prop)) == ZPROP_INVAL) {
+		sh_errf(e, "%s: no such property", prop);
+		return (-1);
+	}
+	if ((zhp = zz_open(z, name, e)) == NULL)
+		return (-1);
+	if (zfs_prop_get(zhp, p, val, len, NULL, NULL, 0, B_FALSE) == 0)
+		r = 0;
+	else
+		zz_err(z, e, name);
+	zfs_close(zhp);
+	return (r);
+}
+
+int
 sh_zfs_set(struct sh_zfs *z, const char *name, const char *prop,
     const char *value, struct sh_err *e)
 {

@@ -48,6 +48,16 @@ int sh_zfs_user(struct sh_zfs *z, const char *name, const char *prop,
     char *val, size_t len, struct sh_err *e);
 
 /*
+ * The native property PROP of NAME, a filesystem, as zfs get gives its
+ * value, into VAL: canmount's on, off or noauto; mountpoint's path,
+ * the pool's altroot before it, inherited where NAME does not set it
+ * (m5-create). Refused: "no such filesystem", "PROP: no such
+ * property".
+ */
+int sh_zfs_native(struct sh_zfs *z, const char *name, const char *prop,
+    char *val, size_t len, struct sh_err *e);
+
+/*
  * The property PROP set on NAME to VALUE: a filesystem, below it
  * inherited, or a snapshot (ds@snap); a user property, or a native one
  * (m5-create: mountpoint). A mountpoint set moves what it mounts as
