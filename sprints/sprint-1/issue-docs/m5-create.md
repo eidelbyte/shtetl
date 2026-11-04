@@ -117,3 +117,20 @@ Build run 8: 2026-11-05, build.sh at eb67efa (results d6e15af): 49 ok,
 (8287ea9) and the ver checks moved to the cascade, R3's chroot pieces
 and package ok. Still owed: run.sh, for Z20 and Z21 over libzfs and
 check_house on FreeBSD; m5-box (H17).
+
+## Box run 10
+
+Box run 10: 2026-11-05, run.sh at 525bfdb (results 9835b75): 138 ok,
+0 failed, box run 9's 132 and six new lines.
+
+- check_house ok on FreeBSD, its libc and libucl; check_daemon with
+  H16 and check_beam with B33 - B35 ok too.
+- Z20 over libzfs, all three: a mountpoint set on a mounted
+  filesystem moves it and its mounted child; on one not mounted,
+  canmount noauto leaves it unmounted and canmount on mounts it.
+  libzfs's changelist does what the fake's remount was written to.
+- Z21 over libzfs: canmount noauto read back, "on" where not set, a
+  mountpoint inherited; no such filesystem refused.
+- The lines on stderr are box run 9's: check_daemon's "beam: prune:
+  tank/config: not mounted" (m4-prune) and Z15's cut sends.
+- Still owed: m5-box (H17).
