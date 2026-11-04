@@ -5,7 +5,11 @@
 # FreeBSD src remote, an update, a patch that conflicts (a stall, the
 # foundation at its newest version, zbuild reset), the patch taken
 # out and the roll asked again, a pkg roll, and the daemon stopped in
-# a command (devfs mounted, the head written) and started again.
+# a command (devfs mounted, the head written) and started again. Among
+# the rolls, M4 (m4-box), cells B28 and P24 of families B and P: box
+# pulled to the run by hand and a house stand-in's versions S1 - S3
+# made on it, beamed to the lake, a stream cut and resumed, and the
+# prune at each convergence, the run keeping 1 and the lake 2.
 # The first build takes hours; nothing here asks anything, so start it
 # and leave it.
 #
@@ -14,9 +18,10 @@
 #
 # What a run keeps for the next: the pool's file in IMGDIR, the pool
 # exported between runs, holding zbuild's checkout and box's obj cache,
-# so later builds are incremental. Each run destroys box itself and
-# the beam's copy of it, and writes zconfig anew. The daemon runs from /usr/local/sbin, put there
-# by make install, and by service(8), as rc runs it.
+# so later builds are incremental. Each run destroys what the last
+# made, box, its copy and the stand-ins, and writes zconfig anew. The
+# daemon runs from /usr/local/sbin, put there by make install, and by
+# service(8), as rc runs it.
 #
 # Settings, from the environment:
 #   BRANCH   the branch to build (releng/15.1)
@@ -39,6 +44,10 @@ BALT=$IMGDIR/$P
 SH=/usr/local/sbin/shtetl
 F=box
 FD=$P/lake/foundations/$F
+RD=$P/run/foundations/$F
+LC=$P/lake/containers
+RC=$P/run/containers
+BEAMLOG=/var/log/shtetl/beam.log
 
 daemon_down() {
 	service shtetl onestop >/dev/null 2>&1
@@ -108,10 +117,12 @@ cell() {	# CELL WHAT GOT WANT
 	fi
 }
 
-# The pool, made the first time, imported after; box gone, and its
-# copy on the run space, which a new box shares nothing with and the
-# beam leaves standing (plan 8.1); zconfig written anew, zbuild and
-# the obj caches kept.
+# The pool, made the first time, imported after; what the last run
+# left gone: the house stand-ins and their copies, clones of box's
+# versions, then box's copy on the run, which a new box shares nothing
+# with and the beam leaves standing (plan 8.1), then box; zconfig
+# written anew, the run keeping 1 version of a house and the lake 2;
+# zbuild and the obj caches kept.
 pool_up() {
 	if [ ! -f "$IMG" ]; then
 		x truncate -s "$SIZE" "$IMG" &&
@@ -124,7 +135,9 @@ pool_up() {
 	else
 		x zpool import -d "$IMGDIR" -R "$BALT" $P || return 1
 	fi
-	for _d in $FD $P/run/foundations/$F; do
+	for _d in $(for _r in $LC $RC; do
+	    zfs list -H -o name -d 1 -t filesystem $_r 2>/dev/null |
+	    tail -n +2; done) $RD $FD; do
 		if zfs list -H -o name $_d >/dev/null 2>&1; then
 			x zfs destroy -r $_d || return 1
 		fi
@@ -134,7 +147,7 @@ pool_up() {
 	x rm -rf "$CONF/foundations" "$CONF/patches" "$CONF/shtetl.conf" &&
 	    x mkdir -p "$CONF/foundations" "$CONF/patches/local" &&
 	    printf '%s\n' 'remotes {' "    src = \"$GITURL\";" '}' \
-	    >"$CONF/shtetl.conf"
+	    'run { keep = 1; }' 'lake { keep = 2; }' >"$CONF/shtetl.conf"
 }
 
 # foundations/box.conf: what every run builds, and the lines LINES.
@@ -184,6 +197,60 @@ newest() {	# DS: its newest snapshot's name
 	zfs list -H -t snapshot -d 1 -o name -s createtxg "$1" | tail -1
 }
 
+# The beam's convergence over: its status, once it is not converging.
+# A roll tells the beam as it ends, so after ask the beam has begun.
+beamed() {
+	while "$SH" status 2>&1 | grep -q '^beam converging'; do
+		sleep 5
+	done
+	"$SH" status 2>&1 | grep '^beam '
+}
+
+# box's copy on the run made whole at its version SNAP, a parent first,
+# as a house's pull will make it (m5-create): the beam makes none.
+pull() {	# SNAP
+	for _d in $(zfs list -H -o name -r -t filesystem $FD); do
+		xs "zfs send $_d@$1 | zfs receive -u -o canmount=noauto \
+		    $RD${_d#$FD}@$1" || return 1
+	done
+}
+
+# The house stand-in's version SN on the run, a clone of box's copy at
+# SNAP, shtetl:house standin; with FILL, 8 MiB written in it, so that a
+# stream of it can be cut; its snapshot cN taken last, kind create for
+# the first, update after, which makes it complete.
+standin() {	# N SNAP [FILL]
+	_s=$RC/S$1
+	x zfs clone -o shtetl:house=standin -o canmount=noauto $RD@$2 $_s ||
+	    return 1
+	if [ -n "${3:-}" ]; then
+		x zfs mount $_s && xs "dd if=/dev/random of=$(dir $_s)/fill \
+		    bs=64k count=128 2>/dev/null" && x zfs unmount $_s ||
+		    return 1
+	fi
+	x zfs snapshot -o shtetl:kind=$([ "$1" = 1 ] && echo create ||
+	    echo update) $_s@c$1
+}
+
+# SN's stream to the lake cut part way, as probe P1 cuts one: a
+# mebibyte of it into receive -s, a receive to resume left there.
+breakoff() {	# N SNAP
+	xs "zfs send -i $RD@$2 $RC/S$1@c$1 | head -c 1048576 |
+	    zfs receive -s -u -o origin=$FD@$2 $LC/S$1@c$1 2>/dev/null"
+	return 0
+}
+
+# The filesystems below ROOT's top, by name, on one line.
+tops() {	# ROOT
+	zfs list -H -o name -d 1 -t filesystem "$1" | tail -n +2 |
+	    tr '\n' ' '
+}
+
+# Whether the snapshot NAME is there: yes or no.
+has() {		# NAME
+	zfs list -H -o name "$1" >/dev/null 2>&1 && echo yes || echo no
+}
+
 # box's head mounted, and its usr/local; CMD run in it; unmounted.
 inhead() {	# CMD
 	zfs mount $FD && zfs mount $FD/usr/local || return 1
@@ -226,11 +293,38 @@ rolls() {
 	    awk '{ print $1, $5 }')" "-r--r--r-- schg"
 	cell R4 "the head unmounted" "$(prop mounted $FD)" no
 
+	# B28, P24 (m4-box): the beam and the prune with a house stand-in.
+	# Nothing on the run relies on box: no copy of it there. Pulled by
+	# hand at its first version, as a house's pull will, and S1 cloned
+	# from it before any convergence could prune the copy.
+	cell P24 "no house: no copy of box on the run" \
+	    "$(beamed) $(has $RD)" "beam converged no"
+	_v1=$(newest $FD)
+	pull "${_v1#*@}" && standin 1 "${_v1#*@}"
+
 	# R5: an update
 	cell R5 "an update roll" "$(ask roll)" \
 	    "foundation $F idle $V-DATE-update"
 	cell R5 "kind update" "$(prop shtetl:kind "$(newest $FD)")" update
 	_v=$(newest $FD)
+	_v2=$_v
+	# B28: the update beamed onto the pulled copy; S1 to the lake, a
+	# clone of box's first version there, arrived, canmount=noauto
+	cell B28 "converged" "$(beamed)" "beam converged"
+	cell B28 "box's update beamed onto its copy" \
+	    "$(prop guid "$RD@${_v2#*@}")" "$(prop guid "$_v2")"
+	cell B28 "S1 on the lake, a clone of box's first version" \
+	    "$(prop origin $LC/S1) $(prop guid $LC/S1@c1)" \
+	    "$_v1 $(prop guid $RC/S1@c1)"
+	cell B28 "arrived: its kind there, canmount=noauto set there" \
+	    "$(prop shtetl:kind $LC/S1@c1) $(zfs get -H -s local -o value \
+	    canmount $LC/S1)" "create noauto"
+	cell P24 "S1 the only version: kept; box's versions all kept" \
+	    "$(has $RC/S1) $(has "$_v1") $(has "$RD@${_v1#*@}")" "yes yes yes"
+	# S2 on the update, 8 MiB in it, its stream to the lake cut
+	standin 2 "${_v2#*@}" fill && breakoff 2 "${_v2#*@}"
+	cell B28 "S2's stream cut: a receive to resume on the lake" \
+	    "$(prop receive_resume_token $LC/S2 | cut -c1-2)" 1-
 
 	# R6: two patches of one line, the second a conflict
 	x sed -i '' '1s/.*/shtetl box a/' "$SRCD/README.md"
@@ -254,6 +348,21 @@ rolls() {
 	cell R7 "the patch in the checkout" \
 	    "$(head -1 "$SRCD/README.md")" "shtetl box a"
 	cell R7 "no stall" "$(prop shtetl:stall $FD)" -
+	_v3=$(newest $FD)
+	# B28: the cut stream resumed by the next convergence, first
+	cell B28 "converged" "$(beamed)" "beam converged"
+	cell B28 "S2's receive resumed: no token, S2 there whole" \
+	    "$(prop receive_resume_token $LC/S2) $(prop guid $LC/S2@c2)" \
+	    "- $(prop guid $RC/S2@c2)"
+	cell B28 "the resume in beam.log" \
+	    "$(tail -n "+$BEAMFROM" $BEAMLOG | grep -c "^# resume $LC/S2\$")" 1
+	# P24: the run keeps 1: S1 pruned, its copy having arrived; box's
+	# copy from S2's version on; the lake keeps 2, S1's version with them
+	cell P24 "the run: S2 alone, S1 pruned" "$(tops $RC)" "$RC/S2 "
+	cell P24 "box's first version gone from the run, kept on the lake" \
+	    "$(has "$RD@${_v1#*@}") $(has "$_v1")" "no yes"
+	cell P24 "the lake: S1 and S2" "$(tops $LC)" "$LC/S1 $LC/S2 "
+	standin 3 "${_v3#*@}"
 	# R8: a pkg roll (U7); the version before it read first, as the
 	# prune takes it once the beam has carried the new one
 	_c=$(prop shtetl:commit "$(newest $FD)")
@@ -262,6 +371,24 @@ rolls() {
 	    "$(prop shtetl:kind "$(newest $FD)") $(prop shtetl:commit \
 	    "$(newest $FD)")" "pkg $_c"
 	_v=$(newest $FD)
+	# P24: S3 beamed; the run keeps S3, the lake S2 and S3; box's first
+	# version gone from both spaces, its next from the run, where S3's
+	# version is now the oldest any house is on; each pruning said
+	cell P24 "converged" "$(beamed)" "beam converged"
+	cell P24 "the run: S3 alone; the lake: S2 and S3" \
+	    "$(tops $RC)/ $(tops $LC)" "$RC/S3 / $LC/S2 $LC/S3 "
+	cell P24 "box's first version gone from both spaces" \
+	    "$(has "$_v1") $(has "$RD@${_v1#*@}")" "no no"
+	cell P24 "its update: on the lake for S2, gone from the run" \
+	    "$(has "$_v2") $(has "$RD@${_v2#*@}")" "yes no"
+	cell P24 "S3's version and the pkg on both" \
+	    "$(has "$_v3") $(has "$RD@${_v3#*@}") $(has "$_v") \
+	    $(has "$RD@${_v#*@}")" "yes yes yes yes"
+	cell P24 "each pruned in beam.log" \
+	    "$(tail -n "+$BEAMFROM" $BEAMLOG | grep '^# prune ' | sort |
+	    tr '\n' ' ')" "$(printf '# prune %s\n' "$LC/S1" "$RC/S1" \
+	    "$RC/S2" "$RD@${_v1#*@}" "$RD@${_v2#*@}" "$_v1" | sort |
+	    tr '\n' ' ')"
 
 	# R9: stopped in a command, devfs mounted, the head written (a
 	# marker by commands-external); started again (X8)
@@ -305,6 +432,7 @@ rolls() {
 mkdir -p "$BD/results" || exit 2
 OUT=$BD/results/build-$(date -u +%Y%m%dT%H%M%SZ).log
 LOGFROM=$(($(cat /var/log/daemon.log 2>/dev/null | wc -l) + 1))
+BEAMFROM=$(($(cat $BEAMLOG 2>/dev/null | wc -l) + 1))
 trap 'pool_down; exit 130' INT TERM
 {
 	echo "shtetl $(git -C "$TOP" rev-parse --short HEAD 2>/dev/null)" \
@@ -328,6 +456,9 @@ trap 'pool_down; exit 130' INT TERM
 	echo
 	echo "the last roll's log, /var/log/shtetl/$F.log, its step lines:"
 	grep '^# ' "/var/log/shtetl/$F.log"
+	echo
+	echo "the beam's log, $BEAMLOG, from the run's start:"
+	tail -n "+$BEAMFROM" $BEAMLOG
 } >"$OUT" 2>&1
 ok=$(grep -c '^ok ' "$OUT")
 failed=$(grep -c '^FAIL ' "$OUT")

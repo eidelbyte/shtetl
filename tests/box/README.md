@@ -30,7 +30,8 @@ What runs:
   stopped with SIGTERM. It needs a box with no shtetl space marked and
   no shtetl daemon running, and says so otherwise.
 
-M3 on the box, a real foundation rolled by the daemon (family R):
+M3 and M4 on the box, a real foundation rolled by the daemon (family
+R), beamed and pruned (B28, P24):
 
     git pull
     make freebsd
@@ -41,14 +42,21 @@ would, on the pool s2box: a sparse file in IMGDIR (/var/tmp), imported
 with an altroot beside it for the run and exported after, so it is
 gone from the box between runs and run.sh never meets its spaces. The
 pool keeps zbuild's checkout and the obj cache from run to run, so
-only the first build takes hours; each run destroys the foundation box
-itself and writes zconfig anew. It asks shtetl roll and shtetl pkg as
-a person does, waits on shtetl status, and reads what came of each
-from ZFS and the head. The log is tests/box/results/build-<UTC
-time>.log, sent as run.sh's is, with the run's lines of
-/var/log/daemon.log at its end. BRANCH, GITURL, IMGDIR and SIZE change
-what it builds and where; `sudo sh tests/box/build.sh --clean` takes
-the pool and its file away, the kept build with them.
+only the first build takes hours; each run destroys what the last
+made, the foundation box, its copy on the run and the house stand-ins,
+and writes zconfig anew, the run keeping 1 version of a house and the
+lake 2. It asks shtetl roll and shtetl pkg as a person does, waits on
+shtetl status, and reads what came of each from ZFS and the head.
+Between the rolls it does what M5's houses will: box pulled to the run
+by hand at its first version, and versions S1 - S3 of a house
+stand-in cloned on box's copy, one with 8 MiB in it, whose stream to
+the lake it cuts; the daemon's beam carries the rest and resumes the
+cut, and its prune keeps what each space needs. The log is
+tests/box/results/build-<UTC time>.log, sent as run.sh's is, with the
+run's lines of /var/log/daemon.log and of beam.log at its end. BRANCH,
+GITURL, IMGDIR and SIZE change what it builds and where; `sudo sh
+tests/box/build.sh --clean` takes the pool and its file away, the
+kept build with them.
 
 By hand, once (tests/MATRIX.md D18), the rc script:
 

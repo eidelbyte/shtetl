@@ -812,7 +812,7 @@ zfake_export.
 | B25 | a receive to resume outside the beam's roots | left alone | tests/check_beam.c |
 | B26 | both pairs lacking | the foundations' streams first | tests/check_beam.c |
 | B27 | a system version | as B5, into lake/systems | tests/check_beam.c |
-| B28 | the box: the M3 foundation beamed to a run pool, a stream cut and resumed, a house stand-in beamed back | box: m4-box | box |
+| B28 | the box: box pulled to the run by hand; its updates beamed onto the copy; a house stand-in's versions beamed to the lake as clones of box's versions there, arrived, canmount=noauto; one's stream cut by hand and resumed by the next convergence, first, in beam.log | tests/box/build.sh (m4-box) | box |
 | B29 | a clone the walk finds before its origin's dataset (a top cloned from a deeper one) | the origin's streams first, the clone a clone stream | tests/check_beam.c |
 | B30 | a stream failing, another foundation lacking a version | only the streams that need the failed one held back (its dataset's later ones, the copies below one it was making); the other foundation beamed and arrived in the same convergence; the failed top sent nothing more until the next (ruled 2026-10-20: a failure holds up only what needs it) | tests/check_beam.c |
 | B31 | syslog | a failure said once, "beam: why"; failing so again, nothing; a new failure said; nothing when it is over (ruled 2026-10-20) | tests/check_beam.c |
@@ -896,4 +896,4 @@ the trigger {a convergence, a roll's end}.
 | P21 | the trigger | told once at the end of each convergence (check_beam); the daemon's prune by shtetl.conf's keeps, a foundation's older version gone and in beam.log (check_daemon) | tests/check_beam.c, tests/check_daemon.c |
 | P22 | what it says | each version pruned in beam.log, "# prune NAME"; a refusal once to syslog, "prune: why", and a line of status while it fails (ruled 2026-11-03) | tests/check_beam.c |
 | P23 | a house's roll | its old versions pruned at the convergence that carries its new one, by P1 - P4; the house actor prunes nothing | mapped to P1 - P4 and P21; the roll's tell is m5-roll's |
-| P24 | the box: a foundation rolled twice, its first version pruned in both spaces; a house stand-in kept | box: m4-box | box |
+| P24 | the box: no house, no copy of box on the run; the run keeping 1, the lake 2: the stand-in's S1 pruned on the run once arrived, kept on the lake; S3 added: S2 pruned on the run, S1 on the lake; box's first version gone from both spaces, its update kept on the lake for S2's copy, gone from the run; each pruned in beam.log | tests/box/build.sh (m4-box) | box |
