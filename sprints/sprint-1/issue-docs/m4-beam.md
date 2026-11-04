@@ -248,3 +248,23 @@ Owed: run.sh for Z19 over libzfs; build.sh for R10 and R2. The first
 build.sh after these still imports the copy build run 4 made, which
 is canmount=on, before pool_up destroys it, so the "cannot mount"
 line goes only in the run after.
+
+## Box run 9 and build run 6
+
+Box run 9: 2026-11-04, run.sh at e1ced72 (results 45b83bd): 132 ok,
+0 failed. Build run 6: build.sh at 45b83bd, the same code (results
+b85742f): 30 ok, 0 failed.
+
+- check_beam ok on FreeBSD, with the beam that makes no foundation
+  copy (5cce65b) and tells the prune (be_done).
+- Z19 over libzfs, all four: a whole, a clone stream, and a whole cut
+  by the shell's receive -s and resumed by sh_zfs_resume each land
+  canmount=noauto, set locally; an incremental keeps the copy's own
+  user property. lzc_receive_with_cmdprops takes the uint64 index.
+- R10: syslog heard the stall and nothing else; the "exists" lines of
+  build run 5 are gone, pool_up destroying the run's copy (c21c0a2),
+  and the beam no longer makes one.
+- The import still said "cannot mount .../run/foundations/box/usr/
+  local": build run 4's copy, imported before pool_up destroyed it,
+  as foreseen. With no copy made since, the next import has none.
+- Still owed: m4-box (B28).

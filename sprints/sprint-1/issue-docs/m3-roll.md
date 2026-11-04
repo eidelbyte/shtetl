@@ -132,3 +132,10 @@ canmount (sh_syn_prop). F1 and K17 check it, and the mutant without
 it fails F1; make check and gate clean. Owed: build.sh, R2 on the
 box. The box's kept obj cache predates it and stays canmount=on until
 it is made anew (build.sh --clean).
+
+## Box run 9 and build run 6
+
+Box run 9: 2026-11-04, run.sh at e1ced72 (results 45b83bd): 132 ok,
+0 failed. Build run 6: build.sh at 45b83bd, the same code (results
+b85742f): 30 ok, 0 failed. R2 on the box: box and usr/local
+canmount=noauto, set locally. Tested.

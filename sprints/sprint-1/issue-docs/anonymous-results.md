@@ -58,8 +58,11 @@ that". They did.
   file, the compressed logs included (decompressed and searched).
   Only /home/shtetl remains, the VM's checkout, a name the harness
   gave.
-- Owed: the next run.sh or build.sh on the box, its pushed log read for
-  a name.
+- Box run 9 and build run 6 (2026-11-04, results 45b83bd and
+  b85742f): files named by their time alone, commit subjects "box:
+  132 ok, 0 failed" and "box: build: 30 ok, 0 failed", first lines
+  "on box", the echoed "make -C . install", syslog's host field "box";
+  no host name, login or home path in either.
 
 ## Gotchas
 

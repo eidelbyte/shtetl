@@ -130,3 +130,16 @@ gate, xcheck clean.
 882c4dc (site), f1a312d (matrix, questions), 5cce65b (the beam makes
 no foundation copy), dd4ff53 (rulings), 8590066 (the prune), and
 "prune: a foundation required and forward in both spaces".
+
+## Box run 9 and build run 6
+
+Box run 9: 2026-11-04, run.sh at e1ced72 (results 45b83bd): 132 ok,
+0 failed. Build run 6: build.sh at 45b83bd, the same code (results
+b85742f): 30 ok, 0 failed.
+
+- check_prune ok on FreeBSD; check_daemon's P21 too.
+- build.sh: R8, reading the commit before the pkg roll, ok; R10,
+  syslog the stall alone, so the daemon's prune ran at each
+  convergence's end with no refusal ("beam: prune: ..." would be
+  there). The log holds no beam.log, so what it pruned is m4-box's to
+  show (P24).
