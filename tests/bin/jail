@@ -1,0 +1,6 @@
+#!/bin/sh
+# jail, faked for the tests (tests/bin/make says how the fakes log and
+# fail): logged, and no jail made or removed, on the host least of all.
+echo "jail $*" >> "${FAKE_LOG:-/dev/null}"
+[ "${FAKE_FAIL:-}" = jail ] && { echo "jail: failed" >&2; exit 1; }
+exit 0
