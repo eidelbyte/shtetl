@@ -381,9 +381,9 @@ rolls() {
 	    "$(has "$_v1") $(has "$RD@${_v1#*@}")" "no no"
 	cell P24 "its update: on the lake for S2, gone from the run" \
 	    "$(has "$_v2") $(has "$RD@${_v2#*@}")" "yes no"
+	_h="$(has "$_v3") $(has "$RD@${_v3#*@}")"
 	cell P24 "S3's version and the pkg on both" \
-	    "$(has "$_v3") $(has "$RD@${_v3#*@}") $(has "$_v") \
-	    $(has "$RD@${_v#*@}")" "yes yes yes yes"
+	    "$_h $(has "$_v") $(has "$RD@${_v#*@}")" "yes yes yes yes"
 	cell P24 "each pruned in beam.log" \
 	    "$(tail -n "+$BEAMFROM" $BEAMLOG | grep '^# prune ' | sort |
 	    tr '\n' ' ')" "$(printf '# prune %s\n' "$LC/S1" "$RC/S1" \
