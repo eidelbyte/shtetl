@@ -9,7 +9,11 @@
 # the rolls, M4 (m4-box), cells B28 and P24 of families B and P: box
 # pulled to the run by hand and a house stand-in's versions S1 - S3
 # made on it, beamed to the lake, a stream cut and resumed, and the
-# prune at each convergence, the run keeping 1 and the lake 2.
+# prune at each convergence, the run keeping 1 and the lake 2. After
+# them, M5's first container (m5-jail, cells H17, N14, N15 and N17):
+# s2web made by shtetl create on box's newest version, its jail run
+# from the block the daemon wrote, the daemon stopped and started
+# again around it, the jail removed from its block.
 # The first build takes hours; nothing here asks anything, so start it
 # and leave it.
 #
@@ -19,9 +23,12 @@
 # What a run keeps for the next: the pool's file in IMGDIR, the pool
 # exported between runs, holding zbuild's checkout and box's obj cache,
 # so later builds are incremental. Each run destroys what the last
-# made, box, its copy and the stand-ins, and writes zconfig anew. The
-# daemon runs from /usr/local/sbin, put there by make install, and by
-# service(8), as rc runs it.
+# made, box, its copy, the stand-ins and s2web, and writes zconfig
+# anew. The daemon runs from /usr/local/sbin, put there by make
+# install, and by service(8), as rc runs it. s2web's jail and its block
+# in /etc/jail.conf.d are taken away before the pool is exported: the
+# daemon's stop leaves a jail running (ruled 2026-11-05), and a jail
+# holds the pool busy.
 #
 # Settings, from the environment:
 #   BRANCH   the branch to build (releng/15.1)
@@ -48,14 +55,22 @@ RD=$P/run/foundations/$F
 LC=$P/lake/containers
 RC=$P/run/containers
 BEAMLOG=/var/log/shtetl/beam.log
+J=s2web
+JC=/etc/jail.conf.d/$J.conf
 
 daemon_down() {
 	service shtetl onestop >/dev/null 2>&1
 	return 0
 }
 
-# The pool exported, the mounts that are not ZFS under it first.
+# The pool exported: s2web's jail removed from its block, or without
+# it where that fails, and the block gone; then the mounts that are
+# not ZFS under the pool, a jail's devfs among them.
 pool_export() {
+	if jls -j $J >/dev/null 2>&1; then
+		jail -f "$JC" -r $J >/dev/null 2>&1 || jail -R $J
+	fi
+	rm -f "$JC"
 	if zpool list -H -o name $P >/dev/null 2>&1; then
 		mount -p | awk -v a="$BALT/" 'index($2, a) == 1 &&
 		    $3 != "zfs" { print $2 }' | sort -r | while read -r _mp; do
@@ -118,11 +133,11 @@ cell() {	# CELL WHAT GOT WANT
 }
 
 # The pool, made the first time, imported after; what the last run
-# left gone: the house stand-ins and their copies, clones of box's
-# versions, then box's copy on the run, which a new box shares nothing
-# with and the beam leaves standing (plan 8.1), then box; zconfig
-# written anew, the run keeping 1 version of a house and the lake 2;
-# zbuild and the obj caches kept.
+# left gone: the house stand-ins, s2web and their copies, clones of
+# box's versions, then box's copy on the run, which a new box shares
+# nothing with and the beam leaves standing (plan 8.1), then box;
+# zconfig written anew, the run keeping 1 version of a house and the
+# lake 2; zbuild and the obj caches kept.
 pool_up() {
 	if [ ! -f "$IMG" ]; then
 		x truncate -s "$SIZE" "$IMG" &&
@@ -144,8 +159,10 @@ pool_up() {
 	done
 	CONF=$(dir $P/config)
 	SRCD=$(dir $P/build)/src
-	x rm -rf "$CONF/foundations" "$CONF/patches" "$CONF/shtetl.conf" &&
-	    x mkdir -p "$CONF/foundations" "$CONF/patches/local" &&
+	x rm -rf "$CONF/foundations" "$CONF/containers" "$CONF/patches" \
+	    "$CONF/shtetl.conf" &&
+	    x mkdir -p "$CONF/foundations" "$CONF/containers" \
+	    "$CONF/patches/local" &&
 	    printf '%s\n' 'remotes {' "    src = \"$GITURL\";" '}' \
 	    'run { keep = 1; }' 'lake { keep = 2; }' >"$CONF/shtetl.conf"
 }
@@ -389,6 +406,11 @@ rolls() {
 	    tr '\n' ' ')" "$(printf '# prune %s\n' "$LC/S1" "$RC/S1" \
 	    "$RC/S2" "$RD@${_v1#*@}" "$RD@${_v2#*@}" "$_v1" | sort |
 	    tr '\n' ' ')"
+	# The stand-ins done with. S3 goes before the daemon is started
+	# again (R9): its start would start every house's jail, and a
+	# stand-in holds no house.conf. Nothing on the run relies on box
+	# then, so the prune takes its copy, and s2web pulls it (H17).
+	x zfs destroy -r $RC/S3
 
 	# R9: stopped in a command, devfs mounted, the head written (a
 	# marker by commands-external); started again (X8)
@@ -429,6 +451,80 @@ rolls() {
 	    "foundation $F: patches/local: 2-b.patch: exited 1"
 }
 
+# s2web's status line, once it is neither being made nor started; ""
+# when it is not there.
+house_settled() {
+	while :; do
+		_l=$("$SH" status 2>&1 | grep "^house $J ")
+		case $_l in
+		*" creating "*|*" starting "*)
+			sleep 5
+			;;
+		*)
+			echo "$_l" | sed -E "s/$DATE/DATE/"
+			return 0
+			;;
+		esac
+	done
+}
+
+# What is mounted at PATH/dev: its type, or "".
+devfs_at() {	# PATH
+	mount -p | awk -v d="$1/dev" '$2 == d { print $3 }'
+}
+
+# M5's first container (m5-jail), after the rolls: R10 has read syslog.
+house() {
+	printf '%s\n' \
+	    'commands { motd = "echo s2web > /etc/motd.template"; }' \
+	    'jailconf = "allow.raw_sockets;";' >"$CONF/containers/$J.conf"
+	_f=$(newest $FD)
+	# H17: made on box's newest version, its copy on the run pulled
+	# whole, the stand-ins gone and the copy pruned with them
+	cell H17 "nothing on the run relies on box: no copy of it there" \
+	    "$(beamed) $(has $RD)" "beam converged no"
+	x "$SH" create $J --on $F
+	cell H17 "s2web made on box, active" "$(house_settled)" \
+	    "house $J active $V-DATE-$J"
+	_h=$(zfs get -H -o name,value -d 1 -t filesystem shtetl:house $RC |
+	    awk -v j=$J '$2 == j { print $1 }')
+	cell H17 "its root a clone of box's copy at that version" \
+	    "$(prop origin "$_h" 2>&1)" "$RD@${_f#*@}"
+	_p=$(dir "$_h")
+	cell H17 "placed at the run's containers/s2web" "$_p" "$(dir $RC)/$J"
+	# N17: the jail made from the block the daemon wrote
+	cell N17 "the block: the version's path, the recipe's jailconf" \
+	    "$(grep -c -x -e "$(printf '\tpath = "%s";' "$_p")" \
+	    -e "$(printf '\tallow.raw_sockets;')" "$JC" 2>&1)" 2
+	cell N17 "the jail runs at that path" "$(jls -j $J path 2>&1)" "$_p"
+	cell N17 "devfs at its dev" "$(devfs_at "$_p")" devfs
+	cell N17 "jexec reaches it: what the chroot's command wrote" \
+	    "$(jexec $J cat /etc/motd.template 2>&1)" $J
+	cell N17 "pkg -j reaches it: the foundation's package" \
+	    "$(pkg -j $J query %n tree 2>&1)" tree
+	# N15: the daemon stopped, the jail runs on (ruled 2026-11-05)
+	_jid=$(jls -j $J jid 2>&1)
+	x service shtetl onestop
+	cell N15 "the daemon stopped: the jail runs on" \
+	    "$(jls -j $J name jid 2>&1)" "$J $_jid"
+	# N14: started again, jail -cm leaves the running jail as it is
+	x service shtetl onestart
+	sleep 5
+	cell N14 "started again: active" "$(house_settled)" \
+	    "house $J active $V-DATE-$J"
+	cell N14 "the same jail, devfs mounted there once" \
+	    "$(jls -j $J jid 2>&1) $(mount -p | awk -v d="$_p/dev" \
+	    '$2 == d' | wc -l | tr -d ' ')" "$_jid 1"
+	cell N14 "syslog: no line of s2web's" \
+	    "$(tail -n "+$LOGFROM" /var/log/daemon.log |
+	    grep -c "shtetl\[[0-9]*\]: house $J:")" 0
+	# N17: removed from its block, devfs with it
+	x jail -f "$JC" -r $J
+	_rc=$?
+	cell N17 "jail -r: the jail gone, and its devfs" \
+	    "$_rc $(jls -j $J jid 2>/dev/null)/$(devfs_at "$_p")" "0 /"
+}
+
 mkdir -p "$BD/results" || exit 2
 OUT=$BD/results/build-$(date -u +%Y%m%dT%H%M%SZ).log
 LOGFROM=$(($(cat /var/log/daemon.log 2>/dev/null | wc -l) + 1))
@@ -444,6 +540,7 @@ trap 'pool_down; exit 130' INT TERM
 	    x service shtetl onestart; then
 		sleep 5
 		rolls
+		house
 	else
 		echo "FAIL setup: make install, the pool, the daemon"
 	fi

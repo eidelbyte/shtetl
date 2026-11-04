@@ -100,9 +100,9 @@ writes whole at each start (plan 7.3; tests/MATRIX.md family N):
   there; sh_shaken_read closes what it opens.
 - Owed to the box: run.sh, for check_house, check_jail and the new
   check_daemon on FreeBSD (every jail there the fake's: each test
-  puts tests/bin first in PATH); m5-box for N14 (-cm on a running
-  jail) and N17 (a real jail from the block: devfs at path/dev, jexec
-  H and pkg -j H reaching it, jail -r taking devfs away).
+  puts tests/bin first in PATH), done in box run 11; build.sh for N14
+  (-cm on a running jail) and N17 (a real jail from the block), moved
+  there from m5-box (below).
 
 ## Gotchas for the next issues
 
@@ -147,5 +147,41 @@ Box run 11: 2026-11-05, run.sh at 734b41d (results 50b39a1): 139 ok,
 - check_schema and check_cascade three checks more each: N16, a name
   of digits only refused.
 - The lines on stderr are box run 10's; no house's start was said.
-- Still owed: m5-box, N14 (-cm on a running jail) and N17 (a real
-  jail from the block).
+- Still owed: N14 (-cm on a running jail) and N17 (a real jail from
+  the block), now in build.sh (below).
+
+## The jail's box cells in build.sh
+
+m5-box, where N14 and N17 were, waits on m5-queue, m5-derivations and
+m5-restore, and they need none of it: only a real container on a real
+foundation, which build.sh builds every run. So build.sh gains house(),
+after the rolls, since R10 reads syslog for the rolls alone:
+
+- H17 (moved from m5-box too, being the container N17 needs): the
+  run holding no copy of box; shtetl create s2web --on box, active
+  on box's newest version, its root a clone of the copy pulled whole,
+  placed at the run's containers/s2web.
+- N17: the block holds the version's path and the recipe's jailconf;
+  the jail runs at that path, devfs at its dev; jexec s2web reads what
+  the chroot's command wrote, pkg -j s2web the foundation's package.
+- N15 on the box: the daemon stopped, the jail runs on, its jid the
+  same.
+- N14: the daemon started again, s2web active, the same jid, devfs
+  mounted there once, no syslog line of s2web's.
+- N17: jail -f the block -r s2web takes the jail and its devfs away.
+
+Two changes to what was there:
+
+- The stand-in S3 is destroyed after R8's P24 cells, before R9 starts
+  the daemon again. Since m5-jail that start starts every house's
+  jail, and a stand-in holds no house.conf: its start would fail, and
+  say so in syslog, which R10 holds to the stall's line alone. With
+  no house on the run then, the prune takes box's copy (ruled Q-P1),
+  so s2web's create pulls it whole: H17's "pulled".
+- pool_export removes s2web's jail from its block, or with jail -R
+  where that fails, and the block, before the pool's other mounts and
+  the export: the daemon's stop leaves a jail running (ruled
+  2026-11-05), and a jail holds the pool busy. It runs at the start
+  of a run too, so a run stopped part way leaves nothing for the next.
+
+Verified: sh -n and dash -n; the box's build run is owed.

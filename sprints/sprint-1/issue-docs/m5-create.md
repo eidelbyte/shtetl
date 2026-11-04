@@ -134,3 +134,12 @@ Box run 10: 2026-11-05, run.sh at 525bfdb (results 9835b75): 138 ok,
 - The lines on stderr are box run 9's: check_daemon's "beam: prune:
   tank/config: not mounted" (m4-prune) and Z15's cut sends.
 - Still owed: m5-box (H17).
+
+## H17 in build.sh
+
+H17, a container made on the M3 foundation and pulled, moved from
+m5-box to tests/box/build.sh with m5-jail's N14 and N17, which need
+the same container (issue-docs/m5-jail.md, "The jail's box cells in
+build.sh"): s2web made by shtetl create on box's newest version, the
+run's copy of box pulled whole, the stand-ins gone. Owed: the box's
+build run.

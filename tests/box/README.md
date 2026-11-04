@@ -31,7 +31,8 @@ What runs:
   no shtetl daemon running, and says so otherwise.
 
 M3 and M4 on the box, a real foundation rolled by the daemon (family
-R), beamed and pruned (B28, P24):
+R), beamed and pruned (B28, P24), and M5's first container and its
+jail (H17, N14, N15, N17):
 
     git pull
     make freebsd
@@ -43,15 +44,21 @@ with an altroot beside it for the run and exported after, so it is
 gone from the box between runs and run.sh never meets its spaces. The
 pool keeps zbuild's checkout and the obj cache from run to run, so
 only the first build takes hours; each run destroys what the last
-made, the foundation box, its copy on the run and the house stand-ins,
-and writes zconfig anew, the run keeping 1 version of a house and the
-lake 2. It asks shtetl roll and shtetl pkg as a person does, waits on
-shtetl status, and reads what came of each from ZFS and the head.
-Between the rolls it does what M5's houses will: box pulled to the run
-by hand at its first version, and versions S1 - S3 of a house
-stand-in cloned on box's copy, one with 8 MiB in it, whose stream to
-the lake it cuts; the daemon's beam carries the rest and resumes the
-cut, and its prune keeps what each space needs. The log is
+made, the foundation box, its copy on the run, the house stand-ins and
+the container s2web, and writes zconfig anew, the run keeping 1
+version of a house and the lake 2. It asks shtetl roll and shtetl pkg
+as a person does, waits on shtetl status, and reads what came of each
+from ZFS and the head. Between the rolls it does what M5's houses
+will: box pulled to the run by hand at its first version, and
+versions S1 - S3 of a house stand-in cloned on box's copy, one with
+8 MiB in it, whose stream to the lake it cuts; the daemon's beam
+carries the rest and resumes the cut, and its prune keeps what each
+space needs. After the rolls it asks shtetl create s2web --on box,
+and reads the jail the daemon made: its path and devfs, jexec and
+pkg -j into it; it stops and starts the daemon around the running
+jail, and removes the jail from its block. A real jail runs on the
+box for that time; it and its block in /etc/jail.conf.d are taken
+away before the pool is exported, on every way out. The log is
 tests/box/results/build-<UTC time>.log, sent as run.sh's is, with the
 run's lines of /var/log/daemon.log and of beam.log at its end. BRANCH,
 GITURL, IMGDIR and SIZE change what it builds and where; `sudo sh

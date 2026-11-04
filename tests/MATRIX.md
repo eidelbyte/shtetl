@@ -958,7 +958,7 @@ reply}.
 | H14 | the actor at its start: two complete versions | the newest by its origin's createtxg active; the others unmounted and put back to their own paths | deferred: m5-roll, which makes a second version and the swap that puts the old one back |
 | H15 | status | "house H active VERSION", "house H creating STEP" | tests/check_house.c |
 | H16 | the daemon: shtetl create H --on F | the reply at once, the create the daemon's; the usage, an invalid name, "F: no such foundation", "H: exists"; a house with a complete version started with the daemon, its line in status | tests/check_daemon.c |
-| H17 | the box: a container made on the M3 foundation, pulled | box: m5-box | box |
+| H17 | the box: a container made on the M3 foundation, pulled | made by shtetl create on box's newest version, active, its root a clone of the run's copy, placed at containers/H; the copy pulled whole where nothing on the run relied on box | tests/box/build.sh (m5-jail) |
 
 ## Family N: a container's jail (m5-jail)
 
@@ -1010,8 +1010,8 @@ log, the sink}.
 | N11 | a create whose jail does not start | "house H: jail: exited 1"; the version destroyed, the block it wrote removed, the house gone | tests/check_house.c |
 | N12 | the actor's start | every house's active version's jail started; "house H starting STEP" meanwhile, then "house H active VERSION" | tests/check_house.c |
 | N13 | the actor's start, one house's jail failing | said, "house H: jail: why", in H.log too; it active still; the others started | tests/check_house.c |
-| N14 | a start finding the jail running already | -cm: it runs on, nothing run in it again | box: m5-box (the fake jail runs nothing) |
-| N15 | the daemon's start and stop | the houses started with their jails, the blocks in the daemon's directory for them; at its stop no jail stopped (ruled 2026-11-05, Q-J1) | tests/check_daemon.c |
+| N14 | a start finding the jail running already | -cm: it runs on, its jid the same, devfs mounted there once, nothing said | tests/box/build.sh (the fake jail runs nothing) |
+| N15 | the daemon's start and stop | the houses started with their jails, the blocks in the daemon's directory for them; at its stop no jail stopped (ruled 2026-11-05, Q-J1) | tests/check_daemon.c; on the box, a real jail through the daemon's stop, tests/box/build.sh |
 | N16 | a name of digits only | refused: "containers/123: invalid recipe name: digits only", create's "123: invalid name: digits only", a requires entry | tests/check_cascade.c, tests/check_daemon.c, tests/check_schema.c |
-| N17 | the box: a real jail from the block | made, devfs at path/dev, jexec H and pkg -j H reach it; jail -r takes devfs away | box: m5-box |
+| N17 | the box: a real jail from the block | made, at the version's path, with the recipe's jailconf; devfs at path/dev; jexec H and pkg -j H reach it; jail -r takes the jail and devfs away | tests/box/build.sh |
 | N18 | the fake keeping files (zfake_files) | a snapshot of a mounted filesystem shows its files, not a child's, at MOUNT/.zfs/snapshot/SNAP; a mounted filesystem a mountpoint set moves takes its files along | tests/check_house.c, through N7, N8, N10; the real ones held on the box by I12, I14 and Z20 |
