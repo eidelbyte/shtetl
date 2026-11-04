@@ -109,3 +109,11 @@ a64ba4a (matrix), 54da69d (the pull), eb1c64f (a native set), 9ef301d
 (a native read), 8287ea9 (commands, cascade), "house: a container's
 first version made, and the houses started" and "daemon: shtetl
 create".
+
+## Build run 8
+
+Build run 8: 2026-11-05, build.sh at eb67efa (results d6e15af): 49 ok,
+0 failed: the roll on the box with the commands' kind and layer
+(8287ea9) and the ver checks moved to the cascade, R3's chroot pieces
+and package ok. Still owed: run.sh, for Z20 and Z21 over libzfs and
+check_house on FreeBSD; m5-box (H17).

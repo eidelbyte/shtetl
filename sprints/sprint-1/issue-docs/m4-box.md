@@ -93,3 +93,10 @@ Tested. M4 is done.
 ## Commits
 
 3230f0f, and 4617a22 (the cell's quoting).
+
+## Build run 8
+
+Build run 8: 2026-11-05, build.sh at eb67efa (results d6e15af): 49 ok,
+0 failed. The cell 4617a22 fixed, P24 "S3's version and the pkg on both",
+ok; every B28 and P24 cell and R10 ok, beam.log's six prunings, the
+import clean.
