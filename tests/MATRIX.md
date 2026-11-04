@@ -119,6 +119,8 @@ words. The fake's data is words; the box's are files.
 | Z17 | props | FN stops | FN's value returned |
 | Z17 | props | no such filesystem; no such snapshot | "no such filesystem"; "no such snapshot" |
 | Z18 | create, children | made in a forked child, the layer opened before the fork | seen by the parent: the state is the kernel's, the fake's shared as it is (m4-beam) |
+| Z20 | set | a mountpoint on a mounted filesystem with a mounted child | both mounted again below the new place (libzfs's changelist; P2.5) (m5-create) |
+| Z20 | set | a mountpoint on one not mounted, canmount noauto; canmount on | left unmounted; mounted |
 | Z19 | send | whole; a clone stream | the filesystem made canmount=noauto, set there, so nothing mounts it at import (ruled 2026-11-03) |
 | Z19 | send, resume | a whole cut, resumed | canmount=noauto, set there: on the box the cut's own receive did not set it |
 | Z19 | send | incremental onto a filesystem with a user property of its own | the property kept: canmount is set locally, not received, as a first received set clears the local properties (dsl_prop_get_received) |

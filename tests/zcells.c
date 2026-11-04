@@ -365,6 +365,14 @@ cells_mount(void)
 		{ "canmount", "off" }, { "mountpoint", "/zc-off" }
 	};
 	static const struct sh_zprop none = { "mountpoint", "none" };
+	static const struct sh_zprop mv[] = {
+		{ "canmount", "noauto" }, { "mountpoint", "/zc-mv" }
+	};
+	static const struct sh_zprop nv[] = {
+		{ "canmount", "noauto" }, { "mountpoint", "/zc-nv" }
+	};
+	static const struct sh_zprop noauto = { "canmount", "noauto" };
+	static const struct sh_zprop on = { "mountpoint", "/zc-on" };
 
 	cell("Z8", "mounted there already: nothing to do",
 	    sh_zfs_mount(z, at("m"), &e) == 0 &&
@@ -389,6 +397,28 @@ cells_mount(void)
 	refused("Z8", "where a missing one is mounted: refused",
 	    sh_zfs_mounted(z, at("nope"), seen, sizeof (seen), &e), "nope",
 	    "no such filesystem");
+
+	cell("Z20", "a mountpoint set on a mounted one: it and its child "
+	    "moved", sh_zfs_create(z, at("mv"), mv, 2, &e) == 0 &&
+	    sh_zfs_create(z, at("mv/k"), &noauto, 1, &e) == 0 &&
+	    sh_zfs_mount(z, at("mv"), &e) == 0 &&
+	    sh_zfs_mount(z, at("mv/k"), &e) == 0 &&
+	    sh_zfs_set(z, at("mv"), "mountpoint", "/zc-mw", &e) == 0 &&
+	    strcmp(where("mv"), "/zc-mw") == 0 &&
+	    strcmp(where("mv/k"), "/zc-mw/k") == 0);
+	cell("Z20", "on one not mounted, canmount noauto: left unmounted",
+	    sh_zfs_create(z, at("nv"), nv, 2, &e) == 0 &&
+	    sh_zfs_set(z, at("nv"), "mountpoint", "/zc-nw", &e) == 0 &&
+	    strcmp(where("nv"), "") == 0);
+	cell("Z20", "on one not mounted, canmount on: mounted",
+	    sh_zfs_create(z, at("on"), &on, 1, &e) == 0 &&
+	    strcmp(where("on"), "") == 0 &&
+	    sh_zfs_set(z, at("on"), "mountpoint", "/zc-ow", &e) == 0 &&
+	    strcmp(where("on"), "/zc-ow") == 0);
+	(void) sh_zfs_unmount(z, at("mv/k"), &e);
+	(void) sh_zfs_unmount(z, at("mv"), &e);
+	(void) sh_zfs_unmount(z, at("on"), &e);
+	hush();
 }
 
 static void

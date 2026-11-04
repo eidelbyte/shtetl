@@ -48,9 +48,14 @@ int sh_zfs_user(struct sh_zfs *z, const char *name, const char *prop,
     char *val, size_t len, struct sh_err *e);
 
 /*
- * The user property PROP set on NAME to VALUE: a filesystem, below it
- * inherited, or a snapshot (ds@snap). Refused: "no such filesystem",
- * "no such snapshot".
+ * The property PROP set on NAME to VALUE: a filesystem, below it
+ * inherited, or a snapshot (ds@snap); a user property, or a native one
+ * (m5-create: mountpoint). A mountpoint set moves what it mounts as
+ * libzfs's changelist does (libzfs_changelist.c): each filesystem that
+ * takes it, NAME and those below inheriting it, mounted again at its
+ * new place where it was mounted, and mounted where canmount is on.
+ * Refused: "no such filesystem", "no such snapshot"; ZFS's words for a
+ * value it refuses.
  */
 int sh_zfs_set(struct sh_zfs *z, const char *name, const char *prop,
     const char *value, struct sh_err *e);

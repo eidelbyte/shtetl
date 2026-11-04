@@ -366,6 +366,47 @@ zf_named(const char *name, struct sh_err *e)
 	return (o);
 }
 
+static void zf_mkdirs(const char *);
+
+/*
+ * The filesystems that take DS's mountpoint, DS and those below it
+ * inheriting it, mounted again where they were, and where canmount is
+ * on, as libzfs's changelist_postfix mounts them.
+ */
+static void
+zf_remount(const char *ds)
+{
+	char mp[ZF_NAME], cur[ZF_NAME], up[ZF_NAME];
+	struct zf_obj *d;
+	const char *cm;
+	size_t n = strlen(ds);
+	int i;
+
+	for (i = 0; i < zf->zs_n; i++) {
+		d = &zf->zs_ds[i];
+		if (strncmp(d->zo_name, ds, n) != 0 ||
+		    (d->zo_name[n] != '\0' && d->zo_name[n] != '/'))
+			continue;
+		/* the nearest that sets a mountpoint must be DS */
+		(void) snprintf(cur, sizeof (cur), "%s", d->zo_name);
+		while (zf_prop(zf_fs(cur), "mountpoint") == NULL &&
+		    zf_parent(cur, up))
+			(void) snprintf(cur, sizeof (cur), "%s", up);
+		if (strcmp(cur, ds) != 0)
+			continue;
+		zf_mountpoint(d->zo_name, mp);
+		cm = zf_prop(d, "canmount");
+		if (mp[0] == '/' && (d->zo_at[0] != '\0' || cm == NULL ||
+		    strcmp(cm, "on") == 0) && (cm == NULL ||
+		    strcmp(cm, "off") != 0)) {
+			(void) snprintf(d->zo_at, ZF_NAME, "%s", mp);
+			zf_mkdirs(mp);
+		} else {
+			d->zo_at[0] = '\0';
+		}
+	}
+}
+
 int
 sh_zfs_set(struct sh_zfs *z, const char *name, const char *prop,
     const char *value, struct sh_err *e)
@@ -377,6 +418,8 @@ sh_zfs_set(struct sh_zfs *z, const char *name, const char *prop,
 		return (-1);
 	zf_drop(o, prop);
 	zf_put(o, prop, value);
+	if (strcmp(prop, "mountpoint") == 0)
+		zf_remount(name);
 	return (0);
 }
 
