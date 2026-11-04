@@ -8,12 +8,12 @@
  *   - the lake, the copies of a house's versions: the newest LAKE_KEEP
  *     arrived; an older one once the run holds the version no more,
  *     or the beam would send it back.
- *   - the run, a foundation's copy: every version from the oldest one
- *     a filesystem of the run is a clone of, as a house rolls through
- *     each (7.2); with none, the copy whole (ruled 2026-11-03).
- *   - the lake, a foundation's versions: its newest, any a filesystem
- *     of either space is a clone of, by guid, and any not older than
- *     the newest the run's copy holds, the base of its next stream.
+ *   - a foundation, required and forward (ruled 2026-11-03): every
+ *     version from the oldest one a filesystem is a clone of, by guid,
+ *     kept, as a house rolls through each (7.2); on the run, clones on
+ *     the run; on the lake, in either space. With none, the run's copy
+ *     goes whole, and the lake keeps the newest until foundations are
+ *     made on demand.
  *
  * A house version is the root's child of <space>/containers or
  * <space>/systems with shtetl:house, a clone of a foundation version;

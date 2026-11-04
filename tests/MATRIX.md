@@ -845,14 +845,14 @@ beyond 8.2's words are marked (+):
   one stalled or frozen on an old version keeps every later one for
   its rolls (+); older ones pruned, and with no clone the copy
   destroyed whole. The beam makes no foundation copy (B1).
-- zlake, a foundation version (the foundation actor's): its newest
-  kept; one a filesystem in either space is a clone of, by guid, kept,
-  so a house version on zrun not yet beamed keeps its clone stream's
-  origin on zlake (+); one not older than the newest version zrun's
-  copy holds kept, the base of the next stream, or the copy would
-  stall on "exists" for good (Q-B1) (+). Older ones pruned, the
-  version's snapshot on every dataset of the foundation: only the
-  latest of what nothing relies on is kept (ruled 2026-11-03).
+- zlake, a foundation: required and forward (ruled 2026-11-03), as
+  zrun's copy, the clones counted in either space, by guid, so a house
+  version on zrun not yet beamed keeps its clone stream's origin on
+  zlake (+), and every version from it on, the base of zrun's copy's
+  next stream among them. Older ones pruned, the version's snapshot on
+  every dataset of the foundation. With none required, the newest
+  kept, until foundations are made on demand (sprints/future-work.md),
+  when the foundation goes whole.
 
 Versions are ordered by createtxg, a house version by its origin's,
 never by name. The beam prunes all four at the end of each
@@ -887,7 +887,7 @@ the trigger {a convergence, a roll's end}.
 | P12 | zlake: a foundation's newest | kept | tests/check_prune.c |
 | P13 | zlake: a foundation version a copy on zlake is a clone of | kept | tests/check_prune.c |
 | P14 | zlake: a foundation version a house version on zrun is a clone of (by guid), its copy not on zlake yet | kept | tests/check_prune.c |
-| P15 | zlake: a foundation version not older than the newest zrun's copy holds | kept | tests/check_prune.c |
+| P15 | zlake: versions newer than the oldest required, nothing a clone of them, not yet on zrun | kept: forward | tests/check_prune.c |
 | P16 | zlake: an older foundation version, no clone in either space | destroyed, its snapshot on every dataset of the foundation | tests/check_prune.c |
 | P17 | the order | by createtxg, a house version by its origin's; names that sort the other way change nothing | tests/check_prune.c |
 | P18 | a system's versions | as a container's, under systems | tests/check_prune.c |

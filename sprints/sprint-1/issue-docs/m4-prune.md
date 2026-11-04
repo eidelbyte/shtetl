@@ -105,8 +105,28 @@
   snapshot names are unique in shtetl (dates, versions), and the
   tests name each version's snapshots apart (u1, s1, u2, ...).
 
+## Required and forward (2026-11-03, Q-F1)
+
+Ruled: no going back on a foundation's timeline; prune unused
+foundations from everywhere and keep required + forward, with
+foundations made on demand. The lake's rule is now the run's: every
+version from the oldest one a filesystem is a clone of, by guid, the
+clones counted in either space (required(), one function for both,
+foundations(p, RUN) then foundations(p, LAKE)). The lake's per-version
+checks, a clone of it and the base of the run copy's next stream, are
+gone: the base is never older than the oldest version the run's
+clones need, and a run copy with no clone goes whole in the same prune
+before the lake's turn. With nothing required, the lake keeps the
+newest until foundations are made on demand (sprints/future-work.md);
+deleting it now would delete every foundation as soon as it is built.
+P15 restated as forward: versions newer than the oldest required,
+nothing a clone of them, kept. Mutants caught: the lake's unused
+foundation destroyed whole (P21 in check_daemon), the lake blind to
+the run's clones (P14), the oldest required destroyed (P1). make check,
+gate, xcheck clean.
+
 ## Commits
 
 882c4dc (site), f1a312d (matrix, questions), 5cce65b (the beam makes
-no foundation copy), dd4ff53 (rulings), and "prune: what neither
-space needs, at each convergence's end".
+no foundation copy), dd4ff53 (rulings), 8590066 (the prune), and
+"prune: a foundation required and forward in both spaces".

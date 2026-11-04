@@ -460,108 +460,64 @@ version_destroy(struct prune *p, struct pspace *sp, const char *top,
 }
 
 /*
- * The run's copies of the foundations: each version older than the
- * oldest one a filesystem of the run is a clone of; with none, the
- * copy whole.
+ * The createtxg of the oldest version of TOP, a foundation of the space
+ * OWN or its copy, that a filesystem is a clone of, by guid: of the
+ * lake's, in either space; of the run's, in the run. UINT64_MAX when
+ * nothing is.
  */
-static void
-run_foundations(struct prune *p)
+static uint64_t
+required(const struct prune *p, int own, const struct pfs *top)
 {
-	struct pspace *run = &p->p_sp[RUN];
-	char *root = join(p->p_root[RUN], "/foundations", "");
-	const struct psnap *o;
-	struct pfs *t, *f;
-	uint64_t least;
-	size_t i, k;
-
-	for (i = 0; i < run->pp_n; i++) {
-		t = &run->pp_fs[i];
-		if (t->pf_gone || !child(t->pf_name, root))
-			continue;
-		least = UINT64_MAX;
-		for (k = 0; k < run->pp_n; k++) {
-			f = &run->pp_fs[k];
-			if (!f->pf_gone && f->pf_origin != NULL &&
-			    in(f->pf_origin, t->pf_name) &&
-			    (o = top_snap(t, f->pf_origin)) != NULL &&
-			    o->ps_txg < least)
-				least = o->ps_txg;
-		}
-		if (least == UINT64_MAX) {
-			if (tree_destroy(p, run, t->pf_name) != 0)
-				p->p_rc = -1;
-			continue;
-		}
-		for (k = 0; k < t->pf_n && t->pf_snaps[k].ps_txg < least; k++) {
-			if (version_destroy(p, run, t->pf_name,
-			    strchr(t->pf_snaps[k].ps_name, '@')) != 0) {
-				p->p_rc = -1;
-				break;
-			}
-		}
-	}
-	free(root);
-}
-
-/*
- * Whether a filesystem of either space is a clone of the version AT of
- * TOP, a foundation of the lake: of its snapshot of that name, or of
- * a copy with its guid.
- */
-static int
-cloned(const struct prune *p, const char *top, const char *at)
-{
-	const struct psnap *o, *s;
+	const struct psnap *o, *s, *v;
+	uint64_t least = UINT64_MAX;
 	const struct pfs *f;
-	size_t w, i;
+	size_t i;
+	int w;
 
-	for (w = 0; w < 2; w++) {
+	for (w = own; w <= RUN; w++) {
 		for (i = 0; i < p->p_sp[w].pp_n; i++) {
 			f = &p->p_sp[w].pp_fs[i];
 			if (!f->pf_gone && f->pf_origin != NULL &&
 			    (o = snap_of(&p->p_sp[w], f->pf_origin)) != NULL &&
-			    (s = by_guid(&p->p_sp[LAKE], top, o->ps_guid)) !=
-			    NULL && strcmp(strchr(s->ps_name, '@'), at) == 0)
-				return (1);
+			    (s = by_guid(&p->p_sp[own], top->pf_name,
+			    o->ps_guid)) != NULL &&
+			    (v = top_snap(top, s->ps_name)) != NULL &&
+			    v->ps_txg < least)
+				least = v->ps_txg;
 		}
 	}
-	return (0);
+	return (least);
 }
 
 /*
- * The lake's foundations: each version but the newest, older than the
- * newest the run's copy holds, that nothing in either space is a clone
- * of.
+ * The foundations of the space OWN: of each, every version older than
+ * the oldest one required (ruled 2026-11-03: required and forward).
+ * With none required, the run's copy goes whole, and the lake keeps its
+ * newest, until foundations are made on demand (sprints/future-work.md).
  */
 static void
-lake_foundations(struct prune *p)
+foundations(struct prune *p, int own)
 {
-	struct pspace *lake = &p->p_sp[LAKE];
-	char *root = join(p->p_root[LAKE], "/foundations", ""), *name;
-	const struct psnap *s;
-	const struct pfs *c;
-	const char *at;
+	struct pspace *sp = &p->p_sp[own];
+	char *root = join(p->p_root[own], "/foundations", "");
 	struct pfs *t;
-	uint64_t base;
+	uint64_t least;
 	size_t i, k;
 
-	for (i = 0; i < lake->pp_n; i++) {
-		t = &lake->pp_fs[i];
-		if (!child(t->pf_name, root))
+	for (i = 0; i < sp->pp_n; i++) {
+		t = &sp->pp_fs[i];
+		if (t->pf_gone || !child(t->pf_name, root))
 			continue;
-		base = UINT64_MAX;
-		name = join(p->p_root[RUN], t->pf_name +
-		    strlen(p->p_root[LAKE]), "");
-		if ((c = fs_of(&p->p_sp[RUN], name)) != NULL && c->pf_n > 0 &&
-		    (s = by_guid(lake, t->pf_name,
-		    c->pf_snaps[c->pf_n - 1].ps_guid)) != NULL)
-			base = s->ps_txg;
-		free(name);
-		for (k = 0; k + 1 < t->pf_n; k++) {
-			at = strchr(t->pf_snaps[k].ps_name, '@');
-			if (t->pf_snaps[k].ps_txg < base &&
-			    !cloned(p, t->pf_name, at) &&
-			    version_destroy(p, lake, t->pf_name, at) != 0) {
+		least = required(p, own, t);
+		if (least == UINT64_MAX && own == RUN) {
+			if (tree_destroy(p, sp, t->pf_name) != 0)
+				p->p_rc = -1;
+			continue;
+		}
+		for (k = 0; k + 1 < t->pf_n && t->pf_snaps[k].ps_txg < least;
+		    k++) {
+			if (version_destroy(p, sp, t->pf_name,
+			    strchr(t->pf_snaps[k].ps_name, '@')) != 0) {
 				p->p_rc = -1;
 				break;
 			}
@@ -585,8 +541,8 @@ sh_prune(struct sh_zfs *z, const char *lake, const char *run,
 	if (space_read(&p, lake, &p.p_sp[LAKE]) == 0 &&
 	    space_read(&p, run, &p.p_sp[RUN]) == 0) {
 		houses(&p, run_keep, lake_keep);
-		run_foundations(&p);
-		lake_foundations(&p);
+		foundations(&p, RUN);
+		foundations(&p, LAKE);
 	} else {
 		p.p_rc = -1;
 	}

@@ -409,8 +409,8 @@ main(void)
 	CHECK(there(LF "/g@v1") && there(RF "/g@v1"));
 
 	/*
-	 * P15: the run's copy behind: every lake version not older than
-	 * its newest kept, the base of its next stream
+	 * P15: forward: v2 and v3, newer than v1, which V1 is a clone of,
+	 * kept though nothing is a clone of them, and not yet on the run
 	 */
 	fresh();
 	foundation();
