@@ -505,11 +505,12 @@ when the other space no longer needs it there. What each keeps:
   each in order (7.2); with none, the copy goes whole. So a house
   needing an old version pulls it into a run that holds nothing of
   the foundation, and rolls forward from it.
-- zlake, a foundation's versions: its newest; any a filesystem in
-  either space is a clone of, by guid; any not older than the newest
-  zrun's copy holds, the base of that copy's next stream. Older ones
-  go: only the latest of what nothing relies on is kept (ruled
-  2026-11-03).
+- zlake, a foundation's versions: required and forward, as zrun's
+  copy, the clones in either space counted, by guid (ruled
+  2026-11-03); the base of zrun's copy's next stream is among them.
+  With none required, only the newest is kept for now; once
+  foundations are made on demand, a foundation nothing on zrun relies
+  on goes from both spaces (sprints/future-work.md).
 
 A house version is pruned by promoting every filesystem of its space
 that is a clone of one of its snapshots (the newer version's own
@@ -1144,3 +1145,25 @@ a restore, pulls the foundation from that version on (M5), into a run
 that holds nothing of it, so an older version comes as easily as the
 newest. That reading is the implementer's; the words above are the
 ruling.
+
+### 2026-11-03 (Q-F1: required and forward; foundations out of sight)
+
+Asked (Q-F1) how a container would reach a point older than its
+foundation's newest, the author answered:
+
+    let's just not worry about the old-fonudation problem for now.
+    Let's take the simplest answer where we just prune unused
+    foundations from everywhere and just keep required + forward.
+    Yeah it would have to come with on-demand foundations. We'll want
+    the user to interact with the program in a "foundation
+    transparent" way anyway. the user should really only care about
+    containers and systems and foundations get built behind the
+    scenes to fulfill requirements.
+
+So: no going back on a timeline. In both spaces a foundation keeps
+every version from the oldest one something is a clone of, forward
+(8.2), and a foundation nothing on zrun relies on goes from both,
+once foundations are built on demand to meet the requirements of the
+containers and systems the person asks for; until then the lake keeps
+its newest. Foundations drop out of the person's view: they are
+shtetl's to build, keep and prune (sprints/future-work.md).

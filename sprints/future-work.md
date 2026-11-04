@@ -28,48 +28,39 @@ To flesh out:
   them: it stays on its version, or stalls, as a ver that no longer
   holds does today.
 
-## Foundations on demand (asked 2026-11-03, open as Q-F1)
+## Foundations on demand, out of sight (ruled 2026-11-03, Q-F1)
 
-The author asked what happens when foundation X is at commit Y and a
-container needs commit Y-3, and ruled that a foundation nothing on
-zrun relies on may be deleted from existence, since nothing holds
-state in a foundation.
+The author: "the user should really only care about containers and
+systems and foundations get built behind the scenes to fulfill
+requirements", and "just prune unused foundations from everywhere and
+just keep required + forward" (plan 18).
 
-As built (m4-prune), Y-3 is reachable in the first case below, and in
-the second only if the lake kept it:
-
-- zrun's copy of X still holds Y-3, because a house there is on Y-3
-  or older: the new house is cloned from it.
-- zrun holds nothing of X: a pull from Y-3 on works if the lake still
-  holds Y-3. The lake keeps only X's newest and the versions something
-  relies on, so Y-3 is most likely gone.
-- zrun's copy of X starts after Y-3: Y-3 cannot be put into it. ZFS
-  grows a dataset's history forward only: an incremental lands only on
-  the copy's newest snapshot, and a full stream only where there is no
-  dataset (cell Z14's refusals).
-
-Proposal: a foundation's timeline only moves forward, and going back
-is a new foundation, never a rewind.
-
-- A container whose requirements only an older point meets gets a
-  foundation of its own, a branch: built from the src commit that
-  meets them, or, where the lake still holds that version, cloned
-  from it there, so that it shares its blocks and needs no build. The
-  branch rolls forward on its own line, with its own houses and its
-  own copy on zrun, pulled from its first version; X and X's houses
-  are untouched.
-- Foundations are made when a container's requirements need one and
-  no foundation meets them, and a foundation nothing on zrun relies on
-  goes whole, in both spaces. The lake's copies of house versions are
-  clones of the foundation versions they were made on; they would be
-  promoted first, so that they hold those blocks themselves and keep
-  working as restore points.
-- A foundation is then known by what it meets (properties on its
-  dataset), not by its recipe's name alone, and there may be more than
-  one of a recipe.
-
-Why it waits: today a foundation is made per recipe and rolled by
-`shtetl roll`, and no house exists yet. Deleting a foundation nothing
-on zrun relies on, as things stand, would destroy every foundation as
-soon as it is built. It comes with the requirements above and with
-houses (M5), which are what relies on a foundation.
+- The person asks for containers and systems and states their
+  requirements (above). shtetl finds a foundation that meets them, or
+  builds one, and rolls, keeps and prunes it itself. Foundations leave
+  the person's commands and status: `shtetl roll F` and `shtetl pkg F`
+  become shtetl's own acts, or a house's.
+- A foundation nothing on zrun relies on goes from both spaces. The
+  lake's copies of house versions are clones of the foundation
+  versions they were made on; they are promoted first, so that they
+  hold those blocks themselves and stay restore points. Whether the
+  foundation's obj cache in foundation-builds goes with it, or stays
+  to make the next build of it short, is to be asked.
+- Required and forward is built already (m4-prune): in both spaces a
+  foundation keeps every version from the oldest one something is a
+  clone of. Until foundations are made on demand, the lake keeps a
+  foundation's newest when nothing requires it, since otherwise every
+  foundation would go as soon as it is built.
+- Not handled, by ruling: a container whose requirements only a point
+  older than a foundation's newest meets. ZFS grows a dataset's
+  history forward only (an incremental lands only on a copy's newest
+  snapshot, cell Z14), so such a point would be a foundation of its
+  own, a branch, should it ever be wanted.
+- A foundation is known by what it meets, properties on its dataset,
+  not by a recipe's name alone, so that one recipe can have more than
+  one foundation.
+- The pull (m5-create, m5-restore): a house needing a foundation zrun
+  does not hold pulls it from the version it is made on, forward. The
+  prune takes a copy nothing on zrun is a clone of, so the pull and
+  the house's clone must leave no convergence's end between them, or
+  the pull is marked in ZFS as relied on.
