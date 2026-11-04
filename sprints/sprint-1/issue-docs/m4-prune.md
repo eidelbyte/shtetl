@@ -143,3 +143,10 @@ b85742f): 30 ok, 0 failed.
   convergence's end with no refusal ("beam: prune: ..." would be
   there). The log holds no beam.log, so what it pruned is m4-box's to
   show (P24).
+
+## m4-box's build run 7
+
+Build run 7: 2026-11-04, build.sh at 3230f0f (results 025ed10): 48
+ok, 1 failed. The one failure a cell's quoting (4617a22), its
+facts all as wanted; P24 ok on the box (issue-docs/m4-box.md).
+Tested.

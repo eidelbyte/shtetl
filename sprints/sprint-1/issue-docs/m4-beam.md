@@ -268,3 +268,10 @@ b85742f): 30 ok, 0 failed.
   local": build run 4's copy, imported before pool_up destroyed it,
   as foreseen. With no copy made since, the next import has none.
 - Still owed: m4-box (B28).
+
+## m4-box's build run 7
+
+Build run 7: 2026-11-04, build.sh at 3230f0f (results 025ed10): 48
+ok, 1 failed. The one failure a cell's quoting (4617a22), its
+facts all as wanted; B28 ok on the box (issue-docs/m4-box.md).
+Tested.

@@ -54,8 +54,7 @@ M5's houses will do:
 
 - sh -n; the new helpers run on the mac against a stub zfs, their
   commands as meant; make check and gate unchanged.
-- Owed: the box. sudo sh tests/box/build.sh, its log read for B28 and
-  P24, R10 still the stall alone.
+- The box: build run 7, below.
 
 ## Gotchas
 
@@ -65,6 +64,32 @@ M5's houses will do:
 - A run stopped between breakoff and R7 leaves S2's copy with a
   receive to resume; the next run's pool_up destroys it whole.
 
+## Build run 7
+
+Build run 7: 2026-11-04, build.sh at 3230f0f (results 025ed10): 48
+ok, 1 failed. The failure was the harness's: P24 "S3's version
+and the pkg on both" got [yes yes yes <tab>    yes], the four facts it
+checks all yes, a backslash at a line's end inside the cell's double
+quotes having joined the next line's indentation into the value
+(4617a22 builds it on one line). Every other cell ok:
+
+- B28: box's update beamed onto the copy pulled by hand (one guid);
+  S1 on the lake a clone of box's first version there, arrived,
+  canmount=noauto set locally; S2's stream cut by hand ("cannot send
+  ...: signal received" from the cut send), a receive to resume left,
+  and resumed first by the next convergence, "# resume" in beam.log.
+- P24: no copy of box on the run before the pull; S1 kept while the
+  only version; after R7, S1 pruned on the run, box's first version
+  gone from the run and kept on the lake, S1 and S2 on the lake; after
+  R8, S3 alone on the run, S2 and S3 on the lake, box's first version
+  gone from both, its update kept on the lake for S2 and gone from the
+  run, S3's version and the pkg on both; beam.log's six prunings and
+  no others.
+- R1 - R10 ok, R10 the stall alone. The import was clean: no copy of
+  box was left on the run, the beam having made none.
+
+Tested. M4 is done.
+
 ## Commits
 
-"box: m4-box, the beam and the prune with a house stand-in".
+3230f0f, and 4617a22 (the cell's quoting).
