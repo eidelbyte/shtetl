@@ -131,4 +131,21 @@ writes whole at each start (plan 7.3; tests/MATRIX.md family N):
 
 7fa83e8 (matrix, Q-J1), ae2e46c (digits only), 899ab58 (the block and
 the steps), b9aec30 (the start, the daemon), a1cc52a (the worklog);
-after the ruling, 98212c9 (the docs) and the ruling's record.
+after the ruling, 98212c9 (the docs) and 734b41d (the ruling's
+record).
+
+## Box run 11
+
+Box run 11: 2026-11-05, run.sh at 734b41d (results 50b39a1): 139 ok,
+0 failed, box run 10's 138 and check_jail.
+
+- check_jail ok on FreeBSD (N1 - N6), with tests/bin's jail.
+- check_house ok: N7 - N13 and N18, zfake_files's view and move on
+  FreeBSD's libc, the start reading house.conf through var's view.
+- check_daemon ok: N15 and N7, two houses started with the daemon,
+  their jails the fake's, none stopped at its stop.
+- check_schema and check_cascade three checks more each: N16, a name
+  of digits only refused.
+- The lines on stderr are box run 10's; no house's start was said.
+- Still owed: m5-box, N14 (-cm on a running jail) and N17 (a real
+  jail from the block).
