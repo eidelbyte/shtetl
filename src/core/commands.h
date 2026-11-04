@@ -1,13 +1,16 @@
 /*
  * A foundation's packages and commands (plan 6 step 5), as steps of
- * its roll, carried from main, in the order docs/configuration.md
- * gives: the recipe's commands-external on the host, each piece by
- * sh -e with the head's path in SHTETL_ROOT, the foundation's name in
- * SHTETL_NAME and foundation in SHTETL_KIND; then in a chroot of the
+ * its roll, carried from main, and a house's as it is made (m5-create),
+ * in the order docs/configuration.md gives: the recipe's
+ * commands-external on the host, each piece by sh -e with the head's
+ * path in SHTETL_ROOT, the name in SHTETL_NAME and the kind in
+ * SHTETL_KIND; then in a chroot of the
  * head, devfs mounted on its dev and the host's resolv.conf lent for
  * pkg where the head has none, the packages (pkg -c HEAD install) and
  * the commands, each piece by /bin/sh -e; devfs unmounted and the
- * resolv.conf taken back. Every label and piece in the recipe's order.
+ * resolv.conf taken back. Every label and piece in the recipe's order,
+ * but those of the layer CM_RAN, a house's foundation's, which ran when
+ * the foundation was built (plan 5); no chroot where nothing is left.
  *
  * A failure part way leaves devfs mounted; sh_foundation_idle, which
  * every failure and every start runs, unmounts it.
@@ -21,7 +24,9 @@
 
 struct sh_commands {
 	const char		*cm_head;	/* where the head is mounted */
-	const char		*cm_name;	/* the foundation's */
+	const char		*cm_name;	/* the foundation or house */
+	const char		*cm_kind;	/* foundation, container */
+	const char		*cm_ran;	/* the layer run, or NULL */
 	const struct sh_recipe	*cm_recipe;	/* none for an upgrade */
 	const struct sh_node	*cm_pkgs;	/* the packages, or NULL */
 	const char		*cm_resolv;	/* the host's resolv.conf */

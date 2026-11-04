@@ -46,9 +46,16 @@ cm_cat(const char *a, const char *b)
 	return (cm_join(a, "", b));
 }
 
+/* Whether PR, a piece or a package, is of the layer that ran already. */
+static int
+ran(const struct sh_commands *cm, const struct sh_pair *pr)
+{
+	return (cm->cm_ran != NULL && strcmp(pr->pr_from, cm->cm_ran) == 0);
+}
+
 /*
  * Each piece of each label of KEY added to J as a child running it,
- * WORDS before the text: the step "WHAT: LABEL".
+ * WORDS before the text: the step "WHAT: LABEL"; those that ran not.
  */
 static void
 cm_pieces(struct sh_job *j, const struct sh_commands *cm, const char *key,
@@ -66,11 +73,32 @@ cm_pieces(struct sh_job *j, const struct sh_commands *cm, const char *key,
 		label = cmds->sn_obj.ob_v[i].pr_val;
 		step = cm_step(what, cmds->sn_obj.ob_v[i].pr_key);
 		for (k = 0; k < label->sn_obj.ob_n; k++) {
-			argv[nw] = label->sn_obj.ob_v[k].pr_val->sn_str;
-			sh_job_child(j, step, argv);
+			if (!ran(cm, &label->sn_obj.ob_v[k])) {
+				argv[nw] = label->sn_obj.ob_v[k].pr_val->sn_str;
+				sh_job_child(j, step, argv);
+			}
 		}
 		free(step);
 	}
+}
+
+/* How many of OBJ's packages, or with PIECES its labels' pieces, run. */
+static size_t
+torun(const struct sh_commands *cm, const struct sh_node *obj, int pieces)
+{
+	const struct sh_node *label;
+	size_t i, k, n = 0;
+
+	for (i = 0; obj != NULL && i < obj->sn_obj.ob_n; i++) {
+		if (!pieces) {
+			n += !ran(cm, &obj->sn_obj.ob_v[i]);
+			continue;
+		}
+		label = obj->sn_obj.ob_v[i].pr_val;
+		for (k = 0; k < label->sn_obj.ob_n; k++)
+			n += !ran(cm, &label->sn_obj.ob_v[k]);
+	}
+	return (n);
 }
 
 /* The host's resolv.conf lent to a head that has none, for pkg. */
@@ -134,25 +162,27 @@ sh_commands_steps(struct sh_job *j, struct sh_commands *cm)
 {
 	const struct sh_node *pkg = cm->cm_pkgs, *cmds = NULL;
 	const char **argv, *words[8];
-	char *root, *name, *dev;
-	size_t i, n = pkg != NULL ? pkg->sn_obj.ob_n : 0;
+	char *root, *name, *kind, *dev;
+	size_t i, k, n = torun(cm, pkg, 0);
 
 	if (!cm->cm_upgrade) {
 		root = cm_cat("SHTETL_ROOT=", cm->cm_head);
 		name = cm_cat("SHTETL_NAME=", cm->cm_name);
+		kind = cm_cat("SHTETL_KIND=", cm->cm_kind);
 		words[0] = "env";
 		words[1] = root;
 		words[2] = name;
-		words[3] = "SHTETL_KIND=foundation";
+		words[3] = kind;
 		words[4] = "sh";
 		words[5] = "-e";
 		words[6] = "-c";
 		cm_pieces(j, cm, "commands-external", "external", words, 7);
 		free(root);
 		free(name);
+		free(kind);
 		cmds = sh_obj_get(cm->cm_recipe->sr_merged, "commands");
 	}
-	if (n == 0 && (cmds == NULL || cmds->sn_obj.ob_n == 0))
+	if (n == 0 && torun(cm, cmds, 1) == 0)
 		return;
 	dev = sh_root_path(cm->cm_head, "dev");
 	words[0] = "mount";
@@ -173,8 +203,10 @@ sh_commands_steps(struct sh_job *j, struct sh_commands *cm)
 		argv[5] = cm->cm_upgrade ? "upgrade" : "install";
 		argv[6] = "-y";
 		argv[7] = "--";
-		for (i = 0; i < n; i++)
-			argv[8 + i] = pkg->sn_obj.ob_v[i].pr_key;
+		for (i = 0, k = 8; i < pkg->sn_obj.ob_n; i++) {
+			if (!ran(cm, &pkg->sn_obj.ob_v[i]))
+				argv[k++] = pkg->sn_obj.ob_v[i].pr_key;
+		}
 		sh_job_child(j, "pkg", argv);
 		free(argv);
 	}

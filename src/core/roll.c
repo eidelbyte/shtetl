@@ -156,32 +156,6 @@ roll_props(const struct sh_node *def, const struct sh_node *over, size_t *n)
 }
 
 /*
- * Every ver of the recipe allowing some version from LO to HI (major *
- * SH_VER_MINORS + minor), the versions NAMED: 0; -1 with the first
- * that does not.
- */
-static int
-roll_ver(const struct sh_roll *r, long lo, long hi, const char *named,
-    struct sh_err *e)
-{
-	const struct sh_node *ver, *c;
-	long clo, chi;
-	size_t i;
-
-	ver = sh_obj_get(r->r_recipe.sr_merged, "ver");
-	for (i = 0; ver != NULL && i < ver->sn_arr.ar_n; i++) {
-		c = ver->sn_arr.ar_v[i];
-		sh_ver_range(c->sn_str, &clo, &chi);
-		if (chi < lo || clo > hi) {
-			sh_errf(e, "%s: ver: %s is not %s", c->sn_from, named,
-			    c->sn_str);
-			return (-1);
-		}
-	}
-	return (0);
-}
-
-/*
  * The head unmounted, children first, and every dataset of it
  * snapshotted at once.
  */
@@ -297,6 +271,7 @@ roll_obj(struct sh_job *j, void *arg, struct sh_err *e)
 		return (-1);
 	r->r_commands.cm_head = r->r_head;
 	r->r_commands.cm_name = r->r_f->f_name;
+	r->r_commands.cm_kind = "foundation";
 	r->r_commands.cm_recipe = &r->r_recipe;
 	r->r_commands.cm_pkgs = sh_obj_get(r->r_recipe.sr_merged, "pkg");
 	r->r_commands.cm_resolv = r->r_env->re_resolv;
@@ -347,7 +322,7 @@ roll_version(struct sh_job *j, void *arg, struct sh_err *e)
 		return (-1);
 	(void) snprintf(named, sizeof (named), "%ld.%ld", major, minor);
 	v = major * SH_VER_MINORS + minor;
-	if (roll_ver(r, v, v, named, e) != 0)
+	if (sh_recipe_ver(&r->r_recipe, v, v, named, e) != 0)
 		return (-1);
 	if (b->br_type == SH_BR_RELENG)
 		(void) snprintf(r->r_ver, sizeof (r->r_ver), "%ld.%ld-releng",
@@ -534,7 +509,6 @@ roll_recipe(struct sh_job *j, void *arg, struct sh_err *e)
 	const struct sh_branch *b = &r->r_branch;
 	const char *branch;
 	char target[512];
-	long v;
 
 	(void) snprintf(target, sizeof (target), "foundations/%s",
 	    r->r_f->f_name);
@@ -544,11 +518,7 @@ roll_recipe(struct sh_job *j, void *arg, struct sh_err *e)
 	/* resolved, a foundation's src_branch is there and well formed */
 	branch = sh_obj_get(r->r_recipe.sr_merged, "src_branch")->sn_str;
 	(void) sh_syn_branch(branch, &r->r_branch);
-	v = b->br_major * SH_VER_MINORS;
-	if ((b->br_type == SH_BR_RELENG && roll_ver(r, v + b->br_minor,
-	    v + b->br_minor, branch, e) != 0) ||
-	    (b->br_type == SH_BR_STABLE && roll_ver(r, v,
-	    v + SH_VER_MINORS - 1, branch, e) != 0))
+	if (sh_recipe_branch(&r->r_recipe, b, branch, e) != 0)
 		return (-1);
 	sh_job_call(j, "head", roll_head, r);
 	r->r_src.sc_build = r->r_build;

@@ -885,3 +885,38 @@ sh_recipe_free(struct sh_recipe *r)
 	free(r->sr_root);
 	(void) memset(r, 0, sizeof (*r));
 }
+
+int
+sh_recipe_ver(const struct sh_recipe *r, long lo, long hi,
+    const char *named, struct sh_err *e)
+{
+	const struct sh_node *ver, *c;
+	long clo, chi;
+	size_t i;
+
+	ver = sh_obj_get(r->sr_merged, "ver");
+	for (i = 0; ver != NULL && i < ver->sn_arr.ar_n; i++) {
+		c = ver->sn_arr.ar_v[i];
+		sh_ver_range(c->sn_str, &clo, &chi);
+		if (chi < lo || clo > hi) {
+			sh_errf(e, "%s: ver: %s is not %s", c->sn_from, named,
+			    c->sn_str);
+			return (-1);
+		}
+	}
+	return (0);
+}
+
+int
+sh_recipe_branch(const struct sh_recipe *r, const struct sh_branch *b,
+    const char *named, struct sh_err *e)
+{
+	long v = b->br_major * SH_VER_MINORS;
+
+	if (b->br_type == SH_BR_RELENG)
+		return (sh_recipe_ver(r, v + b->br_minor, v + b->br_minor,
+		    named, e));
+	if (b->br_type == SH_BR_STABLE)
+		return (sh_recipe_ver(r, v, v + SH_VER_MINORS - 1, named, e));
+	return (0);
+}

@@ -10,6 +10,7 @@
 
 #include "core/err.h"
 #include "core/schema.h"
+#include "core/syntax.h"
 #include "core/tree.h"
 
 /* How deep imports may nest. */
@@ -71,5 +72,21 @@ const struct sh_layer *sh_recipe_layer(const struct sh_recipe *r,
  */
 char *sh_recipe_rel(const struct sh_recipe *r, const char *from,
     const char *rel);
+
+/*
+ * Every ver of R allowing some version from LO to HI (major *
+ * SH_VER_MINORS + minor), the versions NAMED: 0; -1 with the first
+ * that does not, "FILE: ver: NAMED is not VER".
+ */
+int sh_recipe_ver(const struct sh_recipe *r, long lo, long hi,
+    const char *named, struct sh_err *e);
+
+/*
+ * Every ver of R held by the branch B, named NAMED: a releng branch's
+ * one version, each minor of a stable one; main names no version until
+ * its checkout does, and is held here. 0, or -1 as sh_recipe_ver.
+ */
+int sh_recipe_branch(const struct sh_recipe *r, const struct sh_branch *b,
+    const char *named, struct sh_err *e);
 
 #endif	/* SH_CASCADE_H */
