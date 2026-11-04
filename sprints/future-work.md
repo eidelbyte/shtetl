@@ -6,11 +6,17 @@ it would touch. An item moves into a sprint's plan when it is ruled.
 ## Container requirements (asked 2026-11-03)
 
 The author: "containers shouldn't pin foundation names, just
-requirements like version and kernel options". Today a house recipe
-states only `ver` constraints (docs/configuration.md 4), and m5-create
-clones a new house from the newest foundation version on zrun that its
-`ver` allows. Nothing a container states can ask for a kernel option,
-a build option or a point on a foundation's timeline.
+requirements like version and kernel options", and then "containers
+will never lock you into a [foundation], it's just that we'll run a
+compatibility check between the container and the picked foundation.
+I guess the user will have to pick a foundation during picking a
+container" (plan 18). So the person picks a container's foundation,
+`shtetl create H --on F`, and the container's requirements are checked
+against it; they choose nothing. Today a house recipe states only
+`ver` constraints (docs/configuration.md 4), held against the picked
+foundation's branch (m5-create). Nothing a container states can ask
+for a kernel option, a build option or a point on a foundation's
+timeline.
 
 To flesh out:
 
@@ -22,8 +28,13 @@ To flesh out:
 - Where a requirement is read on a foundation version: from the
   shaken foundation.conf the version carries (plan 5), its facts, not
   its name.
-- What happens when no foundation version meets them: a foundation
-  made for them (below).
+- What the check says when the picked foundation does not meet them:
+  the create refused with the requirement it fails, as a ver that
+  does not hold is now.
+- A container not locked to its foundation: moving one to another,
+  a pick again and the check, then a roll onto it. Plan 17 holds
+  moving a house to another foundation recipe out of scope; this
+  would bring it in.
 - What a house does when its foundation's next version stops meeting
   them: it stays on its version, or stalls, as a ver that no longer
   holds does today.
@@ -35,11 +46,12 @@ systems and foundations get built behind the scenes to fulfill
 requirements", and "just prune unused foundations from everywhere and
 just keep required + forward" (plan 18).
 
-- The person asks for containers and systems and states their
-  requirements (above). shtetl finds a foundation that meets them, or
-  builds one, and rolls, keeps and prunes it itself. Foundations leave
-  the person's commands and status: `shtetl roll F` and `shtetl pkg F`
-  become shtetl's own acts, or a house's.
+- The person asks for containers and systems, picking each one's
+  foundation, and states their requirements (above), which are
+  checked against the pick. shtetl builds a picked foundation that is
+  not built yet, and rolls, keeps and prunes it itself. Foundations
+  leave the person's other commands and status: `shtetl roll F` and
+  `shtetl pkg F` become shtetl's own acts, or a house's.
 - A foundation nothing on zrun relies on goes from both spaces. The
   lake's copies of house versions are clones of the foundation
   versions they were made on; they are promoted first, so that they

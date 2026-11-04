@@ -48,10 +48,10 @@ version (tests/MATRIX.md family H):
 
 ## Decisions beyond the plan
 
-- `--on F` for now. Choosing a foundation without it would need each
-  foundation's shaken recipe before the clone, from every lake head;
-  that comes with the container requirements (sprints/future-work.md).
-  The docs already gave `--on`.
+- `--on F`, the person picking the foundation, as the docs gave it,
+  and since ruled (2026-11-03, plan 18): a container's requirements
+  are a compatibility check against the foundation picked, not a
+  chooser; its ver is the check there is so far.
 - The create always pulls, also where the run's copy holds the version
   already: the convergence that follows tells it at once. One path.
 - The create snapshot is named <date>-create, not the plan's

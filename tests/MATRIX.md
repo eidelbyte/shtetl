@@ -907,8 +907,9 @@ the trigger {a convergence, a roll's end}.
 ## Family H: a house made (m5-create)
 
 Plan 4, 7.1: `shtetl create H --on F`, a container's first version,
-the person naming the foundation until a container's requirements
-choose it (sprints/future-work.md). The version is cloned from F's
+the person picking the foundation and the container's requirements
+checked against it, its ver for now (ruled 2026-11-03). The version is
+cloned from F's
 newest version, on zrun's copy of F: the create always asks the beam
 to pull F from it on (B33), and the clone is made when it is told the
 copy has arrived, before that convergence's prune (P), so a pulled

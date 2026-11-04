@@ -1167,3 +1167,21 @@ once foundations are built on demand to meet the requirements of the
 containers and systems the person asks for; until then the lake keeps
 its newest. Foundations drop out of the person's view: they are
 shtetl's to build, keep and prune (sprints/future-work.md).
+
+### 2026-11-03 (a container's foundation: picked, then checked)
+
+Told that m5-create has the person name the foundation, `shtetl
+create H --on F`, until a container's requirements choose it, the
+author answered:
+
+    oh containers will never lock you into a container, it's just
+    that we'll run a compatibility check between the container and the
+    picked foundation. I guess the user will have to pick a foundation
+    during picking a container, that's true
+
+So `--on F` is the design, not a stopgap: the person picks a
+container's foundation as they make it, and the container's
+requirements are a compatibility check against the pick, not a way to
+choose one; its ver is the check built (m5-create). A container is not
+bound to its foundation for good ("lock you into a container" read as
+a foundation): moving one is future work (sprints/future-work.md).

@@ -155,8 +155,9 @@ act_roll(struct daemon *d, int argc, char **argv, FILE *out,
 /*
  * shtetl create CONTAINER --on FOUNDATION: the house asked for, on the
  * foundation's newest version, the reply at once; the create is the
- * daemon's, and status shows it. The person names the foundation until
- * a container's requirements choose it (sprints/future-work.md).
+ * daemon's, and status shows it. The person picks the foundation, and
+ * the container's requirements are checked against it, its ver for now
+ * (ruled 2026-11-03; sprints/future-work.md).
  */
 static int
 act_create(struct daemon *d, int argc, char **argv, FILE *out,
