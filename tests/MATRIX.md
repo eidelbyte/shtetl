@@ -959,3 +959,59 @@ reply}.
 | H15 | status | "house H active VERSION", "house H creating STEP" | tests/check_house.c |
 | H16 | the daemon: shtetl create H --on F | the reply at once, the create the daemon's; the usage, an invalid name, "F: no such foundation", "H: exists"; a house with a complete version started with the daemon, its line in status | tests/check_daemon.c |
 | H17 | the box: a container made on the M3 foundation, pulled | box: m5-box | box |
+
+## Family N: a container's jail (m5-jail)
+
+Plan 5, 7.3: a container is started and stopped through its jail,
+made and removed from a block shtetl writes whole to
+/etc/jail.conf.d/H.conf at each start and never reads back. The
+block holds what main's held (ruled 2026-10-14 on main, carried): the
+path, the version's root as ZFS has it mounted, /containers/H; the
+hostname H; rc's start and stop; exec.clean; mount.devfs with
+devfs_ruleset 4; the host's network inherited; then the pieces of the
+house's jailconf, each line a tab in. The jailconf is read from the
+shaken house recipe in the active version's create or update
+snapshot, which nothing in the jail could have written: through the
+snapshot of the dataset that holds var/db/shtetl, the one mounted
+nearest above it. Start is jail -f FILE -cm H, which makes the jail
+and leaves one that runs already as it is, so a start after a crash
+is a first start; stop is jail -f FILE -r H, which undoes mount.devfs
+only for a jail its configuration names (box run 1). The jail's name
+is the house's, so jexec H and pkg -j H reach it, and a name of
+digits only is refused, since jail(8) takes digits for a jail's id
+(ruled 2026-10-14 on main, carried). A create starts the jail last,
+after the place, and a failure to start is the create's; the house
+actor's start starts every house's active version.
+
+Dimensions: the block {its fixed lines, jailconf none, one piece,
+pieces of several layers, a piece of several lines with blank ones, a
+last line with no newline, a block there before, a directory it
+cannot be written in}; the shaken recipe read {from the create
+snapshot, from an update snapshot, var/db/shtetl in the root, in a
+child dataset, the live tree changed after the snapshot, missing from
+the snapshot, a link on the way}; jail(8) {starting, stopping, ending
+well, refusing; the jail running already}; when {a create's end, the
+actor's start, the daemon's start, the daemon's stop}; a name {digits
+only, as a recipe's, create's, in requires}; what it says {status, the
+log, the sink}.
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| N1 | the block | written whole to <jails>/H.conf: a comment, "H {", path the version's mount, host.hostname H, exec.start "/bin/sh /etc/rc", exec.stop "/bin/sh /etc/rc.shutdown jail", exec.clean, mount.devfs, devfs_ruleset 4, ip4 and ip6 inherit, "}" | tests/check_jail.c |
+| N2 | jailconf's pieces: none; one; several layers; lines with blank ones; a last line with no newline | none: no line; each line a tab in, in the layers' order, blank lines dropped, every line ended | tests/check_jail.c |
+| N3 | a block there before | replaced whole | tests/check_jail.c |
+| N4 | a block that cannot be written | refused, "FILE: why" | tests/check_jail.c |
+| N5 | the start's and the stop's steps | a child named jail: jail -f FILE -cm H; jail -f FILE -r H | tests/check_jail.c |
+| N6 | jail(8) refusing | "jail: exited 1", its words in the log | tests/check_jail.c |
+| N7 | read from the version's create or update snapshot | the snapshot's jailconf, not the live tree's: house.conf rewritten after the snapshot, its directory renamed | tests/check_house.c (create), tests/check_daemon.c (update) |
+| N8 | var/db/shtetl in a child dataset | read through that dataset's snapshot, not the root's | tests/check_house.c |
+| N9 | house.conf not in the snapshot; a link on the way | the start refused, "block: PATH: why" | tests/check_house.c; a link mapped to I13 |
+| N10 | a create's end | the block written and the jail started after the place, the last steps; the house active | tests/check_house.c |
+| N11 | a create whose jail does not start | "house H: jail: exited 1"; the version destroyed, the block it wrote removed, the house gone | tests/check_house.c |
+| N12 | the actor's start | every house's active version's jail started; "house H starting STEP" meanwhile, then "house H active VERSION" | tests/check_house.c |
+| N13 | the actor's start, one house's jail failing | said, "house H: jail: why", in H.log too; it active still; the others started | tests/check_house.c |
+| N14 | a start finding the jail running already | -cm: it runs on, nothing run in it again | box: m5-box (the fake jail runs nothing) |
+| N15 | the daemon's start and stop | the houses started with their jails, the blocks in the daemon's directory for them; at its stop no jail stopped (Q-J1 asked) | tests/check_daemon.c |
+| N16 | a name of digits only | refused: "containers/123: invalid recipe name: digits only", create's "123: invalid name: digits only", a requires entry | tests/check_cascade.c, tests/check_daemon.c, tests/check_schema.c |
+| N17 | the box: a real jail from the block | made, devfs at path/dev, jexec H and pkg -j H reach it; jail -r takes devfs away | box: m5-box |
+| N18 | the fake keeping files (zfake_files) | a snapshot of a mounted filesystem shows its files, not a child's, at MOUNT/.zfs/snapshot/SNAP; a mounted filesystem a mountpoint set moves takes its files along | tests/check_house.c, through N7, N8, N10; the real ones held on the box by I12, I14 and Z20 |
