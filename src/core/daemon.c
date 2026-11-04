@@ -27,6 +27,7 @@
 #include "core/daemon.h"
 #include "core/err.h"
 #include "core/foundation.h"
+#include "core/house.h"
 #include "core/job.h"
 #include "core/mem.h"
 #include "core/prune.h"
@@ -59,11 +60,15 @@ struct daemon {
 	struct sh_rollenv	d_env;
 	struct sh_beamenv	d_benv;
 	struct sh_beam		*d_beam;	/* with the lake and the run */
+	struct sh_house		**d_houses;
+	size_t			d_nhouses;
+	struct sh_houseenv	d_henv;
 	struct conn		*d_conns;
 };
 
 static const char usage[] =
 	"usage: shtetl daemon\n"
+	"       shtetl create CONTAINER --on FOUNDATION\n"
 	"       shtetl pkg FOUNDATION\n"
 	"       shtetl roll FOUNDATION\n"
 	"       shtetl show [RECIPE]\n"
@@ -107,6 +112,8 @@ act_status(struct daemon *d, int argc, char **argv, FILE *out,
 	}
 	for (f = 0; f < d->d_nfound; f++)
 		sh_foundation_status(d->d_found[f], out);
+	for (f = 0; f < d->d_nhouses; f++)
+		sh_house_status(d->d_houses[f], out);
 	if (d->d_beam != NULL)
 		sh_beam_status(d->d_beam, out);
 	return (0);
@@ -143,6 +150,49 @@ act_roll(struct daemon *d, int argc, char **argv, FILE *out,
 	f = sh_foundation_find(&d->d_found, &d->d_nfound, d->d_froot,
 	    argv[1]);
 	return (sh_roll_ask(f, &d->d_env, config, build, 0, e) != 0);
+}
+
+/*
+ * shtetl create CONTAINER --on FOUNDATION: the house asked for, on the
+ * foundation's newest version, the reply at once; the create is the
+ * daemon's, and status shows it. The person names the foundation until
+ * a container's requirements choose it (sprints/future-work.md).
+ */
+static int
+act_create(struct daemon *d, int argc, char **argv, FILE *out,
+    struct sh_err *e)
+{
+	const struct sh_foundation *f = NULL;
+	char config[1024];
+	const char *why;
+	size_t i;
+
+	(void) out;
+	if (argc != 4 || strcmp(argv[2], "--on") != 0) {
+		(void) fputs(usage, e->se_out);
+		return (2);
+	}
+	if ((why = sh_syn_name(argv[1])) != NULL) {
+		sh_errf(e, "%s: invalid name: %s", argv[1], why);
+		return (1);
+	}
+	if (d->d_beam == NULL) {
+		sh_errf(e, "no %s space", d->d_froot == NULL ? "lake" : "run");
+		return (1);
+	}
+	if (mounted(d, SH_SP_CONFIG, config, sizeof (config), e) != 0)
+		return (1);
+	for (i = 0; f == NULL && i < d->d_nfound; i++) {
+		if (strcmp(d->d_found[i]->f_name, argv[3]) == 0)
+			f = d->d_found[i];
+	}
+	if (f == NULL || f->f_newest == NULL) {
+		sh_errf(e, "%s: %s", argv[3], f == NULL ?
+		    "no such foundation" : "no version");
+		return (1);
+	}
+	return (sh_house_create(&d->d_houses, &d->d_nhouses, argv[1],
+	    f->f_ds, f->f_newest, &d->d_henv, config, e) != 0);
 }
 
 /* shtetl pkg FOUNDATION: a pkg roll asked for, the reply at once */
@@ -187,6 +237,7 @@ static const struct {
 	int		(*a_fn)(struct daemon *, int, char **, FILE *,
 			    struct sh_err *);
 } acts[] = {
+	{ "create", act_create },
 	{ "pkg", act_pkg },
 	{ "roll", act_roll },
 	{ "show", act_show },
@@ -261,6 +312,16 @@ pruned(void *arg, struct sh_err *e)
 	    d->d_benv.be_log, e);
 	sh_site_free(&s);
 	return (r);
+}
+
+/* A house's pull: the beam's (m5-create). */
+static void
+pull(void *arg, const char *snap,
+    void (*done)(void *, const char *, const char *), void *darg)
+{
+	struct daemon *d = arg;
+
+	sh_beam_pull(d->d_beam, snap, done, darg);
 }
 
 /* A foundation's version made: the beam carries it to the run. */
@@ -452,6 +513,10 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 		    &d.d_nfound, e) != 0)
 			goto out;
 	}
+	if (d.d_sp.ss_root[SH_SP_RUN] != NULL &&
+	    sh_houses_start(z, d.d_sp.ss_root[SH_SP_RUN], &d.d_houses,
+	    &d.d_nhouses, e) != 0)
+		goto out;
 	if (mkdir(logdir, 0755) != 0 && errno != EEXIST) {
 		sh_errf(e, "%s: %s", logdir, strerror(errno));
 		goto out;
@@ -502,6 +567,16 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 		d.d_benv.be_done = pruned;
 		d.d_benv.be_darg = &d;
 		d.d_beam = sh_beam_start(&d.d_benv);
+		d.d_henv.he_z = z;
+		d.d_henv.he_kq = d.d_kq;
+		d.d_henv.he_lake = d.d_benv.be_lake;
+		d.d_henv.he_run = d.d_benv.be_run;
+		d.d_henv.he_resolv = "/etc/resolv.conf";
+		d.d_henv.he_logdir = logdir;
+		d.d_henv.he_err = e;
+		d.d_henv.he_flags = SF_IMMUTABLE;
+		d.d_henv.he_pull = pull;
+		d.d_henv.he_parg = &d;
 	}
 	/*
 	 * One event at a time: an event that ends a job or a connection
@@ -535,6 +610,8 @@ out:
 	/* what a stopped roll leaves, the next start puts back */
 	for (f = 0; f < d.d_nfound; f++)
 		sh_roll_stop(d.d_found[f]);
+	/* and a stopped create: its version, not complete, destroyed */
+	sh_houses_free(d.d_houses, d.d_nhouses);
 	if (d.d_beam != NULL)
 		sh_beam_stop(d.d_beam);
 	if (d.d_benv.be_log != NULL)

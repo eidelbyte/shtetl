@@ -24,6 +24,7 @@
 
 static const char usage[] =
 	"usage: shtetl daemon\n"
+	"       shtetl create CONTAINER --on FOUNDATION\n"
 	"       shtetl pkg FOUNDATION\n"
 	"       shtetl roll FOUNDATION\n"
 	"       shtetl show [RECIPE]\n"
@@ -155,6 +156,7 @@ main(void)
 	    "space config tank/config\n"
 	    "space run fast/run\n"
 	    "foundation generic idle v1\n"
+	    "house web active v1-web\n"
 	    "beam converged\n";
 	static const char *const v0[] = { "tank/lake/foundations/generic@v0" };
 	static const char *const v1[] = { "tank/lake/foundations/generic@v1" };
@@ -178,6 +180,16 @@ main(void)
 	char *rollgen[] = { "roll", "generic" };
 	char *pkg[] = { "pkg" };
 	char *pkgnope[] = { "pkg", "nope" };
+	char *create[] = { "create", "web" };
+	char *createbad[] = { "create", "bad/name", "--on", "generic" };
+	char *createnope[] = { "create", "web2", "--on", "nope" };
+	char *createweb[] = { "create", "web", "--on", "generic" };
+	static const struct sh_zprop house[] = {
+		{ "shtetl:house", "web" }, { "canmount", "noauto" }
+	};
+	static const struct sh_zprop created = { "shtetl:kind", "create" };
+	static const char *const made[] = { "fast/run/containers/v1-web@c" };
+	struct sh_zprop conts = { "mountpoint", NULL };
 	char *big;
 	char buf[64], wantpid[32], zconfig[1024];
 	size_t len;
@@ -211,6 +223,16 @@ main(void)
 	    &c.c_err) == 0);
 	CHECK(sh_zfs_snapshot(z, v0, 1, NULL, 0, &c.c_err) == 0);
 	CHECK(sh_zfs_snapshot(z, v1, 1, NULL, 0, &c.c_err) == 0);
+	/*
+	 * H16: a house with a complete version, the run's containers below
+	 * the scratch directory: started with the daemon, active, placed
+	 */
+	conts.zp_value = scratch_path("containers");
+	CHECK(sh_zfs_create(z, "fast/run/containers", &conts, 1,
+	    &c.c_err) == 0);
+	CHECK(sh_zfs_create(z, "fast/run/containers/v1-web", house, 2,
+	    &c.c_err) == 0);
+	CHECK(sh_zfs_snapshot(z, made, 1, &created, 1, &c.c_err) == 0);
 
 	/* D12: a socket's path holding what a dead daemon left */
 	scratch_write("sock", "left\n");
@@ -372,6 +394,16 @@ main(void)
 	CHECK(sht(1, pkg) == 2 && strcmp(ebuf, usage) == 0);
 	CHECK(sht(2, pkgnope) == 1 &&
 	    strcmp(ebuf, "shtetl: nope: no such foundation\n") == 0);
+	CHECK(status() == 0 && strcmp(obuf, want) == 0);
+	/* H16: create's words; a name, a foundation, a house there */
+	CHECK(sht(2, create) == 2 && strcmp(ebuf, usage) == 0);
+	CHECK(sht(4, createbad) == 1 && strncmp(ebuf, "shtetl: bad/name: "
+	    "invalid name: ", sizeof ("shtetl: bad/name: invalid name: ") -
+	    1) == 0);
+	CHECK(sht(4, createnope) == 1 &&
+	    strcmp(ebuf, "shtetl: nope: no such foundation\n") == 0);
+	CHECK(sht(4, createweb) == 1 &&
+	    strcmp(ebuf, "shtetl: web: exists\n") == 0);
 	CHECK(status() == 0 && strcmp(obuf, want) == 0);
 
 	/* D10: SIGTERM: exit 0, the socket gone */
