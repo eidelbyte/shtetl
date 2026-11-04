@@ -143,3 +143,24 @@ the same container (issue-docs/m5-jail.md, "The jail's box cells in
 build.sh"): s2web made by shtetl create on box's newest version, the
 run's copy of box pulled whole, the stand-ins gone. Owed: the box's
 build run.
+
+## The altroot, found in build run 9
+
+Build run 9 (618de48, m5-jail's worklog) placed s2web at the pool's
+altroot twice. sh_zfs_native (9ef301d) gave a mountpoint as zfs get
+does, the pool's altroot before it, and place() set the run's
+containers' mountpoint with /H after it into the version's
+mountpoint, which ZFS then puts below the altroot again. On a pool
+with no altroot the two agree, which is why make check and the
+design never met it; the box's pools all have one. At the daemon's
+next start activate() found the mountpoint not the place, set it on a
+mounted root a running jail used, and ZFS refused it busy.
+
+Fixed in e2eab12: sh_zfs_native takes the altroot off a mountpoint
+(zfs_prop_get always puts it there, libzfs_dataset.c), so the
+property's value is what is read, compared and set; where a
+filesystem is mounted, the altroot with it, stays sh_zfs_mounted's,
+which the jail's path comes from. Z21's helper had cut everything
+before "/zc-" off, which hid it on the box; it compares exactly now,
+and Z22 sets a mountpoint back as native read it. house.c needed no
+change. Owed: run.sh, Z21 and Z22 over libzfs.

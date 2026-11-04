@@ -185,3 +185,35 @@ Two changes to what was there:
   of a run too, so a run stopped part way leaves nothing for the next.
 
 Verified: sh -n and dash -n; the box's build run is owed.
+
+## Build run 9
+
+Build run 9: 2026-11-05, build.sh at 99b96f1 (results 618de48): 61
+ok, 2 failed. Every R, B and P cell ok, R10 among them, the stand-in
+gone before R9's restart.
+
+- Ok: H17's pull (no copy of box on the run, then s2web active on
+  box's newest version, its root a clone of the copy); every N17 cell
+  (the block, the jail at the version's path, devfs at its dev,
+  jexec, pkg -j, jail -r), though at the wrong path, as below; N15
+  (the daemon stopped, the jail running on).
+- FAIL H17 "placed": the version's mountpoint
+  /var/tmp/s2box/var/tmp/s2box/containers/s2web, the pool's altroot
+  twice. sh_zfs_native gave the run's containers' mountpoint with the
+  altroot before it, as zfs get does, and create's place set that
+  with /s2web after it into the property, which ZFS puts below the
+  altroot again. The jail ran there, the block saying the same path,
+  so N17 held together around the wrong place.
+- FAIL N14 "started again": no status line. The daemon's start
+  compared the version's mountpoint, the altroot twice, with the place
+  it computed, once, set it again on the root the running jail used,
+  and ZFS said "pool or dataset is busy"; sh_houses_start failed, and
+  the daemon never started (syslog, shtetl[2013]). N14's syslog cell
+  passed over that line, counting only "house s2web:" lines.
+- Fixed: e2eab12, sh_zfs_native's mountpoint without the altroot, so
+  what it reads is what sh_zfs_set takes; Z21 exact, Z22 the round
+  trip on the box's altroot (m5-create's worklog); e02b849, N14's
+  syslog cell counting every line from before the restart.
+- Raised: one house's refusal at the daemon's start stops the whole
+  daemon, against plan 1's "holds nobody up" (Q-H1).
+- Owed: run.sh (Z21, Z22 over libzfs) and the next build run.
