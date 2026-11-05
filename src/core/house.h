@@ -24,18 +24,24 @@ enum sh_hstate {
 	SH_H_CREATING,
 	SH_H_STARTING,
 	SH_H_FAILED,		/* left out at the start, ZFS refusing */
-	SH_H_UPGRADING
+	SH_H_UPGRADING,
+	SH_H_ROLLING
 };
 
 struct sh_hmake;
+struct sh_hroll;
 struct sh_houseenv;
 
 struct sh_house {
 	char				*h_name;	/* its shtetl:house */
 	enum sh_hstate			h_state;
 	char				*h_active;	/* the active root */
+	char				*h_stall;	/* its shtetl:stall */
 	const struct sh_houseenv	*h_env;
 	struct sh_hmake			*h_make;	/* a create */
+	struct sh_hroll			*h_roll;	/* a roll */
+	char				**h_clean;	/* incomplete, */
+	size_t				h_nclean;	/* to destroy */
 	struct sh_job			h_job;		/* the act's */
 	FILE				*h_log;		/* H.log, in one */
 	struct sh_err			h_lerr;		/* to it, "# " */
@@ -45,7 +51,8 @@ struct sh_house {
 struct sh_houseenv {
 	struct sh_zfs	*he_z;
 	int		he_kq;
-	const char	*he_run;	/* the run's root */
+	const char	*he_lake;	/* the spaces' roots */
+	const char	*he_run;
 	const char	*he_resolv;	/* the host's resolv.conf */
 	const char	*he_logdir;	/* each house's log, H.log */
 	const char	*he_jails;	/* the jails' blocks, H.conf */
@@ -62,16 +69,22 @@ struct sh_houseenv {
 
 /*
  * The houses among ENV's run's containers, sorted by name into *HP and
- * *NP, each started from ZFS: a version that is not complete, a create
- * a crash cut short, destroyed; the newest complete one, by its
- * origin's createtxg, active, and mounted at <containers>/<house>
- * where it is not; then its jail started (sh_house_create's last
+ * *NP, each started from ZFS. First every copy of a foundation on the
+ * run is unmounted, a roll a crash cut short having left it mounted.
+ * The newest complete version, by its origin's createtxg, is active:
+ * every other version placed at <containers>/<house>, a swap a crash
+ * left undone, unmounted and given back its own path (m5-roll), and
+ * the active one mounted at <containers>/<house> where it is not; its
+ * shtetl:stall read; then its jail started (sh_house_create's last
  * steps), the house starting until it is, and a start that fails said
- * to ENV's sink, "house H: why". A house ZFS refuses a step of is said
- * to the sink once, "house H: why", and left out, failed, until the
- * next start; the rest go on (ruled 2026-11-05, Q-H1). -1 when ZFS
- * refuses the run's containers themselves, said to E. ENV outlives
- * the houses.
+ * to ENV's sink, "house H: why". A version that is not complete is
+ * destroyed: a house's, after its start, by its job, every open
+ * zfs_rebase run on it aborted first, a roll a crash cut short; one of
+ * a house with no complete version, a create cut short, at once. A
+ * house ZFS refuses a step of is said to the sink once, "house H:
+ * why", and left out, failed, until the next start; the rest go on
+ * (ruled 2026-11-05, Q-H1). -1 when ZFS refuses the run's containers
+ * themselves, said to E. ENV outlives the houses.
  */
 int sh_houses_start(const struct sh_houseenv *env, struct sh_house ***hp,
     size_t *np, struct sh_err *e);
@@ -113,6 +126,26 @@ int sh_house_save(struct sh_house *h, struct sh_err *e);
  * to ENV's sink, "house H: why". Refused, said to E, as a save is.
  */
 int sh_house_pkg(struct sh_house *h, struct sh_err *e);
+
+/*
+ * H rolled onto the next version of its foundation the run's copy
+ * holds, the oldest newer than its active version's origin (plan 7.2,
+ * tests/MATRIX.md family W): its stall cleared, then a job of the
+ * steps: the jail stopped; the final save; the copy mounted; the
+ * replay into the new version, named as a create names one; its own
+ * datasets cloned from the final save; what its recipe gained, read
+ * against the old version's house.conf; house.conf; the update
+ * snapshot; the swap; the start; the copy unmounted where no other
+ * house's roll is on it; the beam told. "house H rolling STEP"
+ * meanwhile. A failure before the update snapshot aborts the open
+ * zfs_rebase runs on the new version, destroys it, starts the old
+ * version again and stalls H: shtetl:stall on it, the step and why,
+ * said once to ENV's sink. CONFIG is where zconfig is mounted; *HP the
+ * houses, another's roll being on the same copy. Refused, said to E:
+ * "H: up to date", or as a save is.
+ */
+int sh_house_roll(struct sh_house ***hp, size_t *np, struct sh_house *h,
+    const char *config, struct sh_err *e);
 
 /* H's line of shtetl status. */
 void sh_house_status(const struct sh_house *h, FILE *out);

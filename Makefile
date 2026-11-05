@@ -81,7 +81,7 @@ SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS)
 TESTS = check_mem check_zfs check_spaces check_daemon check_foundation \
 	check_parse check_schema check_site check_cascade check_show \
 	check_shake check_job check_src check_roll check_install check_beam \
-	check_prune check_house check_jail
+	check_prune check_house check_jail check_hroll
 
 ALL_portable = $(SHTETL_OBJS)
 ALL_freebsd = shtetl $(BUILD)/box_zcheck $(BUILD)/box_shake

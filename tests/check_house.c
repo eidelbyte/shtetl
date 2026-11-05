@@ -607,16 +607,16 @@ main(void)
 	CHECK(is(settle(), "house web active " VWEB "\n"));
 
 	/*
-	 * H13: an incomplete version, a create a crash cut short:
-	 * destroyed at the start; web active still
+	 * H13: an incomplete version beside a complete one, cut short by a
+	 * crash: destroyed by the start's job, after the start; web active
 	 */
 	CHECK(sh_zfs_clone(z, RF "/g@" V, RC "/cut-web", NULL, 0,
 	    &c.c_err) == 0 &&
 	    sh_zfs_set(z, RC "/cut-web", "shtetl:house", "web",
 	    &c.c_err) == 0);
 	restart();
-	CHECK(nh == 1 && !there(RC "/cut-web") &&
-	    is(settle(), "house web active " VWEB "\n"));
+	CHECK(nh == 1 && is(settle(), "house web active " VWEB "\n") &&
+	    !there(RC "/cut-web"));
 
 	/*
 	 * N13, N9: two houses started again, web's house.conf gone from
@@ -677,9 +677,10 @@ main(void)
 	CHECK(is(slurp("fake.log"), want));
 	CHECK(create("app") == -1 && is(cap_text(&c), "app: exists\n"));
 	/*
-	 * H19: an incomplete version ZFS will not destroy: the house
-	 * failed, said once, its complete version left as it is; the other
-	 * started; the next start destroys it and starts both
+	 * H19: an incomplete version ZFS will not destroy: cleaned by the
+	 * start's job, after the jail, so the house runs on its complete
+	 * version all the same, the refusal said once; the next start
+	 * destroys it
 	 */
 	CHECK(sh_zfs_clone(z, RF "/g@" V, RC "/cut-web", NULL, 0,
 	    &c.c_err) == 0 &&
@@ -687,15 +688,15 @@ main(void)
 	    &c.c_err) == 0);
 	(void) unlink(scratch_path("fake.log"));
 	cap_reset(&sys);
-	zfake_fail("destroy");
 	restart();
+	zfake_fail("destroy");
 	CHECK(is(settle(), "house app active 15.1-releng-T-app\n"
-	    "house web failed\n") && there(RC "/cut-web"));
-	CHECK(is(cap_text(&sys), "house web: zfake: destroy failed as "
+	    "house web active " VWEB "\n") && there(RC "/cut-web"));
+	CHECK(is(cap_text(&sys), "house web: clean: zfake: destroy failed as "
 	    "asked\n"));
-	(void) snprintf(want, sizeof (want), "jail -f %s/app.conf -cm app\n",
-	    jails);
-	CHECK(is(slurp("fake.log"), want));
+	CHECK((text = slurp("fake.log")) != NULL &&
+	    strstr(text, "-cm app\n") != NULL && strstr(text, "-cm web\n") !=
+	    NULL);
 	cap_reset(&sys);
 	restart();
 	CHECK(is(settle(), "house app active 15.1-releng-T-app\n"

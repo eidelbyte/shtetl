@@ -958,13 +958,13 @@ reply}.
 | H10 | H a house already; no recipe | "H: exists"; the recipe's words | tests/check_house.c |
 | H11 | a second create of H while one is under way | "H: creating" | tests/check_house.c |
 | H12 | the actor at its start: one complete version | active, mounted at /containers/H, mounted already left | tests/check_house.c |
-| H13 | the actor at its start: an incomplete version | destroyed; the newest complete one active | tests/check_house.c |
+| H13 | the actor at its start: an incomplete version | beside a complete one, destroyed by the house's start job after its jail; alone, a create cut short, destroyed at once; the newest complete one active | tests/check_house.c |
 | H14 | the actor at its start: two complete versions | the newest by its origin's createtxg active; the others unmounted and put back to their own paths | mapped to W13 (m5-roll) |
 | H15 | status | "house H active VERSION", "house H creating STEP" | tests/check_house.c |
 | H16 | the daemon: shtetl create H --on F | the reply at once, the create the daemon's; the usage, an invalid name, "F: no such foundation", "H: exists"; a house with a complete version started with the daemon, its line in status | tests/check_daemon.c |
 | H17 | the box: a container made on the M3 foundation, pulled | made by shtetl create on box's newest version, active, its root a clone of the run's copy, placed at containers/H; the copy pulled whole where nothing on the run relied on box | tests/box/build.sh (m5-jail) |
 | H18 | the actor's start, ZFS refusing a step of putting one house in place (a mount) | said once, "house H: why"; that house "house H failed", left out, not mounted or started; the others active and started; a create of it "H: exists" (ruled 2026-11-05, Q-H1) | tests/check_house.c |
-| H19 | the actor's start, ZFS refusing to destroy a house's incomplete version | as H18: the house failed, said once, its complete version left; the next start destroys the incomplete one and starts the house | tests/check_house.c |
+| H19 | the actor's start, ZFS refusing to destroy a house's incomplete version | the house active and its jail started all the same, the refusal said once, "house H: clean: why"; the next start destroys it | tests/check_house.c |
 
 ## Family N: a container's jail (m5-jail)
 
@@ -1086,9 +1086,10 @@ its recipe gained since its version was made: the recipe resolved on
 foundation.conf as the foundation version's snapshot holds it, a
 command piece the old house.conf holds not run again, its own
 packages installed; house.conf; the update snapshot -r, kind update,
-taken last; the copy unmounted; the swap, the old version unmounted
-and given back its own path, the new placed at /containers/H; the
-start, its block from the update snapshot; the beam told. A failure
+taken last; the swap, the old version unmounted and given back its
+own path, the new placed at /containers/H; the start, its block from
+the update snapshot; the copy unmounted where no other house's roll
+is on it; the beam told. A failure
 or a conflict before the update snapshot aborts every open zfs_rebase
 run on the new version, found by zfs_rebase:tag set on a dataset
 itself, destroys the new version, unmounts the copy, starts the old
@@ -1108,7 +1109,7 @@ complete versions}.
 
 | cell | what | expected | disposition |
 |------|------|----------|-------------|
-| W1 | shtetl roll H, a newer version on the run | jail -r; the final save; the copy mounted; per dataset the clone form then dataset forms, as above; own datasets cloned; house.conf; the update snapshot; the copy unmounted; the swap; block and jail -cm from the new version; the beam told; "house H rolling STEP" meanwhile; active on the new version | tests/check_hroll.c |
+| W1 | shtetl roll H, a newer version on the run | jail -r; the final save; the copy mounted; per dataset the clone form then dataset forms, as above; own datasets cloned; house.conf; the update snapshot; the swap; block and jail -cm from the new version; the copy unmounted; the beam told; "house H rolling STEP" meanwhile; active on the new version | tests/check_hroll.c |
 | W2 | the new version | named for the foundation snapshot less its kind, then H; its snapshots the replayed saves' names but the last, then `<date>-update`, kind update; shtetl:house; canmount noauto, placeholders off | tests/check_hroll.c |
 | W3 | roll.depth | 0: every snapshot of the active version; a count: the newest that many; an interval: those younger | tests/check_hroll.c |
 | W4 | the trees differ | a dataset new in the foundation version cloned from it; one the active version took from the foundation and the version lacks: stalled "replay: D: not in F@V", nothing made | tests/check_hroll.c |
@@ -1119,8 +1120,8 @@ complete versions}.
 | W9 | refusals | "H: up to date" where the run holds no newer version; "H: creating", "H: starting", "H: upgrading", "H: rolling", "H: failed" | tests/check_hroll.c |
 | W10 | a stalled house | active and its jail running; save and pkg as ever; shtetl roll H clears the stall and rolls | tests/check_hroll.c |
 | W11 | the daemon stopped at each step before the update snapshot | at the next start: every open run on the incomplete version aborted, it destroyed, the old version placed and started; no stall | tests/check_hroll.c |
-| W12 | the daemon stopped after the update snapshot, before the swap or in it | at the next start the new version active: the old unmounted and given back its own path, the new placed and started | tests/check_hroll.c |
-| W13 | two complete versions at the start | the newest active; the others unmounted where placed and given back their own paths (H14) | tests/check_hroll.c |
+| W12 | after the update snapshot, the swap refused part way, as the daemon stopped there leaves it | the house failed, said once, refused a roll; at the next start the new version active: the old unmounted and given back its own path, the new placed and started | tests/check_hroll.c |
+| W13 | two complete versions at the start, the old one placed at /containers/H where a crash cut the swap short | the newest active, placed and started; the others unmounted and given back their own paths (H14) | tests/check_hroll.c |
 | W14 | the daemon | shtetl roll NAME: a house's roll where a house, a foundation's where a foundation (one namespace), the reply at once | tests/check_daemon.c |
 | W15 | the fake rebaser (tests/rbfake.c) | logs each start; the clone form a read-only clone, mountpoint none; the dataset form its pre-apply snapshot; the record set while a run is open, gone at done; a run asked to stop or fail does; --abort undoes it | tests/check_hroll.c; the real one held on the box by P6 and m5-box |
 | W16 | the box: a real container rolled | box: m5-box | box |
