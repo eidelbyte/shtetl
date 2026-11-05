@@ -355,7 +355,8 @@ act(struct daemon *d, struct conn *c, const char *args, size_t len)
 /*
  * A convergence of the beam over: what neither space needs pruned, by
  * the keeps shtetl.conf gives now (plan 8.2), each version pruned in
- * beam.log.
+ * beam.log; then every house asked to take the next version waiting
+ * (plan 7.2: after a roll, the prune, then the next).
  */
 static int
 pruned(void *arg, struct sh_err *e)
@@ -363,6 +364,7 @@ pruned(void *arg, struct sh_err *e)
 	struct daemon *d = arg;
 	struct sh_site s;
 	char path[1024];
+	size_t i;
 	int r;
 
 	if (mounted(d, SH_SP_CONFIG, path, sizeof (path), e) != 0 ||
@@ -372,7 +374,33 @@ pruned(void *arg, struct sh_err *e)
 	    sh_site_keep(&s, "run"), sh_site_keep(&s, "lake"),
 	    d->d_benv.be_log, e);
 	sh_site_free(&s);
+	for (i = 0; i < d->d_nhouses; i++)
+		sh_house_next(&d->d_houses, &d->d_nhouses, d->d_houses[i],
+		    path);
 	return (r);
+}
+
+/*
+ * A house's act over: it takes the next version waiting, where zconfig
+ * is mounted; where it is not, the convergence's prune says so.
+ */
+static void
+house_idle(void *arg, struct sh_house *h)
+{
+	struct daemon *d = arg;
+	char path[1024], *buf = NULL;
+	struct sh_err q;
+	size_t len = 0;
+	FILE *f;
+	int r;
+
+	f = sh_memstream(&buf, &len);
+	sh_err_init(&q, f, "");
+	r = mounted(d, SH_SP_CONFIG, path, sizeof (path), &q);
+	(void) fclose(f);
+	free(buf);
+	if (r == 0)
+		sh_house_next(&d->d_houses, &d->d_nhouses, h, path);
 }
 
 /* A house's pull: the beam's (m5-create). */
@@ -611,6 +639,7 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 		d.d_henv.he_flags = SF_IMMUTABLE;
 		d.d_henv.he_pull = pull;
 		d.d_henv.he_beam = made;
+		d.d_henv.he_idle = house_idle;
 		d.d_henv.he_parg = &d;
 		if (sh_houses_start(&d.d_henv, &d.d_houses, &d.d_nhouses,
 		    e) != 0)

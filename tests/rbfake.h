@@ -24,7 +24,9 @@
 /*
  * The start answering to IDENT, a clone form's result or a dataset
  * form's onto@result, ends RC: 1 stopped at conflicts, 2 refused, 3
- * failed part way; -1 never, sleeping until it is killed.
+ * failed part way; -1 never, sleeping until it is killed; -2 done, a
+ * second later, for a roll that must not end in the second another
+ * did (same-second snapshot names collide, ruled out of scope).
  */
 void rbfake_end(const char *ident, int rc);
 

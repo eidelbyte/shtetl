@@ -35,6 +35,7 @@
 #include "core/shake.h"
 #include "core/show.h"
 #include "core/site.h"
+#include "core/syntax.h"
 #include "core/tree.h"
 #include "core/zfs.h"
 
@@ -358,6 +359,17 @@ act_over(struct sh_house *h)
 	h->h_log = NULL;
 }
 
+/*
+ * H's act ended, the last thing its end does: active, the daemon told,
+ * which asks it to take the next version waiting (sh_house_next).
+ */
+static void
+idle(struct sh_house *h)
+{
+	if (h->h_state == SH_H_ACTIVE)
+		h->h_env->he_idle(h->h_env->he_parg, h);
+}
+
 /* Where H's jail's block is: <jails>/H.conf, into BUF. */
 static void
 block_path(const struct sh_house *h, char *buf, size_t len)
@@ -481,6 +493,7 @@ act_end(struct sh_job *j, const char *why, void *arg)
 	}
 	h->h_state = SH_H_ACTIVE;
 	act_over(h);
+	idle(h);
 }
 
 /* A zfs_rebase run's record as a dataset itself holds it. */
@@ -808,6 +821,7 @@ make_end(struct sh_job *j, const char *why, void *arg)
 		make_free(m);
 		/* the version on to the lake now, not at the next period */
 		env->he_beam(env->he_parg);
+		idle(h);
 		return;
 	}
 	sh_errf(env->he_err, "house %s: %s", h->h_name, why);
@@ -1405,8 +1419,11 @@ exists(struct sh_zfs *z, const char *name)
 
 /*
  * The next version of the foundation the run's copy holds for R's
- * house: the oldest snapshot of the copy newer than its active
- * version's origin, "H: up to date" where there is none.
+ * house (plan 7.2): the oldest snapshot of the copy newer than its
+ * active version's origin that has arrived, its shtetl:kind set, the
+ * beam's last word on it, and whose shtetl:branch the house's ver
+ * allows, its recipe resolved from zconfig as it is now. 0; 1 where
+ * none waits; -1 said to E.
  */
 static int
 roll_next(struct sh_hroll *r, struct sh_err *e)
@@ -1414,33 +1431,52 @@ roll_next(struct sh_hroll *r, struct sh_err *e)
 	const struct sh_house *h = r->hr_h;
 	struct sh_zfs *z = h->h_env->he_z;
 	struct names s = { NULL, 0 };
-	char o[1024], *snap;
+	struct sh_recipe rec;
+	struct sh_branch b;
+	char o[1024], kind[16], branch[64], target[300], *snap, *buf = NULL;
 	uint64_t g, at, txg;
-	size_t i;
+	struct sh_err q;
+	size_t i, len = 0;
+	FILE *f;
 	int rc;
 
-	if ((rc = sh_zfs_origin(z, h->h_active, o, sizeof (o), e)) == 0)
-		sh_errf(e, "%s: no foundation version", h->h_name);
-	if (rc != 1 || sh_zfs_snapinfo(z, o, &g, &at, e) != 0)
+	/* a version that is a clone of none, a hand's, has none waiting */
+	if ((rc = sh_zfs_origin(z, h->h_active, o, sizeof (o), e)) != 1)
+		return (rc == 0 ? 1 : -1);
+	if (sh_zfs_snapinfo(z, o, &g, &at, e) != 0)
 		return (-1);
 	r->hr_copy = sh_strdup(o);
 	*strchr(r->hr_copy, '@') = '\0';
 	r->hr_fds = join(h->h_env->he_lake, "/foundations",
 	    strrchr(r->hr_copy, '/'));
+	(void) snprintf(target, sizeof (target), "containers/%s", h->h_name);
+	if (sh_recipe_resolve(r->hr_config, r->hr_repos, target, NULL, &rec,
+	    e, NULL) != 0) {
+		sh_recipe_free(&rec);
+		return (-1);
+	}
+	/* what a version not taken says is no one's */
+	f = sh_memstream(&buf, &len);
+	sh_err_init(&q, f, "");
 	rc = sh_zfs_snapshots(z, r->hr_copy, name_add, &s, e);
 	for (i = 0; rc == 0 && r->hr_next == NULL && i < s.n_n; i++) {
 		snap = join(r->hr_copy, "@", s.n_v[i]);
 		if ((rc = sh_zfs_snapinfo(z, snap, &g, &txg, e)) == 0 &&
-		    txg > at)
+		    txg > at && sh_zfs_user(z, snap, "shtetl:kind", kind,
+		    sizeof (kind), &q) == 0 && sh_zfs_user(z, snap,
+		    "shtetl:branch", branch, sizeof (branch), &q) == 0 &&
+		    sh_syn_branch(branch, &b) == NULL &&
+		    sh_recipe_branch(&rec, &b, branch, &q) == 0)
 			r->hr_next = sh_strdup(s.n_v[i]);
 		free(snap);
 	}
+	(void) fclose(f);
+	free(buf);
 	names_free(&s);
-	if (rc == 0 && r->hr_next == NULL) {
-		sh_errf(e, "%s: up to date", h->h_name);
-		rc = -1;
-	}
-	return (rc);
+	sh_recipe_free(&rec);
+	if (rc != 0)
+		return (-1);
+	return (r->hr_next == NULL);
 }
 
 /* The final save, on the active version, the jail stopped. */
@@ -1859,13 +1895,15 @@ roll_undo(struct sh_job *j, void *arg, struct sh_err *e)
 	struct sh_zfs *z = h->h_env->he_z;
 
 	(void) j;
-	if ((r->hr_new != NULL && exists(z, r->hr_new) &&
-	    tree_destroy(z, r->hr_new, e) != 0) ||
-	    (!copy_shared(r) && tree_unmount(z, r->hr_copy, e) != 0) ||
-	    sh_zfs_set(z, h->h_active, "shtetl:stall", r->hr_why, e) != 0)
+	/* stalled first: a refusal after it leaves H stalled, not idle */
+	if (sh_zfs_set(z, h->h_active, "shtetl:stall", r->hr_why, e) != 0)
 		return (-1);
 	free(h->h_stall);
 	h->h_stall = sh_strdup(r->hr_why);
+	if ((r->hr_new != NULL && exists(z, r->hr_new) &&
+	    tree_destroy(z, r->hr_new, e) != 0) ||
+	    (!copy_shared(r) && tree_unmount(z, r->hr_copy, e) != 0))
+		return (-1);
 	return (0);
 }
 
@@ -1881,10 +1919,14 @@ undo_end(struct sh_job *j, const char *why, void *arg)
 		sh_errf(h->h_env->he_err, "house %s: %s", h->h_name, why);
 		sh_errf(&h->h_lerr, "failed: %s", why);
 	}
+	/* where ZFS refused the stall, H is stalled until the next start */
+	if (h->h_stall == NULL)
+		h->h_stall = sh_strdup(r->hr_why);
 	h->h_state = SH_H_ACTIVE;
 	h->h_roll = NULL;
 	act_over(h);
 	roll_free(r);
+	idle(h);
 }
 
 /*
@@ -1908,6 +1950,7 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 		act_over(h);
 		roll_free(r);
 		env->he_beam(env->he_parg);
+		idle(h);
 		return;
 	}
 	sh_errf(env->he_err, "house %s: %s", h->h_name, why);
@@ -1919,6 +1962,7 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 		h->h_roll = NULL;
 		act_over(h);
 		roll_free(r);
+		idle(h);
 		return;
 	}
 	r->hr_why = sh_strdup(why);
@@ -1930,16 +1974,19 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 	sh_job_run(&h->h_job, env->he_kq);
 }
 
-int
-sh_house_roll(struct sh_house ***hp, size_t *np, struct sh_house *h,
+/*
+ * A roll of H, active, begun onto the next version waiting (roll_next),
+ * its stall cleared: 0; 1 where none waits; -1 said to E.
+ */
+static int
+roll_begin(struct sh_house ***hp, size_t *np, struct sh_house *h,
     const char *config, struct sh_err *e)
 {
 	const struct sh_houseenv *env = h->h_env;
 	struct sh_hroll *r;
 	char file[1024];
+	int rc;
 
-	if (busy(h, e) != 0)
-		return (-1);
 	r = sh_calloc(1, sizeof (*r));
 	r->hr_h = h;
 	r->hr_list = hp;
@@ -1952,11 +1999,11 @@ sh_house_roll(struct sh_house ***hp, size_t *np, struct sh_house *h,
 	}
 	r->hr_repos = sh_site_repos(&r->hr_site);
 	/* shtetl roll H clears the stall (plan 7.4) */
-	if (roll_next(r, e) != 0 || (h->h_stall != NULL &&
+	if ((rc = roll_next(r, e)) != 0 || (h->h_stall != NULL &&
 	    sh_zfs_inherit(env->he_z, h->h_active, "shtetl:stall", e) != 0) ||
 	    house_log(h, "a", e) != 0) {
 		roll_free(r);
-		return (-1);
+		return (rc == 1 ? 1 : -1);
 	}
 	free(h->h_stall);
 	h->h_stall = NULL;
@@ -1969,6 +2016,51 @@ sh_house_roll(struct sh_house ***hp, size_t *np, struct sh_house *h,
 	sh_job_call(&h->h_job, "replay", roll_plan, r);
 	sh_job_run(&h->h_job, env->he_kq);
 	return (0);
+}
+
+int
+sh_house_roll(struct sh_house ***hp, size_t *np, struct sh_house *h,
+    const char *config, struct sh_err *e)
+{
+	int rc;
+
+	if (busy(h, e) != 0)
+		return (-1);
+	if ((rc = roll_begin(hp, np, h, config, e)) == 1)
+		sh_errf(e, "%s: up to date", h->h_name);
+	return (rc == 0 ? 0 : -1);
+}
+
+void
+sh_house_next(struct sh_house ***hp, size_t *np, struct sh_house *h,
+    const char *config)
+{
+	const struct sh_houseenv *env = h->h_env;
+	char *buf = NULL, *why, pfx[300];
+	struct sh_err q, he;
+	size_t len = 0;
+	FILE *f;
+
+	if (h->h_state != SH_H_ACTIVE || h->h_stall != NULL)
+		return;
+	f = sh_memstream(&buf, &len);
+	sh_err_init(&q, f, "");
+	if (roll_begin(hp, np, h, config, &q) < 0) {
+		(void) fflush(f);
+		why = sh_calloc(1, len + 8);
+		(void) snprintf(why, len + 8, "next: %.*s",
+		    (int)strcspn(buf, "\n"), buf);
+		(void) snprintf(pfx, sizeof (pfx), "%shouse %s: ",
+		    env->he_err->se_prefix, h->h_name);
+		sh_err_init(&he, env->he_err->se_out, pfx);
+		sh_errf(&he, "%s", why);
+		/* stalled, not asked again; in ZFS too, where it takes it */
+		(void) sh_zfs_set(env->he_z, h->h_active, "shtetl:stall", why,
+		    &he);
+		h->h_stall = why;
+	}
+	(void) fclose(f);
+	free(buf);
 }
 
 void

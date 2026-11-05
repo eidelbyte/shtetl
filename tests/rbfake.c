@@ -233,6 +233,10 @@ rf_run(struct sh_job *j, void *arg, struct sh_err *e)
 		for (;;)
 			(void) pause();
 	}
+	if (rc == -2) {
+		(void) sleep(1);
+		rc = 0;
+	}
 	/* stopped at the conflicts gate; failed part way past it */
 	if (rc == 1 || rc == 3)
 		(void) sh_zfs_set(z, clone ? result : onto, SH_REBASE_PHASE,

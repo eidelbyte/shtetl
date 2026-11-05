@@ -50,6 +50,14 @@ told(void *arg)
 	beamed++;
 }
 
+/* A house idle again: the queue is check_hroll's (family Q). */
+static void
+idle_none(void *arg, struct sh_house *h)
+{
+	(void) arg;
+	(void) h;
+}
+
 /* The pull asked, for the test to deliver. */
 static struct {
 	char	snap[300];
@@ -483,6 +491,7 @@ main(void)
 	env.he_err = &sys.c_err;
 	env.he_pull = asked;
 	env.he_beam = told;
+	env.he_idle = idle_none;
 	/* N18: the snapshot's view the start reads house.conf through */
 	(void) snprintf(store, sizeof (store), "%s", scratch_path("zfake"));
 	zfake_files(store);

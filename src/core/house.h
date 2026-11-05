@@ -6,7 +6,9 @@
  * <containers>/<house>; one being made, at its own path,
  * <containers>/<version>. m5-create makes a house's first version;
  * m5-jail starts a container's jail from its active version;
- * m5-save-pkg takes its saves and upgrades its packages.
+ * m5-save-pkg takes its saves and upgrades its packages; m5-roll rolls
+ * it onto the next version of its foundation; m5-queue rolls it so
+ * whenever one waits and it is idle.
  */
 
 #ifndef	SH_HOUSE_H
@@ -64,6 +66,11 @@ struct sh_houseenv {
 			    void *);
 	/* the beam told a version or a snapshot is made, HE_PARG's */
 	void		(*he_beam)(void *);
+	/*
+	 * a house's act over, the house active, the last thing its end
+	 * does: the daemon asks it to take the next (sh_house_next)
+	 */
+	void		(*he_idle)(void *, struct sh_house *);
 	void		*he_parg;
 };
 
@@ -129,8 +136,11 @@ int sh_house_pkg(struct sh_house *h, struct sh_err *e);
 
 /*
  * H rolled onto the next version of its foundation the run's copy
- * holds, the oldest newer than its active version's origin (plan 7.2,
- * tests/MATRIX.md family W): its stall cleared, then a job of the
+ * holds (plan 7.2, tests/MATRIX.md families W and Q): the oldest newer
+ * than its active version's origin that has arrived, the copy's top
+ * snapshot holding shtetl:kind, and whose shtetl:branch H's ver allows,
+ * its recipe resolved from CONFIG as it is now. Its stall cleared, then
+ * a job of the
  * steps: the jail stopped; the final save; the copy mounted; the
  * replay into the new version, named as a create names one; its own
  * datasets cloned from the final save; what its recipe gained, read
@@ -146,6 +156,18 @@ int sh_house_pkg(struct sh_house *h, struct sh_err *e);
  */
 int sh_house_roll(struct sh_house ***hp, size_t *np, struct sh_house *h,
     const char *config, struct sh_err *e);
+
+/*
+ * H asked to take the next version waiting, as the daemon asks every
+ * house when a convergence of the beam is over and a house when its
+ * act is (plan 7.2): where H is active, not stalled, and one waits, an
+ * automatic roll of it, as sh_house_roll's, which a conflict stalls.
+ * Nothing waiting, nothing is said; any other refusal stalls H, "next:
+ * why", said once to ENV's sink, "house H: next: why", so that it is
+ * not asked again until it is rolled by hand.
+ */
+void sh_house_next(struct sh_house ***hp, size_t *np, struct sh_house *h,
+    const char *config);
 
 /* H's line of shtetl status. */
 void sh_house_status(const struct sh_house *h, FILE *out);

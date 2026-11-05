@@ -1176,7 +1176,7 @@ command gone}; the command {a terminal, none}.
 
 | cell | what | expected | disposition |
 |------|------|----------|-------------|
-| Q1 | a convergence over, a house idle and not stalled, a newer version arrived on the run | after the prune, the house rolls onto it, "house H rolling STEP"; active on it after; no line in syslog | tests/check_hroll.c, tests/check_daemon.c |
+| Q1 | a convergence over, a house idle and not stalled, a newer version arrived on the run | after the prune, the house rolls onto it, "house H rolling STEP"; active on it after; no line in syslog | tests/check_hroll.c (the ask, as the daemon asks); the daemon's asking at a convergence's end and an act's: box (Q19) |
 | Q2 | what waits | the copy's versions newer than the active origin, arrived, the oldest first; one whose top snapshot has no shtetl:kind yet (arriving) is not taken | tests/check_hroll.c |
 | Q3 | the house's ver | a version whose shtetl:branch the ver refuses is passed over, the next allowed taken; all refused, or none with a shtetl:branch, and nothing waits; a ver changed in zconfig counts at the next ask | tests/check_hroll.c |
 | Q4 | several versions waiting | rolled through one at a time, in order: each roll's end asks again, and the next convergence too | tests/check_hroll.c |

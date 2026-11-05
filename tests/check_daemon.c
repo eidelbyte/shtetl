@@ -519,12 +519,13 @@ main(void)
 	/*
 	 * V7, W14: one namespace: a foundation's name created refused; a
 	 * house's name rolled the house's roll, refused at once, v1-web,
-	 * made by hand, being a clone of no foundation version
+	 * made by hand, being a clone of no foundation version, which
+	 * nothing waits for (and so the queue never stalled it, Q9)
 	 */
 	CHECK(sht(4, creategen) == 1 &&
 	    strcmp(ebuf, "shtetl: generic: a foundation\n") == 0);
 	CHECK(sht(2, rollweb) == 1 &&
-	    strcmp(ebuf, "shtetl: web: no foundation version\n") == 0);
+	    strcmp(ebuf, "shtetl: web: up to date\n") == 0);
 	/*
 	 * V8, V2, V1, V4: save's words; web saved and upgraded, the reply
 	 * at once and empty, nginx its own, tree the foundation's; the

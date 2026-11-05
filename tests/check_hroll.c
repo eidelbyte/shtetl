@@ -34,6 +34,7 @@
 #define	RC	RUN "/containers"
 #define	V	"15.1-releng-T-create"
 #define	V2	"15.1-releng-U-create"
+#define	V3	"15.1-releng-W-create"
 #define	OLD	RC "/15.1-releng-T-web"
 #define	NEW	RC "/15.1-releng-U-web"
 
@@ -54,9 +55,7 @@ static struct cap c;
 static struct cap sys;		/* the houses' error sink, syslog's */
 static struct sh_zfs *z;
 static struct sh_houseenv env;
-static struct sh_house **hs;
-static size_t nh;
-static char config[1024], conts[1024], copies[1024], logdir[1024];
+static char conts[1024], copies[1024], logdir[1024];
 static char resolv[1024], jails[1024], store[1024];
 
 /* How often the beam was told a version or a snapshot was made. */
@@ -67,6 +66,35 @@ told(void *arg)
 {
 	(void) arg;
 	beamed++;
+}
+
+/*
+ * Whether a house idle again is asked to take the next version, as the
+ * daemon asks it (family Q); not for family W, whose rolls are asked.
+ */
+static int asking;
+
+static struct sh_house **hs;
+static size_t nh;
+static char config[1024];
+
+/*
+ * A version whose tree an ask's roll would make, laid at each ask: the
+ * fake keeps no files in a clone, and a start's clean takes away what
+ * was laid for one cut short (Q10).
+ */
+static const char *relay_vn;
+
+static void lay(const char *, const char *);
+
+static void
+idle_ask(void *arg, struct sh_house *h)
+{
+	(void) arg;
+	if (relay_vn != NULL)
+		lay(relay_vn, "releng/16.0");
+	if (asking)
+		sh_house_next(&hs, &nh, h, config);
 }
 
 /* The pull a create asks, for the test to deliver. */
@@ -206,7 +234,8 @@ there(const char *name)
 /*
  * g's tree at VER sent to the run as the beam sends it: incremental
  * from PREV where the copy holds a dataset at PREV, whole where it holds
- * none; the copy's top told its kind.
+ * none; the copy's top given the version's shtetl:branch and, last, its
+ * kind, which says it has arrived.
  */
 static void
 beam(const char *ver, const char *prev)
@@ -232,6 +261,8 @@ beam(const char *ver, const char *prev)
 	}
 	names_free(&t);
 	(void) snprintf(to, sizeof (to), RF "/g@%s", ver);
+	CHECK(sh_zfs_set(z, to, "shtetl:branch", "releng/15.1",
+	    &c.c_err) == 0);
 	CHECK(sh_zfs_set(z, to, "shtetl:kind", "create", &c.c_err) == 0);
 }
 
@@ -484,6 +515,32 @@ next(void)
 	beamed = 0;
 }
 
+/* A convergence of the beam over: every house asked, as the daemon does. */
+static void
+converged(void)
+{
+	size_t i;
+
+	for (i = 0; i < nh; i++)
+		sh_house_next(&hs, &nh, hs[i], config);
+}
+
+/*
+ * V3 made on the lake after V2 and sent to the run, its shtetl:branch
+ * BRANCH there; what a roll onto it reads laid, as next() lays V2's.
+ */
+static void
+third(const char *branch)
+{
+	take(LF "/g", V3, "create");
+	beam(V3, V2);
+	CHECK(sh_zfs_set(z, RF "/g@" V3, "shtetl:branch", branch,
+	    &c.c_err) == 0);
+	relay("copies/g/var/.zfs/snapshot/" V3 "/db/shtetl/foundation.conf",
+	    FCONF("releng/15.1"));
+	lay("15.1-releng-W-web", "releng/15.1");
+}
+
 static int
 roll(void)
 {
@@ -576,6 +633,7 @@ main(void)
 	env.he_err = &sys.c_err;
 	env.he_pull = asked;
 	env.he_beam = told;
+	env.he_idle = idle_ask;
 	(void) snprintf(store, sizeof (store), "%s", scratch_path("zfake"));
 	zfake_files(store);
 
@@ -939,6 +997,143 @@ main(void)
 	    is(cap_text(&sys), ""));
 	CHECK(is(where(NEW), "/web") && is(where(OLD), "") &&
 	    zfake_local(OLD, "mountpoint") == NULL);
+
+	/*
+	 * Family Q: every house idle again asked to take the next version,
+	 * as the daemon asks it, and a convergence's end asking them all.
+	 * Q9, Q1: nothing waiting, nothing done or said; V2 arrived, web
+	 * rolls onto it by itself, nothing in syslog
+	 */
+	asking = 1;
+	made();
+	converged();
+	CHECK(is(status(), "house web active 15.1-releng-T-web\n") &&
+	    is(cap_text(&sys), ""));
+	next();
+	converged();
+	CHECK(is(status(), "house web rolling jail\n"));
+	CHECK(is(settle(), "house web active 15.1-releng-U-web\n") &&
+	    is(cap_text(&sys), ""));
+
+	/* Q2: V2 not arrived yet, its kind not set: not taken; then it is */
+	made();
+	next();
+	CHECK(sh_zfs_inherit(z, RF "/g@" V2, "shtetl:kind", &c.c_err) == 0);
+	converged();
+	CHECK(is(status(), "house web active 15.1-releng-T-web\n"));
+	CHECK(sh_zfs_set(z, RF "/g@" V2, "shtetl:kind", "create",
+	    &c.c_err) == 0);
+	converged();
+	CHECK(is(settle(), "house web active 15.1-releng-U-web\n"));
+
+	/*
+	 * Q3: V2 on a branch web's ver refuses, or on none: nothing waits;
+	 * then V3, allowed, taken over it; and web's ver changed in
+	 * zconfig, V2 taken at the next ask
+	 */
+	made();
+	next();
+	CHECK(sh_zfs_set(z, RF "/g@" V2, "shtetl:branch", "releng/16.0",
+	    &c.c_err) == 0);
+	converged();
+	CHECK(is(status(), "house web active 15.1-releng-T-web\n"));
+	CHECK(sh_zfs_inherit(z, RF "/g@" V2, "shtetl:branch", &c.c_err) == 0);
+	converged();
+	CHECK(is(status(), "house web active 15.1-releng-T-web\n") &&
+	    is(cap_text(&sys), ""));
+	third("releng/15.1");
+	converged();
+	CHECK(is(settle(), "house web active 15.1-releng-W-web\n") &&
+	    !there(NEW));
+	made();
+	next();
+	CHECK(sh_zfs_set(z, RF "/g@" V2, "shtetl:branch", "releng/16.0",
+	    &c.c_err) == 0);
+	converged();
+	CHECK(is(status(), "house web active 15.1-releng-T-web\n"));
+	relay("config/containers/web.conf", "ver = \"<17\";\n"
+	    "pkg = [ \"nginx\" ];\n"
+	    "datasets { www { compression = \"lz4\"; } \"srv/db\" {} }\n"
+	    "commands { site = \"echo web\"; }\n");
+	converged();
+	CHECK(is(settle(), "house web active 15.1-releng-U-web\n"));
+
+	/*
+	 * Q4: V2 and V3 waiting: one at a time, in order, the end of the
+	 * roll onto V2 asking for V3
+	 */
+	made();
+	next();
+	third("releng/15.1");
+	/* the second roll a second after the first, or their updates collide */
+	snap_at(OLD, 0, cr, sizeof (cr));
+	(void) snprintf(l[0], sizeof (l[0]), RC "/15.1-releng-W-web@%s", cr);
+	rbfake_end(l[0], -2);
+	converged();
+	CHECK(is(settle(), "house web active 15.1-releng-W-web\n") &&
+	    there(NEW) && is(origin(NEW), RF "/g@" V2) &&
+	    is(origin(RC "/15.1-releng-W-web"), RF "/g@" V3));
+
+	/* Q5: web upgrading at the ask: not taken then; at the end, it is */
+	made();
+	next();
+	CHECK(sh_house_pkg(house("web"), &c.c_err) == 0);
+	converged();
+	CHECK(strstr(status(), " upgrading ") != NULL);
+	CHECK(is(settle(), "house web active 15.1-releng-U-web\n"));
+
+	/*
+	 * Q7, Q6: an automatic roll's conflict: undone, stalled, said once;
+	 * stalled, never taken again by an ask
+	 */
+	made();
+	next();
+	snap_at(OLD, 0, cr, sizeof (cr));
+	(void) snprintf(l[0], sizeof (l[0]), NEW "@%s", cr);
+	rbfake_end(l[0], 1);
+	converged();
+	CHECK(is(settle(), "house web stalled replay: exited 1\n"));
+	CHECK(is(cap_text(&sys), "house web: replay: exited 1\n"));
+	converged();
+	CHECK(is(settle(), "house web stalled replay: exited 1\n") &&
+	    is(cap_text(&sys), "house web: replay: exited 1\n"));
+
+	/*
+	 * Q8: an automatic roll refused before it begins, web's recipe one
+	 * zconfig cannot resolve: stalled "next: why", said once; not
+	 * asked again
+	 */
+	made();
+	next();
+	relay("config/containers/web.conf", "pkgs = [ \"nginx\" ];\n");
+	converged();
+	CHECK(is(status(), "house web stalled next: containers/web.conf: "
+	    "pkgs: invalid key\n"));
+	CHECK(is(cap_text(&sys), "house web: next: containers/web.conf: "
+	    "pkgs: invalid key\n") && is(user(OLD, "shtetl:stall"),
+	    "next: containers/web.conf: pkgs: invalid key"));
+	converged();
+	CHECK(is(cap_text(&sys), "house web: next: containers/web.conf: "
+	    "pkgs: invalid key\n"));
+
+	/*
+	 * Q10: the daemon stopped in the replay, a run open: at the next
+	 * start the version cleaned (W11), the old one started, then the
+	 * roll asked again and run
+	 */
+	made();
+	next();
+	rbfake_end(NEW "/usr/local", -1);
+	CHECK(roll() == 0);
+	until_open(NEW "/usr/local");
+	rbfake_reset();
+	/* the rerun's final save not in the second the first's was */
+	(void) sleep(1);
+	relay_vn = "15.1-releng-U-web";
+	restart();
+	CHECK(is(settle(), "house web active 15.1-releng-U-web\n") &&
+	    is(cap_text(&sys), ""));
+	relay_vn = NULL;
 
 	sh_houses_free(hs, nh);
 	(void) close(env.he_kq);
