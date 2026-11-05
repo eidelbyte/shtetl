@@ -427,6 +427,68 @@ main(void)
 	}
 	(void) close(kq);
 
+	/*
+	 * J19: a child on descriptors of its own, a terminal's stand-in:
+	 * what it reads and writes there, none of it the log's; a forked
+	 * call failing there said as a program is, its words not the job's
+	 */
+	{
+		int in[2], out[2], fds[3];
+		char got[64];
+		ssize_t n;
+
+		CHECK(pipe(in) == 0 && pipe(out) == 0);
+		fds[0] = in[0];
+		fds[1] = out[1];
+		fds[2] = out[1];
+		fresh();
+		child("talk", "echo hi; read x; echo got $x");
+		sh_job_fds(&job, fds);
+		CHECK(write(in[1], "yes\n", 4) == 4);
+		CHECK(strcmp(run(), "(well)") == 0);
+		CHECK(logged("# talk\n") && !logged("hi"));
+		fresh();
+		sh_job_fork(&job, "quietly", fork_fails, NULL);
+		sh_job_fds(&job, fds);
+		CHECK(strcmp(run(), "quietly: exited 1") == 0);
+		(void) close(out[1]);
+		CHECK((n = read(out[0], got, sizeof (got) - 1)) > 0);
+		got[n] = '\0';
+		CHECK(strcmp(got, "hi\ngot yes\nzrun/foundations/f: no such "
+		    "filesystem\n") == 0);
+		(void) close(in[0]);
+		(void) close(in[1]);
+		(void) close(out[0]);
+	}
+	/*
+	 * J19: a then: the child's exit 3 answered by a call whose steps run
+	 * next, before the step after it; a then refusing ends the job with
+	 * its words; another exit fails as ever
+	 */
+	fresh();
+	child("three", "exit 3");
+	sh_job_then(&job, 3, call_adds, NULL);
+	child("after", "echo after");
+	CHECK(strcmp(run(), "(well)") == 0);
+	CHECK(logged("# three\n# added\nadded\n# after\nafter\n"));
+	fresh();
+	child("three", "exit 3");
+	sh_job_then(&job, 3, call_fails, NULL);
+	CHECK(strcmp(run(), "three: var/db: a link") == 0);
+	fresh();
+	child("four", "exit 4");
+	sh_job_then(&job, 3, call_adds, NULL);
+	CHECK(strcmp(run(), "four: exited 4") == 0 && !logged("added"));
+	/* J19: sh_job_kill: the child under way ended as a signal ends it */
+	fresh();
+	child("sleep", "sleep 30");
+	CHECK((kq = kqueue()) >= 0);
+	sh_job_run(&job, kq);
+	sh_job_kill(&job);
+	wait_end(kq);
+	(void) close(kq);
+	CHECK(strcmp(why, "sleep: killed by signal 15") == 0);
+
 	/* T1, T2, T3: one turn at a time, in the order asked */
 	sh_builder_init(&b);
 	sh_builder_ask(&b, turn, (void *)1);

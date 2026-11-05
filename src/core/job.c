@@ -28,17 +28,33 @@ struct sh_step {
 	int		(*sp_fn)(struct sh_job *, void *, struct sh_err *);
 	void		*sp_arg;
 	int		sp_fork;	/* the call made in a child */
+	int		sp_term;	/* the child on sp_fds, no pipe */
+	int		sp_fds[3];
+	int		sp_then;	/* the exit sp_tfn answers, or -1 */
+	int		(*sp_tfn)(struct sh_job *, void *, struct sh_err *);
+	void		*sp_targ;
 	struct sh_step	*sp_next;
 };
 
+/* A step added at the end, or next, while a then's call adds steps. */
 static struct sh_step *
 step_add(struct sh_job *j, const char *name)
 {
 	struct sh_step *s = sh_calloc(1, sizeof (*s));
 
 	s->sp_name = sh_strdup(name);
-	*j->j_last = s;
-	j->j_last = &s->sp_next;
+	s->sp_then = -1;
+	if (j->j_ins != NULL) {
+		s->sp_next = *j->j_ins;
+		*j->j_ins = s;
+		j->j_ins = &s->sp_next;
+		if (s->sp_next == NULL)
+			j->j_last = &s->sp_next;
+	} else {
+		*j->j_last = s;
+		j->j_last = &s->sp_next;
+	}
+	j->j_added = s;
 	return (s);
 }
 
@@ -51,6 +67,8 @@ step_drop(struct sh_job *j)
 
 	if ((j->j_steps = s->sp_next) == NULL)
 		j->j_last = &j->j_steps;
+	if (j->j_added == s)
+		j->j_added = NULL;
 	for (a = s->sp_argv; a != NULL && *a != NULL; a++)
 		free(*a);
 	free(s->sp_argv);
@@ -103,6 +121,29 @@ sh_job_fork(struct sh_job *j, const char *step,
 	s->sp_fn = fn;
 	s->sp_arg = arg;
 	s->sp_fork = 1;
+}
+
+void
+sh_job_fds(struct sh_job *j, const int fds[3])
+{
+	j->j_added->sp_term = 1;
+	(void) memcpy(j->j_added->sp_fds, fds, sizeof (j->j_added->sp_fds));
+}
+
+void
+sh_job_then(struct sh_job *j, int status,
+    int (*fn)(struct sh_job *, void *, struct sh_err *), void *arg)
+{
+	j->j_added->sp_then = status;
+	j->j_added->sp_tfn = fn;
+	j->j_added->sp_targ = arg;
+}
+
+void
+sh_job_kill(struct sh_job *j)
+{
+	if (j->j_pid != 0)
+		(void) kill(-j->j_pid, SIGTERM);
 }
 
 const char *
@@ -179,7 +220,7 @@ job_spawn(struct sh_job *j, int kq)
 
 	(void) fprintf(j->j_log, "# %s\n", s->sp_name);
 	j->j_said[0] = '\0';
-	if (pipe(fds) != 0)
+	if (!s->sp_term && pipe(fds) != 0)
 		return (-1);
 	if ((pid = fork()) == 0) {
 		/* the daemon's ignored signals would outlive the exec */
@@ -187,10 +228,16 @@ job_spawn(struct sh_job *j, int kq)
 		(void) signal(SIGPIPE, SIG_DFL);
 		(void) signal(SIGTERM, SIG_DFL);
 		(void) signal(SIGINT, SIG_DFL);
-		null = open("/dev/null", O_RDONLY);
-		(void) dup2(null, 0);
-		(void) dup2(fds[1], 1);
-		(void) dup2(fds[1], 2);
+		if (s->sp_term) {
+			(void) dup2(s->sp_fds[0], 0);
+			(void) dup2(s->sp_fds[1], 1);
+			(void) dup2(s->sp_fds[2], 2);
+		} else {
+			null = open("/dev/null", O_RDONLY);
+			(void) dup2(null, 0);
+			(void) dup2(fds[1], 1);
+			(void) dup2(fds[1], 2);
+		}
 		if (s->sp_fork) {
 			sh_err_init(&e, stderr, "");
 			_exit(s->sp_fn(j, s->sp_arg, &e) != 0);
@@ -199,23 +246,52 @@ job_spawn(struct sh_job *j, int kq)
 		(void) dprintf(2, "%s: %s\n", argv[0], strerror(errno));
 		_exit(127);
 	}
-	(void) close(fds[1]);
+	if (!s->sp_term)
+		(void) close(fds[1]);
 	if (pid < 0) {
-		(void) close(fds[0]);
+		if (!s->sp_term)
+			(void) close(fds[0]);
 		return (-1);
 	}
 	(void) setpgid(pid, pid);
-	(void) fcntl(fds[0], F_SETFD, FD_CLOEXEC);
-	(void) fcntl(fds[0], F_SETFL, O_NONBLOCK);
 	j->j_pid = pid;
-	j->j_fd = fds[0];
-	EV_SET(&ev, fds[0], EVFILT_READ, EV_ADD, 0, 0, j);
-	(void) kevent(kq, &ev, 1, NULL, 0, NULL);
+	if (!s->sp_term) {
+		(void) fcntl(fds[0], F_SETFD, FD_CLOEXEC);
+		(void) fcntl(fds[0], F_SETFL, O_NONBLOCK);
+		j->j_fd = fds[0];
+		EV_SET(&ev, fds[0], EVFILT_READ, EV_ADD, 0, 0, j);
+		(void) kevent(kq, &ev, 1, NULL, 0, NULL);
+	}
 	EV_SET(&ev, pid, EVFILT_PROC, EV_ADD, NOTE_EXIT, 0, j);
 	/* gone before it could be watched: its exit is now */
 	if (kevent(kq, &ev, 1, NULL, 0, NULL) != 0 && errno == ESRCH)
 		job_exited(j, kq);
 	return (0);
+}
+
+/*
+ * FN called with ARG for the first step, as a call is: 0; -1 with WHY
+ * "STEP: the first line it reported".
+ */
+static int
+job_call(struct sh_job *j, int (*fn)(struct sh_job *, void *,
+    struct sh_err *), void *arg, char *why, size_t wlen)
+{
+	struct sh_err e;
+	char *buf = NULL;
+	size_t len = 0;
+	FILE *f;
+	int r;
+
+	f = sh_memstream(&buf, &len);
+	sh_err_init(&e, f, "");
+	r = fn(j, arg, &e);
+	(void) fclose(f);
+	if (r != 0)
+		(void) snprintf(why, wlen, "%s: %.*s", j->j_steps->sp_name,
+		    (int)strcspn(buf, "\n"), buf);
+	free(buf);
+	return (r);
 }
 
 /*
@@ -226,11 +302,7 @@ static void
 job_next(struct sh_job *j, int kq)
 {
 	struct sh_step *s;
-	struct sh_err e;
-	char *buf = NULL, why[1024];
-	size_t len = 0;
-	FILE *f;
-	int r;
+	char why[1024];
 
 	while ((s = j->j_steps) != NULL) {
 		if (s->sp_argv != NULL || s->sp_fork) {
@@ -241,19 +313,10 @@ job_next(struct sh_job *j, int kq)
 			job_end(j, why);
 			return;
 		}
-		f = sh_memstream(&buf, &len);
-		sh_err_init(&e, f, "");
-		r = s->sp_fn(j, s->sp_arg, &e);
-		(void) fclose(f);
-		if (r != 0) {
-			(void) snprintf(why, sizeof (why), "%s: %.*s",
-			    s->sp_name, (int)strcspn(buf, "\n"), buf);
-			free(buf);
+		if (job_call(j, s->sp_fn, s->sp_arg, why, sizeof (why)) != 0) {
 			job_end(j, why);
 			return;
 		}
-		free(buf);
-		buf = NULL;
 		step_drop(j);
 	}
 	job_end(j, NULL);
@@ -262,29 +325,44 @@ job_next(struct sh_job *j, int kq)
 /*
  * The first step's child has exited: its output read to the last, it
  * reaped, what is left of its group sent SIGTERM; the next step, or
- * the end: a forked call's why its words, a program's its status.
+ * the end: a forked call's why its words, a program's its status. An
+ * exit a then answers is its call's, the steps it adds next.
  */
 static void
 job_exited(struct sh_job *j, int kq)
 {
+	struct sh_step *s = j->j_steps;
 	char why[1024];
-	int st;
+	int st, r;
 
-	job_read(j);
-	if (j->j_line.b_len > 0)
-		job_line(j, j->j_line.b_data, j->j_line.b_len);
-	(void) close(j->j_fd);
-	j->j_fd = -1;
+	if (j->j_fd >= 0) {
+		job_read(j);
+		if (j->j_line.b_len > 0)
+			job_line(j, j->j_line.b_data, j->j_line.b_len);
+		(void) close(j->j_fd);
+		j->j_fd = -1;
+	}
 	while (waitpid(j->j_pid, &st, 0) == -1 && errno == EINTR)
 		;
 	(void) kill(-j->j_pid, SIGTERM);
 	j->j_pid = 0;
-	if (WIFEXITED(st) && WEXITSTATUS(st) == 0) {
+	if (WIFEXITED(st) && WEXITSTATUS(st) == s->sp_then) {
+		j->j_ins = &s->sp_next;
+		r = job_call(j, s->sp_tfn, s->sp_targ, why, sizeof (why));
+		j->j_ins = NULL;
+		if (r != 0) {
+			job_end(j, why);
+			return;
+		}
+	}
+	if (WIFEXITED(st) && (WEXITSTATUS(st) == 0 ||
+	    WEXITSTATUS(st) == s->sp_then)) {
 		step_drop(j);
 		job_next(j, kq);
 		return;
 	}
-	if (WIFEXITED(st) && j->j_steps->sp_fork)
+	/* a child on a terminal said its words there, not to the job */
+	if (WIFEXITED(st) && s->sp_fork && !s->sp_term)
 		(void) snprintf(why, sizeof (why), "%s: %s",
 		    j->j_steps->sp_name, j->j_said);
 	else if (WIFEXITED(st))
@@ -337,7 +415,8 @@ sh_job_stop(struct sh_job *j, int kq)
 		(void) kill(-j->j_pid, SIGTERM);
 		while (waitpid(j->j_pid, &st, 0) == -1 && errno == EINTR)
 			;
-		(void) close(j->j_fd);
+		if (j->j_fd >= 0)
+			(void) close(j->j_fd);
 	}
 	while (j->j_steps != NULL)
 		step_drop(j);

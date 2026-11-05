@@ -43,6 +43,8 @@ struct sh_job {
 	void		*j_arg;
 	struct sh_step	*j_steps;	/* the one under way first */
 	struct sh_step	**j_last;
+	struct sh_step	*j_added;	/* the step added last */
+	struct sh_step	**j_ins;	/* where a then's steps go */
 	pid_t		j_pid;		/* the child under way, or 0 */
 	int		j_fd;		/* its output, or -1 */
 	struct sh_buf	j_line;		/* the line it has not ended yet */
@@ -78,6 +80,26 @@ void sh_job_call(struct sh_job *j, const char *step,
     int (*fn)(struct sh_job *, void *, struct sh_err *), void *arg);
 void sh_job_fork(struct sh_job *j, const char *step,
     int (*fn)(struct sh_job *, void *, struct sh_err *), void *arg);
+
+/*
+ * The step added last, a child's, run on the descriptors FDS, copied,
+ * its standard input, output and error, a person's terminal (m5-queue,
+ * the attended roll): no pipe, so nothing it writes is the job's, and
+ * its failure is said as a program's is, "STEP: exited N". FDS are the
+ * caller's, open while the step can run.
+ */
+void sh_job_fds(struct sh_job *j, const int fds[3]);
+
+/*
+ * The step added last, a child's: its exit with STATUS no failure, but
+ * FN called with ARG, as a call is, and the steps it adds run next,
+ * before those after it; its -1 ends the job with its words.
+ */
+void sh_job_then(struct sh_job *j, int status,
+    int (*fn)(struct sh_job *, void *, struct sh_err *), void *arg);
+
+/* The child under way sent SIGTERM; its exit is told as ever. */
+void sh_job_kill(struct sh_job *j);
 
 /* J begun on the kqueue KQ: its steps run until a child, or its end. */
 void sh_job_run(struct sh_job *j, int kq);
