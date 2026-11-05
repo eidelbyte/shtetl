@@ -70,7 +70,7 @@ static const char usage[] =
 	"usage: shtetl daemon\n"
 	"       shtetl create CONTAINER --on FOUNDATION\n"
 	"       shtetl pkg CONTAINER|FOUNDATION\n"
-	"       shtetl roll FOUNDATION\n"
+	"       shtetl roll CONTAINER|FOUNDATION\n"
 	"       shtetl save CONTAINER\n"
 	"       shtetl show [RECIPE]\n"
 	"       shtetl status\n";
@@ -147,14 +147,18 @@ act_status(struct daemon *d, int argc, char **argv, FILE *out,
 }
 
 /*
- * shtetl roll FOUNDATION: the roll asked for, the reply at once; the
- * roll is the daemon's, and status shows it.
+ * shtetl roll CONTAINER|FOUNDATION: the house's roll onto the next
+ * version of its foundation the run holds, or the foundation's roll,
+ * asked for, the reply at once; the roll is the daemon's, and status
+ * shows it. Houses and foundations share one namespace (ruled
+ * 2026-11-05).
  */
 static int
 act_roll(struct daemon *d, int argc, char **argv, FILE *out,
     struct sh_err *e)
 {
 	struct sh_foundation *f;
+	struct sh_house *h;
 	char config[1024], build[1024];
 	const char *why;
 
@@ -167,17 +171,16 @@ act_roll(struct daemon *d, int argc, char **argv, FILE *out,
 		sh_errf(e, "%s: invalid name: %s", argv[1], why);
 		return (1);
 	}
-	/* one namespace for houses and foundations (ruled 2026-11-05) */
-	if (house_named(d, argv[1]) != NULL) {
-		sh_errf(e, "%s: a house", argv[1]);
-		return (1);
-	}
 	if (d->d_froot == NULL) {
 		sh_errf(e, "no lake space");
 		return (1);
 	}
-	if (mounted(d, SH_SP_CONFIG, config, sizeof (config), e) != 0 ||
-	    mounted(d, SH_SP_BUILD, build, sizeof (build), e) != 0)
+	if (mounted(d, SH_SP_CONFIG, config, sizeof (config), e) != 0)
+		return (1);
+	if ((h = house_named(d, argv[1])) != NULL)
+		return (sh_house_roll(&d->d_houses, &d->d_nhouses, h, config,
+		    e) != 0);
+	if (mounted(d, SH_SP_BUILD, build, sizeof (build), e) != 0)
 		return (1);
 	f = sh_foundation_find(&d->d_found, &d->d_nfound, d->d_froot,
 	    argv[1]);
@@ -599,6 +602,7 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 	if (d.d_sp.ss_root[SH_SP_RUN] != NULL) {
 		d.d_henv.he_z = z;
 		d.d_henv.he_kq = d.d_kq;
+		d.d_henv.he_lake = d.d_sp.ss_root[SH_SP_LAKE];
 		d.d_henv.he_run = d.d_sp.ss_root[SH_SP_RUN];
 		d.d_henv.he_resolv = "/etc/resolv.conf";
 		d.d_henv.he_logdir = logdir;

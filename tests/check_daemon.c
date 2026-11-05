@@ -26,7 +26,7 @@ static const char usage[] =
 	"usage: shtetl daemon\n"
 	"       shtetl create CONTAINER --on FOUNDATION\n"
 	"       shtetl pkg CONTAINER|FOUNDATION\n"
-	"       shtetl roll FOUNDATION\n"
+	"       shtetl roll CONTAINER|FOUNDATION\n"
 	"       shtetl save CONTAINER\n"
 	"       shtetl show [RECIPE]\n"
 	"       shtetl status\n";
@@ -516,11 +516,15 @@ main(void)
 	CHECK(sht(4, createweb) == 1 &&
 	    strcmp(ebuf, "shtetl: web: exists\n") == 0);
 	CHECK(status() == 0 && strcmp(obuf, want) == 0);
-	/* V7: one namespace: a foundation's name created, a house's rolled */
+	/*
+	 * V7, W14: one namespace: a foundation's name created refused; a
+	 * house's name rolled the house's roll, refused at once, v1-web,
+	 * made by hand, being a clone of no foundation version
+	 */
 	CHECK(sht(4, creategen) == 1 &&
 	    strcmp(ebuf, "shtetl: generic: a foundation\n") == 0);
 	CHECK(sht(2, rollweb) == 1 &&
-	    strcmp(ebuf, "shtetl: web: a house\n") == 0);
+	    strcmp(ebuf, "shtetl: web: no foundation version\n") == 0);
 	/*
 	 * V8, V2, V1, V4: save's words; web saved and upgraded, the reply
 	 * at once and empty, nginx its own, tree the foundation's; the
