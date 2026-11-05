@@ -15,6 +15,7 @@
 #include <sys/stat.h>
 
 #include <stdint.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "check.h"
@@ -526,13 +527,16 @@ depth(const char *depth, int64_t age)
 	return (got);
 }
 
-/* Until the fake rebaser's record stands on DS, the kqueue handed on. */
+/*
+ * Until the fake rebaser's record stands on DS, the kqueue handed on:
+ * no more than 20 s, however many events come meanwhile.
+ */
 static void
 until_open(const char *ds)
 {
-	int i;
+	time_t end = time(NULL) + 20;
 
-	for (i = 0; i < 400 && zfake_local(ds, SH_REBASE_TAG) == NULL; i++)
+	while (zfake_local(ds, SH_REBASE_TAG) == NULL && time(NULL) < end)
 		(void) one(50);
 	CHECK(zfake_local(ds, SH_REBASE_TAG) != NULL);
 }
