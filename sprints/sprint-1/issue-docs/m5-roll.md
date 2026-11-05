@@ -224,3 +224,16 @@ xcheck-freebsd pass on the mac.
 
 Owed: run.sh again, for check_hroll W11 - W13 and W15, J18 and the
 doc check on FreeBSD.
+
+## Box run 15
+
+Box run 15: run.sh at bfd1373 (results 1db04e1): 143 ok, 0 failed.
+All 20 unit programs on FreeBSD: check_hroll whole, W1 - W13 and
+W15, with W11's wait by the clock; check_job with J17 and J18;
+check_house, check_daemon (W14); the doc check; family Z with Z23
+over libzfs; families A and I as before.
+
+Every cell of family W whose disposition is a unit program has passed
+on the mac and on FreeBSD. Owed to the box: W16, a real container
+rolled by the real zfs_rebase, and H20, a real devfs released, both
+m5-box's; m5-roll stays testing until they pass.
