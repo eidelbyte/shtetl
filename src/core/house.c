@@ -483,44 +483,50 @@ act_end(struct sh_job *j, const char *why, void *arg)
 	act_over(h);
 }
 
-/* Whether the user properties set on a dataset itself hold PI_PROP. */
-struct prop_is {
-	const char	*pi_prop;
-	int		pi_got;
+/* A zfs_rebase run's record as a dataset itself holds it. */
+struct record {
+	int	rc_open;		/* zfs_rebase:tag there */
+	char	rc_phase[32];
 };
 
 static int
-prop_one(void *arg, const char *prop, const char *value)
+record_one(void *arg, const char *prop, const char *value)
 {
-	struct prop_is *is = arg;
+	struct record *rc = arg;
 
-	(void) value;
-	if (strcmp(prop, is->pi_prop) == 0)
-		is->pi_got = 1;
+	if (strcmp(prop, SH_REBASE_TAG) == 0)
+		rc->rc_open = 1;
+	else if (strcmp(prop, SH_REBASE_PHASE) == 0)
+		(void) snprintf(rc->rc_phase, sizeof (rc->rc_phase), "%s",
+		    value);
 	return (0);
 }
 
 /*
  * The steps aborting every open zfs_rebase run on the tree ROOT, found
- * by its record, zfs_rebase:tag set on a dataset itself, added to J.
+ * by its record, zfs_rebase:tag set on a dataset itself, added to J:
+ * one --abort, two where the run is in applying2, whose first --abort
+ * steps back to the conflicts gate, holds and all (zfs_rebase(8)).
  */
 static void
 aborts(struct sh_job *j, struct sh_zfs *z, const char *root,
     struct sh_err *e)
 {
 	const char *argv[3] = { "--abort", NULL, NULL };
-	struct prop_is is = { SH_REBASE_TAG, 0 };
+	struct record rc;
 	struct names t;
 	size_t i;
 
 	if (tree(z, root, &t, e) == 0) {
 		for (i = 0; i < t.n_n; i++) {
-			is.pi_got = 0;
-			if (sh_zfs_props(z, t.n_v[i], prop_one, &is, e) == 0 &&
-			    is.pi_got) {
-				argv[1] = t.n_v[i];
+			(void) memset(&rc, 0, sizeof (rc));
+			if (sh_zfs_props(z, t.n_v[i], record_one, &rc,
+			    e) != 0 || !rc.rc_open)
+				continue;
+			argv[1] = t.n_v[i];
+			sh_rebase(j, "abort", argv);
+			if (strcmp(rc.rc_phase, "applying2") == 0)
 				sh_rebase(j, "abort", argv);
-			}
 		}
 	}
 	names_free(&t);

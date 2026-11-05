@@ -5,9 +5,12 @@
  * clone of onto, read-only, mountpoint none; the dataset form's
  * pre-apply snapshot, the dataset unmounted for the run and mounted
  * again at done, refused where it will not unmount; the record,
- * zfs_rebase:tag set on the result itself while a run is open; --abort
- * undoing either. Its sides must be mounted, and a dataset form given
- * -u and -b, or it refuses, as the program does. Each start is logged
+ * zfs_rebase:tag and zfs_rebase:phase set on the result itself while a
+ * run is open, the phase applying1, conflicts where it stopped there,
+ * applying2 where it failed part way; --abort undoing either, but from
+ * applying2 only stepping back to conflicts. Its sides must be
+ * mounted, and a dataset form given -u and -b, or it refuses, as the
+ * program does. Each start is logged
  * to $FAKE_LOG as tests/bin's programs log theirs, "zfs_rebase ARGS",
  * and a run that does not reach done ends on the line "exited RC", so
  * that the job says of it what it says of the program. The content of

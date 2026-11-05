@@ -120,14 +120,18 @@ static void
 rf_unrecord(struct sh_zfs *z, const char *ds, struct sh_err *e)
 {
 	(void) sh_zfs_inherit(z, ds, SH_REBASE_TAG, e);
+	(void) sh_zfs_inherit(z, ds, SH_REBASE_PHASE, e);
 	(void) sh_zfs_inherit(z, ds, RF_PRE, e);
 }
 
-/* --abort DS: the run DS carries undone, as if it never happened. */
+/*
+ * --abort DS: the run DS carries undone, as if it never happened; from
+ * applying2, only stepped back to the conflicts gate.
+ */
 static void
 rf_abort(struct sh_zfs *z, const char *ds, struct sh_err *e)
 {
-	struct rf_local tag, pre;
+	struct rf_local tag, pre, phase;
 	char snap[1024];
 
 	rf_local(z, ds, SH_REBASE_TAG, &tag, e);
@@ -135,6 +139,10 @@ rf_abort(struct sh_zfs *z, const char *ds, struct sh_err *e)
 		(void) printf("zfs_rebase: %s: no rebase\n", ds);
 		rf_exit(2);
 	}
+	rf_local(z, ds, SH_REBASE_PHASE, &phase, e);
+	if (phase.rl_got && strcmp(phase.rl_val, "applying2") == 0)
+		rf_exit(sh_zfs_set(z, ds, SH_REBASE_PHASE, "conflicts",
+		    e) == 0 ? 0 : 3);
 	rf_local(z, ds, RF_PRE, &pre, e);
 	if (!pre.rl_got) {
 		/* the clone form's result: made by the run, so taken away */
@@ -205,12 +213,14 @@ rf_run(struct sh_job *j, void *arg, struct sh_err *e)
 		if (sh_zfs_clone(z, onto, result, none, 2, e) != 0)
 			rf_exit(3);
 		(void) sh_zfs_set(z, result, SH_REBASE_TAG, "zr-fake", e);
+		(void) sh_zfs_set(z, result, SH_REBASE_PHASE, "applying1", e);
 	} else {
 		(void) snprintf(snap, sizeof (snap), "%s@%s", onto, result);
 		names[0] = snap;
 		if (sh_zfs_snapshot(z, names, 1, NULL, 0, e) != 0)
 			rf_exit(3);
 		(void) sh_zfs_set(z, onto, SH_REBASE_TAG, "zr-fake", e);
+		(void) sh_zfs_set(z, onto, SH_REBASE_PHASE, "applying1", e);
 		(void) sh_zfs_set(z, onto, RF_PRE, result, e);
 		/* the take: one somebody is using will not unmount */
 		if (sh_zfs_unmount(z, onto, e) != 0) {
@@ -223,6 +233,10 @@ rf_run(struct sh_job *j, void *arg, struct sh_err *e)
 		for (;;)
 			(void) pause();
 	}
+	/* stopped at the conflicts gate; failed part way past it */
+	if (rc == 1 || rc == 3)
+		(void) sh_zfs_set(z, clone ? result : onto, SH_REBASE_PHASE,
+		    rc == 1 ? "conflicts" : "applying2", e);
 	if (rc != 0)
 		rf_exit(rc);
 	rf_unrecord(z, clone ? result : onto, e);

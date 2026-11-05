@@ -785,6 +785,29 @@ main(void)
 	    is(user(OLD, "shtetl:stall"), "(unset)"));
 
 	/*
+	 * W17: the root's dataset form failing part way, its run left in
+	 * applying2: aborted twice, the first --abort stepping it back to
+	 * the conflicts gate; then destroyed and stalled as W7
+	 */
+	made();
+	next();
+	snap_at(OLD, 0, cr, sizeof (cr));
+	(void) snprintf(l[0], sizeof (l[0]), NEW "@%s", cr);
+	rbfake_end(l[0], 3);
+	CHECK(roll() == 0);
+	CHECK(is(settle(), "house web stalled replay: exited 3\n"));
+	CHECK(is(cap_text(&sys), "house web: replay: exited 3\n") &&
+	    !there(NEW));
+	(void) snprintf(want, sizeof (want), "jail -f %s/web.conf -cm web\n",
+	    jails);
+	v[0] = "zfs_rebase --abort " NEW "\n";
+	v[1] = "zfs_rebase --abort " NEW "\n";
+	v[2] = want;
+	v[3] = NULL;
+	CHECK((text = slurp("fake.log")) != NULL && in_order(text, v));
+	CHECK(strstr(text, "no rebase") == NULL);
+
+	/*
 	 * W8: a failure at another step, as W7, its step's words, nothing
 	 * to abort: the final save; pkg; house.conf; the update snapshot,
 	 * the fifth snapshot of the roll after the final save and the
