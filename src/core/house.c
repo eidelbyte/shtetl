@@ -1090,7 +1090,7 @@ sh_house_stop(struct sh_house *h)
 	if (h->h_state == SH_H_ACTIVE || h->h_state == SH_H_FAILED)
 		return;
 	if (h->h_make == NULL || !h->h_make->hm_pulling)
-		sh_job_stop(&h->h_job);
+		sh_job_stop(&h->h_job, h->h_env->he_kq);
 	if (h->h_make != NULL)
 		make_free(h->h_make);
 	h->h_make = NULL;

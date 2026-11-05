@@ -312,11 +312,15 @@ sh_job_event(struct sh_job *j, int kq, const struct kevent *ev)
 }
 
 void
-sh_job_stop(struct sh_job *j)
+sh_job_stop(struct sh_job *j, int kq)
 {
+	struct kevent ev;
 	int st;
 
 	if (j->j_pid != 0) {
+		/* its exit, queued once it is killed, would find J reused */
+		EV_SET(&ev, j->j_pid, EVFILT_PROC, EV_DELETE, 0, 0, NULL);
+		(void) kevent(kq, &ev, 1, NULL, 0, NULL);
 		(void) kill(-j->j_pid, SIGTERM);
 		while (waitpid(j->j_pid, &st, 0) == -1 && errno == EINTR)
 			;

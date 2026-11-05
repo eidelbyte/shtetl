@@ -305,7 +305,7 @@ main(void)
 	{
 		pid_t g = logged_pid();
 
-		sh_job_stop(&job);
+		sh_job_stop(&job, kq);
 		CHECK(ended == 0 && gone(g));
 	}
 	(void) close(kq);
@@ -373,9 +373,16 @@ main(void)
 	}
 	{
 		pid_t f = job.j_pid, g = logged_pid();
+		struct timespec ts = { 0, 200000000L };
+		struct kevent ev;
 
-		sh_job_stop(&job);
+		sh_job_stop(&job, kq);
 		CHECK(ended == 0 && gone(f) && gone(g));
+		/*
+		 * J17: and nothing of the forked call left on the kqueue,
+		 * whose exit would come to the job after, reused
+		 */
+		CHECK(kevent(kq, NULL, 0, &ev, 1, &ts) == 0);
 	}
 	(void) close(kq);
 

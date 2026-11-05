@@ -705,7 +705,7 @@ sh_roll_stop(struct sh_foundation *f)
 	if (f->f_roll == NULL)
 		return;
 	if (f->f_state == SH_F_ROLLING)
-		sh_job_stop(&f->f_roll->r_job);
+		sh_job_stop(&f->f_roll->r_job, f->f_roll->r_env->re_kq);
 	roll_free(f->f_roll);
 	f->f_roll = NULL;
 }

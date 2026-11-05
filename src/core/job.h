@@ -87,10 +87,11 @@ void sh_job_event(struct sh_job *j, int kq, const struct kevent *ev);
 
 /*
  * The child under way and its group sent SIGTERM and reaped, as when
- * the daemon stops; END is not called, and J is left as sh_job_init
- * left it.
+ * the daemon stops, its watch taken off KQ first, so that no event of
+ * it comes to J, or to what is in J's place, after; END is not called,
+ * and J is left as sh_job_init left it.
  */
-void sh_job_stop(struct sh_job *j);
+void sh_job_stop(struct sh_job *j, int kq);
 
 /* The step under way, or NULL. */
 const char *sh_job_step(const struct sh_job *j);

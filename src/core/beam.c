@@ -1023,7 +1023,7 @@ sh_beam_stop(struct sh_beam *b)
 	struct bpull *p;
 
 	if (b->b_busy)
-		sh_job_stop(&b->b_job);
+		sh_job_stop(&b->b_job, b->b_env->be_kq);
 	pass_free(b);
 	while ((p = b->b_pulls) != NULL) {
 		b->b_pulls = p->bp_next;
