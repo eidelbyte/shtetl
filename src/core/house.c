@@ -424,59 +424,89 @@ activate(struct sh_zfs *z, const char *run, struct sh_house *h,
 	return (r);
 }
 
+/* The house NAME of *HP, added where it is not, failed: left out. */
+static void
+house_fail(struct sh_house ***hp, size_t *np, const char *name,
+    const struct sh_houseenv *env)
+{
+	struct sh_house *h;
+
+	if ((h = house_of(*hp, *np, name)) == NULL)
+		h = house_add(hp, np, name, env);
+	h->h_state = SH_H_FAILED;
+}
+
 int
 sh_houses_start(const struct sh_houseenv *env, struct sh_house ***hp,
     size_t *np, struct sh_err *e)
 {
 	char *c = join(env->he_run, "/containers", ""), house[256], o[1024];
-	char snap[256];
+	char snap[256], pfx[300];
 	struct sh_zfs *z = env->he_z;
 	struct names tops = { NULL, 0 };
 	struct hver *v = NULL;
 	struct sh_house *h;
+	struct sh_err he;
 	uint64_t guid, txg;
 	size_t i, k, n = 0;
-	int r, best;
+	int r, best, got;
 
 	*hp = NULL;
 	*np = 0;
 	r = sh_zfs_children(z, c, name_add, &tops, e);
+	/*
+	 * What ZFS refuses of one house is said once, to the sink, "house
+	 * H: why", and the house is left out; the rest go on (ruled
+	 * 2026-11-05, Q-H1).
+	 */
 	for (i = 0; r == 0 && i < tops.n_n; i++) {
-		if ((r = sh_zfs_user(z, tops.n_v[i], "shtetl:house", house,
-		    sizeof (house), e)) == 1) {
-			r = 0;
+		if (sh_zfs_user(z, tops.n_v[i], "shtetl:house", house,
+		    sizeof (house), env->he_err) != 0 ||
+		    ((h = house_of(*hp, *np, house)) != NULL &&
+		    h->h_state == SH_H_FAILED))
 			continue;
-		}
-		if (r != 0 || (r = complete(z, tops.n_v[i], snap,
-		    sizeof (snap), e)) < 0)
-			break;
-		if (r == 0) {
-			/* a create a crash cut short */
-			r = tree_destroy(z, tops.n_v[i], e);
-			continue;
-		}
-		r = 0;
+		(void) snprintf(pfx, sizeof (pfx), "%shouse %s: ",
+		    env->he_err->se_prefix, house);
+		sh_err_init(&he, env->he_err->se_out, pfx);
 		txg = 0;
-		if (sh_zfs_origin(z, tops.n_v[i], o, sizeof (o), e) == 1)
-			r = sh_zfs_snapinfo(z, o, &guid, &txg, e);
+		if ((got = complete(z, tops.n_v[i], snap, sizeof (snap),
+		    &he)) == 0) {
+			/* a create a crash cut short */
+			if (tree_destroy(z, tops.n_v[i], &he) != 0)
+				house_fail(hp, np, house, env);
+			continue;
+		}
+		if (got == 1 && (got = sh_zfs_origin(z, tops.n_v[i], o,
+		    sizeof (o), &he)) == 1)
+			got = sh_zfs_snapinfo(z, o, &guid, &txg, &he);
+		if (got < 0) {
+			house_fail(hp, np, house, env);
+			continue;
+		}
 		v = sh_realloc(v, (n + 1) * sizeof (*v));
 		v[n].hv_root = sh_strdup(tops.n_v[i]);
 		v[n].hv_house = sh_strdup(house);
 		v[n++].hv_txg = txg;
-		if ((h = house_of(*hp, *np, house)) == NULL)
+		if (h == NULL)
 			(void) house_add(hp, np, house, env);
 	}
 	for (i = 0; r == 0 && i < *np; i++) {
 		h = (*hp)[i];
+		if (h->h_state == SH_H_FAILED)
+			continue;
 		best = -1;
 		for (k = 0; k < n; k++) {
 			if (strcmp(v[k].hv_house, h->h_name) == 0 &&
 			    (best < 0 || v[k].hv_txg > v[best].hv_txg))
 				best = (int)k;
 		}
-		if ((r = activate(z, env->he_run, h, v[best].hv_root,
-		    e)) == 0)
+		(void) snprintf(pfx, sizeof (pfx), "%shouse %s: ",
+		    env->he_err->se_prefix, h->h_name);
+		sh_err_init(&he, env->he_err->se_out, pfx);
+		if (activate(z, env->he_run, h, v[best].hv_root, &he) == 0)
 			house_start(h);
+		else
+			h->h_state = SH_H_FAILED;
 	}
 	for (k = 0; k < n; k++) {
 		free(v[k].hv_root);
@@ -917,6 +947,10 @@ sh_house_status(const struct sh_house *h, FILE *out)
 		    strrchr(h->h_active, '/') + 1);
 		return;
 	}
+	if (h->h_state == SH_H_FAILED) {
+		(void) fprintf(out, "house %s failed\n", h->h_name);
+		return;
+	}
 	step = h->h_make != NULL && h->h_make->hm_pulling ? "pull" :
 	    sh_job_step(&h->h_job);
 	(void) fprintf(out, "house %s %s %s\n", h->h_name,
@@ -927,7 +961,7 @@ sh_house_status(const struct sh_house *h, FILE *out)
 void
 sh_house_stop(struct sh_house *h)
 {
-	if (h->h_state == SH_H_ACTIVE)
+	if (h->h_state != SH_H_CREATING && h->h_state != SH_H_STARTING)
 		return;
 	if (h->h_make == NULL || !h->h_make->hm_pulling)
 		sh_job_stop(&h->h_job);

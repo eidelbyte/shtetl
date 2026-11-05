@@ -21,7 +21,8 @@
 enum sh_hstate {
 	SH_H_ACTIVE,
 	SH_H_CREATING,
-	SH_H_STARTING
+	SH_H_STARTING,
+	SH_H_FAILED		/* left out at the start, ZFS refusing */
 };
 
 struct sh_hmake;
@@ -62,8 +63,11 @@ struct sh_houseenv {
  * origin's createtxg, active, and mounted at <containers>/<house>
  * where it is not; then its jail started (sh_house_create's last
  * steps), the house starting until it is, and a start that fails said
- * to ENV's sink, "house H: why". -1 when ZFS refuses a step, said to
- * E. ENV outlives the houses.
+ * to ENV's sink, "house H: why". A house ZFS refuses a step of is said
+ * to the sink once, "house H: why", and left out, failed, until the
+ * next start; the rest go on (ruled 2026-11-05, Q-H1). -1 when ZFS
+ * refuses the run's containers themselves, said to E. ENV outlives
+ * the houses.
  */
 int sh_houses_start(const struct sh_houseenv *env, struct sh_house ***hp,
     size_t *np, struct sh_err *e);

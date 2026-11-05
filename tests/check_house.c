@@ -583,6 +583,58 @@ main(void)
 	    strstr(text, "# failed: block: ") != NULL);
 
 	/*
+	 * H18: the actor's start, ZFS refusing one house's mount: said
+	 * once, that house failed and left out, the other active and its
+	 * jail started; a create of the failed one refused (ruled
+	 * 2026-11-05, Q-H1)
+	 */
+	fresh();
+	CHECK(create("web") == 0);
+	lay(VWEB);
+	deliver(NULL);
+	CHECK(is(settle(), "house web active " VWEB "\n"));
+	CHECK(create("app") == 0);
+	lay("15.1-releng-T-app");
+	deliver(NULL);
+	CHECK(is(settle(), "house app active 15.1-releng-T-app\n"
+	    "house web active " VWEB "\n"));
+	(void) unlink(scratch_path("fake.log"));
+	cap_reset(&sys);
+	zfake_fail("mount");
+	restart();
+	CHECK(is(settle(), "house app failed\nhouse web active " VWEB "\n"));
+	CHECK(is(cap_text(&sys), "house app: zfake: mount failed as asked\n"));
+	(void) snprintf(want, sizeof (want), "jail -f %s/web.conf -cm web\n",
+	    jails);
+	CHECK(is(slurp("fake.log"), want));
+	CHECK(create("app") == -1 && is(cap_text(&c), "app: exists\n"));
+	/*
+	 * H19: an incomplete version ZFS will not destroy: the house
+	 * failed, said once, its complete version left as it is; the other
+	 * started; the next start destroys it and starts both
+	 */
+	CHECK(sh_zfs_clone(z, RF "/g@" V, RC "/cut-web", NULL, 0,
+	    &c.c_err) == 0 &&
+	    sh_zfs_set(z, RC "/cut-web", "shtetl:house", "web",
+	    &c.c_err) == 0);
+	(void) unlink(scratch_path("fake.log"));
+	cap_reset(&sys);
+	zfake_fail("destroy");
+	restart();
+	CHECK(is(settle(), "house app active 15.1-releng-T-app\n"
+	    "house web failed\n") && there(RC "/cut-web"));
+	CHECK(is(cap_text(&sys), "house web: zfake: destroy failed as "
+	    "asked\n"));
+	(void) snprintf(want, sizeof (want), "jail -f %s/app.conf -cm app\n",
+	    jails);
+	CHECK(is(slurp("fake.log"), want));
+	cap_reset(&sys);
+	restart();
+	CHECK(is(settle(), "house app active 15.1-releng-T-app\n"
+	    "house web active " VWEB "\n") && !there(RC "/cut-web") &&
+	    is(cap_text(&sys), ""));
+
+	/*
 	 * N11: a create whose jail does not start: said; the version and
 	 * the block it wrote destroyed, the house gone
 	 */

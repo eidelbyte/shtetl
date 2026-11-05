@@ -960,6 +960,8 @@ reply}.
 | H15 | status | "house H active VERSION", "house H creating STEP" | tests/check_house.c |
 | H16 | the daemon: shtetl create H --on F | the reply at once, the create the daemon's; the usage, an invalid name, "F: no such foundation", "H: exists"; a house with a complete version started with the daemon, its line in status | tests/check_daemon.c |
 | H17 | the box: a container made on the M3 foundation, pulled | made by shtetl create on box's newest version, active, its root a clone of the run's copy, placed at containers/H; the copy pulled whole where nothing on the run relied on box | tests/box/build.sh (m5-jail) |
+| H18 | the actor's start, ZFS refusing a step of putting one house in place (a mount) | said once, "house H: why"; that house "house H failed", left out, not mounted or started; the others active and started; a create of it "H: exists" (ruled 2026-11-05, Q-H1) | tests/check_house.c |
+| H19 | the actor's start, ZFS refusing to destroy a house's incomplete version | as H18: the house failed, said once, its complete version left; the next start destroys the incomplete one and starts the house | tests/check_house.c |
 
 ## Family N: a container's jail (m5-jail)
 
