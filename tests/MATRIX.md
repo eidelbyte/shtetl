@@ -956,7 +956,7 @@ reply}.
 | H11 | a second create of H while one is under way | "H: creating" | tests/check_house.c |
 | H12 | the actor at its start: one complete version | active, mounted at /containers/H, mounted already left | tests/check_house.c |
 | H13 | the actor at its start: an incomplete version | destroyed; the newest complete one active | tests/check_house.c |
-| H14 | the actor at its start: two complete versions | the newest by its origin's createtxg active; the others unmounted and put back to their own paths | deferred: m5-roll, which makes a second version and the swap that puts the old one back |
+| H14 | the actor at its start: two complete versions | the newest by its origin's createtxg active; the others unmounted and put back to their own paths | mapped to W13 (m5-roll) |
 | H15 | status | "house H active VERSION", "house H creating STEP" | tests/check_house.c |
 | H16 | the daemon: shtetl create H --on F | the reply at once, the create the daemon's; the usage, an invalid name, "F: no such foundation", "H: exists"; a house with a complete version started with the daemon, its line in status | tests/check_daemon.c |
 | H17 | the box: a container made on the M3 foundation, pulled | made by shtetl create on box's newest version, active, its root a clone of the run's copy, placed at containers/H; the copy pulled whole where nothing on the run relied on box | tests/box/build.sh (m5-jail) |
@@ -1059,3 +1059,64 @@ reply}.
 | V8 | the daemon's verbs | shtetl save H, shtetl pkg H in the usage; the reply at once, pkg the daemon's | tests/check_daemon.c |
 | V9 | a create's end | the beam told, so the new version reaches the lake without waiting for the next convergence | tests/check_house.c |
 | V10 | the box: save and pkg of a real container | kinds save and pkg on its every dataset; the save beamed to the lake; pkg -j upgraded its own package in the running jail, its log saying so | tests/box/build.sh |
+
+## Family W: a container's roll (m5-roll)
+
+Plan 7.2, 7.3, probes P5 and P6: `shtetl roll H` moves a container
+onto the next version of its foundation that the run's copy holds,
+the oldest newer than its active version's origin. The steps, in one
+job: the jail stopped; the final save, kind save; the copy of the
+foundation mounted, since zfs_rebase reads every side through a
+mounted dataset's .zfs/snapshot; the replay, for each dataset of the
+next foundation version's tree, parent first: a placeholder cloned,
+canmount off; one the active version has, its saves replayed, the
+oldest of them by zfs_rebase's clone form onto the foundation version,
+the result placed (readonly and mountpoint inherited, canmount
+noauto, mounted at its own path), each later one by the dataset form
+with -u, -b the save before it and the pre-apply snapshot named for
+it, -m always; one the active version lacks cloned as a create does.
+The saves are the active version's snapshots, oldest first, the last
+roll.depth of them (0 every one, a count, or an interval). The
+container's own datasets are cloned from the final save; then what
+its recipe gained since its version was made: the recipe resolved on
+foundation.conf as the foundation version's snapshot holds it, a
+command piece the old house.conf holds not run again, its own
+packages installed; house.conf; the update snapshot -r, kind update,
+taken last; the copy unmounted; the swap, the old version unmounted
+and given back its own path, the new placed at /containers/H; the
+start, its block from the update snapshot; the beam told. A failure
+or a conflict before the update snapshot aborts every open zfs_rebase
+run on the new version, found by zfs_rebase:tag set on a dataset
+itself, destroys the new version, unmounts the copy, starts the old
+version's jail again and stalls the house: shtetl:stall on its active
+version, "STEP: why". A crash is no failure: the next start aborts
+and destroys what is incomplete and finishes a swap left undone.
+
+Dimensions: the ask {a house active, not active, stalled, no newer
+version, not a house}; the trees {a dataset both have, a placeholder,
+one new in the foundation, one the foundation dropped, the
+container's own}; the saves {one, several, more than roll.depth, an
+interval}; the recipe {unchanged, a piece added, a package added};
+how a step ends {well, a conflict, refused, failed, killed}; where it
+ends {before the update snapshot, after it, in the swap}; the start
+after {an incomplete version with an open run, a swap undone, two
+complete versions}.
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| W1 | shtetl roll H, a newer version on the run | jail -r; the final save; the copy mounted; per dataset the clone form then dataset forms, as above; own datasets cloned; house.conf; the update snapshot; the copy unmounted; the swap; block and jail -cm from the new version; the beam told; "house H rolling STEP" meanwhile; active on the new version | tests/check_hroll.c |
+| W2 | the new version | named for the foundation snapshot less its kind, then H; its snapshots the replayed saves' names but the last, then `<date>-update`, kind update; shtetl:house; canmount noauto, placeholders off | tests/check_hroll.c |
+| W3 | roll.depth | 0: every snapshot of the active version; a count: the newest that many; an interval: those younger | tests/check_hroll.c |
+| W4 | the trees differ | a dataset new in the foundation version cloned from it; one the active version took from the foundation and the version lacks: stalled "replay: D: not in F@V", nothing made | tests/check_hroll.c |
+| W5 | what the recipe gained | a command piece the old house.conf holds not run again, a new one run, its own packages installed; house.conf the new shaken recipe | tests/check_hroll.c |
+| W6 | foundation.conf | read from the foundation version's snapshot on the run's copy, not from the new tree the replay wrote | tests/check_hroll.c |
+| W7 | a conflict in the replay | the open run aborted, zfs_rebase --abort by its dataset; the new version destroyed; the copy unmounted; the old version's jail started again; shtetl:stall "replay: exited 1"; said once to the sink; "house H stalled ..." | tests/check_hroll.c |
+| W8 | a failure at another step (the final save, pkg, house.conf, the update snapshot) | as W7, its step's words; nothing to abort where no run is open | tests/check_hroll.c |
+| W9 | refusals | "H: up to date" where the run holds no newer version; "H: creating", "H: starting", "H: upgrading", "H: rolling", "H: failed" | tests/check_hroll.c |
+| W10 | a stalled house | active and its jail running; save and pkg as ever; shtetl roll H clears the stall and rolls | tests/check_hroll.c |
+| W11 | the daemon stopped at each step before the update snapshot | at the next start: every open run on the incomplete version aborted, it destroyed, the old version placed and started; no stall | tests/check_hroll.c |
+| W12 | the daemon stopped after the update snapshot, before the swap or in it | at the next start the new version active: the old unmounted and given back its own path, the new placed and started | tests/check_hroll.c |
+| W13 | two complete versions at the start | the newest active; the others unmounted where placed and given back their own paths (H14) | tests/check_hroll.c |
+| W14 | the daemon | shtetl roll NAME: a house's roll where a house, a foundation's where a foundation (one namespace), the reply at once | tests/check_daemon.c |
+| W15 | the fake rebaser (tests/rbfake.c) | logs each start; the clone form a read-only clone, mountpoint none; the dataset form its pre-apply snapshot; the record set while a run is open, gone at done; a run asked to stop or fail does; --abort undoes it | tests/check_hroll.c; the real one held on the box by P6 and m5-box |
+| W16 | the box: a real container rolled | box: m5-box | box |
