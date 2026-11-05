@@ -212,6 +212,8 @@ over the fake on a socket listened on before the fork.
 | D23 | show, zconfig not mounted | "shtetl: ROOT: not mounted", 1 | tests/check_daemon.c |
 | D24 | show, no config space | "shtetl: no config space", 1 | tests/check_daemon.c |
 | D25 | the lake and the run found; the run not | the beam begun at the start, beam.log made in the log directory, the lake's foundation not beamed (no house on the run), "beam converged" in status after the foundations; no beam and no line (m4-beam) | tests/check_daemon.c |
+| D26 | a request with descriptors (SCM_RIGHTS) | received with the request's first bytes, kept with the connection, closed with it unless an act takes them | tests/check_daemon.c |
+| D27 | a reply held back (an attended roll) | the connection kept, read for a half-close; the reply framed and written when the act's end sends it; a half-close told to the act once | tests/check_daemon.c |
 
 Also run by hand on the mac (not in make check, since leaks(1) hangs
 on a forked child that exits): a live daemon over the fake after 600
@@ -507,6 +509,7 @@ there}; standard input; the job stopped while a child runs.
 | J16 | stopped while a forked call runs, a child of its own under it | both killed, reaped, no end | tests/check_job.c |
 | J17 | stopped while a child runs, the kqueue used on after, the job's memory reused (a house's job, the houses started again) | the child's watch taken off the kqueue before it is killed: no event of its exit comes after | tests/check_job.c |
 | J18 | a child that closes its output and lives on (a forked call's exit tearing down a copy of the daemon is one, briefly) | the output's end handed once and its watch taken off, not handed at every kevent until the exit, a spin | tests/check_job.c |
+| J19 | a child given descriptors of its own (sh_job_term) | its standard input, output and error those descriptors, no output pipe; its exit the step's end; stopped, killed as any child | tests/check_job.c |
 
 Mutations caught: the signals not put back (J11), no SIGTERM to a
 step's leftovers (J10). On FreeBSD, make check-freebsd (in the box run)
@@ -629,6 +632,7 @@ the commit not the src's (F1).
 | F18 | foundation.conf schg, a roll over libzfs | as F1, on ZFS | box: tests/box/build.sh R1 - R4 |
 | F19 | asked while zbuild is reset after a failure | rolling still: "F: rolling"; stalled only once the reset is over | tests/check_roll.c |
 | F20 | a roll ending well; one failing | the beam told of the version, once; told nothing (m4-beam) | tests/check_roll.c |
+| F21 | a version's snapshot | shtetl:branch, the recipe's src_branch, beside shtetl:kind and shtetl:commit | tests/check_roll.c |
 
 ## Family K: the build and the install (m3-install)
 
@@ -1124,6 +1128,70 @@ complete versions}.
 | W11 | the daemon stopped at each step before the update snapshot | at the next start: every open run on the incomplete version aborted, it destroyed, the old version placed and started; no stall | tests/check_hroll.c |
 | W12 | after the update snapshot, the swap refused part way, as the daemon stopped there leaves it | the house failed, said once, refused a roll; at the next start the new version active: the old unmounted and given back its own path, the new placed and started | tests/check_hroll.c |
 | W13 | two complete versions at the start, the old one placed at /containers/H where a crash cut the swap short | the newest active, placed and started; the others unmounted and given back their own paths (H14) | tests/check_hroll.c |
-| W14 | the daemon | shtetl roll NAME: a house's roll where a house, a foundation's where a foundation (one namespace), the reply at once | tests/check_daemon.c |
+| W14 | the daemon | shtetl roll NAME: a house's roll where a house, a foundation's where a foundation (one namespace), the reply at once, or for an attended roll at its end (Q13) | tests/check_daemon.c |
 | W15 | the fake rebaser (tests/rbfake.c) | logs each start; the clone form a read-only clone, mountpoint none; the dataset form its pre-apply snapshot; the record set while a run is open, gone at done; a run asked to stop or fail does; --abort undoes it | tests/check_hroll.c; the real one held on the box by P6 and m5-box |
 | W16 | the box: a real container rolled | zfs_rebase on the daemon's PATH; s2app, with no package of its own, rolled by the real zfs_rebase onto box's next version (a pkg roll), beamed to the run's copy; what the container wrote and its command wrote carried over; the jail at its path; the saves but the last, then the update; no stall or record left; the copy unmounted; the old version pruned, the new on the lake; nothing in syslog | tests/box/build.sh (m5-roll) |
+| W17 | an open zfs_rebase run in applying2 at the undo or the start's clean (a crash, or a failure part way) | aborted twice, zfs_rebase(8)'s --abort stepping back to the conflicts gate first, then taking the rebase away with its holds; one --abort for any other phase | tests/check_hroll.c |
+
+## Family Q: the queue, freeze, the attended roll (m5-queue)
+
+Plan 7.2, 7.4, ruled 2026-10-19: a house rolls as soon as a version of
+its foundation arrives on the run, and through every one that arrives,
+in order, each only when the house is idle and not stalled. What waits
+is read from ZFS, not kept: the arrived versions of the run's copy
+(the copy's top snapshot holds shtetl:kind, which the beam sets last)
+newer than the active version's origin whose shtetl:branch the house's
+ver allows, the oldest first; so the queue outlives any restart, and a
+roll a crash cut short runs again. The daemon asks every house to take
+the next when a convergence of the beam is over, after its prune, and
+a house when it is idle again, at the end of an act. Such a roll is
+automatic: never attended, a conflict stalls it, and a refusal before
+it begins stalls the house too, said once, so that it is not asked
+again at every convergence; nothing waiting is nothing said.
+
+`shtetl freeze H` sets shtetl:stall "frozen" on the active version
+(plan 7.2's PROPOSAL, under the ruling that freeze pins a house): a
+stall the person set, which `shtetl roll H` lifts as it lifts any.
+
+`shtetl roll H` from a terminal is attended (ruled 2026-10-19): the
+command sends its standard input, output and error with its request
+(SCM_RIGHTS), and the daemon answers when the roll ends, not at once.
+At a conflict in the replay, `zfs_rebase -c -m -i IDENT` runs on those
+descriptors, the built-in picker in the person's terminal, the house
+down meanwhile; its exit 0 and the roll goes on, anything else and the
+roll is undone and stalled as an automatic one is. The command's
+SIGINT, SIGTERM and SIGHUP end the picker, not the roll: it half-closes
+its socket, the daemon kills the picker, the roll is undone and
+stalled, and the command, still connected, prints the stall, puts its
+terminal's modes back and exits 1. Without a terminal the command
+sends none, and the roll is the automatic kind with the reply at once.
+
+Dimensions: the trigger {a convergence's end, an act's end, the
+daemon's start, shtetl roll H}; the house {idle, creating, starting,
+upgrading, rolling, stalled, frozen}; what waits {nothing, one, several,
+one not arrived, one its ver refuses, one with no shtetl:branch}; the
+roll {automatic, attended, unattended by hand}; the conflict's answer
+{the picker ends 0, ends 1, killed by the command's signal, the
+command gone}; the command {a terminal, none}.
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| Q1 | a convergence over, a house idle and not stalled, a newer version arrived on the run | after the prune, the house rolls onto it, "house H rolling STEP"; active on it after; no line in syslog | tests/check_hroll.c, tests/check_daemon.c |
+| Q2 | what waits | the copy's versions newer than the active origin, arrived, the oldest first; one whose top snapshot has no shtetl:kind yet (arriving) is not taken | tests/check_hroll.c |
+| Q3 | the house's ver | a version whose shtetl:branch the ver refuses is passed over, the next allowed taken; all refused, or none with a shtetl:branch, and nothing waits; a ver changed in zconfig counts at the next ask | tests/check_hroll.c |
+| Q4 | several versions waiting | rolled through one at a time, in order: each roll's end asks again, and the next convergence too | tests/check_hroll.c |
+| Q5 | the house busy at the ask (creating, starting, upgrading, rolling) | not taken then; taken at its act's end | tests/check_hroll.c |
+| Q6 | stalled or frozen | never taken automatically, at a convergence or an act's end | tests/check_hroll.c |
+| Q7 | an automatic roll's conflict or failure | as W7, W8: undone, stalled, said once; nothing waits on a person | tests/check_hroll.c |
+| Q8 | an automatic roll refused before it begins (a recipe zconfig cannot resolve) | the house stalled with the refusal, "next: why", said once; not asked again until rolled by hand | tests/check_hroll.c |
+| Q9 | nothing waits | nothing done, nothing said, at every ask | tests/check_hroll.c |
+| Q10 | the daemon stopped mid-roll, started again | the incomplete version cleaned (W11), the old version started, then the roll asked again and run | tests/check_hroll.c |
+| Q11 | shtetl freeze H | shtetl:stall "frozen" on the active version, "house H stalled frozen"; kept over a restart; never taken automatically; shtetl roll H lifts it and rolls | tests/check_hroll.c, tests/check_daemon.c |
+| Q12 | shtetl freeze: refusals | the usage; "NAME: no such house" for a foundation's or no name; "H: rolling" and the other busy states; a house frozen or stalled already, frozen again, its stall replaced | tests/check_daemon.c, tests/check_hroll.c |
+| Q13 | shtetl roll H from a terminal | the command sends its three descriptors with the request; the reply when the roll ends: nothing and 0 rolled, "H: stalled STEP: why" and 1 stalled, a refusal at once as before | tests/check_daemon.c |
+| Q14 | an attended roll's conflict | zfs_rebase -c -m -i IDENT run on the person's descriptors, the step "picker"; exit 0, the roll goes on and ends active; nonzero, undone and stalled | tests/check_hroll.c |
+| Q15 | the command's SIGINT, SIGTERM or SIGHUP during an attended roll | its socket half-closed; the daemon kills the picker if it runs, and no later conflict of that roll waits; the roll undone and stalled; the command prints the stall and exits 1; its terminal's modes put back | tests/check_daemon.c (the half-close), tests/check_hroll.c (the picker ended) |
+| Q16 | the command gone during an attended roll | as Q15; the reply dropped | tests/check_daemon.c |
+| Q17 | shtetl roll with no terminal, or of a foundation | no descriptors sent, or those sent closed at once: the reply at once, a conflict stalls (W14, F16) | tests/check_daemon.c |
+| Q18 | shtetl:branch (F21) carried to the run's copy | the beam makes a version's shtetl:* the owner's, shtetl:branch among them (B family) | tests/check_hroll.c reads it from the copy; box: m5-box |
+| Q19 | the box: a version arriving rolls a real container by itself; an attended roll's picker | box: m5-box | box |
