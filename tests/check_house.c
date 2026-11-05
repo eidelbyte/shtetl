@@ -38,7 +38,7 @@ static struct sh_houseenv env;
 static struct sh_house **hs;
 static size_t nh;
 static char config[1024], conts[1024], logdir[1024], resolv[1024];
-static char jails[1024];
+static char jails[1024], store[1024];
 
 /* How often the beam was told a version or a snapshot was made. */
 static int beamed;
@@ -404,12 +404,13 @@ fresh(void)
 	static const struct sh_zprop run = { "shtetl:space", "run" };
 	static const struct sh_zprop off = { "canmount", "off" };
 	struct sh_spaces sp;
-	char cmd[2200];
+	char cmd[3300];
 
 	sh_houses_free(hs, nh);
 	hs = NULL;
 	nh = 0;
-	(void) snprintf(cmd, sizeof (cmd), "rm -rf '%s' '%s'", conts, jails);
+	(void) snprintf(cmd, sizeof (cmd), "rm -rf '%s' '%s' '%s'", conts,
+	    jails, store);
 	CHECK(system(cmd) == 0 && mkdir(jails, 0755) == 0);
 	zfake_reset();
 	zfake_pool("tank");
@@ -483,7 +484,8 @@ main(void)
 	env.he_pull = asked;
 	env.he_beam = told;
 	/* N18: the snapshot's view the start reads house.conf through */
-	zfake_files();
+	(void) snprintf(store, sizeof (store), "%s", scratch_path("zfake"));
+	zfake_files(store);
 
 	/*
 	 * H2, H1, H5 - H7, H15: web made on g, the run holding none of

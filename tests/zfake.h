@@ -56,11 +56,13 @@ int zfake_has(const char *ds, const char *word);
  * filesystem's directory kept as ZFS keeps them for what reads them: a
  * snapshot of it copies them, not those of a filesystem mounted inside
  * it, into MOUNT/.zfs/snapshot/SNAP; a mountpoint set that moves it
- * moves its directory. Off until asked: a foundation's tests walk
- * trees in which ZFS hides .zfs. The box holds the real ones (I12,
- * I14, Z20).
+ * moves its directory; unmounted, they are put away in the directory
+ * STORE, gone from where it was mounted, and mounted, brought back; a
+ * filesystem destroyed takes its away for good. Off until asked: a
+ * foundation's tests walk trees in which ZFS hides .zfs. The box holds
+ * the real ones (I12, I14, Z20).
  */
-void zfake_files(void);
+void zfake_files(const char *store);
 
 /* The snapshot SNAP's creation made SECONDS earlier. */
 void zfake_age(const char *snap, int64_t seconds);

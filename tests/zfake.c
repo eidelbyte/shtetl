@@ -75,6 +75,8 @@ static struct zf_state {
 } *zf;
 static struct sh_zfs zf_handle;
 static int zf_files;		/* zfake_files */
+static char zf_store[512];	/* its directory, unmounted files there */
+static int zf_gone;		/* the store's retired, counted */
 
 static void
 zf_die(const char *what, const char *arg)
@@ -374,6 +376,46 @@ zf_named(const char *name, struct sh_err *e)
 
 static void zf_mkdirs(const char *);
 
+/* Where the filesystem DS's files are while it is unmounted, into BUF. */
+static void
+zf_stored(const char *ds, char *buf, size_t len)
+{
+	size_t i, n;
+
+	n = (size_t)snprintf(buf, len, "%s/", zf_store);
+	for (i = 0; ds[i] != '\0' && n + i + 1 < len; i++)
+		buf[n + i] = ds[i] == '/' ? '%' : ds[i];
+	buf[n + i] = '\0';
+}
+
+/* D mounted at MP: its files there, from the store where they were. */
+static void
+zf_attach(struct zf_obj *d, const char *mp)
+{
+	char st[1024];
+
+	zf_mkdirs(mp);
+	if (zf_files && d->zo_at[0] == '\0') {
+		zf_stored(d->zo_name, st, sizeof (st));
+		(void) rename(st, mp);
+	}
+	(void) snprintf(d->zo_at, ZF_NAME, "%s", mp);
+}
+
+/* D unmounted: its files away in the store, at its mountpoint no more. */
+static void
+zf_detach(struct zf_obj *d)
+{
+	char st[1024];
+
+	if (zf_files && d->zo_at[0] != '\0') {
+		(void) mkdir(zf_store, 0755);
+		zf_stored(d->zo_name, st, sizeof (st));
+		(void) rename(d->zo_at, st);
+	}
+	d->zo_at[0] = '\0';
+}
+
 /* The two native properties the callers read: as libzfs gives them. */
 int
 sh_zfs_native(struct sh_zfs *z, const char *name, const char *prop,
@@ -441,9 +483,11 @@ zf_remount(const char *ds)
 			    strcmp(d->zo_at, mp) != 0 &&
 			    access(d->zo_at, F_OK) == 0)
 				(void) rename(d->zo_at, mp);
+			if (d->zo_at[0] == '\0')
+				zf_attach(d, mp);
 			(void) snprintf(d->zo_at, ZF_NAME, "%s", mp);
 		} else {
-			d->zo_at[0] = '\0';
+			zf_detach(d);
 		}
 	}
 }
@@ -596,9 +640,10 @@ zf_why(const char *const *names, size_t i, int asked)
 }
 
 void
-zfake_files(void)
+zfake_files(const char *store)
 {
 	zf_files = 1;
+	(void) snprintf(zf_store, sizeof (zf_store), "%s", store);
 }
 
 /* Whether a filesystem of the fake is mounted at PATH. */
@@ -815,6 +860,15 @@ sh_zfs_destroy(struct sh_zfs *z, const char *name, struct sh_err *e)
 			return (-1);
 		}
 	}
+	if (zf_files) {
+		/* its files gone with it: retired, never mounted again */
+		char st[1024], gone[1100];
+
+		zf_stored(name, st, sizeof (st));
+		(void) snprintf(gone, sizeof (gone), "%s/.gone%d", zf_store,
+		    zf_gone++);
+		(void) rename(st, gone);
+	}
 	i = (int)(o - zf->zs_ds);
 	(void) memmove(o, o + 1, (size_t)(zf->zs_n - i - 1) * sizeof (*o));
 	zf->zs_n--;
@@ -872,8 +926,7 @@ sh_zfs_mount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 		    d->zo_at);
 		return (-1);
 	}
-	(void) snprintf(d->zo_at, ZF_NAME, "%s", mp);
-	zf_mkdirs(mp);
+	zf_attach(d, mp);
 	return (0);
 }
 
@@ -901,7 +954,7 @@ sh_zfs_unmount(struct sh_zfs *z, const char *ds, struct sh_err *e)
 			return (-1);
 		}
 	}
-	d->zo_at[0] = '\0';
+	zf_detach(d);
 	return (0);
 }
 

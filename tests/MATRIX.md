@@ -1019,7 +1019,7 @@ log, the sink}.
 | N15 | the daemon's start and stop | the houses started with their jails, the blocks in the daemon's directory for them; at its stop no jail stopped (ruled 2026-11-05, Q-J1) | tests/check_daemon.c; on the box, a real jail through the daemon's stop, tests/box/build.sh |
 | N16 | a name of digits only | refused: "containers/123: invalid recipe name: digits only", create's "123: invalid name: digits only", a requires entry | tests/check_cascade.c, tests/check_daemon.c, tests/check_schema.c |
 | N17 | the box: a real jail from the block | made, at the version's path, with the recipe's jailconf; devfs at path/dev; jexec H and pkg -j H reach it; jail -r takes the jail and devfs away | tests/box/build.sh |
-| N18 | the fake keeping files (zfake_files) | a snapshot of a mounted filesystem shows its files, not a child's, at MOUNT/.zfs/snapshot/SNAP; a mounted filesystem a mountpoint set moves takes its files along | tests/check_house.c, through N7, N8, N10; the real ones held on the box by I12, I14 and Z20 |
+| N18 | the fake keeping files (zfake_files) | a snapshot of a mounted filesystem shows its files, not a child's, at MOUNT/.zfs/snapshot/SNAP; a mounted filesystem a mountpoint set moves takes its files along; unmounted, its files are gone from its mountpoint until it is mounted again (m5-roll's swap); destroyed, gone for good | tests/check_house.c, through N7, N8, N10; the real ones held on the box by I12, I14 and Z20 |
 | N19 | the stop of a jail not running, its start having failed or a hand having removed it | jls -j H asked first; nothing refused, the step ends well; the stop of one running, jail -r as N5 (m5-roll, which stops first) | tests/check_jail.c |
 
 ## Family V: a house's saves and pkg upgrades (m5-save-pkg)
