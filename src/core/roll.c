@@ -40,6 +40,7 @@ struct sh_roll {
 	struct sh_recipe	r_recipe;
 	struct sh_src		r_src;
 	struct sh_branch	r_branch;
+	const char		*r_bname;	/* its src_branch, as written */
 	char			*r_head;	/* where F is mounted */
 	char			*r_srcdir;	/* the checkout */
 	char			*r_obj;		/* where F's obj cache is */
@@ -165,7 +166,7 @@ roll_snapshot(struct sh_job *j, void *arg, struct sh_err *e)
 	struct sh_roll *r = arg;
 	struct sh_zfs *z = r->r_env->re_z;
 	struct names tree = { NULL, 0 }, snaps = { NULL, 0 };
-	struct sh_zprop p[2];
+	struct sh_zprop p[3];
 	char snap[128], date[32], name[512];
 	time_t now = time(NULL);
 	struct tm tm;
@@ -192,8 +193,11 @@ roll_snapshot(struct sh_job *j, void *arg, struct sh_err *e)
 	p[0].zp_value = r->r_kind;
 	p[1].zp_name = "shtetl:commit";
 	p[1].zp_value = r->r_commit;
+	/* what a house's ver is held to, read on the copy (m5-queue) */
+	p[2].zp_name = "shtetl:branch";
+	p[2].zp_value = r->r_bname;
 	if ((rc = sh_zfs_snapshot(z, (const char *const *)snaps.n_v,
-	    snaps.n_n, p, 2, e)) == 0)
+	    snaps.n_n, p, 3, e)) == 0)
 		r->r_snap = sh_strdup(snap);
 out:
 	names_free(&snaps);
@@ -463,6 +467,7 @@ roll_pkg(struct sh_job *j, void *arg, struct sh_err *e)
 	struct sh_roll *r = arg;
 	struct sh_zfs *z = r->r_env->re_z;
 	const char *v = r->r_f->f_newest, *kind = strrchr(v, '-');
+	const struct sh_node *b;
 	char path[1024], snap[512];
 	size_t n = kind != NULL ? (size_t)(kind - v) : 0;
 	int rc;
@@ -487,6 +492,13 @@ roll_pkg(struct sh_job *j, void *arg, struct sh_err *e)
 	    SH_SHAKEN_FOUNDATION, e)) == NULL ||
 	    roll_mount(r, sh_obj_get(r->r_shaken, "datasets"), e) != 0)
 		return (-1);
+	/* the head's branch, the version it rolls from was built on */
+	if ((b = sh_obj_get(r->r_shaken, "src_branch")) == NULL ||
+	    b->sn_type != SH_STR) {
+		sh_errf(e, "%s: src_branch: missing", SH_SHAKEN_FOUNDATION);
+		return (-1);
+	}
+	r->r_bname = b->sn_str;
 	r->r_commands.cm_head = r->r_head;
 	r->r_commands.cm_name = r->r_f->f_name;
 	r->r_commands.cm_resolv = r->r_env->re_resolv;
@@ -518,6 +530,7 @@ roll_recipe(struct sh_job *j, void *arg, struct sh_err *e)
 	/* resolved, a foundation's src_branch is there and well formed */
 	branch = sh_obj_get(r->r_recipe.sr_merged, "src_branch")->sn_str;
 	(void) sh_syn_branch(branch, &r->r_branch);
+	r->r_bname = branch;
 	if (sh_recipe_branch(&r->r_recipe, b, branch, e) != 0)
 		return (-1);
 	sh_job_call(j, "head", roll_head, r);

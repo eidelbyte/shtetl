@@ -327,6 +327,8 @@ main(void)
 	    f->f_newest);
 	CHECK(strcmp(user(snap, "shtetl:kind"), "create") == 0 &&
 	    strcmp(user(snap, "shtetl:commit"), oid) == 0);
+	/* F21: the recipe's src_branch beside them */
+	CHECK(is(user(snap, "shtetl:branch"), "releng/15.1"));
 	(void) snprintf(snap, sizeof (snap), "%s@%s", ds("r1/usr"),
 	    f->f_newest);
 	CHECK(strcmp(user(snap, "shtetl:kind"), "create") == 0);
@@ -578,6 +580,8 @@ main(void)
 	    f->f_newest);
 	CHECK(is(user(snap, "shtetl:kind"), "pkg") &&
 	    is(user(snap, "shtetl:commit"), oid));
+	/* F21: a pkg roll's, the head's own shaken src_branch */
+	CHECK(is(user(snap, "shtetl:branch"), "releng/15.1"));
 	CHECK(sh_zfs_mounted(z, ds("r7/new"), want, sizeof (want), &c.c_err) ==
 	    -1 && !there("lake/foundations/r7/etc/resolv.conf"));
 
