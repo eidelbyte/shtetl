@@ -198,3 +198,29 @@ stop at conflicts, fail or hang does.
 247df06 (CS17), 2bd5ad5 (N19), c030c8b (N18), 38aacbf (cm_had),
 dd8b873 (job, J17), 4fbca8e (the roll, W1 - W13, W15), 47a8be3 (the
 daemon, W14), 8398b86 (devfs, H20), and this worklog's.
+
+## Box run 14
+
+Box run 14: run.sh at 9d9efe4 (results 978f3f0): 142 ok, 1 failed.
+Every unit program but check_hroll passed on FreeBSD, check_job's J17
+and check_house's H13 and H19 among them; family Z with Z23 over
+libzfs, the creation of a snapshot; families A and I as before.
+check_hroll passed W1 - W10 and failed at W11's wait for the fake
+rebaser's run to open (tests/check_hroll.c:537); the doc check, after
+the units, did not run.
+
+The cause was a spin in job.c, not the roll: a pipe at its end is ever
+readable, and its read watch stayed on until the child's exit was
+handed on, so every kevent between the two returned at once. A forked
+call closes its output as it exits and tears down its copy of the
+process after; on FreeBSD the spin spent W11's 400 events before the
+run began. W1 - W10 wait in settle(), which counts no events. In the
+daemon, a child that closed its output and lived on would have spun a
+whole CPU for as long as it lived. Fixed in a09bf71 (J18: the watch
+taken off at the end, a forked call that closes everything and lives
+a second handed a few events, not millions; its mutant caught) and
+1ceaf1e (until_open waits 20 s by the clock). make check, gate and
+xcheck-freebsd pass on the mac.
+
+Owed: run.sh again, for check_hroll W11 - W13 and W15, J18 and the
+doc check on FreeBSD.
