@@ -261,3 +261,37 @@ property when a run is done (zfs_rebase_tool src/zfsops.h), so the
 tag marks only open runs, as the undo's aborts assume.
 
 Owed: the next build run.
+
+## Build run 13
+
+Build run 13: build.sh at 9099541 (results 1409abf): 82 ok, 7 failed.
+Every R, B, P, H17, N and V10 cell as before. Of the new: zfs_rebase
+on the daemon's PATH, s2app made, box pkg-rolled and its new version
+beamed to the run's copy, all ok. Both rolls of s2app stalled at the
+replay, before any zfs_rebase ran: "s2box/run/foundations/box/
+usr/local: failed to create mountpoint: Read-only file system". The
+seven failures are that stall's: H20 wanted the piece's stall, W16 an
+active new version. H20's other three passed, but a failure at the
+replay proves nothing of devfs.
+
+The cause: the roll mounted the run's copy with tree_mount, every
+dataset but those canmount=off, and a copy is canmount=noauto
+throughout, its owner's placeholders too, so box/usr, empty and
+read-only, was mounted over the root's /usr, hiding the directory
+usr/local mounts on. The create asks the lake's owner which datasets
+are placeholders; the roll's mount did not. The fake ZFS hides nothing
+under a mount, so no unit cell saw it. Fixed in b15bae1: the copy's
+datasets of the next version mounted as their steps are planned,
+placeholders not; check_hroll holds it at W11's open run, and the old
+code fails it.
+
+Also in the log, as in builds 11 and 12: "cannot unmount
+'/var/tmp/s2box/containers/s2web': pool or dataset is busy" at the
+pool's export, which left s2box imported; that is what the next run.sh
+met as "this box has shtetl spaces". It began with build 11, the first
+with V10's pkg -j into s2web. build.sh now says what holds the pool
+when the export is refused (its mounts, the jails dying too) and
+exports it with -f (4d66231). W16's update-snapshot cell passed 0 of
+0 on a version not there; it wants at least one now.
+
+Owed: the next build run.
