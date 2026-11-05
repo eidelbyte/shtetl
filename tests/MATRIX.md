@@ -123,6 +123,7 @@ words. The fake's data is words; the box's are files.
 | Z20 | set | a mountpoint on one not mounted, canmount noauto; canmount on | left unmounted; mounted |
 | Z21 | native | canmount set, canmount not set, a mountpoint inherited; no such filesystem | its value, "on", the parent's below it, exactly, no altroot before it; "no such filesystem" (m5-create) |
 | Z22 | native, set | a mountpoint read and set back, on a pool with an altroot (the box's) | the same read again, mounted where it was: the altroot not set into the property (build run 9 placed s2web at the altroot twice) |
+| Z23 | created | two snapshots; no such snapshot | the creation of each, within the hour, the second not before the first; "no such snapshot" (m5-roll, roll.depth's interval) |
 | Z19 | send | whole; a clone stream | the filesystem made canmount=noauto, set there, so nothing mounts it at import (ruled 2026-11-03) |
 | Z19 | send, resume | a whole cut, resumed | canmount=noauto, set there: on the box the cut's own receive did not set it |
 | Z19 | send | incremental onto a filesystem with a user property of its own | the property kept: canmount is set locally, not received, as a first received set clears the local properties (dsl_prop_get_received) |

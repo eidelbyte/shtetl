@@ -161,6 +161,14 @@ int sh_zfs_snapinfo(struct sh_zfs *z, const char *name, uint64_t *guid,
     uint64_t *txg, struct sh_err *e);
 
 /*
+ * When the snapshot NAME was taken, in seconds since the epoch, its
+ * creation property, which a received snapshot keeps from its source
+ * (m5-roll, roll.depth's interval). Refused: "no such snapshot".
+ */
+int sh_zfs_created(struct sh_zfs *z, const char *name, int64_t *when,
+    struct sh_err *e);
+
+/*
  * The snapshot the filesystem DS is a clone of, into ORIGIN: 1; 0 when
  * DS is no clone. Refused: "no such filesystem".
  */

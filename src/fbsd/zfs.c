@@ -624,6 +624,24 @@ sh_zfs_snapinfo(struct sh_zfs *z, const char *name, uint64_t *guid,
 	return (0);
 }
 
+int
+sh_zfs_created(struct sh_zfs *z, const char *name, int64_t *when,
+    struct sh_err *e)
+{
+	zfs_handle_t *zhp;
+
+	/* a filesystem's name would open as one */
+	if (strchr(name, '@') == NULL) {
+		sh_errf(e, "%s: no such snapshot", name);
+		return (-1);
+	}
+	if ((zhp = zz_open(z, name, e)) == NULL)
+		return (-1);
+	*when = (int64_t)zfs_prop_get_int(zhp, ZFS_PROP_CREATION);
+	zfs_close(zhp);
+	return (0);
+}
+
 /*
  * The property PROP of ZHP as zfs get prints it, into BUF: 1; 0 for
  * one it has none of, which zfs get prints "-".

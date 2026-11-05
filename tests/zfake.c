@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "core/err.h"
@@ -46,6 +47,7 @@ struct zf_obj {
 	char		zo_at[ZF_NAME];	/* a filesystem: mounted there, or "" */
 	uint64_t	zo_guid;	/* a snapshot's, or its source's */
 	uint64_t	zo_txg;		/* a snapshot's createtxg */
+	int64_t		zo_ctime;	/* a snapshot's creation, or source's */
 	char		zo_origin[ZF_NAME];	/* a clone's snapshot, or "" */
 	/* a filesystem's receive to resume: what it was sent, or "" */
 	char		zo_rsnap[ZF_NAME];
@@ -697,6 +699,7 @@ sh_zfs_snapshot(struct sh_zfs *z, const char *const *names, size_t n,
 		s->zo_rsnap[0] = '\0';
 		s->zo_guid = zf_guid();
 		s->zo_txg = ++zf->zs_txg;
+		s->zo_ctime = (int64_t)time(NULL);
 		for (k = 0; k < nprops; k++)
 			zf_put(s, props[k].zp_name, props[k].zp_value);
 		if (zf_files && zf_fs(ds)->zo_at[0] != '\0') {
@@ -963,6 +966,33 @@ sh_zfs_snapinfo(struct sh_zfs *z, const char *name, uint64_t *guid,
 	return (0);
 }
 
+int
+sh_zfs_created(struct sh_zfs *z, const char *name, int64_t *when,
+    struct sh_err *e)
+{
+	const struct zf_obj *s;
+
+	(void) z;
+	if (zf_fails("created", e))
+		return (-1);
+	if ((s = zf_snap(name)) == NULL) {
+		sh_errf(e, "zfake: %s: no such snapshot", name);
+		return (-1);
+	}
+	*when = s->zo_ctime;
+	return (0);
+}
+
+void
+zfake_age(const char *snap, int64_t seconds)
+{
+	struct zf_obj *s;
+
+	if ((s = zf_snap(snap)) == NULL)
+		zf_die("no such snapshot", snap);
+	s->zo_ctime -= seconds;
+}
+
 /* The filesystem DS, or NULL with "no such filesystem" said. */
 static struct zf_obj *
 zf_fsof(const char *ds, struct sh_err *e)
@@ -1121,6 +1151,7 @@ zf_take(struct zf_obj *d, const char *snap, const char *from,
 	(void) snprintf(t->zo_name, ZF_NAME, "%s", to);
 	zf_data(t, s);
 	t->zo_guid = s->zo_guid;
+	t->zo_ctime = s->zo_ctime;
 	t->zo_txg = ++zf->zs_txg;
 	d->zo_rsnap[0] = '\0';
 	d->zo_made = 0;

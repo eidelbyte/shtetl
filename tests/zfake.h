@@ -10,6 +10,8 @@
 #ifndef	SH_ZFAKE_H
 #define	SH_ZFAKE_H
 
+#include <stdint.h>
+
 /* Everything forgotten. */
 void zfake_reset(void);
 
@@ -59,5 +61,8 @@ int zfake_has(const char *ds, const char *word);
  * I14, Z20).
  */
 void zfake_files(void);
+
+/* The snapshot SNAP's creation made SECONDS earlier. */
+void zfake_age(const char *snap, int64_t seconds);
 
 #endif	/* SH_ZFAKE_H */

@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "core/err.h"
@@ -633,6 +634,7 @@ cells_send(void)
 	};
 	char why[600], buf[512];
 	uint64_t g1, t1, g2, t2;
+	int64_t c1, c2;
 
 	cell("Z11", "two snapshots: their guids apart, createtxg in order",
 	    sh_zfs_create(z, at("s"), &mp, 1, &e) == 0 &&
@@ -644,6 +646,14 @@ cells_send(void)
 	    g1 != g2 && t1 < t2);
 	refused("Z11", "no such snapshot: refused",
 	    sh_zfs_snapinfo(z, at("s@9"), &g1, &t1, &e), "s@9",
+	    "no such snapshot");
+	cell("Z23", "created: s@1 taken within the last hour, s@2 not before",
+	    sh_zfs_created(z, at("s@1"), &c1, &e) == 0 &&
+	    sh_zfs_created(z, at("s@2"), &c2, &e) == 0 &&
+	    c1 > (int64_t)time(NULL) - 3600 && c1 <= (int64_t)time(NULL) &&
+	    c2 >= c1);
+	refused("Z23", "created of no such snapshot: refused",
+	    sh_zfs_created(z, at("s@9"), &c1, &e), "s@9",
 	    "no such snapshot");
 
 	cell("Z14", "whole: t made, its @1 the source's guid",
