@@ -966,7 +966,7 @@ reply}.
 | H17 | the box: a container made on the M3 foundation, pulled | made by shtetl create on box's newest version, active, its root a clone of the run's copy, placed at containers/H; the copy pulled whole where nothing on the run relied on box | tests/box/build.sh (m5-jail) |
 | H18 | the actor's start, ZFS refusing a step of putting one house in place (a mount) | said once, "house H: why"; that house "house H failed", left out, not mounted or started; the others active and started; a create of it "H: exists" (ruled 2026-11-05, Q-H1) | tests/check_house.c |
 | H19 | the actor's start, ZFS refusing to destroy a house's incomplete version | the house active and its jail started all the same, the refusal said once, "house H: clean: why"; the next start destroys it | tests/check_house.c |
-| H20 | a create or a roll failing after the commands' devfs is mounted on the version's dev | the devfs released before the version unmounts, so it is destroyed, and a roll's old version started again and stalled | box: m5-box (the fake mount mounts nothing) |
+| H20 | a create or a roll failing after the commands' devfs is mounted on the version's dev | the devfs released before the version unmounts, so it is destroyed, and a roll's old version started again and stalled | tests/box/build.sh (m5-roll): s2app rolled with a piece that fails; the fake mount mounts nothing |
 
 ## Family N: a container's jail (m5-jail)
 
@@ -1126,4 +1126,4 @@ complete versions}.
 | W13 | two complete versions at the start, the old one placed at /containers/H where a crash cut the swap short | the newest active, placed and started; the others unmounted and given back their own paths (H14) | tests/check_hroll.c |
 | W14 | the daemon | shtetl roll NAME: a house's roll where a house, a foundation's where a foundation (one namespace), the reply at once | tests/check_daemon.c |
 | W15 | the fake rebaser (tests/rbfake.c) | logs each start; the clone form a read-only clone, mountpoint none; the dataset form its pre-apply snapshot; the record set while a run is open, gone at done; a run asked to stop or fail does; --abort undoes it | tests/check_hroll.c; the real one held on the box by P6 and m5-box |
-| W16 | the box: a real container rolled | box: m5-box | box |
+| W16 | the box: a real container rolled | zfs_rebase on the daemon's PATH; s2app, with no package of its own, rolled by the real zfs_rebase onto box's next version (a pkg roll), beamed to the run's copy; what the container wrote and its command wrote carried over; the jail at its path; the saves but the last, then the update; no stall or record left; the copy unmounted; the old version pruned, the new on the lake; nothing in syslog | tests/box/build.sh (m5-roll) |

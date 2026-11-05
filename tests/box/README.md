@@ -45,7 +45,7 @@ gone from the box between runs and run.sh never meets its spaces. The
 pool keeps zbuild's checkout and the obj cache from run to run, so
 only the first build takes hours; each run destroys what the last
 made, the foundation box, its copy on the run, the house stand-ins and
-the container s2web, and writes zconfig anew, the run keeping 1
+the containers s2web and s2app, and writes zconfig anew, the run keeping 1
 version of a house and the lake 2. It asks shtetl roll and shtetl pkg
 as a person does, waits on shtetl status, and reads what came of each
 from ZFS and the head. Between the rolls it does what M5's houses
@@ -58,9 +58,16 @@ and reads the jail the daemon made: its path and devfs, jexec and
 pkg -j into it; it asks shtetl save s2web and shtetl pkg s2web, which
 upgrades the container's own package, jq, and reads both snapshots
 and the save on the lake; it stops and starts the daemon around the
-running jail, and removes the jail from its block. A real jail runs on the
-box for that time; it and its block in /etc/jail.conf.d are taken
-away before the pool is exported, on every way out. The log is
+running jail, and removes the jail from its block. Then it makes
+s2app, with no package of its own, on the same version, pkg-rolls box
+and lets the beam carry the new version to the run, and asks shtetl
+roll s2app twice: with a command piece that fails in the chroot, which
+must leave s2app stalled on its old version, the new one destroyed and
+its devfs released; then without it, which must carry what the
+container wrote onto the new version by the real zfs_rebase, installed
+where the daemon's PATH finds it. Real jails run on the box for that
+time; they and their blocks in /etc/jail.conf.d are taken away before
+the pool is exported, on every way out. The log is
 tests/box/results/build-<UTC time>.log, sent as run.sh's is, with the
 run's lines of /var/log/daemon.log and of beam.log at its end. BRANCH,
 GITURL, IMGDIR and SIZE change what it builds and where; `sudo sh

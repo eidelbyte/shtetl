@@ -14,7 +14,12 @@
 # s2web made by shtetl create on box's newest version, its jail run
 # from the block the daemon wrote, saved and its own package upgraded
 # (m5-save-pkg, V10), the daemon stopped and started again around it,
-# the jail removed from its block.
+# the jail removed from its block. Then a container's roll (m5-roll,
+# cells H20 and W16): s2app, with no package of its own, made on the
+# same version; box pkg-rolled and its next version beamed to the run;
+# s2app rolled onto it with a command piece that fails in the chroot,
+# devfs mounted there (H20, stalled), then without it (W16, rolled by
+# the real zfs_rebase, what the container wrote carried over).
 # The first build takes hours; nothing here asks anything, so start it
 # and leave it.
 #
@@ -24,12 +29,13 @@
 # What a run keeps for the next: the pool's file in IMGDIR, the pool
 # exported between runs, holding zbuild's checkout and box's obj cache,
 # so later builds are incremental. Each run destroys what the last
-# made, box, its copy, the stand-ins and s2web, and writes zconfig
-# anew. The daemon runs from /usr/local/sbin, put there by make
-# install, and by service(8), as rc runs it. s2web's jail and its block
+# made, box, its copy, the stand-ins, s2web and s2app, and writes
+# zconfig anew. The daemon runs from /usr/local/sbin, put there by make
+# install, and by service(8), as rc runs it. The jails and their blocks
 # in /etc/jail.conf.d are taken away before the pool is exported: the
 # daemon's stop leaves a jail running (ruled 2026-11-05), and a jail
-# holds the pool busy.
+# holds the pool busy. A roll runs zfs_rebase, which must be installed
+# where rc's PATH and /usr/local's find it.
 #
 # Settings, from the environment:
 #   BRANCH   the branch to build (releng/15.1)
@@ -58,20 +64,24 @@ RC=$P/run/containers
 BEAMLOG=/var/log/shtetl/beam.log
 J=s2web
 JC=/etc/jail.conf.d/$J.conf
+J2=s2app
 
 daemon_down() {
 	service shtetl onestop >/dev/null 2>&1
 	return 0
 }
 
-# The pool exported: s2web's jail removed from its block, or without
-# it where that fails, and the block gone; then the mounts that are
-# not ZFS under the pool, a jail's devfs among them.
+# The pool exported: each house's jail removed from its block, or
+# without it where that fails, and the block gone; then the mounts that
+# are not ZFS under the pool, a jail's devfs among them.
 pool_export() {
-	if jls -j $J >/dev/null 2>&1; then
-		jail -f "$JC" -r $J >/dev/null 2>&1 || jail -R $J
-	fi
-	rm -f "$JC"
+	for _j in $J $J2; do
+		if jls -j $_j >/dev/null 2>&1; then
+			jail -f "/etc/jail.conf.d/$_j.conf" -r $_j >/dev/null \
+			    2>&1 || jail -R $_j
+		fi
+		rm -f "/etc/jail.conf.d/$_j.conf"
+	done
 	if zpool list -H -o name $P >/dev/null 2>&1; then
 		mount -p | awk -v a="$BALT/" 'index($2, a) == 1 &&
 		    $3 != "zfs" { print $2 }' | sort -r | while read -r _mp; do
@@ -452,13 +462,13 @@ rolls() {
 	    "foundation $F: patches/local: 2-b.patch: exited 1"
 }
 
-# s2web's status line, once it is neither being made nor started; ""
-# when it is not there.
-house_settled() {
+# A house's status line, s2web's or NAME's, once it is neither being
+# made, started, upgraded nor rolled; "" when it is not there.
+house_settled() {	# [NAME]
 	while :; do
-		_l=$("$SH" status 2>&1 | grep "^house $J ")
+		_l=$("$SH" status 2>&1 | grep "^house ${1:-$J} ")
 		case $_l in
-		*" creating "*|*" starting "*|*" upgrading "*)
+		*" creating "*|*" starting "*|*" upgrading "*|*" rolling "*)
 			sleep 5
 			;;
 		*)
@@ -563,6 +573,105 @@ house() {
 	    "$_rc $(jls -j $J jid 2>/dev/null)/$(devfs_at "$_p")" "0 /"
 }
 
+# The house NAME's version roots on the run, by name, on one line.
+versions() {	# NAME
+	zfs get -H -o name,value -d 1 -t filesystem shtetl:house $RC |
+	    awk -v j="$1" '$2 == j { printf "%s ", $1 }'
+}
+
+# The lines shtetl put in syslog since line FROM, its prefix gone.
+said() {	# FROM
+	tail -n "+$1" /var/log/daemon.log | grep 'shtetl\[' |
+	    sed 's/.*shtetl\[[0-9]*\]: //'
+}
+
+# s2app's recipe: a command piece of its own, no package; with LINE,
+# one more piece (H20's).
+app_recipe() {	# [LINE]
+	printf '%s\n' "commands { motd = \"echo $J2 > /etc/motd.template\";" \
+	    "${1:-}" '}' >"$CONF/containers/$J2.conf"
+}
+
+# A container's roll (m5-roll), after house(): s2app made on box's
+# newest version, then box pkg-rolled, its next version beamed to the
+# run's copy, which s2app relies on; s2app has no package of its own,
+# so a replay meets nothing in var/db/pkg, which box's pkg roll writes
+# (that is m5-derivations'). H20 then W16.
+hroll() {
+	# rc's PATH and what etc/rc.d/shtetl adds to it
+	_path=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+	cell W16 "zfs_rebase where the daemon's PATH finds it" \
+	    "$(env PATH=$_path sh -c 'command -v zfs_rebase >/dev/null' &&
+	    echo yes || echo no)" yes
+	app_recipe
+	x "$SH" create $J2 --on $F
+	cell W16 "s2app made on box, active" "$(house_settled $J2)" \
+	    "house $J2 active $V-DATE-$J2"
+	_old=$(versions $J2 | tr -d ' ')
+	_ap=$(dir $RC)/$J2
+	cell W16 "box pkg-rolled" "$(ask pkg)" "foundation $F idle $V-DATE-pkg"
+	_n=$(newest $FD)
+	_nv=${_n#*@}
+	_nv=${_nv%-pkg}-$J2
+	cell W16 "its next version beamed to the run's copy" \
+	    "$(beamed) $(has "$RD@${_n#*@}")" "beam converged yes"
+
+	# H20: a piece that fails in the chroot, devfs mounted on the new
+	# version's dev: the version destroyed all the same, devfs
+	# released, the old version's jail started again, stalled
+	_from=$(($(wc -l </var/log/daemon.log) + 1))
+	app_recipe 'h20 = "exit 1";'
+	x "$SH" roll $J2
+	cell H20 "stalled at the piece" "$(house_settled $J2)" \
+	    "house $J2 stalled commands: h20: exited 1"
+	cell H20 "the stall on the old version, said once" \
+	    "$(prop shtetl:stall "$_old") / $(said $_from)" \
+	    "commands: h20: exited 1 / house $J2: commands: h20: exited 1"
+	cell H20 "the new version destroyed, nothing mounted at its path" \
+	    "$(has $RC/$_nv) $(mount -p | awk -v d="$(dir $RC)/$_nv" \
+	    '$2 == d || index($2, d "/") == 1' | wc -l | tr -d ' ')" "no 0"
+	cell H20 "the old version's jail started again" \
+	    "$(jls -j $J2 path 2>&1) $(devfs_at "$_ap")" "$_ap devfs"
+	cell H20 "the run's copy unmounted" "$(prop mounted $RD)" no
+
+	# W16: the piece taken out; what the container writes; rolled by
+	# shtetl roll, which clears the stall
+	app_recipe
+	x jexec $J2 sh -c 'echo w16 > /root/w16'
+	_ns=$(zfs list -H -t snapshot -d 1 -o name "$_old" | wc -l | tr -d ' ')
+	_from=$(($(wc -l </var/log/daemon.log) + 1))
+	x "$SH" roll $J2
+	cell W16 "rolled: active" "$(house_settled $J2)" \
+	    "house $J2 active $V-DATE-$J2"
+	cell W16 "on a clone of the run's copy at the next version" \
+	    "$(prop origin $RC/$_nv 2>&1) $(dir $RC/$_nv 2>&1)" \
+	    "$RD@${_n#*@} $_ap"
+	cell W16 "what the container wrote, carried over" \
+	    "$(jexec $J2 cat /root/w16 2>&1)" w16
+	cell W16 "what its command wrote, carried over" \
+	    "$(jexec $J2 cat /etc/motd.template 2>&1)" $J2
+	cell W16 "the jail at its path, devfs there once" \
+	    "$(jls -j $J2 path 2>&1) $(mount -p | awk -v d="$_ap/dev" \
+	    '$2 == d' | wc -l | tr -d ' ')" "$_ap 1"
+	cell W16 "its snapshots: the saves but the last, then the update" \
+	    "$(zfs list -H -t snapshot -d 1 -o name $RC/$_nv | wc -l |
+	    tr -d ' ') $(prop shtetl:kind "$(newest $RC/$_nv)")" \
+	    "$((_ns + 1)) update"
+	cell W16 "every filesystem, an update snapshot" \
+	    "$(kinds_of $RC/$_nv update | awk '{ print ($1 == $2) }')" 1
+	cell W16 "no stall left, nothing of zfs_rebase's set" \
+	    "$(zfs get -H -r -s local -o value shtetl:stall,zfs_rebase:tag \
+	    $RC 2>&1 | wc -l | tr -d ' ')" 0
+	cell W16 "the run's copy unmounted" "$(prop mounted $RD)" no
+	# the run keeps 1: the old version pruned once its copy on the lake
+	# has its final save; the new one on the lake
+	cell W16 "beamed: the old pruned from the run, the new on the lake" \
+	    "$(beamed) $(has "$_old") $(has $LC/$_nv)" \
+	    "beam converged no yes"
+	cell W16 "syslog: nothing of the roll's or the prune's" \
+	    "$(said $_from | wc -l | tr -d ' ')" 0
+}
+
 mkdir -p "$BD/results" || exit 2
 OUT=$BD/results/build-$(date -u +%Y%m%dT%H%M%SZ).log
 LOGFROM=$(($(cat /var/log/daemon.log 2>/dev/null | wc -l) + 1))
@@ -579,6 +688,7 @@ trap 'pool_down; exit 130' INT TERM
 		sleep 5
 		rolls
 		house
+		hroll
 	else
 		echo "FAIL setup: make install, the pool, the daemon"
 	fi
@@ -594,6 +704,9 @@ trap 'pool_down; exit 130' INT TERM
 	echo
 	echo "the beam's log, $BEAMLOG, from the run's start:"
 	tail -n "+$BEAMFROM" $BEAMLOG
+	echo
+	echo "s2app's log, /var/log/shtetl/$J2.log, its last lines:"
+	tail -n 60 "/var/log/shtetl/$J2.log"
 } >"$OUT" 2>&1
 ok=$(grep -c '^ok ' "$OUT")
 failed=$(grep -c '^FAIL ' "$OUT")
