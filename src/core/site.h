@@ -44,6 +44,16 @@ const char **sh_site_repos(const struct sh_site *s);
 /* The keep of SECTION, "run" or "lake", in S's settings (plan 8.2). */
 int64_t sh_site_keep(const struct sh_site *s, const char *section);
 
+/*
+ * roll.depth, the saves a house's roll replays (plan 8.2): a count in
+ * *COUNT, the newest that many, 0 every one, with *SINCE 0; or, given
+ * as an interval, *COUNT 0 and in *SINCE the moment it reaches back to
+ * from NOW, as date(1) -v takes it back on the local calendar, a save
+ * taken before it not replayed.
+ */
+void sh_site_depth(const struct sh_site *s, int64_t now, int64_t *count,
+    int64_t *since);
+
 /* The built-in settings alone (the caller frees them), or NULL. */
 struct sh_node *sh_site_builtins(struct sh_err *e);
 

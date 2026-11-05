@@ -2,7 +2,9 @@
  * shtetl.conf: its schema, the built-in settings, and the merge.
  */
 
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "core/err.h"
 #include "core/mem.h"
@@ -308,6 +310,52 @@ int64_t
 sh_site_keep(const struct sh_site *s, const char *section)
 {
 	return (keep(s->ss_merged, section));
+}
+
+void
+sh_site_depth(const struct sh_site *s, int64_t now, int64_t *count,
+    int64_t *since)
+{
+	const struct sh_node *d;
+	struct tm tm;
+	time_t t = (time_t)now;
+	long n;
+
+	d = sh_obj_get(sh_obj_get(s->ss_merged, "roll"), "depth");
+	*count = 0;
+	*since = 0;
+	if (d->sn_type == SH_INT) {
+		*count = d->sn_int;
+		return;
+	}
+	/* checked at the load: a count above 0 and one unit letter */
+	n = strtol(d->sn_str, NULL, 10);
+	(void) localtime_r(&t, &tm);
+	switch (d->sn_str[strlen(d->sn_str) - 1]) {
+	case 'y':
+		tm.tm_year -= (int)n;
+		break;
+	case 'm':
+		tm.tm_mon -= (int)n;
+		break;
+	case 'w':
+		tm.tm_mday -= 7 * (int)n;
+		break;
+	case 'd':
+		tm.tm_mday -= (int)n;
+		break;
+	case 'H':
+		tm.tm_hour -= (int)n;
+		break;
+	case 'M':
+		tm.tm_min -= (int)n;
+		break;
+	default:
+		tm.tm_sec -= (int)n;
+		break;
+	}
+	tm.tm_isdst = -1;
+	*since = (int64_t)mktime(&tm);
 }
 
 int

@@ -358,6 +358,7 @@ over it}.
 | CS14 | remotes.recipes: name = remote; a bad name, a bad remote, a list refused; remotes.lake an invalid key (out of scope) | covered: check_site.c test_remotes |
 | CS15 | the src remote built in, no recipe repository; shtetl.conf's repositories in the order it gives them (sh_site_repos) | covered: check_site.c test_load |
 | CS16 | run.keep less than lake.keep in the merged settings (ruled 2026-10-20): equal by shtetl.conf's run.keep or by its lake.keep refused, "shtetl.conf: run.keep: must be less than lake.keep"; less accepted | covered: check_site.c test_load |
+| CS17 | roll.depth read for the roll (sh_site_depth): built in 0; a count; an interval, back from now on the local calendar as date(1) -v goes, y, m, w, d, H | covered: check_site.c test_depth (m5-roll) |
 
 ### CC: the cascade (docs/configuration.md 5, 6; src/core/cascade.c)
 

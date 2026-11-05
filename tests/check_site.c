@@ -1,9 +1,10 @@
 /*
  * shtetl.conf (docs/configuration.md 3): tests/MATRIX.md family CS,
- * every cell (CS1 - CS15, CS3 and CS6 retired).
+ * every cell (CS1 - CS17, CS3 and CS6 retired).
  */
 
 #include <string.h>
+#include <time.h>
 
 #include "check.h"
 #include "core/parse.h"
@@ -335,6 +336,50 @@ test_load(void)
 	CHECK(cap_has(&c, "shtetl.conf:1: macros are illegal"));
 }
 
+/* The roll.depth of shtetl.conf TEXT, read at NOW. */
+static void
+depth(const char *text, int64_t now, int64_t *count, int64_t *since)
+{
+	struct sh_site s;
+	char root[1100];
+
+	(void) scratch_write("depth/shtetl.conf", text);
+	(void) snprintf(root, sizeof (root), "%s", scratch_path("depth"));
+	cap_reset(&c);
+	CHECK(sh_site_load(root, &s, &c.c_err) == 0);
+	sh_site_depth(&s, now, count, since);
+	sh_site_free(&s);
+}
+
+/*
+ * CS17: roll.depth read for the roll: built in 0, every save; a count;
+ * an interval, back from now on the calendar, as date(1) -v goes
+ */
+static void
+test_depth(void)
+{
+	/* 2023-11-14 22:13:20 UTC; 2023-10-14 is 31 days before */
+	const int64_t now = 1700000000;
+	int64_t count, since;
+
+	CHECK(setenv("TZ", "UTC", 1) == 0);
+	tzset();
+	depth("", now, &count, &since);
+	CHECK(count == 0 && since == 0);
+	depth("roll { depth = 3; }\n", now, &count, &since);
+	CHECK(count == 3 && since == 0);
+	depth("roll { depth = \"2d\"; }\n", now, &count, &since);
+	CHECK(count == 0 && since == now - 2 * 86400);
+	depth("roll { depth = \"3H\"; }\n", now, &count, &since);
+	CHECK(since == now - 3 * 3600);
+	depth("roll { depth = \"1w\"; }\n", now, &count, &since);
+	CHECK(since == now - 7 * 86400);
+	depth("roll { depth = \"1m\"; }\n", now, &count, &since);
+	CHECK(since == now - 31 * 86400);
+	depth("roll { depth = \"1y\"; }\n", now, &count, &since);
+	CHECK(since == now - 365 * 86400);
+}
+
 int
 main(void)
 {
@@ -345,6 +390,7 @@ main(void)
 	test_values();
 	test_remotes();
 	test_load();
+	test_depth();
 	cap_close(&c);
 	scratch_clean();
 	printf("check_site: %d checks\n", checks);
