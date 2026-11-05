@@ -1743,13 +1743,15 @@ roll_own(struct sh_job *j, void *arg, struct sh_err *e)
 }
 
 /*
- * The plan, once the old version holds its final save: the copy
- * mounted, since zfs_rebase reads every side through a mounted
- * dataset; the saves, roll.depth deep; the new version named; then a
- * step for each dataset of the foundation's next version, parent
- * first, and the rest of the roll. A dataset the old version took from
- * the foundation that the next version lacks stops it here, before
- * anything is made.
+ * The plan, once the old version holds its final save: the saves,
+ * roll.depth deep; the new version named; then, for each dataset of
+ * the foundation's next version, parent first, its copy mounted, since
+ * zfs_rebase reads every side through a mounted dataset, and its steps;
+ * then the rest of the roll. A placeholder's copy is not mounted: a
+ * copy is noauto, its owner's placeholders too, and one mounted would
+ * hide the directories below it that its children mount on (build run
+ * 13). A dataset the old version took from the foundation that the
+ * next version lacks stops it here, before anything is made.
  */
 static int
 roll_plan(struct sh_job *j, void *arg, struct sh_err *e)
@@ -1759,12 +1761,12 @@ roll_plan(struct sh_job *j, void *arg, struct sh_err *e)
 	struct sh_zfs *z = h->h_env->he_z;
 	struct names all = { NULL, 0 }, old = { NULL, 0 }, cp = { NULL, 0 };
 	int64_t count, since, when;
+	const char *rel;
 	char *name, *snap;
 	size_t i, k, n = strlen(h->h_active);
 	int rc, off;
 
-	if (tree_mount(z, r->hr_copy, e) != 0 ||
-	    sh_zfs_snapshots(z, h->h_active, name_add, &all, e) != 0) {
+	if (sh_zfs_snapshots(z, h->h_active, name_add, &all, e) != 0) {
 		names_free(&all);
 		return (-1);
 	}
@@ -1815,16 +1817,16 @@ roll_plan(struct sh_job *j, void *arg, struct sh_err *e)
 	if (rc == 0)
 		r->hr_ds = sh_calloc(cp.n_n, sizeof (*r->hr_ds));
 	for (i = 0; rc == 0 && i < cp.n_n; i++) {
-		name = join(h->h_active, cp.n_v[i] + strlen(r->hr_copy), "");
-		if ((off = placeholder(z, r->hr_fds,
-		    cp.n_v[i] + strlen(r->hr_copy), e)) < 0)
+		rel = cp.n_v[i] + strlen(r->hr_copy);
+		name = join(h->h_active, rel, "");
+		if ((off = placeholder(z, r->hr_fds, rel, e)) < 0 ||
+		    (!off && sh_zfs_mount(z, cp.n_v[i], e) != 0))
 			rc = -1;
 		else if (!off && names_have(&old, name))
-			roll_replay(j, r, roll_ds(r,
-			    cp.n_v[i] + strlen(r->hr_copy), 0));
+			roll_replay(j, r, roll_ds(r, rel, 0));
 		else
-			sh_job_call(j, "clone", roll_clone, roll_ds(r,
-			    cp.n_v[i] + strlen(r->hr_copy), off));
+			sh_job_call(j, "clone", roll_clone, roll_ds(r, rel,
+			    off));
 		free(name);
 	}
 	names_free(&cp);

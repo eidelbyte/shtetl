@@ -1111,7 +1111,7 @@ complete versions}.
 
 | cell | what | expected | disposition |
 |------|------|----------|-------------|
-| W1 | shtetl roll H, a newer version on the run | jail -r; the final save; the copy mounted; per dataset the clone form then dataset forms, as above; own datasets cloned; house.conf; the update snapshot; the swap; block and jail -cm from the new version; the copy unmounted; the beam told; "house H rolling STEP" meanwhile; active on the new version | tests/check_hroll.c |
+| W1 | shtetl roll H, a newer version on the run | jail -r; the final save; the copy mounted but its placeholders (a copy is noauto throughout, and a placeholder mounted hides the directories its children mount on: build run 13); per dataset the clone form then dataset forms, as above; own datasets cloned; house.conf; the update snapshot; the swap; block and jail -cm from the new version; the copy unmounted; the beam told; "house H rolling STEP" meanwhile; active on the new version | tests/check_hroll.c |
 | W2 | the new version | named for the foundation snapshot less its kind, then H; its snapshots the replayed saves' names but the last, then `<date>-update`, kind update; shtetl:house; canmount noauto, placeholders off | tests/check_hroll.c |
 | W3 | roll.depth | 0: every snapshot of the active version; a count: the newest that many; an interval: those younger | tests/check_hroll.c |
 | W4 | the trees differ | a dataset new in the foundation version cloned from it; one the active version took from the foundation and the version lacks: stalled "replay: D: not in F@V", nothing made | tests/check_hroll.c |

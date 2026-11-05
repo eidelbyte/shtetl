@@ -856,6 +856,13 @@ main(void)
 	CHECK(roll() == 0);
 	until_open(NEW "/usr/local");
 	CHECK(is(status(), "house web rolling replay\n"));
+	/*
+	 * W1: the copy mounted for the replay but its placeholder, usr: a
+	 * copy is noauto, and usr mounted would hide the directory
+	 * usr/local mounts on (build run 13)
+	 */
+	CHECK(where(RF "/g")[0] != '\0' &&
+	    where(RF "/g/usr/local")[0] != '\0' && is(where(RF "/g/usr"), ""));
 	CHECK(is(zfake_local(NEW "/usr/local", "readonly"), "on") &&
 	    is(zfake_local(NEW "/usr/local", "mountpoint"), "none"));
 	(void) unlink(scratch_path("fake.log"));
