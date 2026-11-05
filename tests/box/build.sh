@@ -12,8 +12,9 @@
 # prune at each convergence, the run keeping 1 and the lake 2. After
 # them, M5's first container (m5-jail, cells H17, N14, N15 and N17):
 # s2web made by shtetl create on box's newest version, its jail run
-# from the block the daemon wrote, the daemon stopped and started
-# again around it, the jail removed from its block.
+# from the block the daemon wrote, saved and its own package upgraded
+# (m5-save-pkg, V10), the daemon stopped and started again around it,
+# the jail removed from its block.
 # The first build takes hours; nothing here asks anything, so start it
 # and leave it.
 #
@@ -457,7 +458,7 @@ house_settled() {
 	while :; do
 		_l=$("$SH" status 2>&1 | grep "^house $J ")
 		case $_l in
-		*" creating "*|*" starting "*)
+		*" creating "*|*" starting "*|*" upgrading "*)
 			sleep 5
 			;;
 		*)
@@ -473,10 +474,23 @@ devfs_at() {	# PATH
 	mount -p | awk -v d="$1/dev" '$2 == d { print $3 }'
 }
 
+# Of the filesystems of ROOT's tree, how many and how many have a
+# snapshot of the kind KIND: equal, when every one has.
+kinds_of() {	# ROOT KIND
+	echo "$(zfs list -H -r -t filesystem -o name "$1" | wc -l |
+	    tr -d ' ') $(zfs get -H -r -t snapshot -o value shtetl:kind \
+	    "$1" | grep -cx "$2")"
+}
+
 # M5's first container (m5-jail), after the rolls: R10 has read syslog.
+# Its own package, jq, and the host's resolv.conf, so that pkg -j can
+# reach the repository from inside the running jail (m5-save-pkg).
 house() {
 	printf '%s\n' \
 	    'commands { motd = "echo s2web > /etc/motd.template"; }' \
+	    'commands-external { resolv = <<EOD' \
+	    'cp /etc/resolv.conf "$SHTETL_ROOT/etc/resolv.conf"' 'EOD' '}' \
+	    'pkg = [ "jq" ];' \
 	    'jailconf = "allow.raw_sockets;";' >"$CONF/containers/$J.conf"
 	_f=$(newest $FD)
 	# H17: made on box's newest version, its copy on the run pulled
@@ -502,6 +516,26 @@ house() {
 	    "$(jexec $J cat /etc/motd.template 2>&1)" $J
 	cell N17 "pkg -j reaches it: the foundation's package" \
 	    "$(pkg -j $J query %n tree 2>&1)" tree
+	# V10 (m5-save-pkg): the running container saved, then its own
+	# package, jq, upgraded in it; each snapshot beamed to the lake
+	_from=$(($(wc -l </var/log/daemon.log) + 1))
+	_l=$LC/${_h##*/}
+	x "$SH" save $J
+	_n=$(zfs list -H -r -t filesystem -o name "$_h" | wc -l | tr -d ' ')
+	cell V10 "saved: every filesystem, kind save" \
+	    "$(kinds_of "$_h" save)" "$_n 1"
+	cell V10 "the save beamed to the lake" "$(beamed) $(zfs list -H \
+	    -t snapshot -o name -d 1 "$_l" 2>&1 | grep -c -- '-save$')" \
+	    "beam converged 1"
+	x "$SH" pkg $J
+	cell V10 "upgraded: active again" "$(house_settled)" \
+	    "house $J active $V-DATE-$J"
+	cell V10 "every filesystem, kind pkg" "$(kinds_of "$_h" pkg)" "$_n 1"
+	cell V10 "pkg -j ran, its own package to upgrade" \
+	    "$(grep -A1 '^# packages$' "/var/log/shtetl/$J.log" | tail -1)" \
+	    "# pkg"
+	cell V10 "syslog: nothing of the save's or the pkg's" \
+	    "$(tail -n "+$_from" /var/log/daemon.log | grep -c 'shtetl\[')" 0
 	# N15: the daemon stopped, the jail runs on (ruled 2026-11-05)
 	_jid=$(jls -j $J jid 2>&1)
 	_from=$(($(wc -l </var/log/daemon.log) + 1))

@@ -31,8 +31,8 @@ What runs:
   no shtetl daemon running, and says so otherwise.
 
 M3 and M4 on the box, a real foundation rolled by the daemon (family
-R), beamed and pruned (B28, P24), and M5's first container and its
-jail (H17, N14, N15, N17):
+R), beamed and pruned (B28, P24), and M5's first container, its jail,
+a save and a pkg upgrade (H17, N14, N15, N17, V10):
 
     git pull
     make freebsd
@@ -55,8 +55,10 @@ versions S1 - S3 of a house stand-in cloned on box's copy, one with
 carries the rest and resumes the cut, and its prune keeps what each
 space needs. After the rolls it asks shtetl create s2web --on box,
 and reads the jail the daemon made: its path and devfs, jexec and
-pkg -j into it; it stops and starts the daemon around the running
-jail, and removes the jail from its block. A real jail runs on the
+pkg -j into it; it asks shtetl save s2web and shtetl pkg s2web, which
+upgrades the container's own package, jq, and reads both snapshots
+and the save on the lake; it stops and starts the daemon around the
+running jail, and removes the jail from its block. A real jail runs on the
 box for that time; it and its block in /etc/jail.conf.d are taken
 away before the pool is exported, on every way out. The log is
 tests/box/results/build-<UTC time>.log, sent as run.sh's is, with the
