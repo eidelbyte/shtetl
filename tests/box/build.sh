@@ -523,17 +523,20 @@ house() {
 	x "$SH" save $J
 	_n=$(zfs list -H -r -t filesystem -o name "$_h" | wc -l | tr -d ' ')
 	cell V10 "saved: every filesystem, kind save" \
-	    "$(kinds_of "$_h" save)" "$_n 1"
+	    "$(kinds_of "$_h" save)" "$_n $_n"
 	cell V10 "the save beamed to the lake" "$(beamed) $(zfs list -H \
 	    -t snapshot -o name -d 1 "$_l" 2>&1 | grep -c -- '-save$')" \
 	    "beam converged 1"
 	x "$SH" pkg $J
 	cell V10 "upgraded: active again" "$(house_settled)" \
 	    "house $J active $V-DATE-$J"
-	cell V10 "every filesystem, kind pkg" "$(kinds_of "$_h" pkg)" "$_n 1"
+	cell V10 "every filesystem, kind pkg" "$(kinds_of "$_h" pkg)" \
+	    "$_n $_n"
+	# only a child's step writes its line in the log, not a call's
+	# such as packages: the last, pkg's, where it had one to upgrade;
+	# with none of its own, the create's last line would be last
 	cell V10 "pkg -j ran, its own package to upgrade" \
-	    "$(grep -A1 '^# packages$' "/var/log/shtetl/$J.log" | tail -1)" \
-	    "# pkg"
+	    "$(grep '^# ' "/var/log/shtetl/$J.log" | tail -1)" "# pkg"
 	cell V10 "syslog: nothing of the save's or the pkg's" \
 	    "$(tail -n "+$_from" /var/log/daemon.log | grep -c 'shtetl\[')" 0
 	# N15: the daemon stopped, the jail runs on (ruled 2026-11-05)
