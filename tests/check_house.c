@@ -40,6 +40,16 @@ static size_t nh;
 static char config[1024], conts[1024], logdir[1024], resolv[1024];
 static char jails[1024];
 
+/* How often the beam was told a version or a snapshot was made. */
+static int beamed;
+
+static void
+told(void *arg)
+{
+	(void) arg;
+	beamed++;
+}
+
 /* The pull asked, for the test to deliver. */
 static struct {
 	char	snap[300];
@@ -200,25 +210,76 @@ status(void)
 	return (buf != NULL ? buf : "");
 }
 
-/* Every create and start run to its end: the houses' status. */
+/* Every create, start and upgrade run to its end: the houses' status. */
 static const char *
 settle(void)
 {
 	while (strstr(status(), " creating ") != NULL ||
-	    strstr(status(), " starting ") != NULL)
+	    strstr(status(), " starting ") != NULL ||
+	    strstr(status(), " upgrading ") != NULL)
 		CHECK(one(20000));
 	return (status());
 }
 
-/* The name after the @ of DS's one snapshot, into SNAP. */
+/* The kinds of DS's snapshots, oldest first, a space after each. */
+static const char *
+kinds(const char *ds)
+{
+	static char buf[256];
+	char name[512], v[64];
+	struct names s;
+	size_t i;
+
+	s.n = 0;
+	buf[0] = '\0';
+	CHECK(sh_zfs_snapshots(z, ds, name_add, &s, &c.c_err) == 0);
+	for (i = 0; i < s.n; i++) {
+		(void) snprintf(name, sizeof (name), "%s@%s", ds, s.v[i]);
+		CHECK(sh_zfs_user(z, name, "shtetl:kind", v, sizeof (v),
+		    &c.c_err) == 0);
+		(void) strlcat(buf, v, sizeof (buf));
+		(void) strlcat(buf, " ", sizeof (buf));
+	}
+	names_free(&s);
+	return (buf);
+}
+
+/* Whether every dataset of ROOT's tree has snapshots of kinds WANT. */
+static int
+kinds_all(const char *root, const char *want)
+{
+	struct names t;
+	size_t i;
+	int r = 1;
+
+	tree(root, &t);
+	for (i = 0; i < t.n; i++)
+		r = r && is(kinds(t.v[i]), want);
+	names_free(&t);
+	return (r);
+}
+
+/* The house NAME. */
+static struct sh_house *
+house(const char *name)
+{
+	size_t i;
+
+	for (i = 0; i < nh && strcmp(hs[i]->h_name, name) != 0; i++)
+		;
+	CHECK(i < nh);
+	return (hs[i]);
+}
+
+/* The name after the @ of DS's oldest snapshot, its create's, into SNAP. */
 static void
-only_snap(const char *ds, char *snap, size_t len)
+create_snap(const char *ds, char *snap, size_t len)
 {
 	struct names s;
 
 	s.n = 0;
 	CHECK(sh_zfs_snapshots(z, ds, name_add, &s, &c.c_err) == 0 &&
-	    s.n == 1);
+	    s.n > 0);
 	(void) snprintf(snap, len, "%s", s.v[0]);
 	names_free(&s);
 }
@@ -320,8 +381,9 @@ lay(const char *vn)
 
 	(void) snprintf(rel, sizeof (rel), "containers/%s/var/db/shtetl/"
 	    "foundation.conf", vn);
+	/* pkg as show writes it in a shaken recipe, an object */
 	(void) scratch_write(rel, "src_branch = \"releng/15.1\";\n"
-	    "pkg = [ \"tmux\" ];\n"
+	    "pkg { tmux = true; }\n"
 	    "datasets { \"usr/local\" {} }\n"
 	    "commands { base = \"echo base\"; }\n");
 	/* and the tree it was made in: what the chroot lends resolv.conf to */
@@ -398,6 +460,9 @@ main(void)
 	    "jailconf = \"allow.raw_sockets;\";\n");
 	(void) scratch_write("config/containers/app.conf",
 	    "pkg = [ \"x\" ];\n");
+	/* V5: no package of its own: tmux, its only one, the foundation's */
+	(void) scratch_write("config/containers/bare.conf",
+	    "pkg = [ \"tmux\" ];\n");
 	(void) scratch_write("config/containers/old.conf", "ver = \"<15\";\n");
 	(void) scratch_write("resolv.conf", "nameserver 127.0.0.1\n");
 	(void) snprintf(config, sizeof (config), "%s", scratch_path("config"));
@@ -416,6 +481,7 @@ main(void)
 	env.he_jails = jails;
 	env.he_err = &sys.c_err;
 	env.he_pull = asked;
+	env.he_beam = told;
 	/* N18: the snapshot's view the start reads house.conf through */
 	zfake_files();
 
@@ -565,7 +631,7 @@ main(void)
 	deliver(NULL);
 	CHECK(is(settle(), "house app active 15.1-releng-T-app\n"
 	    "house web active " VWEB "\n"));
-	only_snap(RC "/" VWEB "/var", snap, sizeof (snap));
+	create_snap(RC "/" VWEB "/var", snap, sizeof (snap));
 	(void) snprintf(path, sizeof (path), "containers/web/var/.zfs/"
 	    "snapshot/%s/db/shtetl/house.conf", snap);
 	CHECK(unlink(scratch_path(path)) == 0);
@@ -633,6 +699,85 @@ main(void)
 	CHECK(is(settle(), "house app active 15.1-releng-T-app\n"
 	    "house web active " VWEB "\n") && !there(RC "/cut-web") &&
 	    is(cap_text(&sys), ""));
+
+	/* V2: a save of a house being made: refused, nothing taken */
+	fresh();
+	beamed = 0;
+	CHECK(create("web") == 0);
+	cap_reset(&c);
+	CHECK(sh_house_save(house("web"), &c.c_err) == -1 &&
+	    is(cap_text(&c), "web: creating\n"));
+	/* V9: a create's end told to the beam */
+	lay(VWEB);
+	deliver(NULL);
+	CHECK(is(settle(), "house web active " VWEB "\n") && beamed == 1);
+	/* V1: saved: every dataset at once, kind save; the beam told */
+	CHECK(sh_house_save(house("web"), &c.c_err) == 0 && beamed == 2 &&
+	    kinds_all(RC "/" VWEB, "create save "));
+	/*
+	 * V4: upgraded: house.conf and foundation.conf read from the
+	 * create snapshot; nginx its own, tmux the foundation's; the
+	 * snapshot after, kind pkg; upgrading meanwhile; the beam told.
+	 * V2: a save while it upgrades refused.
+	 */
+	(void) unlink(scratch_path("fake.log"));
+	CHECK(sh_house_pkg(house("web"), &c.c_err) == 0 &&
+	    is(status(), "house web upgrading pkg\n"));
+	cap_reset(&c);
+	CHECK(sh_house_save(house("web"), &c.c_err) == -1 &&
+	    is(cap_text(&c), "web: upgrading\n"));
+	CHECK(is(settle(), "house web active " VWEB "\n") && beamed == 3 &&
+	    is(cap_text(&sys), ""));
+	CHECK(is(slurp("fake.log"), "pkg -j web upgrade -y -- nginx\n") &&
+	    kinds_all(RC "/" VWEB, "create save pkg "));
+	/* V6: pkg failing: said once, no snapshot, active; nothing told */
+	CHECK(setenv("FAKE_FAIL", "pkg", 1) == 0);
+	CHECK(sh_house_pkg(house("web"), &c.c_err) == 0);
+	CHECK(is(settle(), "house web active " VWEB "\n") &&
+	    is(cap_text(&sys), "house web: pkg: exited 1\n") && beamed == 3 &&
+	    kinds_all(RC "/" VWEB, "create save pkg "));
+	CHECK(unsetenv("FAKE_FAIL") == 0);
+	/* V3: a save ZFS refuses: its words, nothing told */
+	zfake_fail("snapshot");
+	cap_reset(&c);
+	CHECK(sh_house_save(house("web"), &c.c_err) == -1 &&
+	    is(cap_text(&c), "zfake: snapshot failed as asked\n") &&
+	    beamed == 3);
+	/* V5: none of its own, tmux the foundation's: no pkg, the snapshot */
+	CHECK(create("bare") == 0);
+	lay("15.1-releng-T-bare");
+	deliver(NULL);
+	CHECK(is(settle(), "house bare active 15.1-releng-T-bare\n"
+	    "house web active " VWEB "\n"));
+	(void) unlink(scratch_path("fake.log"));
+	CHECK(sh_house_pkg(house("bare"), &c.c_err) == 0);
+	CHECK(is(settle(), "house bare active 15.1-releng-T-bare\n"
+	    "house web active " VWEB "\n") && slurp("fake.log") == NULL &&
+	    kinds_all(RC "/15.1-releng-T-bare", "create pkg "));
+	/* V6: foundation.conf not in the create snapshot: said, no pkg */
+	create_snap(RC "/" VWEB "/var", snap, sizeof (snap));
+	(void) snprintf(path, sizeof (path), "containers/web/var/.zfs/"
+	    "snapshot/%s/db/shtetl/foundation.conf", snap);
+	CHECK(unlink(scratch_path(path)) == 0);
+	cap_reset(&sys);
+	CHECK(sh_house_pkg(house("web"), &c.c_err) == 0);
+	CHECK(is(settle(), "house bare active 15.1-releng-T-bare\n"
+	    "house web active " VWEB "\n") &&
+	    strncmp(cap_text(&sys), "house web: packages: ", 21) == 0 &&
+	    strstr(cap_text(&sys), "foundation.conf") != NULL);
+	/* V2: started again, and one failed: refused as their state */
+	restart();
+	cap_reset(&c);
+	CHECK(sh_house_save(house("web"), &c.c_err) == -1 &&
+	    is(cap_text(&c), "web: starting\n"));
+	CHECK(is(settle(), "house bare active 15.1-releng-T-bare\n"
+	    "house web active " VWEB "\n"));
+	zfake_fail("mount");
+	restart();
+	(void) settle();
+	cap_reset(&c);
+	CHECK(sh_house_pkg(house("bare"), &c.c_err) == -1 &&
+	    is(cap_text(&c), "bare: failed\n"));
 
 	/*
 	 * N11: a create whose jail does not start: said; the version and

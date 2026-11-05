@@ -69,10 +69,37 @@ struct daemon {
 static const char usage[] =
 	"usage: shtetl daemon\n"
 	"       shtetl create CONTAINER --on FOUNDATION\n"
-	"       shtetl pkg FOUNDATION\n"
+	"       shtetl pkg CONTAINER|FOUNDATION\n"
 	"       shtetl roll FOUNDATION\n"
+	"       shtetl save CONTAINER\n"
 	"       shtetl show [RECIPE]\n"
 	"       shtetl status\n";
+
+/* The house NAME, or NULL. */
+static struct sh_house *
+house_named(struct daemon *d, const char *name)
+{
+	size_t i;
+
+	for (i = 0; i < d->d_nhouses; i++) {
+		if (strcmp(d->d_houses[i]->h_name, name) == 0)
+			return (d->d_houses[i]);
+	}
+	return (NULL);
+}
+
+/* The foundation NAME, or NULL. */
+static struct sh_foundation *
+foundation_named(struct daemon *d, const char *name)
+{
+	size_t i;
+
+	for (i = 0; i < d->d_nfound; i++) {
+		if (strcmp(d->d_found[i]->f_name, name) == 0)
+			return (d->d_found[i]);
+	}
+	return (NULL);
+}
 
 /* Where the space SP's root is mounted, into PATH: 0, or -1 said to E. */
 static int
@@ -140,6 +167,11 @@ act_roll(struct daemon *d, int argc, char **argv, FILE *out,
 		sh_errf(e, "%s: invalid name: %s", argv[1], why);
 		return (1);
 	}
+	/* one namespace for houses and foundations (ruled 2026-11-05) */
+	if (house_named(d, argv[1]) != NULL) {
+		sh_errf(e, "%s: a house", argv[1]);
+		return (1);
+	}
 	if (d->d_froot == NULL) {
 		sh_errf(e, "no lake space");
 		return (1);
@@ -163,10 +195,9 @@ static int
 act_create(struct daemon *d, int argc, char **argv, FILE *out,
     struct sh_err *e)
 {
-	const struct sh_foundation *f = NULL;
+	const struct sh_foundation *f;
 	char config[1024];
 	const char *why;
-	size_t i;
 
 	(void) out;
 	if (argc != 4 || strcmp(argv[2], "--on") != 0) {
@@ -177,16 +208,18 @@ act_create(struct daemon *d, int argc, char **argv, FILE *out,
 		sh_errf(e, "%s: invalid name: %s", argv[1], why);
 		return (1);
 	}
+	/* one namespace for houses and foundations (ruled 2026-11-05) */
+	if (foundation_named(d, argv[1]) != NULL) {
+		sh_errf(e, "%s: a foundation", argv[1]);
+		return (1);
+	}
 	if (d->d_beam == NULL) {
 		sh_errf(e, "no %s space", d->d_froot == NULL ? "lake" : "run");
 		return (1);
 	}
 	if (mounted(d, SH_SP_CONFIG, config, sizeof (config), e) != 0)
 		return (1);
-	for (i = 0; f == NULL && i < d->d_nfound; i++) {
-		if (strcmp(d->d_found[i]->f_name, argv[3]) == 0)
-			f = d->d_found[i];
-	}
+	f = foundation_named(d, argv[3]);
 	if (f == NULL || f->f_newest == NULL) {
 		sh_errf(e, "%s: %s", argv[3], f == NULL ?
 		    "no such foundation" : "no version");
@@ -196,25 +229,48 @@ act_create(struct daemon *d, int argc, char **argv, FILE *out,
 	    f->f_ds, f->f_newest, &d->d_henv, config, e) != 0);
 }
 
-/* shtetl pkg FOUNDATION: a pkg roll asked for, the reply at once */
+/*
+ * shtetl pkg CONTAINER|FOUNDATION: the house's own packages upgraded,
+ * or the foundation's pkg roll, whichever the name is (one namespace,
+ * ruled 2026-11-05); the reply at once.
+ */
 static int
 act_pkg(struct daemon *d, int argc, char **argv, FILE *out,
     struct sh_err *e)
 {
-	size_t i;
+	struct sh_foundation *f;
+	struct sh_house *h;
 
 	(void) out;
 	if (argc != 2) {
 		(void) fputs(usage, e->se_out);
 		return (2);
 	}
-	for (i = 0; i < d->d_nfound; i++) {
-		if (strcmp(d->d_found[i]->f_name, argv[1]) == 0)
-			return (sh_roll_ask(d->d_found[i], &d->d_env, NULL,
-			    NULL, 1, e) != 0);
-	}
-	sh_errf(e, "%s: no such foundation", argv[1]);
+	if ((h = house_named(d, argv[1])) != NULL)
+		return (sh_house_pkg(h, e) != 0);
+	if ((f = foundation_named(d, argv[1])) != NULL)
+		return (sh_roll_ask(f, &d->d_env, NULL, NULL, 1, e) != 0);
+	sh_errf(e, "%s: no such house or foundation", argv[1]);
 	return (1);
+}
+
+/* shtetl save CONTAINER: the house's active version saved */
+static int
+act_save(struct daemon *d, int argc, char **argv, FILE *out,
+    struct sh_err *e)
+{
+	struct sh_house *h;
+
+	(void) out;
+	if (argc != 2) {
+		(void) fputs(usage, e->se_out);
+		return (2);
+	}
+	if ((h = house_named(d, argv[1])) == NULL) {
+		sh_errf(e, "%s: no such house", argv[1]);
+		return (1);
+	}
+	return (sh_house_save(h, e) != 0);
 }
 
 /* shtetl show [RECIPE]: read from zconfig, where its root is mounted */
@@ -241,6 +297,7 @@ static const struct {
 	{ "create", act_create },
 	{ "pkg", act_pkg },
 	{ "roll", act_roll },
+	{ "save", act_save },
 	{ "show", act_show },
 	{ "status", act_status }
 };
@@ -549,6 +606,7 @@ sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
 		d.d_henv.he_err = e;
 		d.d_henv.he_flags = SF_IMMUTABLE;
 		d.d_henv.he_pull = pull;
+		d.d_henv.he_beam = made;
 		d.d_henv.he_parg = &d;
 		if (sh_houses_start(&d.d_henv, &d.d_houses, &d.d_nhouses,
 		    e) != 0)

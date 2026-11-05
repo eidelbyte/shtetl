@@ -25,8 +25,9 @@
 static const char usage[] =
 	"usage: shtetl daemon\n"
 	"       shtetl create CONTAINER --on FOUNDATION\n"
-	"       shtetl pkg FOUNDATION\n"
+	"       shtetl pkg CONTAINER|FOUNDATION\n"
 	"       shtetl roll FOUNDATION\n"
+	"       shtetl save CONTAINER\n"
 	"       shtetl show [RECIPE]\n"
 	"       shtetl status\n";
 
@@ -35,6 +36,7 @@ static const char usage[] =
 static struct sh_zfs *z;
 static struct cap c;
 static char lockp[1024], sockp[1024], logp[1024], jailp[1024];
+static char kindbuf[256];
 static pid_t pid;
 
 /* What the last command wrote. */
@@ -106,6 +108,30 @@ status(void)
 	return (sht(1, argv));
 }
 
+/* One snapshot's kind, the snapshot of the filesystem ARG. */
+static int
+kind_add(void *arg, const char *snap)
+{
+	char name[512], v[64];
+
+	(void) snprintf(name, sizeof (name), "%s@%s", (const char *)arg, snap);
+	if (sh_zfs_user(z, name, "shtetl:kind", v, sizeof (v), &c.c_err) != 0)
+		(void) snprintf(v, sizeof (v), "-");
+	(void) strlcat(kindbuf, v, sizeof (kindbuf));
+	(void) strlcat(kindbuf, " ", sizeof (kindbuf));
+	return (0);
+}
+
+/* The kinds of DS's snapshots, oldest first, a space after each. */
+static const char *
+kinds(const char *ds)
+{
+	kindbuf[0] = '\0';
+	CHECK(sh_zfs_snapshots(z, ds, kind_add, (void *)(uintptr_t)ds,
+	    &c.c_err) == 0);
+	return (kindbuf);
+}
+
 /* The file PATH whole, until the next call; NULL if none. */
 static const char *
 slurp(const char *path)
@@ -138,7 +164,8 @@ settled(void)
 	for (i = 0; i < 100; i++) {
 		if ((r = status()) != 0 ||
 		    (strstr(obuf, "beam converging") == NULL &&
-		    strstr(obuf, " starting ") == NULL))
+		    strstr(obuf, " starting ") == NULL &&
+		    strstr(obuf, " upgrading ") == NULL))
 			break;
 		(void) usleep(100000);
 	}
@@ -210,6 +237,12 @@ main(void)
 	char *create123[] = { "create", "123", "--on", "generic" };
 	char *createnope[] = { "create", "web2", "--on", "nope" };
 	char *createweb[] = { "create", "web", "--on", "generic" };
+	char *creategen[] = { "create", "generic", "--on", "generic" };
+	char *rollweb[] = { "roll", "web" };
+	char *save[] = { "save" };
+	char *savenope[] = { "save", "nope" };
+	char *saveweb[] = { "save", "web" };
+	char *pkgweb[] = { "pkg", "web" };
 	static const struct sh_zprop house[] = {
 		{ "shtetl:house", "web" }, { "canmount", "noauto" }
 	};
@@ -275,7 +308,9 @@ main(void)
 	    &c.c_err) == 0);
 	CHECK(sh_zfs_snapshot(z, made, 1, &created, 1, &c.c_err) == 0);
 	(void) scratch_write("containers/web/.zfs/snapshot/c/var/db/shtetl/"
-	    "house.conf", "pkg { nginx = true; }\n");
+	    "house.conf", "pkg { nginx = true; tree = true; }\n");
+	(void) scratch_write("containers/web/.zfs/snapshot/c/var/db/shtetl/"
+	    "foundation.conf", "pkg { tree = true; }\n");
 	/*
 	 * N7: a house whose version holds an update snapshot: the block
 	 * from it, not from the live tree's house.conf
@@ -466,7 +501,7 @@ main(void)
 	/* U6: pkg with no foundation, one that is not there */
 	CHECK(sht(1, pkg) == 2 && strcmp(ebuf, usage) == 0);
 	CHECK(sht(2, pkgnope) == 1 &&
-	    strcmp(ebuf, "shtetl: nope: no such foundation\n") == 0);
+	    strcmp(ebuf, "shtetl: nope: no such house or foundation\n") == 0);
 	CHECK(status() == 0 && strcmp(obuf, want) == 0);
 	/* H16: create's words; a name, a foundation, a house there */
 	CHECK(sht(2, create) == 2 && strcmp(ebuf, usage) == 0);
@@ -481,6 +516,28 @@ main(void)
 	CHECK(sht(4, createweb) == 1 &&
 	    strcmp(ebuf, "shtetl: web: exists\n") == 0);
 	CHECK(status() == 0 && strcmp(obuf, want) == 0);
+	/* V7: one namespace: a foundation's name created, a house's rolled */
+	CHECK(sht(4, creategen) == 1 &&
+	    strcmp(ebuf, "shtetl: generic: a foundation\n") == 0);
+	CHECK(sht(2, rollweb) == 1 &&
+	    strcmp(ebuf, "shtetl: web: a house\n") == 0);
+	/*
+	 * V8, V2, V1, V4: save's words; web saved and upgraded, the reply
+	 * at once and empty, nginx its own, tree the foundation's; the
+	 * snapshots after its create snapshot
+	 */
+	CHECK(sht(1, save) == 2 && strcmp(ebuf, usage) == 0);
+	CHECK(sht(2, savenope) == 1 &&
+	    strcmp(ebuf, "shtetl: nope: no such house\n") == 0);
+	CHECK(sht(2, saveweb) == 0 && strcmp(obuf, "") == 0 &&
+	    strcmp(ebuf, "") == 0);
+	CHECK(sht(2, pkgweb) == 0 && strcmp(obuf, "") == 0 &&
+	    strcmp(ebuf, "") == 0);
+	CHECK(settled() == 0 && strcmp(obuf, want) == 0);
+	CHECK(strcmp(kinds("fast/run/containers/v1-web"), "create save pkg ") ==
+	    0);
+	CHECK((p = slurp(scratch_path("fake.log"))) != NULL &&
+	    strstr(p, "pkg -j web upgrade -y -- nginx\n") != NULL);
 
 	/* D10: SIGTERM: exit 0, the socket gone */
 	CHECK(down() == 0);

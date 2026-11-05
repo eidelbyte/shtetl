@@ -297,52 +297,62 @@ block_path(const struct sh_house *h, char *buf, size_t len)
 }
 
 /*
- * The jail's block written from the active version's shaken recipe,
- * read from its create or update snapshot, which nothing in the jail
- * could have written (plan 5): through the snapshot of the dataset
- * holding var/db/shtetl, the one mounted nearest above it.
+ * REL, a shaken recipe in H's active version, read from its create or
+ * update snapshot, which nothing in the jail could have written (plan
+ * 5): through the snapshot of the dataset holding var/db/shtetl, the
+ * one mounted nearest above it. Its layer, *LAYER, outlives it, and
+ * is freed after it; where the version's root is mounted into ROOT.
  */
-static int
-start_block(struct sh_job *j, void *arg, struct sh_err *e)
+static struct sh_node *
+shaken(struct sh_house *h, const char *rel, char **layer, char *root,
+    size_t len, struct sh_err *e)
 {
-	struct sh_house *h = arg;
 	struct sh_zfs *z = h->h_env->he_z;
-	char snap[256], root[1024], at[1024], best[1024], want[1100];
-	char file[1024], *layer;
-	struct sh_node *n;
+	char snap[256], at[1024], best[1024], want[1100];
 	struct names t;
-	size_t i, k, len;
+	size_t i, k, n;
 	int r;
 
-	(void) j;
+	*layer = NULL;
 	snap[0] = '\0';
 	if (complete(z, h->h_active, snap, sizeof (snap), e) < 0 ||
-	    (r = sh_zfs_mounted(z, h->h_active, root, sizeof (root), e)) < 0)
-		return (-1);
+	    (r = sh_zfs_mounted(z, h->h_active, root, len, e)) < 0)
+		return (NULL);
 	if (r == 0) {
 		sh_errf(e, "%s: not mounted", h->h_active);
-		return (-1);
+		return (NULL);
 	}
-	(void) snprintf(want, sizeof (want), "%s/%s", root, SH_SHAKEN_HOUSE);
+	(void) snprintf(want, sizeof (want), "%s/%s", root, rel);
 	(void) snprintf(best, sizeof (best), "%s", root);
-	len = strlen(root);
+	n = strlen(root);
 	r = tree(z, h->h_active, &t, e);
 	for (i = 1; r == 0 && i < t.n_n; i++) {
 		if ((r = sh_zfs_mounted(z, t.n_v[i], at, sizeof (at),
-		    e)) == 1 && (k = strlen(at)) > len &&
+		    e)) == 1 && (k = strlen(at)) > n &&
 		    strncmp(want, at, k) == 0 && want[k] == '/') {
 			(void) snprintf(best, sizeof (best), "%s", at);
-			len = k;
+			n = k;
 		}
 		r = r < 0 ? -1 : 0;
 	}
 	names_free(&t);
 	if (r != 0)
-		return (-1);
-	/* the tree's layer, which outlives it */
-	layer = join(h->h_active, "@", snap);
-	r = -1;
-	if ((n = sh_shaken_read(best, snap, want + len + 1, layer,
+		return (NULL);
+	*layer = join(h->h_active, "@", snap);
+	return (sh_shaken_read(best, snap, want + n + 1, *layer, e));
+}
+
+/* The jail's block written from the active version's house.conf. */
+static int
+start_block(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	struct sh_house *h = arg;
+	char root[1024], file[1024], *layer;
+	struct sh_node *n;
+	int r = -1;
+
+	(void) j;
+	if ((n = shaken(h, SH_SHAKEN_HOUSE, &layer, root, sizeof (root),
 	    e)) != NULL) {
 		block_path(h, file, sizeof (file));
 		r = sh_jail_write(file, h->h_name, root,
@@ -366,18 +376,24 @@ start_steps(struct sh_house *h)
 	sh_jail_start(&h->h_job, file, h->h_name);
 }
 
-/* The start over: the house active, WHY said where it failed. */
+/*
+ * A start or an upgrade over: the house active, WHY said where it
+ * failed; an upgrade's snapshot told to the beam.
+ */
 static void
-start_end(struct sh_job *j, const char *why, void *arg)
+act_end(struct sh_job *j, const char *why, void *arg)
 {
 	struct sh_house *h = arg;
+	const struct sh_houseenv *env = h->h_env;
 
 	(void) j;
-	h->h_state = SH_H_ACTIVE;
 	if (why != NULL) {
-		sh_errf(h->h_env->he_err, "house %s: %s", h->h_name, why);
+		sh_errf(env->he_err, "house %s: %s", h->h_name, why);
 		sh_errf(&h->h_lerr, "failed: %s", why);
+	} else if (h->h_state == SH_H_UPGRADING) {
+		env->he_beam(env->he_parg);
 	}
+	h->h_state = SH_H_ACTIVE;
 	act_over(h);
 }
 
@@ -390,7 +406,7 @@ house_start(struct sh_house *h)
 	if (house_log(h, "a", env->he_err) != 0)
 		return;
 	h->h_state = SH_H_STARTING;
-	sh_job_init(&h->h_job, h->h_log, start_end, h);
+	sh_job_init(&h->h_job, h->h_log, act_end, h);
 	start_steps(h);
 	sh_job_run(&h->h_job, env->he_kq);
 }
@@ -565,6 +581,8 @@ make_end(struct sh_job *j, const char *why, void *arg)
 		h->h_state = SH_H_ACTIVE;
 		act_over(h);
 		make_free(m);
+		/* the version on to the lake now, not at the next period */
+		env->he_beam(env->he_parg);
 		return;
 	}
 	sh_errf(env->he_err, "house %s: %s", h->h_name, why);
@@ -671,13 +689,15 @@ make_inject(struct sh_job *j, void *arg, struct sh_err *e)
 	return (r);
 }
 
-/* The create snapshot, -r over the version, kind create, taken last. */
+/*
+ * ROOT's tree snapshotted at once, every dataset of it, <date>-KIND,
+ * shtetl:kind KIND: a create's, a save, a pkg upgrade's.
+ */
 static int
-make_snapshot(struct sh_job *j, void *arg, struct sh_err *e)
+take(struct sh_zfs *z, const char *root, const char *kind,
+    struct sh_err *e)
 {
-	static const struct sh_zprop kind = { "shtetl:kind", "create" };
-	struct sh_hmake *m = arg;
-	struct sh_zfs *z = m->hm_h->h_env->he_z;
+	struct sh_zprop p = { "shtetl:kind", kind };
 	struct names t, s = { NULL, 0 };
 	char date[32], name[1100];
 	time_t now = time(NULL);
@@ -685,21 +705,30 @@ make_snapshot(struct sh_job *j, void *arg, struct sh_err *e)
 	size_t i;
 	int r;
 
-	(void) j;
 	(void) strftime(date, sizeof (date), "%Y-%m-%dT%H_%M_%SZ",
 	    gmtime_r(&now, &tm));
-	r = tree(z, m->hm_root, &t, e);
+	r = tree(z, root, &t, e);
 	for (i = 0; r == 0 && i < t.n_n; i++) {
-		(void) snprintf(name, sizeof (name), "%s@%s-create", t.n_v[i],
-		    date);
+		(void) snprintf(name, sizeof (name), "%s@%s-%s", t.n_v[i],
+		    date, kind);
 		(void) name_add(&s, name);
 	}
 	if (r == 0)
 		r = sh_zfs_snapshot(z, (const char *const *)s.n_v, s.n_n,
-		    &kind, 1, e);
+		    &p, 1, e);
 	names_free(&s);
 	names_free(&t);
 	return (r);
+}
+
+/* The create snapshot, -r over the version, kind create, taken last. */
+static int
+make_snapshot(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	struct sh_hmake *m = arg;
+
+	(void) j;
+	return (take(m->hm_h->h_env->he_z, m->hm_root, "create", e));
 }
 
 /*
@@ -937,6 +966,104 @@ sh_house_create(struct sh_house ***hp, size_t *np, const char *name,
 	return (0);
 }
 
+/* A house's state, as status and a refusal say it. */
+static const char *const states[] = {
+	[SH_H_ACTIVE] = "active",
+	[SH_H_CREATING] = "creating",
+	[SH_H_STARTING] = "starting",
+	[SH_H_FAILED] = "failed",
+	[SH_H_UPGRADING] = "upgrading"
+};
+
+/* H not active, said to E, "H: upgrading": -1; or 0. */
+static int
+busy(const struct sh_house *h, struct sh_err *e)
+{
+	if (h->h_state == SH_H_ACTIVE)
+		return (0);
+	sh_errf(e, "%s: %s", h->h_name, states[h->h_state]);
+	return (-1);
+}
+
+int
+sh_house_save(struct sh_house *h, struct sh_err *e)
+{
+	const struct sh_houseenv *env = h->h_env;
+
+	if (busy(h, e) != 0 || take(env->he_z, h->h_active, "save", e) != 0)
+		return (-1);
+	env->he_beam(env->he_parg);
+	return (0);
+}
+
+/* The pkg upgrade's snapshot, as a save's, kind pkg. */
+static int
+pkg_snapshot(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	struct sh_house *h = arg;
+
+	(void) j;
+	return (take(h->h_env->he_z, h->h_active, "pkg", e));
+}
+
+/*
+ * The house's own packages, its house.conf's less its foundation.conf's
+ * (ruled 2026-11-05), upgraded in its running jail, then the snapshot.
+ * With none, no pkg: pkg upgrade with no names upgrades everything.
+ */
+static int
+pkg_packages(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	static const char *const words[] = { "env", "ASSUME_ALWAYS_YES=yes",
+	    "pkg", "-j", NULL, "upgrade", "-y", "--" };
+	struct sh_house *h = arg;
+	const struct sh_node *own, *ran;
+	struct sh_node *hn, *fn = NULL;
+	char root[1024], *hl, *fl = NULL;
+	const char **argv;
+	size_t i, k, n;
+	int r = -1;
+
+	if ((hn = shaken(h, SH_SHAKEN_HOUSE, &hl, root, sizeof (root),
+	    e)) != NULL && (fn = shaken(h, SH_SHAKEN_FOUNDATION, &fl, root,
+	    sizeof (root), e)) != NULL) {
+		own = sh_obj_get(hn, "pkg");
+		ran = sh_obj_get(fn, "pkg");
+		n = sizeof (words) / sizeof (words[0]);
+		argv = sh_calloc(n + 1 + (own != NULL ? own->sn_obj.ob_n : 0),
+		    sizeof (*argv));
+		(void) memcpy(argv, words, sizeof (words));
+		argv[4] = h->h_name;
+		for (i = 0, k = n; own != NULL && i < own->sn_obj.ob_n; i++) {
+			if (ran == NULL ||
+			    sh_obj_get(ran, own->sn_obj.ob_v[i].pr_key) == NULL)
+				argv[k++] = own->sn_obj.ob_v[i].pr_key;
+		}
+		if (k > n)
+			sh_job_child(j, "pkg", argv);
+		free(argv);
+		sh_job_call(j, "snapshot", pkg_snapshot, h);
+		r = 0;
+	}
+	sh_node_free(fn);
+	sh_node_free(hn);
+	free(fl);
+	free(hl);
+	return (r);
+}
+
+int
+sh_house_pkg(struct sh_house *h, struct sh_err *e)
+{
+	if (busy(h, e) != 0 || house_log(h, "a", e) != 0)
+		return (-1);
+	h->h_state = SH_H_UPGRADING;
+	sh_job_init(&h->h_job, h->h_log, act_end, h);
+	sh_job_call(&h->h_job, "packages", pkg_packages, h);
+	sh_job_run(&h->h_job, h->h_env->he_kq);
+	return (0);
+}
+
 void
 sh_house_status(const struct sh_house *h, FILE *out)
 {
@@ -954,14 +1081,13 @@ sh_house_status(const struct sh_house *h, FILE *out)
 	step = h->h_make != NULL && h->h_make->hm_pulling ? "pull" :
 	    sh_job_step(&h->h_job);
 	(void) fprintf(out, "house %s %s %s\n", h->h_name,
-	    h->h_state == SH_H_CREATING ? "creating" : "starting",
-	    step != NULL ? step : "");
+	    states[h->h_state], step != NULL ? step : "");
 }
 
 void
 sh_house_stop(struct sh_house *h)
 {
-	if (h->h_state != SH_H_CREATING && h->h_state != SH_H_STARTING)
+	if (h->h_state == SH_H_ACTIVE || h->h_state == SH_H_FAILED)
 		return;
 	if (h->h_make == NULL || !h->h_make->hm_pulling)
 		sh_job_stop(&h->h_job);

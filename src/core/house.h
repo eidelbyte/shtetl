@@ -5,7 +5,8 @@
  * beside. The active version, the newest complete one, is mounted at
  * <containers>/<house>; one being made, at its own path,
  * <containers>/<version>. m5-create makes a house's first version;
- * m5-jail starts a container's jail from its active version.
+ * m5-jail starts a container's jail from its active version;
+ * m5-save-pkg takes its saves and upgrades its packages.
  */
 
 #ifndef	SH_HOUSE_H
@@ -22,7 +23,8 @@ enum sh_hstate {
 	SH_H_ACTIVE,
 	SH_H_CREATING,
 	SH_H_STARTING,
-	SH_H_FAILED		/* left out at the start, ZFS refusing */
+	SH_H_FAILED,		/* left out at the start, ZFS refusing */
+	SH_H_UPGRADING
 };
 
 struct sh_hmake;
@@ -53,6 +55,8 @@ struct sh_houseenv {
 	void		(*he_pull)(void *, const char *,
 			    void (*)(void *, const char *, const char *),
 			    void *);
+	/* the beam told a version or a snapshot is made, HE_PARG's */
+	void		(*he_beam)(void *);
 	void		*he_parg;
 };
 
@@ -91,6 +95,25 @@ int sh_house_create(struct sh_house ***hp, size_t *np, const char *name,
     const char *fds, const char *newest, const struct sh_houseenv *env,
     const char *config, struct sh_err *e);
 
+/*
+ * H's active version snapshotted at once, every dataset of it,
+ * <date>-save, kind save, and the beam told (m5-save-pkg). Refused,
+ * said to E: "H: creating", "H: starting", "H: upgrading", "H:
+ * failed"; what ZFS says.
+ */
+int sh_house_save(struct sh_house *h, struct sh_err *e);
+
+/*
+ * H's own packages upgraded in its running jail, pkg -j H upgrade,
+ * then its active version snapshotted as a save is, kind pkg, and the
+ * beam told. Its own are those its house.conf lists less those its
+ * foundation.conf lists (ruled 2026-11-05), both read from the
+ * version's create or update snapshot; with none, no pkg runs. The
+ * act is H's job, "house H upgrading STEP" meanwhile, a failure said
+ * to ENV's sink, "house H: why". Refused, said to E, as a save is.
+ */
+int sh_house_pkg(struct sh_house *h, struct sh_err *e);
+
 /* H's line of shtetl status. */
 void sh_house_status(const struct sh_house *h, FILE *out);
 
@@ -98,7 +121,8 @@ void sh_house_status(const struct sh_house *h, FILE *out);
  * H's act stopped where it stands, as when the daemon stops: its child
  * killed. A create's version, not complete, is destroyed by the next
  * start, and a pull it waits for is the beam's to drop; a start's
- * jail, by -cm, is made or left at the next.
+ * jail, by -cm, is made or left at the next; an upgrade's packages
+ * stay as far as pkg took them, with no snapshot of them.
  */
 void sh_house_stop(struct sh_house *h);
 
