@@ -18,6 +18,7 @@
 #include "check.h"
 #include "core/daemon.h"
 #include "core/mem.h"
+#include "core/spaces.h"
 #include "core/wire.h"
 #include "core/zfs.h"
 #include "zfake.h"
@@ -95,9 +96,58 @@ sht(int argc, char **argv)
 	obuf = ebuf = NULL;
 	CHECK((o = open_memstream(&obuf, &olen)) != NULL);
 	CHECK((e = open_memstream(&ebuf, &elen)) != NULL);
-	r = sh_command(sockp, argc, argv, o, e);
+	r = sh_command(sockp, argc, argv, NULL, o, e);
 	(void) fclose(o);
 	(void) fclose(e);
+	return (r);
+}
+
+/* shtetl ARGV sent with FDS, three descriptors, as from a terminal. */
+static int
+shtfd(int argc, char **argv, const int *fds)
+{
+	FILE *o, *e;
+	int r;
+
+	free(obuf);
+	free(ebuf);
+	obuf = ebuf = NULL;
+	CHECK((o = open_memstream(&obuf, &olen)) != NULL);
+	CHECK((e = open_memstream(&ebuf, &elen)) != NULL);
+	r = sh_command(sockp, argc, argv, fds, o, e);
+	(void) fclose(o);
+	(void) fclose(e);
+	return (r);
+}
+
+/*
+ * A terminal's stand-in: a pipe, its read end the three descriptors
+ * sent, into FDS; its write end, the test's, returned.
+ */
+static int
+term(int *fds)
+{
+	int p[2];
+
+	CHECK(pipe(p) == 0);
+	fds[0] = fds[1] = fds[2] = p[0];
+	return (p[1]);
+}
+
+/*
+ * Whether the daemon let go of the descriptors sent, FDS: the pipe's
+ * other end W closed here, its read end FDS[0] at its end, or not.
+ */
+static int
+let_go(int w, const int *fds)
+{
+	char b;
+	int r;
+
+	(void) close(w);
+	(void) fcntl(fds[0], F_SETFL, O_NONBLOCK);
+	r = read(fds[0], &b, 1) == 0;
+	(void) close(fds[0]);
 	return (r);
 }
 
@@ -171,6 +221,20 @@ settled(void)
 		(void) usleep(100000);
 	}
 	return (r);
+}
+
+/* Until status holds TEXT: in 10 s. */
+static int
+until_status(const char *text)
+{
+	int i;
+
+	for (i = 0; i < 100; i++) {
+		if (status() == 0 && strstr(obuf, text) != NULL)
+			return (1);
+		(void) usleep(100000);
+	}
+	return (0);
 }
 
 /* A client of our own, connected. */
@@ -597,6 +661,140 @@ main(void)
 	/* D25: no run: no beam, and no line of it */
 	CHECK(status() == 0 && strcmp(obuf, "space lake tank/lake\n") == 0);
 	CHECK(down() == 0);
+
+	/*
+	 * Q13, Q15 - Q17, D26, D27: attended rolls through the daemon. A
+	 * house, app, a clone of the run's copy of a foundation af at s1,
+	 * s2 waiting there, arrived, its branch releng/15.1; ZFS refusing
+	 * each roll's final save, so that it stalls at it: what the person
+	 * is told is its reply at the roll's end
+	 */
+	{
+		static const struct sh_zprop app[] = {
+			{ "shtetl:house", "app" }, { "canmount", "noauto" }
+		};
+		static const struct sh_zprop arrived[] = {
+			{ "shtetl:kind", "create" },
+			{ "shtetl:branch", "releng/15.1" }
+		};
+		static const struct sh_zprop created = {
+			"shtetl:kind", "create"
+		};
+		const char *const s1[] = { "fast/run/foundations/af@s1" };
+		const char *const s2[] = { "fast/run/foundations/af@s2" };
+		const char *const c1[] = { "fast/run/containers/v1-app@c" };
+		char *rollapp[] = { "roll", "app" };
+		char *stat1[] = { "status" };
+		struct sh_spaces sp;
+		int fds[3], w;
+		pid_t kid;
+		FILE *f;
+
+		zfake_reset();
+		zfake_pool("tank");
+		zfake_pool("fast");
+		CHECK(sh_zfs_create(z, "tank/lake", &lake, 1, &c.c_err) == 0);
+		CHECK(sh_zfs_create(z, "tank/config", config, 2,
+		    &c.c_err) == 0 && sh_zfs_mount(z, "tank/config",
+		    &c.c_err) == 0);
+		CHECK(sh_zfs_create(z, "fast/run", &run, 1, &c.c_err) == 0);
+		CHECK(sh_spaces_find(z, &sp, &c.c_err) == 0 &&
+		    sh_spaces_skeleton(z, &sp, &c.c_err) == 0);
+		sh_spaces_free(&sp);
+		conts.zp_value = scratch_path("conts2");
+		CHECK(sh_zfs_set(z, "fast/run/containers", "mountpoint",
+		    conts.zp_value, &c.c_err) == 0);
+		CHECK(sh_zfs_create(z, "fast/run/foundations/af", NULL, 0,
+		    &c.c_err) == 0);
+		CHECK(sh_zfs_snapshot(z, s1, 1, arrived, 2, &c.c_err) == 0);
+		CHECK(sh_zfs_snapshot(z, s2, 1, arrived, 2, &c.c_err) == 0);
+		CHECK(sh_zfs_clone(z, s1[0], "fast/run/containers/v1-app",
+		    app, 2, &c.c_err) == 0);
+		CHECK(sh_zfs_snapshot(z, c1, 1, &created, 1, &c.c_err) == 0);
+		(void) scratch_write("conts2/app/.zfs/snapshot/c/var/db/shtetl/"
+		    "house.conf", "src_branch = \"releng/15.1\";\n");
+		(void) scratch_write("zconfig/containers/app.conf",
+		    "pkg = [ \"x\" ];\n");
+		/* frozen, or the queue would roll it as the daemon starts */
+		CHECK(sh_zfs_set(z, "fast/run/containers/v1-app",
+		    "shtetl:stall", "frozen", &c.c_err) == 0);
+		up();
+		CHECK(until_status("house app stalled frozen\n"));
+
+		/* D26: descriptors with a request no act takes: let go */
+		w = term(fds);
+		CHECK(shtfd(1, stat1, fds) == 0);
+		CHECK(let_go(w, fds));
+
+		/*
+		 * Q13, D27, D26: shtetl roll app from a terminal: the reply
+		 * held to the roll's end, its stall, 1; the descriptors the
+		 * roll's, let go at its end
+		 */
+		w = term(fds);
+		zfake_fail("snapshot");
+		CHECK(shtfd(2, rollapp, fds) == 1 && strcmp(obuf, "") == 0 &&
+		    strcmp(ebuf, "shtetl: app: stalled save: zfake: snapshot "
+		    "failed as asked\n") == 0);
+		CHECK(let_go(w, fds));
+		CHECK(status() == 0 && strstr(obuf, "house app stalled save: "
+		    "zfake: snapshot failed as asked\n") != NULL);
+
+		/*
+		 * Q15: the command's SIGINT while its roll goes, the jail's
+		 * stop held: it half-closes and waits on, and is told the
+		 * roll's end, the stall lifted and set again
+		 */
+		(void) scratch_write("fake.log.hold", "");
+		zfake_fail("snapshot");
+		w = term(fds);
+		CHECK((kid = fork()) >= 0);
+		if (kid == 0) {
+			int r = shtfd(2, rollapp, fds);
+
+			if ((f = fopen(scratch_path("q15"), "w")) != NULL) {
+				(void) fprintf(f, "%d %s", r, ebuf);
+				(void) fclose(f);
+			}
+			_exit(0);
+		}
+		CHECK(until_status("house app rolling "));
+		CHECK(kill(kid, SIGINT) == 0);
+		CHECK(waitpid(kid, NULL, 0) == kid);
+		(void) unlink(scratch_path("fake.log.hold"));
+		CHECK((f = fopen(scratch_path("q15"), "r")) != NULL &&
+		    fgets(buf, sizeof (buf), f) != NULL);
+		(void) fclose(f);
+		CHECK(strcmp(buf, "1 shtetl: app: stalled save: zfake: "
+		    "snapshot failed as asked\n") == 0);
+		CHECK(let_go(w, fds));
+
+		/*
+		 * Q16: the command killed while its roll goes: the reply
+		 * dropped, the roll ended and stalled, the daemon answering
+		 */
+		(void) scratch_write("fake.log.hold", "");
+		zfake_fail("snapshot");
+		w = term(fds);
+		CHECK((kid = fork()) >= 0);
+		if (kid == 0) {
+			(void) shtfd(2, rollapp, fds);
+			_exit(0);
+		}
+		CHECK(until_status("house app rolling "));
+		CHECK(kill(kid, SIGKILL) == 0);
+		CHECK(waitpid(kid, NULL, 0) == kid);
+		(void) unlink(scratch_path("fake.log.hold"));
+		CHECK(until_status("house app stalled save: "));
+		(void) close(w);
+		(void) close(fds[0]);
+
+		/* Q17: from no terminal: the reply at once, the roll after */
+		zfake_fail("snapshot");
+		CHECK(sht(2, rollapp) == 0 && strcmp(ebuf, "") == 0);
+		CHECK(until_status("house app stalled save: "));
+		CHECK(down() == 0);
+	}
 
 	/* D11: no daemon: the command says what connect said, exit 1 */
 	CHECK(status() == 1);

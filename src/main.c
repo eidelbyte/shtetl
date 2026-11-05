@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <syslog.h>
+#include <unistd.h>
 
 #include "core/daemon.h"
 #include "core/err.h"
@@ -30,15 +31,17 @@ logged(void *cookie, const char *p, int n)
 int
 main(int argc, char **argv)
 {
+	static const int term[3] = { 0, 1, 2 };
 	struct sh_zfs *z;
 	struct sh_err e;
 	FILE *log;
 	int lk, sk;
 
 	(void) signal(SIGPIPE, SIG_IGN);
+	/* a terminal's descriptors go with the request (m5-queue) */
 	if (argc != 2 || strcmp(argv[1], "daemon") != 0)
-		return (sh_command(SH_SOCKET, argc - 1, argv + 1, stdout,
-		    stderr));
+		return (sh_command(SH_SOCKET, argc - 1, argv + 1,
+		    isatty(0) ? term : NULL, stdout, stderr));
 	openlog("shtetl", LOG_PID | LOG_PERROR, LOG_DAEMON);
 	if ((log = funopen(NULL, NULL, logged, NULL, NULL)) == NULL) {
 		syslog(LOG_ERR, "out of memory");

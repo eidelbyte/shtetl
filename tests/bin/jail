@@ -6,6 +6,8 @@
 # a jail not there is refused as jail(8) refuses it.
 echo "jail $*" >> "${FAKE_LOG:-/dev/null}"
 [ "${FAKE_FAIL:-}" = jail ] && { echo "jail: failed" >&2; exit 1; }
+# a test holding an act under way: a while, as long as $FAKE_LOG.hold is
+[ -f "${FAKE_LOG:-/dev/null}.hold" ] && sleep 2
 d=${FAKE_LOG:-/dev/null}.jails
 for name; do :; done
 case " $* " in

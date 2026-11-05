@@ -39,12 +39,22 @@
 #include "core/wire.h"
 #include "core/zfs.h"
 
-/* One person's command, from its request to the last of its reply. */
+struct daemon;
+
+/*
+ * One person's command, from its request to the last of its reply: the
+ * descriptors that came with it, and the house whose attended roll
+ * holds its reply until the roll ends (m5-queue).
+ */
 struct conn {
 	enum sh_ev	c_ev;		/* SH_EV_CONN, first, for the udata */
 	int		c_fd;
 	struct sh_buf	c_in;
 	struct sh_buf	c_out;
+	int		c_fds[3];
+	int		c_nfds;
+	struct sh_house	*c_held;
+	struct daemon	*c_d;
 	struct conn	*c_next;
 };
 
@@ -64,6 +74,7 @@ struct daemon {
 	size_t			d_nhouses;
 	struct sh_houseenv	d_henv;
 	struct conn		*d_conns;
+	struct conn		*d_conn;	/* whose request is acted on */
 };
 
 static const char usage[] =
@@ -147,12 +158,69 @@ act_status(struct daemon *d, int argc, char **argv, FILE *out,
 	return (0);
 }
 
+static void watch(struct daemon *, struct conn *, int, int);
+static void held_done(void *, int, const char *);
+
+/* H's roll asked, attended where the request brought a terminal. */
+static int
+house_roll(struct daemon *d, struct sh_house *h, const char *config,
+    struct sh_err *e)
+{
+	struct conn *c = d->d_conn;
+	struct sh_hattend *a = NULL;
+
+	if (c->c_nfds == 3) {
+		a = sh_calloc(1, sizeof (*a));
+		(void) memcpy(a->ha_fds, c->c_fds, sizeof (a->ha_fds));
+		a->ha_done = held_done;
+		a->ha_arg = c;
+	}
+	if (sh_house_roll(&d->d_houses, &d->d_nhouses, h, config, a, e) != 0) {
+		free(a);
+		return (1);
+	}
+	if (a == NULL)
+		return (0);
+	/* the descriptors the roll's now */
+	c->c_nfds = 0;
+	c->c_held = h;
+	return (-1);
+}
+
+/*
+ * An attended roll over: its reply, held until now, framed and sent;
+ * the connection read no more.
+ */
+static void
+held_done(void *arg, int status, const char *text)
+{
+	struct conn *c = arg;
+	struct sh_err e;
+	char *ebuf = NULL, st = (char)status;
+	size_t elen = 0;
+	FILE *err;
+
+	err = sh_memstream(&ebuf, &elen);
+	sh_err_init(&e, err, "shtetl: ");
+	if (text[0] != '\0')
+		sh_errf(&e, "%s", text);
+	(void) fclose(err);
+	sh_wire_put(&c->c_out, SH_WIRE_OUT, "", 0);
+	sh_wire_put(&c->c_out, SH_WIRE_ERR, ebuf, elen);
+	sh_wire_put(&c->c_out, SH_WIRE_EXIT, &st, 1);
+	free(ebuf);
+	c->c_held = NULL;
+	watch(c->c_d, c, EVFILT_READ, EV_DELETE);
+	watch(c->c_d, c, EVFILT_WRITE, EV_ADD);
+}
+
 /*
  * shtetl roll CONTAINER|FOUNDATION: the house's roll onto the next
  * version of its foundation the run holds, or the foundation's roll,
  * asked for, the reply at once; the roll is the daemon's, and status
  * shows it. Houses and foundations share one namespace (ruled
- * 2026-11-05).
+ * 2026-11-05). A house's, asked from a terminal, its descriptors with
+ * the request, is attended, and its reply held until it ends: -1.
  */
 static int
 act_roll(struct daemon *d, int argc, char **argv, FILE *out,
@@ -179,8 +247,7 @@ act_roll(struct daemon *d, int argc, char **argv, FILE *out,
 	if (mounted(d, SH_SP_CONFIG, config, sizeof (config), e) != 0)
 		return (1);
 	if ((h = house_named(d, argv[1])) != NULL)
-		return (sh_house_roll(&d->d_houses, &d->d_nhouses, h, config,
-		    NULL, e) != 0);
+		return (house_roll(d, h, config, e));
 	if (mounted(d, SH_SP_BUILD, build, sizeof (build), e) != 0)
 		return (1);
 	f = sh_foundation_find(&d->d_found, &d->d_nfound, d->d_froot,
@@ -337,7 +404,7 @@ act(struct daemon *d, struct conn *c, const char *args, size_t len)
 	char **argv, *a, *obuf = NULL, *ebuf = NULL;
 	size_t olen = 0, elen = 0, i;
 	FILE *out, *err;
-	int argc = 0;
+	int argc = 0, st;
 	char status;
 
 	/* ended by a NUL each, and the last by one of our own */
@@ -360,10 +427,21 @@ act(struct daemon *d, struct conn *c, const char *args, size_t len)
 		(void) fputs(usage, err);
 		status = 2;
 	} else {
-		status = (char)acts[i].a_fn(d, argc, argv, out, &e);
+		d->d_conn = c;
+		st = acts[i].a_fn(d, argc, argv, out, &e);
+		d->d_conn = NULL;
+		status = (char)st;
 	}
 	(void) fclose(out);
 	(void) fclose(err);
+	/* held: an attended roll frames it at its end (held_done) */
+	if (c->c_held != NULL) {
+		free(obuf);
+		free(ebuf);
+		free(argv);
+		free(a);
+		return;
+	}
 	sh_wire_put(&c->c_out, SH_WIRE_OUT, obuf, olen);
 	sh_wire_put(&c->c_out, SH_WIRE_ERR, ebuf, elen);
 	sh_wire_put(&c->c_out, SH_WIRE_EXIT, &status, 1);
@@ -454,6 +532,14 @@ watch(struct daemon *d, struct conn *c, int filter, int flags)
 	(void) kevent(d->d_kq, &ev, 1, NULL, 0, NULL);
 }
 
+/* The descriptors that came with C's request let go. */
+static void
+let_go(struct conn *c)
+{
+	while (c->c_nfds > 0)
+		(void) close(c->c_fds[--c->c_nfds]);
+}
+
 static void
 hang_up(struct daemon *d, struct conn *c)
 {
@@ -462,6 +548,7 @@ hang_up(struct daemon *d, struct conn *c)
 	for (p = &d->d_conns; *p != c; p = &(*p)->c_next)
 		;
 	*p = c->c_next;
+	let_go(c);
 	(void) close(c->c_fd);
 	free(c->c_in.b_data);
 	free(c->c_out.b_data);
@@ -481,26 +568,73 @@ accepted(struct daemon *d, int sk)
 	c = sh_calloc(1, sizeof (*c));
 	c->c_ev = SH_EV_CONN;
 	c->c_fd = fd;
+	c->c_d = d;
 	c->c_next = d->d_conns;
 	d->d_conns = c;
 	watch(d, c, EVFILT_READ, EV_ADD);
 }
 
 /*
+ * Descriptors that came with C's bytes, SCM_RIGHTS in M: three, a
+ * terminal's, kept with C; any others closed.
+ */
+static void
+taken(struct conn *c, struct msghdr *m)
+{
+	struct cmsghdr *cm;
+	int fds[8];
+	size_t i, n;
+
+	for (cm = CMSG_FIRSTHDR(m); cm != NULL; cm = CMSG_NXTHDR(m, cm)) {
+		if (cm->cmsg_level != SOL_SOCKET ||
+		    cm->cmsg_type != SCM_RIGHTS)
+			continue;
+		n = (cm->cmsg_len - CMSG_LEN(0)) / sizeof (int);
+		(void) memcpy(fds, CMSG_DATA(cm), n * sizeof (int));
+		for (i = 0; i < n; i++) {
+			(void) fcntl(fds[i], F_SETFD, FD_CLOEXEC);
+			if (n == 3 && c->c_nfds < 3)
+				c->c_fds[c->c_nfds++] = fds[i];
+			else
+				(void) close(fds[i]);
+		}
+	}
+}
+
+/*
  * More of C's request. Whole, it is answered, and C is read no more; a
- * person's command sends nothing else, so anything else hangs up.
+ * person's command sends nothing else, so anything else hangs up. A
+ * reply held, an attended roll's, C is read on for the command's
+ * half-close or its going, which is the roll's hang-up (Q15, Q16).
  */
 static void
 readable(struct daemon *d, struct conn *c)
 {
-	char buf[4096];
+	char buf[4096], cbuf[CMSG_SPACE(8 * sizeof (int))];
+	struct msghdr m;
+	struct iovec iov;
 	const char *p;
 	size_t len;
 	ssize_t n;
 	int kind;
 
-	if ((n = read(c->c_fd, buf, sizeof (buf))) < 0 && errno == EAGAIN)
+	(void) memset(&m, 0, sizeof (m));
+	iov.iov_base = buf;
+	iov.iov_len = sizeof (buf);
+	m.msg_iov = &iov;
+	m.msg_iovlen = 1;
+	m.msg_control = cbuf;
+	m.msg_controllen = sizeof (cbuf);
+	if ((n = recvmsg(c->c_fd, &m, 0)) < 0 && errno == EAGAIN)
 		return;
+	taken(c, &m);
+	if (c->c_held != NULL) {
+		if (n <= 0) {
+			sh_house_hangup(c->c_held);
+			watch(d, c, EVFILT_READ, EV_DELETE);
+		}
+		return;
+	}
 	if (n <= 0) {
 		hang_up(d, c);
 		return;
@@ -513,6 +647,8 @@ readable(struct daemon *d, struct conn *c)
 		return;
 	}
 	act(d, c, p, len);
+	if (c->c_held != NULL)
+		return;
 	watch(d, c, EVFILT_READ, EV_DELETE);
 	watch(d, c, EVFILT_WRITE, EV_ADD);
 }

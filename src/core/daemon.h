@@ -44,10 +44,14 @@ int sh_daemon_run(int sk, const char *sock, struct sh_zfs *z,
     const char *logdir, const char *jaildir, struct sh_err *e);
 
 /*
- * The command: its ARGC arguments sent to the daemon at SOCK, and the
- * reply written to OUT and ERR as it comes. The exit status.
+ * The command: its ARGC arguments sent to the daemon at SOCK, with FDS,
+ * three descriptors, a terminal's standard input, output and error, or
+ * NULL (m5-queue, an attended roll's); the reply written to OUT and ERR
+ * as it comes. The exit status. With FDS, SIGINT, SIGTERM and SIGHUP
+ * while it waits half-close the socket and it waits on, and the modes
+ * of FDS's terminal are put back as it ends.
  */
-int sh_command(const char *sock, int argc, char *const *argv, FILE *out,
-    FILE *err);
+int sh_command(const char *sock, int argc, char *const *argv,
+    const int *fds, FILE *out, FILE *err);
 
 #endif	/* SH_DAEMON_H */
