@@ -95,3 +95,23 @@ tests/MATRIX.md family V):
 
 c8ece8b (matrix, rulings), a2d675b (save, pkg, the daemon), 8fa0197
 (build.sh V10), and this worklog's.
+
+## Box run 13 and build run 11
+
+- Box run 13: run.sh at 5fdb0d7 (results 9b1a32a): 140 ok, 0 failed.
+  check_house and check_daemon on FreeBSD with V1 - V9, and with Q-H1's
+  H18 and H19, which box run 12 came before.
+- Build run 11: build.sh at 9b1a32a (results 0646114): 66 ok, 3
+  failed, every failure V10's cells', not the code's. Ok: the save on
+  the lake's copy after its convergence, s2web active again after the
+  upgrade, nothing in syslog; every R, B, P, H17, N cell as before.
+  FAIL "saved: every filesystem, kind save" and "every filesystem, kind
+  pkg": got "3 3", which is what every filesystem having one means;
+  the cells wanted "3 1". FAIL "pkg -j ran": the cell looked for the
+  line after "# packages" in s2web.log, but only a child's step writes
+  its line (job_spawn), and packages is a call: there is no such line.
+  Fixed in 70d7cee: "$_n $_n", and the log's last step line, pkg's,
+  where the upgrade had a package of its own.
+- Owed: the next build run, for V10 with its cells mended; what it
+  will show that this run could not is that pkg ran, jq being s2web's
+  own.
