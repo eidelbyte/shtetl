@@ -16,7 +16,8 @@
  * version was made (plan 7.2 step 4); no chroot where nothing is left.
  *
  * A failure part way leaves devfs mounted; sh_foundation_idle, which
- * every failure and every start runs, unmounts it.
+ * every failure and every start runs, unmounts it, and a house's
+ * version releases it before it is unmounted (H20).
  */
 
 #ifndef	SH_COMMANDS_H

@@ -13,7 +13,8 @@
  * house.
  */
 
-#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/mount.h>
 
 #include <errno.h>
 #include <stdint.h>
@@ -173,14 +174,27 @@ tree_mount(struct sh_zfs *z, const char *root, struct sh_err *e)
 	return (r);
 }
 
-/* ROOT's tree unmounted, children first. */
+/*
+ * ROOT's tree unmounted, children first; first the devfs the commands'
+ * chroot mounts on its dev (commands.h), which a failure part way
+ * leaves there and which ZFS will not unmount ROOT under, released by
+ * the system's call, as sh_foundation_idle releases a head's; where
+ * there is none, it says so to no one.
+ */
 static int
 tree_unmount(struct sh_zfs *z, const char *root, struct sh_err *e)
 {
 	struct names t;
+	char at[1024], dev[1100];
 	size_t i;
 	int r;
 
+	if ((r = sh_zfs_mounted(z, root, at, sizeof (at), e)) == 1) {
+		(void) snprintf(dev, sizeof (dev), "%s/dev", at);
+		(void) unmount(dev, MNT_FORCE);
+	}
+	if (r < 0)
+		return (-1);
 	r = tree(z, root, &t, e);
 	for (i = t.n_n; r == 0 && i > 0; i--)
 		r = sh_zfs_unmount(z, t.n_v[i - 1], e);

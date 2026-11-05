@@ -965,6 +965,7 @@ reply}.
 | H17 | the box: a container made on the M3 foundation, pulled | made by shtetl create on box's newest version, active, its root a clone of the run's copy, placed at containers/H; the copy pulled whole where nothing on the run relied on box | tests/box/build.sh (m5-jail) |
 | H18 | the actor's start, ZFS refusing a step of putting one house in place (a mount) | said once, "house H: why"; that house "house H failed", left out, not mounted or started; the others active and started; a create of it "H: exists" (ruled 2026-11-05, Q-H1) | tests/check_house.c |
 | H19 | the actor's start, ZFS refusing to destroy a house's incomplete version | the house active and its jail started all the same, the refusal said once, "house H: clean: why"; the next start destroys it | tests/check_house.c |
+| H20 | a create or a roll failing after the commands' devfs is mounted on the version's dev | the devfs released before the version unmounts, so it is destroyed, and a roll's old version started again and stalled | box: m5-box (the fake mount mounts nothing) |
 
 ## Family N: a container's jail (m5-jail)
 
