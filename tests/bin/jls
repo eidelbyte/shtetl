@@ -1,0 +1,7 @@
+#!/bin/sh
+# jls, faked for the tests (tests/bin/jail keeps what runs): jls -j
+# NAME, 0 where the jail runs, 1 and jls(8)'s words where it does not.
+echo "jls $*" >> "${FAKE_LOG:-/dev/null}"
+[ "$1" = -j ] && [ -f "${FAKE_LOG:-/dev/null}.jails/$2" ] && exit 0
+echo "jls: jail \"$2\" not found" >&2
+exit 1

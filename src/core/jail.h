@@ -28,7 +28,10 @@ int sh_jail_write(const char *file, const char *name, const char *path,
 /*
  * A step of J, a child named jail: jail -f FILE -cm NAME, which makes
  * the jail, and leaves one that runs already as it is, so a start
- * after a crash is a first start; or jail -f FILE -r NAME.
+ * after a crash is a first start; or, where jls -j NAME finds it
+ * running, jail -f FILE -r NAME, so that stopping one that is not, its
+ * start having failed or a hand having removed it, is done already
+ * rather than refused (m5-roll).
  */
 void sh_jail_start(struct sh_job *j, const char *file, const char *name);
 void sh_jail_stop(struct sh_job *j, const char *file, const char *name);

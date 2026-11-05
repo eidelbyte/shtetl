@@ -60,7 +60,10 @@ sh_jail_start(struct sh_job *j, const char *file, const char *name)
 void
 sh_jail_stop(struct sh_job *j, const char *file, const char *name)
 {
-	const char *argv[] = { "jail", "-f", file, "-r", name, NULL };
+	/* jail -r refuses one not running: jls -j asks the kernel first */
+	static const char script[] = "jls -j \"$1\" >/dev/null 2>&1 || "
+	    "exit 0; exec jail -f \"$2\" -r \"$1\"";
+	const char *argv[] = { "sh", "-c", script, "sh", name, file, NULL };
 
 	sh_job_child(j, "jail", argv);
 }

@@ -1020,6 +1020,7 @@ log, the sink}.
 | N16 | a name of digits only | refused: "containers/123: invalid recipe name: digits only", create's "123: invalid name: digits only", a requires entry | tests/check_cascade.c, tests/check_daemon.c, tests/check_schema.c |
 | N17 | the box: a real jail from the block | made, at the version's path, with the recipe's jailconf; devfs at path/dev; jexec H and pkg -j H reach it; jail -r takes the jail and devfs away | tests/box/build.sh |
 | N18 | the fake keeping files (zfake_files) | a snapshot of a mounted filesystem shows its files, not a child's, at MOUNT/.zfs/snapshot/SNAP; a mounted filesystem a mountpoint set moves takes its files along | tests/check_house.c, through N7, N8, N10; the real ones held on the box by I12, I14 and Z20 |
+| N19 | the stop of a jail not running, its start having failed or a hand having removed it | jls -j H asked first; nothing refused, the step ends well; the stop of one running, jail -r as N5 (m5-roll, which stops first) | tests/check_jail.c |
 
 ## Family V: a house's saves and pkg upgrades (m5-save-pkg)
 

@@ -1,7 +1,8 @@
 /*
- * Family N of tests/MATRIX.md, N1 - N6: a container's jail's block and
- * its steps (src/core/jail.h). jail(8) is tests/bin's, which logs its
- * words. Where the block's jailconf comes from is check_house's.
+ * Family N of tests/MATRIX.md, N1 - N6 and N19: a container's jail's
+ * block and its steps (src/core/jail.h). jail(8) and jls(8) are
+ * tests/bin's, which log their words. Where the block's jailconf
+ * comes from is check_house's.
  */
 
 #include <sys/types.h>
@@ -170,8 +171,15 @@ main(void)
 	CHECK(strcmp(run(), "(well)") == 0);
 	CHECK(strcmp(logbuf, "# jail\n# jail\n") == 0);
 	(void) snprintf(want, sizeof (want), "jail -f %s -cm web\n"
-	    "jail -f %s -r web\n", file, file);
+	    "jls -j web\njail -f %s -r web\n", file, file);
 	CHECK(strcmp(slurp(scratch_path("fake.log")), want) == 0);
+
+	/* N19: stopped again, not running: jls asked, nothing refused */
+	(void) unlink(scratch_path("fake.log"));
+	sh_job_init(&job, logf, end, NULL);
+	sh_jail_stop(&job, file, "web");
+	CHECK(strcmp(run(), "(well)") == 0);
+	CHECK(strcmp(slurp(scratch_path("fake.log")), "jls -j web\n") == 0);
 
 	/* N6: jail(8) refusing: why, and its words in the log */
 	CHECK(setenv("FAKE_FAIL", "jail", 1) == 0);

@@ -1,6 +1,20 @@
 #!/bin/sh
 # jail, faked for the tests (tests/bin/make says how the fakes log and
 # fail): logged, and no jail made or removed, on the host least of all.
+# What runs is kept as a file of the jail's name in $FAKE_LOG.jails,
+# which tests/bin/jls reads: -cm makes it, -r takes it away, and -r of
+# a jail not there is refused as jail(8) refuses it.
 echo "jail $*" >> "${FAKE_LOG:-/dev/null}"
 [ "${FAKE_FAIL:-}" = jail ] && { echo "jail: failed" >&2; exit 1; }
+d=${FAKE_LOG:-/dev/null}.jails
+for name; do :; done
+case " $* " in
+*" -cm "*)
+	mkdir -p "$d" 2>/dev/null && : >"$d/$name"
+	;;
+*" -r "*)
+	[ -f "$d/$name" ] || { echo "jail: \"$name\" not found" >&2; exit 1; }
+	rm -f "$d/$name"
+	;;
+esac
 exit 0
