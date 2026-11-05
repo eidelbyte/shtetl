@@ -87,7 +87,15 @@ pool_export() {
 		    $3 != "zfs" { print $2 }' | sort -r | while read -r _mp; do
 			umount -f "$_mp"
 		done
-		zpool export $P
+		# builds 11 - 13 found s2web's root busy here: what holds
+		# it, for the record, the pool's mounts and the jails dying
+		# too; then forced, or the next run.sh meets its spaces
+		if ! zpool export $P; then
+			mount -p | awk -v a="$BALT/" 'index($2, a) == 1 {
+			    print $1, $2, $3 }'
+			jls -d jid name dying
+			zpool export -f $P
+		fi
 	fi
 	return 0
 }
@@ -658,7 +666,8 @@ hroll() {
 	    tr -d ' ') $(prop shtetl:kind "$(newest $RC/$_nv)")" \
 	    "$((_ns + 1)) update"
 	cell W16 "every filesystem, an update snapshot" \
-	    "$(kinds_of $RC/$_nv update | awk '{ print ($1 == $2) }')" 1
+	    "$(kinds_of $RC/$_nv update 2>/dev/null |
+	    awk '{ print ($1 == $2 && $1 > 0) }')" 1
 	cell W16 "no stall left, nothing of zfs_rebase's set" \
 	    "$(zfs get -H -r -s local -o value shtetl:stall,zfs_rebase:tag \
 	    $RC 2>&1 | wc -l | tr -d ' ')" 0
