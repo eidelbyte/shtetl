@@ -34,6 +34,19 @@ struct sh_hmake;
 struct sh_hroll;
 struct sh_houseenv;
 
+/*
+ * A person attending a roll, shtetl roll H from a terminal (m5-queue,
+ * ruled 2026-10-19): the descriptors their command sent, its standard
+ * input, output and error, and DONE, told with ARG once, at the roll's
+ * end, as shtetl roll H's reply: 0 and "" rolled; 1 and "H: stalled
+ * STEP: why", or after the update snapshot "H: STEP: why".
+ */
+struct sh_hattend {
+	int	ha_fds[3];
+	void	(*ha_done)(void *arg, int status, const char *text);
+	void	*ha_arg;
+};
+
 struct sh_house {
 	char				*h_name;	/* its shtetl:house */
 	enum sh_hstate			h_state;
@@ -153,9 +166,25 @@ int sh_house_pkg(struct sh_house *h, struct sh_err *e);
  * said once to ENV's sink. CONFIG is where zconfig is mounted; *HP the
  * houses, another's roll being on the same copy. Refused, said to E:
  * "H: up to date", or as a save is.
+ *
+ * With ATTEND, allocated, the roll is attended (Q13, Q14): a replay
+ * stopped at its conflicts runs zfs_rebase -c -m -i on ATTEND's
+ * descriptors next, the step "picker", the built-in picker in the
+ * person's terminal; its exit 0 and the roll goes on, anything else and
+ * it is undone and stalled. ATTEND is the roll's from a 0 return: it
+ * is told DONE at the end, and its descriptors closed and itself freed
+ * then, or when the roll is stopped; on a refusal it is the caller's.
  */
 int sh_house_roll(struct sh_house ***hp, size_t *np, struct sh_house *h,
-    const char *config, struct sh_err *e);
+    const char *config, struct sh_hattend *attend, struct sh_err *e);
+
+/*
+ * The person attending H's roll gone, or their command's signal (Q15,
+ * Q16): no later conflict of the roll waits on them, and a picker
+ * under way is sent SIGTERM, ending it and not the roll, which is
+ * undone and stalled as an unattended one is.
+ */
+void sh_house_hangup(struct sh_house *h);
 
 /*
  * H asked to take the next version waiting, as the daemon asks every

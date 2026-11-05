@@ -156,6 +156,36 @@ rf_abort(struct sh_zfs *z, const char *ds, struct sh_err *e)
 	rf_exit(sh_zfs_mount(z, ds, e) == 0 ? 0 : 3);
 }
 
+/*
+ * -c [-i] IDENT: the run stopped at its conflicts taken on from the
+ * gate; with -i, a person at the picker, the fake's a line on standard
+ * input: "ok" answers every name, and the run goes to done; anything
+ * else, or none, and the gate stands, exit 1, as headless.
+ */
+static void
+rf_continue(struct sh_zfs *z, const char *ident, int inter, struct sh_err *e)
+{
+	struct rf_local tag, pre;
+	char ds[512], line[64];
+
+	(void) snprintf(ds, sizeof (ds), "%.*s", (int)strcspn(ident, "@"),
+	    ident);
+	rf_local(z, ds, SH_REBASE_TAG, &tag, e);
+	if (!tag.rl_got) {
+		(void) printf("zfs_rebase: %s: no rebase\n", ident);
+		rf_exit(2);
+	}
+	if (!inter || fgets(line, sizeof (line), stdin) == NULL ||
+	    strcmp(line, "ok\n") != 0)
+		rf_exit(1);
+	rf_local(z, ds, RF_PRE, &pre, e);
+	rf_unrecord(z, ds, e);
+	/* the dataset form's dataset, unmounted for the run, back */
+	if (pre.rl_got && sh_zfs_mount(z, ds, e) != 0)
+		rf_exit(3);
+	rf_exit(0);
+}
+
 /* One start, in the job's forked child: ARG its words. */
 static int
 rf_run(struct sh_job *j, void *arg, struct sh_err *e)
@@ -164,11 +194,11 @@ rf_run(struct sh_job *j, void *arg, struct sh_err *e)
 		{ "readonly", "on" }, { "mountpoint", "none" }
 	};
 	const char *from = NULL, *onto = NULL, *result = NULL;
-	const char *base = NULL;
+	const char *base = NULL, *named = NULL;
 	char **v = arg, ident[1024], snap[1024];
 	const char *names[1];
 	struct sh_zfs *z;
-	int i, u = 0, rc, clone;
+	int i, u = 0, rc, clone, cont = 0, inter = 0;
 
 	(void) j;
 	rf_log(v);
@@ -179,6 +209,12 @@ rf_run(struct sh_job *j, void *arg, struct sh_err *e)
 			continue;
 		if (strcmp(v[i], "-u") == 0)
 			u = 1;
+		else if (strcmp(v[i], "-c") == 0)
+			cont = 1;
+		else if (strcmp(v[i], "-i") == 0)
+			inter = 1;
+		else if (cont && v[i][0] != '-')
+			named = v[i];
 		else if (strcmp(v[i], "--abort") == 0 && v[i + 1] != NULL)
 			rf_abort(z, v[i + 1], e);
 		else if (strcmp(v[i], "-b") == 0 && v[i + 1] != NULL)
@@ -192,6 +228,8 @@ rf_run(struct sh_job *j, void *arg, struct sh_err *e)
 		else
 			rf_exit(2);
 	}
+	if (cont && named != NULL)
+		rf_continue(z, named, inter, e);
 	if (from == NULL || onto == NULL || result == NULL)
 		rf_exit(2);
 	clone = strchr(onto, '@') != NULL;

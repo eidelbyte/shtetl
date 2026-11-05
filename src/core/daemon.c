@@ -180,7 +180,7 @@ act_roll(struct daemon *d, int argc, char **argv, FILE *out,
 		return (1);
 	if ((h = house_named(d, argv[1])) != NULL)
 		return (sh_house_roll(&d->d_houses, &d->d_nhouses, h, config,
-		    e) != 0);
+		    NULL, e) != 0);
 	if (mounted(d, SH_SP_BUILD, build, sizeof (build), e) != 0)
 		return (1);
 	f = sh_foundation_find(&d->d_found, &d->d_nfound, d->d_froot,

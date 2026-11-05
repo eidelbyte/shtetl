@@ -14,6 +14,7 @@
 #include <sys/event.h>
 #include <sys/stat.h>
 
+#include <fcntl.h>
 #include <stdint.h>
 #include <time.h>
 #include <unistd.h>
@@ -545,7 +546,8 @@ static int
 roll(void)
 {
 	cap_reset(&c);
-	return (sh_house_roll(&hs, &nh, house("web"), config, &c.c_err));
+	return (sh_house_roll(&hs, &nh, house("web"), config, NULL,
+	    &c.c_err));
 }
 
 /*
@@ -582,6 +584,60 @@ depth(const char *depth, int64_t age)
 	got[strlen(got) - 1] = '\0';
 	*(strrchr(got, ' ') != NULL ? strrchr(got, ' ') : got) = '\0';
 	return (got);
+}
+
+/* What an attended roll's person was told at its end. */
+static int told_status;
+static char told_text[512];
+
+static void
+told_done(void *arg, int status, const char *text)
+{
+	(void) arg;
+	told_status = status;
+	(void) snprintf(told_text, sizeof (told_text), "%s", text);
+}
+
+/*
+ * shtetl roll web attended (family Q): the person's terminal a pipe
+ * whose write end, *ANSWER, is the test's to answer the picker on, and
+ * the file term, where the picker writes; 0, or -1 refused.
+ */
+static int
+attended(int *answer)
+{
+	struct sh_hattend *a;
+	int in[2];
+
+	CHECK((a = calloc(1, sizeof (*a))) != NULL && pipe(in) == 0);
+	a->ha_fds[0] = in[0];
+	CHECK((a->ha_fds[1] = open(scratch_path("term"), O_WRONLY | O_CREAT |
+	    O_TRUNC, 0644)) >= 0 && (a->ha_fds[2] = dup(a->ha_fds[1])) >= 0);
+	a->ha_done = told_done;
+	*answer = in[1];
+	told_status = -1;
+	told_text[0] = '\0';
+	cap_reset(&c);
+	if (sh_house_roll(&hs, &nh, house("web"), config, a, &c.c_err) == 0)
+		return (0);
+	(void) close(in[0]);
+	(void) close(in[1]);
+	(void) close(a->ha_fds[1]);
+	(void) close(a->ha_fds[2]);
+	free(a);
+	return (-1);
+}
+
+/* Until web's roll waits at the picker: no more than 20 s. */
+static void
+until_picker(void)
+{
+	time_t end = time(NULL) + 20;
+
+	while (strstr(status(), " rolling picker") == NULL &&
+	    time(NULL) < end)
+		(void) one(50);
+	CHECK(is(status(), "house web rolling picker\n"));
 }
 
 /*
@@ -1172,6 +1228,82 @@ main(void)
 	CHECK(sh_house_freeze(house("web"), &c.c_err) == 0 &&
 	    is(status(), "house web stalled frozen\n") &&
 	    is(user(OLD, "shtetl:stall"), "frozen"));
+
+	/*
+	 * Q14: shtetl roll web attended, the root's dataset form stopping
+	 * at its conflicts: next the picker, zfs_rebase -c -m -i the run's
+	 * pre-apply snapshot, on the person's descriptors, web down
+	 * meanwhile; answered, the roll goes on and ends active, the person
+	 * told 0 and nothing, syslog nothing
+	 */
+	{
+		int fd;
+
+		made();
+		next();
+		snap_at(OLD, 0, cr, sizeof (cr));
+		(void) snprintf(l[0], sizeof (l[0]), NEW "@%s", cr);
+		rbfake_end(l[0], 1);
+		CHECK(attended(&fd) == 0);
+		until_picker();
+		CHECK(write(fd, "ok\n", 3) == 3);
+		CHECK(is(settle(), "house web active 15.1-releng-U-web\n") &&
+		    told_status == 0 && is(told_text, "") &&
+		    is(cap_text(&sys), ""));
+		(void) close(fd);
+		(void) snprintf(want, sizeof (want),
+		    "zfs_rebase -c -m -i %s\n", l[0]);
+		CHECK((text = slurp("fake.log")) != NULL &&
+		    strstr(text, want) != NULL);
+
+		/* Q14: answered otherwise: undone, stalled, the person told */
+		made();
+		next();
+		snap_at(OLD, 0, cr, sizeof (cr));
+		(void) snprintf(l[0], sizeof (l[0]), NEW "@%s", cr);
+		rbfake_end(l[0], 1);
+		CHECK(attended(&fd) == 0);
+		until_picker();
+		CHECK(write(fd, "no\n", 3) == 3);
+		CHECK(is(settle(), "house web stalled picker: exited 1\n") &&
+		    told_status == 1 &&
+		    is(told_text, "web: stalled picker: exited 1") &&
+		    !there(NEW));
+		(void) close(fd);
+
+		/*
+		 * Q15: the person hung up while the picker waits: the picker
+		 * ended, not the roll, which is undone and stalled
+		 */
+		made();
+		next();
+		snap_at(OLD, 0, cr, sizeof (cr));
+		(void) snprintf(l[0], sizeof (l[0]), NEW "@%s", cr);
+		rbfake_end(l[0], 1);
+		CHECK(attended(&fd) == 0);
+		until_picker();
+		sh_house_hangup(house("web"));
+		CHECK(is(settle(), "house web stalled picker: killed by "
+		    "signal 15\n") && told_status == 1 &&
+		    is(told_text, "web: stalled picker: killed by signal 15"));
+		(void) close(fd);
+
+		/*
+		 * Q15: hung up before the conflict: it waits on no one, the
+		 * replay's 1 a failure as an unattended roll's
+		 */
+		made();
+		next();
+		snap_at(OLD, 0, cr, sizeof (cr));
+		(void) snprintf(l[0], sizeof (l[0]), NEW "@%s", cr);
+		rbfake_end(l[0], 1);
+		CHECK(attended(&fd) == 0);
+		sh_house_hangup(house("web"));
+		CHECK(is(settle(), "house web stalled replay: exited 1\n") &&
+		    told_status == 1 &&
+		    is(told_text, "web: stalled replay: exited 1"));
+		(void) close(fd);
+	}
 
 	sh_houses_free(hs, nh);
 	(void) close(env.he_kq);

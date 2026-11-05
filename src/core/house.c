@@ -73,6 +73,12 @@ struct hds {
 	int		d_off;		/* a placeholder */
 };
 
+/* A replay step's run, by the name zfs_rebase knows it, for the picker. */
+struct hident {
+	struct sh_hroll	*i_r;
+	char		*i_ident;
+};
+
 /* A roll under way (plan 7.2). */
 struct sh_hroll {
 	struct sh_house		*hr_h;
@@ -97,6 +103,10 @@ struct sh_hroll {
 	struct sh_commands	hr_cm;
 	int			hr_complete;	/* the update snapshot taken */
 	char			*hr_why;	/* the stall, at a failure */
+	struct sh_hattend	*hr_attend;	/* its person, or NULL */
+	int			hr_hup;		/* who hung up */
+	struct hident		**hr_ids;
+	size_t			hr_nids;
 };
 
 static int
@@ -1375,7 +1385,32 @@ roll_free(struct sh_hroll *r)
 	free(r->hr_hlayer);
 	sh_recipe_free(&r->hr_recipe);
 	free(r->hr_why);
+	for (i = 0; i < r->hr_nids; i++) {
+		free(r->hr_ids[i]->i_ident);
+		free(r->hr_ids[i]);
+	}
+	free(r->hr_ids);
+	if (r->hr_attend != NULL) {
+		for (i = 0; i < 3; i++)
+			(void) close(r->hr_attend->ha_fds[i]);
+		free(r->hr_attend);
+	}
 	free(r);
+}
+
+/*
+ * The roll's person told how it ended, once, as shtetl roll H's reply:
+ * 0 and nothing, or 1 and STATUS's words.
+ */
+static void
+roll_told(struct sh_hroll *r, int status, const char *fmt, const char *s)
+{
+	char text[1200];
+
+	if (r->hr_attend == NULL)
+		return;
+	(void) snprintf(text, sizeof (text), fmt, r->hr_h->h_name, s);
+	r->hr_attend->ha_done(r->hr_attend->ha_arg, status, text);
 }
 
 /* Whether a house besides R's rolls from R's copy of the foundation. */
@@ -1565,17 +1600,59 @@ roll_place(struct sh_job *j, void *arg, struct sh_err *e)
 }
 
 /*
+ * A replay stopped at its conflicts (zfs_rebase's 1) in an attended
+ * roll: next, the picker on the person's terminal, zfs_rebase -c -m -i
+ * IDENT, the house down while they answer (plan 7.4); the person gone,
+ * the replay's failure as an unattended roll's is.
+ */
+static int
+roll_conflict(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	struct hident *id = arg;
+	const char *argv[] = { "-c", "-m", "-i", id->i_ident, NULL };
+
+	if (id->i_r->hr_hup) {
+		sh_errf(e, "exited 1");
+		return (-1);
+	}
+	sh_rebase(j, "picker", argv);
+	sh_job_fds(j, id->i_r->hr_attend->ha_fds);
+	return (0);
+}
+
+/* A replay step added to J, the run it starts named IDENT. */
+static void
+roll_rebase(struct sh_job *j, struct sh_hroll *r, const char *const *argv,
+    const char *ident)
+{
+	struct hident *id;
+
+	sh_rebase(j, "replay", argv);
+	if (r->hr_attend == NULL)
+		return;
+	id = sh_calloc(1, sizeof (*id));
+	id->i_r = r;
+	id->i_ident = sh_strdup(ident);
+	r->hr_ids = sh_realloc(r->hr_ids, (r->hr_nids + 1) *
+	    sizeof (*r->hr_ids));
+	r->hr_ids[r->hr_nids++] = id;
+	sh_job_then(j, 1, roll_conflict, id);
+}
+
+/*
  * The replay's steps for REL, a dataset both the old version and the
  * foundation's next version have: the oldest save by the clone form
  * onto the version, the result placed, each later save by the dataset
- * form, -u, -b the save before it and the pre-apply snapshot named
- * for it, -m always (plan 7.2 step 3; probe P6).
+ * form, -u, -b the save before it and the pre-apply snapshot named for
+ * it, -m always (plan 7.2 step 3; probe P6). Each run is named as
+ * zfs_rebase names it: the clone form's by its result, the dataset
+ * form's by its pre-apply snapshot.
  */
 static void
 roll_replay(struct sh_job *j, struct sh_hroll *r, struct hds *d)
 {
 	const char *argv[12];
-	char *from, *onto, *res, *prev, *next;
+	char *from, *onto, *res, *prev, *next, *ident;
 	size_t k;
 
 	from = join(r->hr_h->h_active, d->d_rel, "");
@@ -1591,7 +1668,7 @@ roll_replay(struct sh_job *j, struct sh_hroll *r, struct hds *d)
 	argv[5] = "--result";
 	argv[6] = res;
 	argv[7] = NULL;
-	sh_rebase(j, "replay", argv);
+	roll_rebase(j, r, argv, res);
 	free(onto);
 	free(next);
 	sh_job_call(j, "place", roll_place, d);
@@ -1608,7 +1685,9 @@ roll_replay(struct sh_job *j, struct sh_hroll *r, struct hds *d)
 		argv[8] = "--result";
 		argv[9] = r->hr_saves.n_v[k - 1];
 		argv[10] = NULL;
-		sh_rebase(j, "replay", argv);
+		ident = join(res, "@", r->hr_saves.n_v[k - 1]);
+		roll_rebase(j, r, argv, ident);
+		free(ident);
 		free(prev);
 		prev = next;
 	}
@@ -1925,6 +2004,7 @@ undo_end(struct sh_job *j, const char *why, void *arg)
 	h->h_state = SH_H_ACTIVE;
 	h->h_roll = NULL;
 	act_over(h);
+	roll_told(r, 1, "%s: stalled %s", h->h_stall);
 	roll_free(r);
 	idle(h);
 }
@@ -1948,6 +2028,7 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 		h->h_state = SH_H_ACTIVE;
 		h->h_roll = NULL;
 		act_over(h);
+		roll_told(r, 0, "", "");
 		roll_free(r);
 		env->he_beam(env->he_parg);
 		idle(h);
@@ -1961,6 +2042,7 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 		    SH_H_ACTIVE : SH_H_FAILED;
 		h->h_roll = NULL;
 		act_over(h);
+		roll_told(r, 1, "%s: %s", why);
 		roll_free(r);
 		idle(h);
 		return;
@@ -1980,7 +2062,7 @@ roll_end(struct sh_job *j, const char *why, void *arg)
  */
 static int
 roll_begin(struct sh_house ***hp, size_t *np, struct sh_house *h,
-    const char *config, struct sh_err *e)
+    const char *config, struct sh_hattend *attend, struct sh_err *e)
 {
 	const struct sh_houseenv *env = h->h_env;
 	struct sh_hroll *r;
@@ -2004,6 +2086,7 @@ roll_begin(struct sh_house ***hp, size_t *np, struct sh_house *h,
 	}
 	h->h_state = SH_H_ROLLING;
 	h->h_roll = r;
+	r->hr_attend = attend;
 	sh_job_init(&h->h_job, h->h_log, roll_end, r);
 	block_path(h, file, sizeof (file));
 	sh_jail_stop(&h->h_job, file, h->h_name);
@@ -2015,7 +2098,7 @@ roll_begin(struct sh_house ***hp, size_t *np, struct sh_house *h,
 
 int
 sh_house_roll(struct sh_house ***hp, size_t *np, struct sh_house *h,
-    const char *config, struct sh_err *e)
+    const char *config, struct sh_hattend *attend, struct sh_err *e)
 {
 	int rc;
 
@@ -2029,9 +2112,23 @@ sh_house_roll(struct sh_house ***hp, size_t *np, struct sh_house *h,
 		free(h->h_stall);
 		h->h_stall = NULL;
 	}
-	if ((rc = roll_begin(hp, np, h, config, e)) == 1)
+	if ((rc = roll_begin(hp, np, h, config, attend, e)) == 1)
 		sh_errf(e, "%s: up to date", h->h_name);
 	return (rc == 0 ? 0 : -1);
+}
+
+void
+sh_house_hangup(struct sh_house *h)
+{
+	struct sh_hroll *r = h->h_roll;
+	const char *step;
+
+	if (r == NULL || r->hr_attend == NULL || r->hr_hup)
+		return;
+	r->hr_hup = 1;
+	if ((step = sh_job_step(&h->h_job)) != NULL &&
+	    strcmp(step, "picker") == 0)
+		sh_job_kill(&h->h_job);
 }
 
 int
@@ -2059,7 +2156,7 @@ sh_house_next(struct sh_house ***hp, size_t *np, struct sh_house *h,
 		return;
 	f = sh_memstream(&buf, &len);
 	sh_err_init(&q, f, "");
-	if (roll_begin(hp, np, h, config, &q) < 0) {
+	if (roll_begin(hp, np, h, config, NULL, &q) < 0) {
 		(void) fflush(f);
 		why = sh_calloc(1, len + 8);
 		(void) snprintf(why, len + 8, "next: %.*s",
