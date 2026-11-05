@@ -295,3 +295,29 @@ exports it with -f (4d66231). W16's update-snapshot cell passed 0 of
 0 on a version not there; it wants at least one now.
 
 Owed: the next build run.
+
+## Build run 14
+
+Build run 14: build.sh at 8e8ec7e (results ea39fe3): 89 ok, 0 failed.
+Every R, B, P, H17, N and V10 cell as before, and all of H20 and W16.
+
+- H20: s2app's roll with the failing piece stalled at it, "commands:
+  h20: exited 1", on the old version and said once in syslog; the new
+  version destroyed with nothing left mounted at its path, so the
+  devfs the chroot mounted was released; the old jail running again;
+  the run's copy unmounted.
+- W16: rolled by the real zfs_rebase. Its own report in s2app.log:
+  the root's replay of the final save, 5 actions done, the first
+  /root/w16; usr/local's, 0 actions each. The file written in the jail
+  and the command's motd.template were on the new version; the jail at
+  its path with devfs once; 3 snapshots, the last kind update, on
+  every filesystem; no stall or zfs_rebase record left; the copy
+  unmounted; after the beam converged the old version was pruned from
+  the run and the new one was on the lake; syslog said nothing of the
+  roll or the prune. It held only R6's stall and H20's.
+- The pool exported without -f this time, so the diagnostics did not
+  print; they stay for when it is refused again.
+
+Tested: every cell of family W and H20 has passed where its
+disposition says. check_hroll's check of the copy's mount (b15bae1)
+has run on the mac only; it runs on FreeBSD at the next run.sh.
