@@ -217,3 +217,31 @@ gone before R9's restart.
 - Raised: one house's refusal at the daemon's start stops the whole
   daemon, against plan 1's "holds nobody up" (Q-H1).
 - Owed: run.sh (Z21, Z22 over libzfs) and the next build run.
+
+## Q-H1: a house left out
+
+Ruled 2026-11-05 (plan 18): "for now just log one error in syslog and
+mount and start the rest". Built in ef75504, m5-create's
+sh_houses_start changed for it:
+
+- Each house's steps report through a sink of its own, the daemon's
+  sink with "house H: " before what is said, so what ZFS refuses is
+  one line, "house H: why".
+- A refusal reading a version, destroying an incomplete one or
+  putting the active one in place leaves the house out: SH_H_FAILED,
+  "house H failed" in status, not mounted, its jail not started, a
+  create of it refused "H: exists". Its later versions are passed
+  over, so it says one line. The next start tries it from ZFS again.
+- Only the run's containers refused, which no house is, stops the
+  daemon's start.
+- A version's origin refused was left unread before (its txg 0); it
+  is a refusal now, like the others.
+- Cells H18 (a mount refused) and H19 (an incomplete version not
+  destroyed, then destroyed at the next start); mutants: the failure
+  not marked, at either place; the failed house activated anyway; the
+  house's prefix lost.
+
+The startup tree of `requires` is to be rc scripts (ruled the same
+day), future work: sprints/future-work.md, Container dependencies,
+which also notes rc.shutdown stopping such scripts in reverse at the
+host's shutdown, and jail(8)'s own depend parameter, to weigh.

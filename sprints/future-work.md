@@ -92,14 +92,32 @@ this in future work with the rest of the containers dependency work"
 language and nothing more: each entry is a container recipe, and not
 the container itself. Nothing reads it when a container is made or
 started, and the daemon's start starts every container's jail at once
-(m5-jail).
+(m5-jail); a container ZFS refuses then is said and left out, the rest
+started (ruled 2026-11-05, Q-H1).
+
+The tree is to be made of rc scripts (ruled 2026-11-05): "We'll use
+those for the future work dependency tree for container startup"
+(plan 18). rcorder(8) already orders rc scripts by their PROVIDE and
+REQUIRE lines, at boot and, reversed, at shutdown.
 
 To flesh out:
 
 - The startup tree: the containers started in the order `requires`
   gives, a required container's jail started before the jails of the
   containers that require it, and those with nothing between them at
-  once.
+  once. An rc script for each container, its REQUIRE the containers it
+  requires, written by shtetl as it writes the jail's block; or one
+  script of shtetl's that starts them in rcorder's order. Which, and
+  where they live, is to be asked.
+- How the scripts and the daemon meet. A container's versions are
+  canmount=noauto and the daemon mounts the active one, so at boot
+  something must mount it before its jail starts: the daemon first,
+  then the scripts, or each script mounting its own container. The
+  daemon also stops and starts a jail around a roll's swap (m5-roll).
+- jail(8) orders jails itself too, by the depend parameter: a jail's
+  dependencies are made before it and removed after it (jail.8). With
+  one block in each file, as now, jail -f FILE does not see the
+  others; to weigh beside the scripts.
 - A cycle, a container that requires another that requires it in
   turn: refused where the recipes are read, as a container requiring
   itself is now.
@@ -107,9 +125,10 @@ To flesh out:
   containers that require it are left unstarted, and said, or started
   anyway.
 - Stopping in the reverse order, a container before what it requires.
-  The daemon's stop stops no jail (ruled 2026-11-05, Q-J1), so who
-  stops the containers when the host shuts down, and in that order, is
-  to be asked.
+  The daemon's stop stops no jail (ruled 2026-11-05, Q-J1); rc scripts
+  with KEYWORD: shutdown are stopped by rc.shutdown in rcorder's
+  reverse order, which would stop the containers at the host's
+  shutdown, each running its own rc.shutdown.
 - A roll of a required container: whether the jails of those that
   require it are stopped and started around its swap, or left
   running.

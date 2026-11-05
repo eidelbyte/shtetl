@@ -1233,3 +1233,24 @@ rc starts what rc.conf enables. The containers are to start in the
 order their dependencies give, a tree; that is future work, with the
 rest of what a container's `requires` is to mean
 (sprints/future-work.md).
+
+### 2026-11-05 (Q-H1: one house's failure at the start; rc scripts)
+
+Asked whether ZFS refusing one house as the daemon starts should stop
+the daemon's whole start, as built, or leave that house out (Q-H1),
+and told that what is left to refuse is a dataset's mount, unmount or
+destroy, the pool being the boot pool, the author answered:
+
+    for now just log one error in syslog and mount and start the
+    rest. in container dependency future work we'll have a tree of
+    dependencies.
+
+    oh, shit, we should have just used rc scripts shouldn't we. We'll
+    use those for the future work dependency tree for container
+    startup
+
+So a house ZFS refuses at the start is said once to syslog, "house H:
+why", and left out, failed, until the next start; every other house
+is mounted and started (built, H18, H19). The startup tree of the
+containers' dependencies is to be made of rc scripts, rcorder giving
+the order; that is future work (sprints/future-work.md).
