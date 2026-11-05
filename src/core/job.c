@@ -305,10 +305,23 @@ sh_job_run(struct sh_job *j, int kq)
 void
 sh_job_event(struct sh_job *j, int kq, const struct kevent *ev)
 {
-	if (ev->filter == EVFILT_READ)
-		job_read(j);
-	else
+	struct kevent d;
+
+	if (ev->filter != EVFILT_READ) {
 		job_exited(j, kq);
+		return;
+	}
+	job_read(j);
+	/*
+	 * Its end read, the output is watched no more: a pipe at its end
+	 * is ever readable, and the watch would be handed back at every
+	 * kevent until the exit, a spin for as long as a child that closed
+	 * its output lives on.
+	 */
+	if (ev->flags & EV_EOF) {
+		EV_SET(&d, ev->ident, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+		(void) kevent(kq, &d, 1, NULL, 0, NULL);
+	}
 }
 
 void

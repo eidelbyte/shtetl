@@ -506,6 +506,7 @@ there}; standard input; the job stopped while a child runs.
 | J15 | a forked call sending itself SIGTERM, the daemon ignoring it | "STEP: killed by signal 15" | tests/check_job.c |
 | J16 | stopped while a forked call runs, a child of its own under it | both killed, reaped, no end | tests/check_job.c |
 | J17 | stopped while a child runs, the kqueue used on after, the job's memory reused (a house's job, the houses started again) | the child's watch taken off the kqueue before it is killed: no event of its exit comes after | tests/check_job.c |
+| J18 | a child that closes its output and lives on (a forked call's exit tearing down a copy of the daemon is one, briefly) | the output's end handed once and its watch taken off, not handed at every kevent until the exit, a spin | tests/check_job.c |
 
 Mutations caught: the signals not put back (J11), no SIGTERM to a
 step's leftovers (J10). On FreeBSD, make check-freebsd (in the box run)

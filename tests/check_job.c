@@ -177,6 +177,25 @@ fork_leaves(struct sh_job *j, void *arg, struct sh_err *e)
 	return (0);
 }
 
+/*
+ * A forked call that says a line, then closes every descriptor it has,
+ * its output's every copy among them, and lives on a second.
+ */
+static int
+fork_quiet(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	int fd;
+
+	(void) j;
+	(void) arg;
+	(void) e;
+	(void) dprintf(1, "said\n");
+	for (fd = 0; fd < 256; fd++)
+		(void) close(fd);
+	(void) sleep(1);
+	return (0);
+}
+
 /* Whether the process PID is gone, waited for up to 5 s. */
 static int
 gone(pid_t pid)
@@ -383,6 +402,28 @@ main(void)
 		 * whose exit would come to the job after, reused
 		 */
 		CHECK(kevent(kq, NULL, 0, &ev, 1, &ts) == 0);
+	}
+	(void) close(kq);
+
+	/*
+	 * J18: a child that closes its output and lives on a second: the
+	 * output's end handed once, not at every kevent until the exit
+	 */
+	fresh();
+	sh_job_fork(&job, "quiet", fork_quiet, NULL);
+	CHECK((kq = kqueue()) >= 0);
+	sh_job_run(&job, kq);
+	{
+		struct timespec ts = { 20, 0 };
+		struct kevent ev;
+		int n = 0;
+
+		while (!ended) {
+			CHECK(kevent(kq, NULL, 0, &ev, 1, &ts) == 1);
+			sh_job_event(ev.udata, kq, &ev);
+			n++;
+		}
+		CHECK(n < 10 && strcmp(why, "(well)") == 0 && logged("said\n"));
 	}
 	(void) close(kq);
 
