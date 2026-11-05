@@ -10,7 +10,10 @@
  * the commands, each piece by /bin/sh -e; devfs unmounted and the
  * resolv.conf taken back. Every label and piece in the recipe's order,
  * but those of the layer CM_RAN, a house's foundation's, which ran when
- * the foundation was built (plan 5); no chroot where nothing is left.
+ * the foundation was built (plan 5), and in a house's roll those that
+ * CM_HAD, the house.conf of the version it rolls from, holds alike,
+ * the same text under the same key and label, which ran when that
+ * version was made (plan 7.2 step 4); no chroot where nothing is left.
  *
  * A failure part way leaves devfs mounted; sh_foundation_idle, which
  * every failure and every start runs, unmounts it.
@@ -27,6 +30,7 @@ struct sh_commands {
 	const char		*cm_name;	/* the foundation or house */
 	const char		*cm_kind;	/* foundation, container */
 	const char		*cm_ran;	/* the layer run, or NULL */
+	const struct sh_node	*cm_had;	/* a house.conf, or NULL */
 	const struct sh_recipe	*cm_recipe;	/* none for an upgrade */
 	const struct sh_node	*cm_pkgs;	/* the packages, or NULL */
 	const char		*cm_resolv;	/* the host's resolv.conf */

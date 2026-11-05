@@ -46,11 +46,25 @@ cm_cat(const char *a, const char *b)
 	return (cm_join(a, "", b));
 }
 
-/* Whether PR, a piece or a package, is of the layer that ran already. */
+/*
+ * Whether PR, a package or a piece of the label LABEL of KEY, ran
+ * already: of the layer CM_RAN; or a piece CM_HAD, a house.conf of a
+ * version before, holds with the same text under KEY's LABEL (m5-roll).
+ */
 static int
-ran(const struct sh_commands *cm, const struct sh_pair *pr)
+ran(const struct sh_commands *cm, const char *key, const char *label,
+    const struct sh_pair *pr)
 {
-	return (cm->cm_ran != NULL && strcmp(pr->pr_from, cm->cm_ran) == 0);
+	const struct sh_node *had;
+
+	if (cm->cm_ran != NULL && strcmp(pr->pr_from, cm->cm_ran) == 0)
+		return (1);
+	if (label == NULL)
+		return (0);
+	had = sh_obj_get(sh_obj_get(sh_obj_get(cm->cm_had, key), label),
+	    pr->pr_key);
+	return (had != NULL && had->sn_type == SH_STR &&
+	    strcmp(had->sn_str, pr->pr_val->sn_str) == 0);
 }
 
 /*
@@ -73,7 +87,8 @@ cm_pieces(struct sh_job *j, const struct sh_commands *cm, const char *key,
 		label = cmds->sn_obj.ob_v[i].pr_val;
 		step = cm_step(what, cmds->sn_obj.ob_v[i].pr_key);
 		for (k = 0; k < label->sn_obj.ob_n; k++) {
-			if (!ran(cm, &label->sn_obj.ob_v[k])) {
+			if (!ran(cm, key, cmds->sn_obj.ob_v[i].pr_key,
+			    &label->sn_obj.ob_v[k])) {
 				argv[nw] = label->sn_obj.ob_v[k].pr_val->sn_str;
 				sh_job_child(j, step, argv);
 			}
@@ -82,21 +97,26 @@ cm_pieces(struct sh_job *j, const struct sh_commands *cm, const char *key,
 	}
 }
 
-/* How many of OBJ's packages, or with PIECES its labels' pieces, run. */
+/*
+ * How many of OBJ's packages run, or with KEY the pieces of OBJ's
+ * labels, OBJ being the recipe's KEY.
+ */
 static size_t
-torun(const struct sh_commands *cm, const struct sh_node *obj, int pieces)
+torun(const struct sh_commands *cm, const struct sh_node *obj,
+    const char *key)
 {
 	const struct sh_node *label;
 	size_t i, k, n = 0;
 
 	for (i = 0; obj != NULL && i < obj->sn_obj.ob_n; i++) {
-		if (!pieces) {
-			n += !ran(cm, &obj->sn_obj.ob_v[i]);
+		if (key == NULL) {
+			n += !ran(cm, NULL, NULL, &obj->sn_obj.ob_v[i]);
 			continue;
 		}
 		label = obj->sn_obj.ob_v[i].pr_val;
 		for (k = 0; k < label->sn_obj.ob_n; k++)
-			n += !ran(cm, &label->sn_obj.ob_v[k]);
+			n += !ran(cm, key, obj->sn_obj.ob_v[i].pr_key,
+			    &label->sn_obj.ob_v[k]);
 	}
 	return (n);
 }
@@ -163,7 +183,7 @@ sh_commands_steps(struct sh_job *j, struct sh_commands *cm)
 	const struct sh_node *pkg = cm->cm_pkgs, *cmds = NULL;
 	const char **argv, *words[8];
 	char *root, *name, *kind, *dev;
-	size_t i, k, n = torun(cm, pkg, 0);
+	size_t i, k, n = torun(cm, pkg, NULL);
 
 	if (!cm->cm_upgrade) {
 		root = cm_cat("SHTETL_ROOT=", cm->cm_head);
@@ -182,7 +202,7 @@ sh_commands_steps(struct sh_job *j, struct sh_commands *cm)
 		free(kind);
 		cmds = sh_obj_get(cm->cm_recipe->sr_merged, "commands");
 	}
-	if (n == 0 && torun(cm, cmds, 1) == 0)
+	if (n == 0 && torun(cm, cmds, "commands") == 0)
 		return;
 	dev = sh_root_path(cm->cm_head, "dev");
 	words[0] = "mount";
@@ -204,7 +224,7 @@ sh_commands_steps(struct sh_job *j, struct sh_commands *cm)
 		argv[6] = "-y";
 		argv[7] = "--";
 		for (i = 0, k = 8; i < pkg->sn_obj.ob_n; i++) {
-			if (!ran(cm, &pkg->sn_obj.ob_v[i]))
+			if (!ran(cm, NULL, NULL, &pkg->sn_obj.ob_v[i]))
 				argv[k++] = pkg->sn_obj.ob_v[i].pr_key;
 		}
 		sh_job_child(j, "pkg", argv);
