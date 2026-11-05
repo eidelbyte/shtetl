@@ -237,3 +237,27 @@ Every cell of family W whose disposition is a unit program has passed
 on the mac and on FreeBSD. Owed to the box: W16, a real container
 rolled by the real zfs_rebase, and H20, a real devfs released, both
 m5-box's; m5-roll stays testing until they pass.
+
+## The box cells in build.sh
+
+W16 and H20 moved from m5-box into tests/box/build.sh (1410484), as
+V10 was for m5-save-pkg. After s2web's cells: s2app, a second
+container with a command piece and no package, made on box's newest
+version; box pkg-rolled, the beam carrying the new version to the
+run's copy; shtetl roll s2app with a piece that fails in the chroot
+(H20: stalled on the old version, said once, the new one destroyed
+with its devfs released, the old jail running again), then without it
+(W16: the real zfs_rebase carrying a file written in the jail and the
+command's motd.template onto the new version, placed and started, the
+update snapshot on every filesystem, no stall or record left, the
+copy unmounted, the old version pruned and the new on the lake once
+the beam converges, nothing in syslog).
+
+s2app has no package of its own on purpose: box's pkg roll writes
+var/db/pkg, and a container's pkg writes it too, so replaying s2web
+would likely stop at a conflict there, which is a derived file's and
+m5-derivations' to answer. zfs_rebase clears every zfs_rebase:
+property when a run is done (zfs_rebase_tool src/zfsops.h), so the
+tag marks only open runs, as the undo's aborts assume.
+
+Owed: the next build run.
