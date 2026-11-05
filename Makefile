@@ -73,9 +73,10 @@ CORE_OBJS = $(LANG_OBJS) $(BUILD)/spaces.o $(BUILD)/wire.o \
 # src/core/zfs.h has two implementations, picked at the link: the
 # FreeBSD layer over libzfs, and tests/zfake.c for the tests. The mac
 # has no ZFS to link a program against, so the portable flavor
-# compiles the program's objects and links only the tests.
-ZFS_OBJS = $(BUILD)/fbsd_zfs.o
-TEST_OBJS = $(BUILD)/zfake.o $(BUILD)/zcells.o
+# compiles the program's objects and links only the tests. So has
+# src/core/rebase.h: zfs_rebase run, and tests/rbfake.c.
+ZFS_OBJS = $(BUILD)/fbsd_zfs.o $(BUILD)/fbsd_rebase.o
+TEST_OBJS = $(BUILD)/zfake.o $(BUILD)/zcells.o $(BUILD)/rbfake.o
 SHTETL_OBJS = $(BUILD)/main.o $(CORE_OBJS)
 TESTS = check_mem check_zfs check_spaces check_daemon check_foundation \
 	check_parse check_schema check_site check_cascade check_show \
@@ -188,6 +189,12 @@ $(BUILD)/fbsd_zfs.o: src/fbsd/zfs.c src/core/zfs.h src/core/err.h \
 $(BUILD)/zfake.o: tests/zfake.c tests/zfake.h src/core/zfs.h \
 	src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ tests/zfake.c
+$(BUILD)/fbsd_rebase.o: src/fbsd/rebase.c src/core/rebase.h \
+	src/core/job.h src/core/mem.h
+	$(CC) $(CFLAGS) -c -o $@ src/fbsd/rebase.c
+$(BUILD)/rbfake.o: tests/rbfake.c tests/rbfake.h src/core/rebase.h \
+	src/core/err.h src/core/job.h src/core/mem.h src/core/zfs.h
+	$(CC) $(CFLAGS) -Itests -c -o $@ tests/rbfake.c
 $(BUILD)/zcells.o: tests/zcells.c tests/zcells.h src/core/zfs.h \
 	src/core/err.h
 	$(CC) $(CFLAGS) -c -o $@ tests/zcells.c
