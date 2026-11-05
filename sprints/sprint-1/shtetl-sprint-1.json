@@ -714,7 +714,8 @@
     ],
     "provides": "shtetl save H and shtetl pkg H: snapshots of the active version, kinds save and pkg.",
     "estimated_size": "small",
-    "completed": "not-started"
+    "completed": "testing",
+    "note": "2026-11-05: built. shtetl save H (snapshot -r, <date>-save, kind save, the beam told); shtetl pkg H (its own packages, house.conf's less foundation.conf's, read from the create/update snapshot, pkg -j H upgrade -y --; none, no pkg; then kind pkg, the beam told); refusals by state; one namespace (create 'H: a foundation', roll 'F: a house', pkg either). Ruled 2026-11-05: its own packages; one namespace. Beyond: a create's end tells the beam; no save message. check_house V1-V6/V9, check_daemon V7/V8; ten mutants caught. Owed: run.sh, build.sh V10 (8fa0197). Worklog issue-docs/m5-save-pkg.md."
   },
   "m5-roll": {
     "description": "The house roll (plan 7.2, 7.3, probes P5, P6): the nine steps in one sequence. The replay runs zfs_rebase as a watched child: the clone form onto the foundation version, the result placed (readonly off, its own path, mounted), then a dataset form a save with -u -b and the pre-apply snapshot named for the previous save, -m always, at most roll.depth saves; each dataset that came from the foundation, parent first; the house's own datasets cloned from the final save. The update snapshot -r last; the swap unmounts the active version, puts its mountpoint back, sets the new one's to /containers/<house>; start. A failure or conflict in steps 3 to 7 aborts any open zfs_rebase run, destroys the new version, starts the active one again, and sets shtetl:stall. A crash: an incomplete version destroyed and the roll run again; a complete one not mounted is a swap left undone, done. Then the prune. A fake rebaser beside the fake ZFS (as main's tests/rbfake.c). Kill tests at every step. Verify: make check; m5-box.",
