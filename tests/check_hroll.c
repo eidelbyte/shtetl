@@ -1135,6 +1135,44 @@ main(void)
 	    is(cap_text(&sys), ""));
 	relay_vn = NULL;
 
+	/*
+	 * Q11: web frozen, V2 waiting: stalled "frozen" on its active
+	 * version, nothing said; not taken at an ask, nor after a start;
+	 * shtetl roll web lifts it and rolls
+	 */
+	made();
+	next();
+	CHECK(sh_house_freeze(house("web"), &c.c_err) == 0);
+	CHECK(is(status(), "house web stalled frozen\n") &&
+	    is(user(OLD, "shtetl:stall"), "frozen") && is(cap_text(&sys), ""));
+	converged();
+	restart();
+	CHECK(is(settle(), "house web stalled frozen\n"));
+	CHECK(roll() == 0 && is(settle(), "house web active "
+	    "15.1-releng-U-web\n") && is(user(OLD, "shtetl:stall"), "(unset)"));
+
+	/*
+	 * Q12: refused while rolling, "web: rolling"; a house stalled
+	 * already, frozen again, its stall replaced
+	 */
+	made();
+	next();
+	CHECK(roll() == 0);
+	cap_reset(&c);
+	CHECK(sh_house_freeze(house("web"), &c.c_err) == -1 &&
+	    is(cap_text(&c), "web: rolling\n"));
+	CHECK(is(settle(), "house web active 15.1-releng-U-web\n"));
+	made();
+	next();
+	snap_at(OLD, 0, cr, sizeof (cr));
+	(void) snprintf(l[0], sizeof (l[0]), NEW "@%s", cr);
+	rbfake_end(l[0], 1);
+	CHECK(roll() == 0 && is(settle(), "house web stalled replay: "
+	    "exited 1\n"));
+	CHECK(sh_house_freeze(house("web"), &c.c_err) == 0 &&
+	    is(status(), "house web stalled frozen\n") &&
+	    is(user(OLD, "shtetl:stall"), "frozen"));
+
 	sh_houses_free(hs, nh);
 	(void) close(env.he_kq);
 	sh_zfs_close(z);

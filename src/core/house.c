@@ -1975,8 +1975,8 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 }
 
 /*
- * A roll of H, active, begun onto the next version waiting (roll_next),
- * its stall cleared: 0; 1 where none waits; -1 said to E.
+ * A roll of H, active, begun onto the next version waiting (roll_next):
+ * 0; 1 where none waits; -1 said to E.
  */
 static int
 roll_begin(struct sh_house ***hp, size_t *np, struct sh_house *h,
@@ -1998,15 +1998,10 @@ roll_begin(struct sh_house ***hp, size_t *np, struct sh_house *h,
 		return (-1);
 	}
 	r->hr_repos = sh_site_repos(&r->hr_site);
-	/* shtetl roll H clears the stall (plan 7.4) */
-	if ((rc = roll_next(r, e)) != 0 || (h->h_stall != NULL &&
-	    sh_zfs_inherit(env->he_z, h->h_active, "shtetl:stall", e) != 0) ||
-	    house_log(h, "a", e) != 0) {
+	if ((rc = roll_next(r, e)) != 0 || house_log(h, "a", e) != 0) {
 		roll_free(r);
 		return (rc == 1 ? 1 : -1);
 	}
-	free(h->h_stall);
-	h->h_stall = NULL;
 	h->h_state = SH_H_ROLLING;
 	h->h_roll = r;
 	sh_job_init(&h->h_job, h->h_log, roll_end, r);
@@ -2026,9 +2021,28 @@ sh_house_roll(struct sh_house ***hp, size_t *np, struct sh_house *h,
 
 	if (busy(h, e) != 0)
 		return (-1);
+	/* any stall lifted first, a freeze among them (plan 7.4) */
+	if (h->h_stall != NULL) {
+		if (sh_zfs_inherit(h->h_env->he_z, h->h_active, "shtetl:stall",
+		    e) != 0)
+			return (-1);
+		free(h->h_stall);
+		h->h_stall = NULL;
+	}
 	if ((rc = roll_begin(hp, np, h, config, e)) == 1)
 		sh_errf(e, "%s: up to date", h->h_name);
 	return (rc == 0 ? 0 : -1);
+}
+
+int
+sh_house_freeze(struct sh_house *h, struct sh_err *e)
+{
+	if (busy(h, e) != 0 || sh_zfs_set(h->h_env->he_z, h->h_active,
+	    "shtetl:stall", "frozen", e) != 0)
+		return (-1);
+	free(h->h_stall);
+	h->h_stall = sh_strdup("frozen");
+	return (0);
 }
 
 void

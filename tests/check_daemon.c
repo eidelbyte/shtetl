@@ -25,6 +25,7 @@
 static const char usage[] =
 	"usage: shtetl daemon\n"
 	"       shtetl create CONTAINER --on FOUNDATION\n"
+	"       shtetl freeze CONTAINER\n"
 	"       shtetl pkg CONTAINER|FOUNDATION\n"
 	"       shtetl roll CONTAINER|FOUNDATION\n"
 	"       shtetl save CONTAINER\n"
@@ -243,6 +244,9 @@ main(void)
 	char *savenope[] = { "save", "nope" };
 	char *saveweb[] = { "save", "web" };
 	char *pkgweb[] = { "pkg", "web" };
+	char *freeze[] = { "freeze" };
+	char *freezegen[] = { "freeze", "generic" };
+	char *freezeweb[] = { "freeze", "web" };
 	static const struct sh_zprop house[] = {
 		{ "shtetl:house", "web" }, { "canmount", "noauto" }
 	};
@@ -543,6 +547,22 @@ main(void)
 	    0);
 	CHECK((p = slurp(scratch_path("fake.log"))) != NULL &&
 	    strstr(p, "pkg -j web upgrade -y -- nginx\n") != NULL);
+
+	/*
+	 * Q12, Q11: freeze's words, a foundation's name no house's; web
+	 * frozen, the reply at once and empty, stalled in status; shtetl
+	 * roll web lifts it though nothing waits for web, "up to date"
+	 */
+	CHECK(sht(1, freeze) == 2 && strcmp(ebuf, usage) == 0);
+	CHECK(sht(2, freezegen) == 1 &&
+	    strcmp(ebuf, "shtetl: generic: no such house\n") == 0);
+	CHECK(sht(2, freezeweb) == 0 && strcmp(obuf, "") == 0 &&
+	    strcmp(ebuf, "") == 0);
+	CHECK(status() == 0 &&
+	    strstr(obuf, "house web stalled frozen\n") != NULL);
+	CHECK(sht(2, rollweb) == 1 &&
+	    strcmp(ebuf, "shtetl: web: up to date\n") == 0);
+	CHECK(status() == 0 && strcmp(obuf, want) == 0);
 
 	/* D10: SIGTERM: exit 0, the socket gone */
 	CHECK(down() == 0);

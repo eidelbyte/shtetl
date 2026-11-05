@@ -69,6 +69,7 @@ struct daemon {
 static const char usage[] =
 	"usage: shtetl daemon\n"
 	"       shtetl create CONTAINER --on FOUNDATION\n"
+	"       shtetl freeze CONTAINER\n"
 	"       shtetl pkg CONTAINER|FOUNDATION\n"
 	"       shtetl roll CONTAINER|FOUNDATION\n"
 	"       shtetl save CONTAINER\n"
@@ -257,6 +258,25 @@ act_pkg(struct daemon *d, int argc, char **argv, FILE *out,
 	return (1);
 }
 
+/* shtetl freeze CONTAINER: the house pinned where it is (plan 7.2) */
+static int
+act_freeze(struct daemon *d, int argc, char **argv, FILE *out,
+    struct sh_err *e)
+{
+	struct sh_house *h;
+
+	(void) out;
+	if (argc != 2) {
+		(void) fputs(usage, e->se_out);
+		return (2);
+	}
+	if ((h = house_named(d, argv[1])) == NULL) {
+		sh_errf(e, "%s: no such house", argv[1]);
+		return (1);
+	}
+	return (sh_house_freeze(h, e) != 0);
+}
+
 /* shtetl save CONTAINER: the house's active version saved */
 static int
 act_save(struct daemon *d, int argc, char **argv, FILE *out,
@@ -298,6 +318,7 @@ static const struct {
 			    struct sh_err *);
 } acts[] = {
 	{ "create", act_create },
+	{ "freeze", act_freeze },
 	{ "pkg", act_pkg },
 	{ "roll", act_roll },
 	{ "save", act_save },

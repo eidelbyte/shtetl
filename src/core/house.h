@@ -139,8 +139,8 @@ int sh_house_pkg(struct sh_house *h, struct sh_err *e);
  * holds (plan 7.2, tests/MATRIX.md families W and Q): the oldest newer
  * than its active version's origin that has arrived, the copy's top
  * snapshot holding shtetl:kind, and whose shtetl:branch H's ver allows,
- * its recipe resolved from CONFIG as it is now. Its stall cleared, then
- * a job of the
+ * its recipe resolved from CONFIG as it is now. Its stall lifted first,
+ * a freeze among them, whether one waits or not; then a job of the
  * steps: the jail stopped; the final save; the copy mounted; the
  * replay into the new version, named as a create names one; its own
  * datasets cloned from the final save; what its recipe gained, read
@@ -168,6 +168,14 @@ int sh_house_roll(struct sh_house ***hp, size_t *np, struct sh_house *h,
  */
 void sh_house_next(struct sh_house ***hp, size_t *np, struct sh_house *h,
     const char *config);
+
+/*
+ * H pinned to the version it is on, as shtetl freeze H asks (plan 7.2,
+ * ruled 2026-10-19): a stall the person sets, shtetl:stall "frozen" on
+ * its active version, a stall it had replaced; not taken by the queue
+ * until shtetl roll H lifts it. Refused, said to E, as a save is.
+ */
+int sh_house_freeze(struct sh_house *h, struct sh_err *e);
 
 /* H's line of shtetl status. */
 void sh_house_status(const struct sh_house *h, FILE *out);
