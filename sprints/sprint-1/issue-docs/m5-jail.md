@@ -221,7 +221,7 @@ gone before R9's restart.
 ## Q-H1: a house left out
 
 Ruled 2026-11-05 (plan 18): "for now just log one error in syslog and
-mount and start the rest". Built in ef75504, m5-create's
+mount and start the rest". Built in 0eefacb, m5-create's
 sh_houses_start changed for it:
 
 - Each house's steps report through a sink of its own, the daemon's
@@ -245,3 +245,24 @@ The startup tree of `requires` is to be rc scripts (ruled the same
 day), future work: sprints/future-work.md, Container dependencies,
 which also notes rc.shutdown stopping such scripts in reverse at the
 host's shutdown, and jail(8)'s own depend parameter, to weigh.
+
+## Box run 12 and build run 10
+
+Both at the altroot's fix, before Q-H1's change:
+
+- Box run 12: run.sh at dd62ddb (results 7f18b3c): 140 ok, 0 failed,
+  box run 11's 139 and Z22. Z21 exact and Z22 over libzfs, on the
+  box's pools with their altroot: what sh_zfs_native reads of a
+  mountpoint is what sh_zfs_set takes. One cut send's warning came
+  out in the middle of Z15's line, stderr and stdout meeting; the line
+  is ok.
+- Build run 10: build.sh at 7f18b3c (results 72b84e4): 63 ok, 0
+  failed. H17 placed at the run's containers/s2web, the altroot once;
+  N17 all, the real jail from the block at that path, devfs, jexec,
+  pkg -j, jail -r; N15, the daemon stopped and the jail running on;
+  N14, the daemon started again, the same jail, devfs once, nothing in
+  syslog. Syslog held the R6 stall's line alone.
+
+Tested: m5-jail's every cell has passed where its disposition says.
+Q-H1's change (0eefacb) came after both runs; its cells, H18 and H19,
+are check_house's, and the next run.sh runs them on FreeBSD.

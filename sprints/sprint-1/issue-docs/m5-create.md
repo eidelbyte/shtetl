@@ -164,3 +164,14 @@ which the jail's path comes from. Z21's helper had cut everything
 before "/zc-" off, which hid it on the box; it compares exactly now,
 and Z22 sets a mountpoint back as native read it. house.c needed no
 change. Owed: run.sh, Z21 and Z22 over libzfs.
+
+## Box run 12 and build run 10
+
+Box run 12 (run.sh at dd62ddb, results 7f18b3c), 140 ok, 0 failed: Z21
+exact and Z22 over libzfs, on pools with an altroot. Build run 10
+(build.sh at 7f18b3c, results 72b84e4), 63 ok, 0 failed: H17, s2web
+made on box, the run's copy pulled whole, placed at the run's
+containers/s2web. Tested. The houses' start was changed after both
+for Q-H1 (0eefacb, m5-jail's worklog): one house ZFS refuses is said
+and left out, the rest started; H18 and H19 run on FreeBSD at the
+next run.sh.
