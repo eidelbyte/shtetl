@@ -115,3 +115,14 @@ c8ece8b (matrix, rulings), a2d675b (save, pkg, the daemon), 8fa0197
 - Owed: the next build run, for V10 with its cells mended; what it
   will show that this run could not is that pkg ran, jq being s2web's
   own.
+
+## Build run 12
+
+Build run 12: build.sh at a1a2f31 (results d22b33c): 69 ok, 0 failed.
+V10 all six: the save on every filesystem and on the lake's copy;
+s2web active again after shtetl pkg, the pkg snapshot on every
+filesystem; pkg's the last step line in s2web.log, so pkg -j ran,
+jq being s2web's own and tree the foundation's; nothing in syslog.
+Every other cell as before; syslog held the R6 stall's line alone.
+
+Tested: every cell of family V has passed where its disposition says.
