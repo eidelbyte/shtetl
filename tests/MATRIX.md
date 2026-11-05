@@ -1018,3 +1018,44 @@ log, the sink}.
 | N16 | a name of digits only | refused: "containers/123: invalid recipe name: digits only", create's "123: invalid name: digits only", a requires entry | tests/check_cascade.c, tests/check_daemon.c, tests/check_schema.c |
 | N17 | the box: a real jail from the block | made, at the version's path, with the recipe's jailconf; devfs at path/dev; jexec H and pkg -j H reach it; jail -r takes the jail and devfs away | tests/box/build.sh |
 | N18 | the fake keeping files (zfake_files) | a snapshot of a mounted filesystem shows its files, not a child's, at MOUNT/.zfs/snapshot/SNAP; a mounted filesystem a mountpoint set moves takes its files along | tests/check_house.c, through N7, N8, N10; the real ones held on the box by I12, I14 and Z20 |
+
+## Family V: a house's saves and pkg upgrades (m5-save-pkg)
+
+Plan 7.1: while a version is active, its snapshots after the create
+or update snapshot are its saves and pkg upgrades, linear. `shtetl
+save H` snapshots the active version -r, `<date>-save`, kind save.
+`shtetl pkg H` upgrades the container's own packages in its running
+jail, `pkg -j H upgrade -y --` with them, and then snapshots it the
+same way, kind pkg. Its own packages are those its house.conf lists
+less those its foundation.conf lists (ruled 2026-11-05): the
+foundation's are the foundation's pkg roll's, reaching the container
+when it rolls; both files are read from the version's create or
+update snapshot, through the dataset holding var/db/shtetl, as the
+jail's block is. A container with none of its own runs no pkg, since
+pkg upgrade with no names upgrades everything, and is snapshotted all
+the same, as a foundation's pkg roll with none listed is. Each
+snapshot is told to the beam, which carries it to the lake. A house
+and a foundation never share a name (ruled 2026-11-05): `shtetl
+create H` refuses a foundation's name, `shtetl roll F` a house's, and
+`shtetl pkg NAME` is the house's or the foundation's, whichever it
+names.
+
+Dimensions: the act {save, pkg}; the house {active, creating,
+starting, upgrading, failed, not there}; its own packages {some, a
+package both files list, none}; what fails {pkg, the snapshot, a
+file not in the snapshot}; a name {a house's, a foundation's, both
+asked, neither}; what is told {the beam, status, the sink, the
+reply}.
+
+| cell | what | expected | disposition |
+|------|------|----------|-------------|
+| V1 | shtetl save H, H active | the active version's every dataset snapshotted at once, `<date>-save`, kind save; the reply empty; the beam told | tests/check_house.c, tests/check_daemon.c |
+| V2 | save or pkg of a house not active, or not there | "H: creating", "H: starting", "H: upgrading", "H: failed"; save "H: no such house"; nothing taken | tests/check_house.c, tests/check_daemon.c |
+| V3 | save refused by ZFS | the snapshot's words in the reply; the house active | tests/check_house.c |
+| V4 | shtetl pkg H, packages of its own, one also the foundation's | house.conf and foundation.conf read from the create or update snapshot; `env ASSUME_ALWAYS_YES=yes pkg -j H upgrade -y --` its own, not the foundation's; then the snapshot, kind pkg; "house H upgrading STEP" meanwhile; the beam told | tests/check_house.c |
+| V5 | shtetl pkg H, none of its own | no pkg run; the snapshot taken, kind pkg | tests/check_house.c |
+| V6 | pkg failing; a file not in the snapshot | said once, "house H: pkg: exited 1", "house H: packages: why"; no snapshot; the house active | tests/check_house.c |
+| V7 | one namespace | create of a foundation's name "H: a foundation"; roll of a house's name "F: a house"; pkg NAME the house's where a house, the foundation's where a foundation, "NAME: no such house or foundation" where neither | tests/check_daemon.c |
+| V8 | the daemon's verbs | shtetl save H, shtetl pkg H in the usage; the reply at once, pkg the daemon's | tests/check_daemon.c |
+| V9 | a create's end | the beam told, so the new version reaches the lake without waiting for the next convergence | tests/check_house.c |
+| V10 | the box: save and pkg of a real container | kinds save and pkg on its every dataset; the save beamed to the lake; pkg -j upgraded its own package in the running jail, its log saying so | tests/box/build.sh |

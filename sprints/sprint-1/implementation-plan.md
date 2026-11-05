@@ -1254,3 +1254,26 @@ why", and left out, failed, until the next start; every other house
 is mounted and started (built, H18, H19). The startup tree of the
 containers' dependencies is to be made of rc scripts, rcorder giving
 the order; that is future work (sprints/future-work.md).
+
+### 2026-11-05 (a house's packages; one namespace)
+
+Asked, as m5-save-pkg began, which packages `shtetl pkg H` upgrades
+and how the verbs tell a house from a foundation of the same name,
+the author chose, of the options given:
+
+    Only its own (Recommended): the packages the container's
+    house.conf lists, less those its foundation.conf lists. The
+    foundation's packages are upgraded by the foundation's pkg roll
+    and reach the container when it rolls onto that version, so the
+    two never upgrade the same package.
+
+    One namespace (Recommended): a house and a foundation never share
+    a name: `shtetl create H` refuses a name a foundation has, and a
+    foundation's first roll refuses a house's name. Each verb then
+    finds exactly one thing.
+
+So a house's pkg upgrade is its own packages, read, as a foundation's
+pkg roll reads its list, from what the version shipped: house.conf
+and foundation.conf in its create or update snapshot. And a name
+names one house or one foundation, never both; `shtetl pkg NAME` and,
+from m5-roll, `shtetl roll NAME` act on whichever it is.
