@@ -186,3 +186,75 @@ house), d2859f2 (the daemon and the command), 22b6393 (W18), 4c4e04d
 Owed: build.sh to freeze s2web after its cells and s2app until its own
 rolls; one roll at a time on a foundation's copy, once the VM's
 build.sh shows zfs_rebase's words for the failure; build.sh again.
+
+## Build runs 16 and 17, the attended roll, box run 17: the dev VM
+
+From here the dev VM, shtetl-dev, stands for the box (the author,
+2026-11-06: "we can just trust the vm"): the same FreeBSD 15.1 and
+zfs-2.4.2 build. Each script runs there with SEND=no and its log is
+copied here. The run.sh above at 9594a87 is results 76cb1d5.
+
+- Build run 16: build.sh at 3d49fa6, before build.sh's freezes and
+  Q20 (results f3ca27d): 93 ok, 1 failed, build run 15 again. W16's
+  "no stall left" found s2web's stall; syslog held s2web "replay:
+  exited 1" and s2app "replay: exited 3" in the same second. s2app's
+  log gave zfs_rebase's words, "verify: base: /usr/bin/factor: read:
+  Input/output error": its base snapshot's .zfs view unmounted under
+  it when s2web's undo released its holds. That confirmed the cause,
+  and 0a178b8 (build.sh freezes s2web after its cells and s2app until
+  H20's roll) and 8106ed6 (Q20, one roll at a time on a copy) fixed
+  it.
+- Build run 17: build.sh at f3ca27d (results af07912): 95 ok, 0
+  failed. Q11 (s2web frozen), Q19 (s2app rolled by the queue, the one
+  roll it makes), H20 and W16 all passed; syslog held only R6's patch
+  line and H20's piece line, both expected.
+- The attended roll, by hand in the VM through tmux, the pane the
+  person's terminal (TERM tmux-256color). The first try, at af07912,
+  reached the picker, which refused at once: "zfs_rebase-picker: the
+  picker needs TERM set to the terminal's type", exit 1, s2app stalled
+  "picker: exited 1". The command sent its terminal's descriptors but
+  not its type, and the daemon's job had no TERM to give. 9677824
+  fixed that: the command sends its TERM as a record of its own, t,
+  and the picker's step runs with it; with none sent, the step has no
+  TERM at all, never the daemon's (J20, D28).
+- At 9677824, rolled: shtetl roll s2app from the pane. The picker
+  opened with s2app's one conflict, /etc/motd.template changed on both
+  sides (s2app's command against box's shtetl-box-2). Answered o and
+  written with w, the roll went on: exit 0, s2app active on
+  15.1-releng-2026-11-06T06_57_05Z-s2app with box's motd, nothing in
+  syslog, the pane's modes sane after.
+- At 9677824, stopped: shtetl roll s2web, frozen since build run 17,
+  the roll lifting the freeze. The picker opened on
+  /var/db/pkg/local.sqlite changed on both sides, s2web's jq against
+  box's pkg rolls (m5-derivations' case). ^C in the pane: the command
+  half-closed its socket and the daemon sent the picker SIGTERM
+  ("zfs_rebase: stopped by SIGTERM while the editor ran"); zfs_rebase
+  ended 1 and the roll was undone in W18's order, the old jail started
+  first, then the abort destroyed the new root and zfs_rebase's
+  records. The command printed "shtetl: s2web: stalled picker: exited
+  1" and exited 1; syslog held one line, "house s2web: picker: exited
+  1"; the pane's modes were sane (icanon isig echo), the cursor shown.
+- The real zfs_rebase catches SIGTERM and exits 1, so on the box a
+  picker ended by a hang-up stalls "picker: exited 1", where
+  check_hroll's fake says "killed by signal 15".
+- zfs_rebase's closing advice reaches the person's terminal and is
+  wrong for a shtetl roll: "place it with zfs inherit mountpoint" when
+  shtetl places it next, "continue with: zfs_rebase -c ... -i" when
+  shtetl aborts the run next. Asked as Q-A1 (open-questions.md).
+- Box run 17: run.sh at 9677824 (results 37314ef): 143 ok, 0 failed,
+  check_job's J20 and check_daemon's D28 among the unit programs on
+  FreeBSD.
+- At 9677824, the command gone: shtetl roll s2web again, the same
+  conflict, and the command sent SIGKILL while the picker waited (it
+  died "Killed", 137, with no half-close and no modes put back). The
+  daemon read the connection's end as the hang-up and sent the picker
+  SIGTERM (zfs_rebase's same "stopped by SIGTERM" line); s2web stalled
+  "picker: exited 1", syslog one line; the pane's modes sane, the
+  picker's own teardown having put them back.
+- The VM left clean: the daemon stopped, s2web and s2app removed, the
+  pool s2box exported.
+
+Nothing of m5-queue is owed now but Q-A1's ruling. What "Not held on
+the mac" above owed to the box, a half-close and a command's going
+reaching a picker under way, the picker in a person's terminal and
+the modes put back, is held by the three rolls above.
