@@ -1,0 +1,331 @@
+shtetl f3ca27d build on shtetl-dev 2026-11-06T05:55:11Z
+host: 15.1-RELEASE amd64
+branch: releng/15.1 from https://git.freebsd.org/src.git
+
+# make -C /home/claude/shtetl install
+install -d /usr/local/sbin /usr/local/etc/rc.d
+install -m 0555 shtetl /usr/local/sbin/shtetl
+install -m 0555 etc/rc.d/shtetl /usr/local/etc/rc.d/shtetl
+# zpool import -d /var/tmp -R /var/tmp/s2box s2box
+# zfs destroy -r s2box/lake/containers/15.1-releng-2026-11-06T04_29_29Z-s2web
+# zfs destroy -r s2box/lake/containers/15.1-releng-2026-11-06T04_32_00Z-s2app
+# zfs destroy -r s2box/lake/containers/15.1-releng-2026-11-06T04_33_05Z-s2app
+# zfs destroy -r s2box/lake/containers/S2
+# zfs destroy -r s2box/lake/containers/S3
+# zfs destroy -r s2box/run/containers/15.1-releng-2026-11-06T04_29_29Z-s2web
+# zfs destroy -r s2box/run/containers/15.1-releng-2026-11-06T04_33_05Z-s2app
+# zfs destroy -r s2box/run/foundations/box
+# zfs destroy -r s2box/lake/foundations/box
+# rm -rf /var/tmp/s2box/config/foundations /var/tmp/s2box/config/containers /var/tmp/s2box/config/patches /var/tmp/s2box/config/shtetl.conf
+# mkdir -p /var/tmp/s2box/config/foundations /var/tmp/s2box/config/containers /var/tmp/s2box/config/patches/local
+# service shtetl onestart
+Starting shtetl.
+ok   R1 a create roll (F17, GS10)
+ok   R2 every dataset snapshotted, kind create
+ok   R2 shtetl:commit the checkout's
+ok   R2 usr a placeholder
+ok   R2 box and usr/local canmount noauto, set there
+ok   R2 its log: the build's step, the version
+ok   R3 a world and a kernel (K19)
+ok   R3 the package, in usr/local (X9)
+ok   R3 the command run in the chroot
+ok   R3 no resolv.conf left
+ok   R4 foundation.conf schg (F18)
+ok   R4 the head unmounted
+ok   P24 no house: no copy of box on the run
+# zfs send s2box/lake/foundations/box@15.1-releng-2026-11-06T05_56_29Z-create | zfs receive -u -o canmount=noauto 		    s2box/run/foundations/box@15.1-releng-2026-11-06T05_56_29Z-create
+# zfs send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_56_29Z-create | zfs receive -u -o canmount=noauto 		    s2box/run/foundations/box/usr@15.1-releng-2026-11-06T05_56_29Z-create
+# zfs send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_56_29Z-create | zfs receive -u -o canmount=noauto 		    s2box/run/foundations/box/usr/local@15.1-releng-2026-11-06T05_56_29Z-create
+# zfs clone -o shtetl:house=standin -o canmount=noauto s2box/run/foundations/box@15.1-releng-2026-11-06T05_56_29Z-create s2box/run/containers/S1
+# zfs snapshot -o shtetl:kind=create s2box/run/containers/S1@c1
+ok   R5 an update roll
+ok   R5 kind update
+ok   B28 converged
+ok   B28 box's update beamed onto its copy
+ok   B28 S1 on the lake, a clone of box's first version
+ok   B28 arrived: its kind there, canmount=noauto set there
+ok   P24 S1 the only version: kept; box's versions all kept
+# zfs clone -o shtetl:house=standin -o canmount=noauto s2box/run/foundations/box@15.1-releng-2026-11-06T05_57_57Z-update s2box/run/containers/S2
+# zfs mount s2box/run/containers/S2
+# dd if=/dev/random of=/var/tmp/s2box/containers/S2/fill 		    bs=64k count=128 2>/dev/null
+# zfs unmount s2box/run/containers/S2
+# zfs snapshot -o shtetl:kind=update s2box/run/containers/S2@c2
+# zfs send -i s2box/run/foundations/box@15.1-releng-2026-11-06T05_57_57Z-update s2box/run/containers/S2@c2 | head -c 1048576 |
+	    zfs receive -s -u -o origin=s2box/lake/foundations/box@15.1-releng-2026-11-06T05_57_57Z-update s2box/lake/containers/S2@c2 2>/dev/null
+warning: cannot send 's2box/run/containers/S2@c2': signal received
+-> exit 1
+ok   B28 S2's stream cut: a receive to resume on the lake
+# sed -i  1s/.*/shtetl box a/ /var/tmp/s2box/build/src/README.md
+# git -C /var/tmp/s2box/build/src checkout -q README.md
+# sed -i  1s/.*/shtetl box b/ /var/tmp/s2box/build/src/README.md
+# git -C /var/tmp/s2box/build/src checkout -q README.md
+ok   R6 a conflict: stalled
+ok   R6 shtetl:stall
+ok   R6 at its newest version still
+ok   R6 zbuild reset
+# rm /var/tmp/s2box/config/patches/local/2-b.patch
+ok   R7 asked again: the stall cleared, rolled
+ok   R7 the patch in the checkout
+ok   R7 no stall
+ok   B28 converged
+ok   B28 S2's receive resumed: no token, S2 there whole
+ok   B28 the resume in beam.log
+ok   P24 the run: S2 alone, S1 pruned
+ok   P24 box's first version gone from the run, kept on the lake
+ok   P24 the lake: S1 and S2
+# zfs clone -o shtetl:house=standin -o canmount=noauto s2box/run/foundations/box@15.1-releng-2026-11-06T05_59_57Z-update s2box/run/containers/S3
+# zfs snapshot -o shtetl:kind=update s2box/run/containers/S3@c3
+ok   R8 a pkg roll
+ok   R8 kind pkg, the version's commit
+ok   P24 converged
+ok   P24 the run: S3 alone; the lake: S2 and S3
+ok   P24 box's first version gone from both spaces
+ok   P24 its update: on the lake for S2, gone from the run
+ok   P24 S3's version and the pkg on both
+ok   P24 each pruned in beam.log
+# zfs destroy -r s2box/run/containers/S3
+# /usr/local/sbin/shtetl roll box
+# service shtetl onestop
+Stopping shtetl.
+Waiting for PIDS: 94217.
+ok   R9 stopped: devfs left on the head
+ok   R9 and the roll's marker in it
+# service shtetl onestart
+Starting shtetl.
+ok   R9 started again: idle at the newest, no stall
+ok   R9 devfs gone
+ok   R9 the head unmounted
+ok   R9 what the roll wrote gone
+ok   R10 syslog: one line, the stall
+ok   H17 nothing on the run relies on box: no copy of it there
+# /usr/local/sbin/shtetl create s2web --on box
+ok   H17 s2web made on box, active
+ok   H17 its root a clone of box's copy at that version
+ok   H17 placed at the run's containers/s2web
+ok   N17 the block: the version's path, the recipe's jailconf
+ok   N17 the jail runs at that path
+ok   N17 devfs at its dev
+ok   N17 jexec reaches it: what the chroot's command wrote
+ok   N17 pkg -j reaches it: the foundation's package
+# /usr/local/sbin/shtetl save s2web
+ok   V10 saved: every filesystem, kind save
+ok   V10 the save beamed to the lake
+# /usr/local/sbin/shtetl pkg s2web
+ok   V10 upgraded: active again
+ok   V10 every filesystem, kind pkg
+ok   V10 pkg -j ran, its own package to upgrade
+ok   V10 syslog: nothing of the save's or the pkg's
+# service shtetl onestop
+Stopping shtetl.
+Waiting for PIDS: 14081.
+ok   N15 the daemon stopped: the jail runs on
+# service shtetl onestart
+Starting shtetl.
+ok   N14 started again: active
+ok   N14 the same jail, devfs mounted there once
+ok   N14 syslog: nothing from the daemon's stop and start
+# jail -f /etc/jail.conf.d/s2web.conf -r s2web
+Stopping cron.
+Waiting for PIDS: 14480.
+.
+Terminated
+s2web: removed
+ok   N17 jail -r: the jail gone, and its devfs
+# /usr/local/sbin/shtetl freeze s2web
+ok   Q11 s2web frozen
+ok   W16 zfs_rebase where the daemon's PATH finds it
+# /usr/local/sbin/shtetl create s2app --on box
+ok   W16 s2app made on box, active
+# /usr/local/sbin/shtetl freeze s2app
+ok   W16 box pkg-rolled
+ok   W16 its next version beamed to the run's copy
+# /usr/local/sbin/shtetl roll s2app
+ok   H20 stalled at the piece
+ok   H20 the stall on the old version, said once
+ok   H20 the new version destroyed, nothing mounted at its path
+ok   H20 the old version's jail started again
+ok   H20 the run's copy unmounted
+# jexec s2app sh -c echo w16 > /root/w16
+# /usr/local/sbin/shtetl roll s2app
+ok   W16 rolled: active
+ok   W16 on a clone of the run's copy at the next version
+ok   W16 what the container wrote, carried over
+ok   W16 what its command wrote, carried over
+ok   W16 the jail at its path, devfs there once
+ok   W16 its snapshots: the saves but the last, then the update
+ok   W16 every filesystem, an update snapshot
+ok   W16 no stall left, nothing of zfs_rebase's set
+ok   W16 the run's copy unmounted
+ok   W16 beamed: the old pruned from the run, the new on the lake
+ok   W16 syslog: nothing of the roll's or the prune's
+ok   Q19 box pkg-rolled again
+ok   Q19 s2app rolled onto it by itself
+ok   Q19 its root a clone of the run's copy at it
+ok   Q19 what the container wrote, carried over again
+ok   Q19 syslog: nothing of it
+
+syslog, daemon.log from the run's start:
+Nov  6 05:58:21 shtetl-dev shtetl[94217]: foundation box: patches/local: 2-b.patch: exited 1
+Nov  6 06:03:30 shtetl-dev shtetl[14707]: house s2app: commands: h20: exited 1
+
+the last roll's log, /var/log/shtetl/box.log, its step lines:
+# devfs
+# pkg
+# devfs
+# version 15.1-releng-2026-11-06T06_03_47Z-pkg
+
+the beam's log, /var/log/shtetl/beam.log, from the run's start:
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T05_56_29Z-create
+# send s2box/lake/foundations/box@15.1-releng-2026-11-06T05_57_57Z-update
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_57_57Z-update
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_57_57Z-update
+# send s2box/run/containers/S1@c1
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T05_57_57Z-update
+# arrived s2box/lake/containers/S1@c1
+# resume s2box/lake/containers/S2
+# send s2box/lake/foundations/box@15.1-releng-2026-11-06T05_59_57Z-update
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_59_57Z-update
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_59_57Z-update
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T05_59_57Z-update
+# arrived s2box/lake/containers/S2@c2
+# prune s2box/run/containers/S1
+# prune s2box/run/foundations/box@15.1-releng-2026-11-06T05_56_29Z-create
+# send s2box/lake/foundations/box@15.1-releng-2026-11-06T06_00_21Z-pkg
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T06_00_21Z-pkg
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T06_00_21Z-pkg
+# send s2box/run/containers/S3@c3
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T06_00_21Z-pkg
+# arrived s2box/lake/containers/S3@c3
+# prune s2box/run/containers/S2
+# prune s2box/lake/containers/S1
+# prune s2box/run/foundations/box@15.1-releng-2026-11-06T05_57_57Z-update
+# prune s2box/lake/foundations/box@15.1-releng-2026-11-06T05_56_29Z-create
+# prune s2box/run/foundations/box
+# send s2box/lake/foundations/box@15.1-releng-2026-11-06T06_00_21Z-pkg
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_57_57Z-update
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_59_57Z-update
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T06_00_21Z-pkg
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_57_57Z-update
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_59_57Z-update
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T06_00_21Z-pkg
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T06_00_21Z-pkg
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2web@2026-11-06T06_02_28Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2web/usr@2026-11-06T06_02_28Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2web/usr/local@2026-11-06T06_02_28Z-create
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T06_00_21Z-s2web@2026-11-06T06_02_28Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2web@2026-11-06T06_02_31Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2web/usr@2026-11-06T06_02_31Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2web/usr/local@2026-11-06T06_02_31Z-save
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T06_00_21Z-s2web@2026-11-06T06_02_31Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2web@2026-11-06T06_02_36Z-pkg
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2web/usr@2026-11-06T06_02_36Z-pkg
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2web/usr/local@2026-11-06T06_02_36Z-pkg
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T06_00_21Z-s2web@2026-11-06T06_02_36Z-pkg
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2app@2026-11-06T06_02_46Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2app/usr@2026-11-06T06_02_46Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2app/usr/local@2026-11-06T06_02_46Z-create
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T06_00_21Z-s2app@2026-11-06T06_02_46Z-create
+# send s2box/lake/foundations/box@15.1-releng-2026-11-06T06_02_52Z-pkg
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T06_02_52Z-pkg
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T06_02_52Z-pkg
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T06_02_52Z-pkg
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2app@2026-11-06T06_03_21Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2app@2026-11-06T06_03_31Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_02_52Z-s2app@2026-11-06T06_02_46Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T06_02_52Z-s2app@2026-11-06T06_03_21Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_02_52Z-s2app@2026-11-06T06_03_45Z-update
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2app/usr@2026-11-06T06_03_21Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2app/usr@2026-11-06T06_03_31Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_02_52Z-s2app/usr@2026-11-06T06_03_45Z-update
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2app/usr/local@2026-11-06T06_03_21Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2app/usr/local@2026-11-06T06_03_31Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_02_52Z-s2app/usr/local@2026-11-06T06_02_46Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T06_02_52Z-s2app/usr/local@2026-11-06T06_03_21Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_02_52Z-s2app/usr/local@2026-11-06T06_03_45Z-update
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T06_02_52Z-s2app@2026-11-06T06_03_45Z-update
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T06_00_21Z-s2app@2026-11-06T06_03_21Z-save
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T06_00_21Z-s2app@2026-11-06T06_03_31Z-save
+# prune s2box/run/containers/15.1-releng-2026-11-06T06_00_21Z-s2app
+# send s2box/lake/foundations/box@15.1-releng-2026-11-06T06_03_47Z-pkg
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T06_03_47Z-pkg
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T06_03_47Z-pkg
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T06_03_47Z-pkg
+# send s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app@2026-11-06T06_02_46Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app@2026-11-06T06_03_21Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app@2026-11-06T06_03_45Z-update
+# send s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app@2026-11-06T06_04_06Z-update
+# send s2box/run/containers/15.1-releng-2026-11-06T06_02_52Z-s2app@2026-11-06T06_03_47Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr@2026-11-06T06_04_06Z-update
+# send s2box/run/containers/15.1-releng-2026-11-06T06_02_52Z-s2app/usr@2026-11-06T06_03_47Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local@2026-11-06T06_02_46Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local@2026-11-06T06_03_21Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local@2026-11-06T06_03_45Z-update
+# send s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local@2026-11-06T06_04_06Z-update
+# send s2box/run/containers/15.1-releng-2026-11-06T06_02_52Z-s2app/usr/local@2026-11-06T06_03_47Z-save
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T06_02_52Z-s2app@2026-11-06T06_03_47Z-save
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T06_03_47Z-s2app@2026-11-06T06_04_06Z-update
+# prune s2box/run/containers/15.1-releng-2026-11-06T06_02_52Z-s2app
+# prune s2box/lake/containers/15.1-releng-2026-11-06T06_00_21Z-s2app
+
+s2app's log, /var/log/shtetl/s2app.log, its last lines:
+zfs_rebase: s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local: the manifest, 0 actions
+zfs_rebase:   done 0
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local is the rebased tree, unmounted; place it with zfs inherit mountpoint s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local or zfs set mountpoint=PATH s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local
+# replay
+zfs_rebase: s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local: the manifest, 0 actions
+zfs_rebase:   done 0
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local is the rebased tree, and s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local@2026-11-06T06_02_46Z-create is what it was before
+# replay
+zfs_rebase: s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local: the manifest, 0 actions
+zfs_rebase:   done 0
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local is the rebased tree, and s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local@2026-11-06T06_03_21Z-save is what it was before
+# replay
+zfs_rebase: s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local: the manifest, 0 actions
+zfs_rebase:   done 0
+zfs_rebase:   pending 0
+zfs_rebase:   blocked 0
+zfs_rebase:   drifted 0
+zfs_rebase:   unchecked 0
+zfs_rebase:   outside the manifest: gone 0
+zfs_rebase:   outside the manifest: extra 0
+zfs_rebase:   outside the manifest: changed 0
+zfs_rebase:   outside the manifest: unpooled 0
+zfs_rebase: s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local is the rebased tree, and s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app/usr/local@2026-11-06T06_03_45Z-update is what it was before
+# jail
+s2app: created
+ELF ldconfig path: /lib /usr/lib /usr/lib/compat
+32-bit compatibility ldconfig path:
+Creating and/or trimming log files.
+Clearing /tmp (X related).
+Updating motd:.
+Updating /var/run/os-release done.
+Starting syslogd.
+Starting cron.
+
+Fri Nov  6 06:04:06 UTC 2026
+# version s2box/run/containers/15.1-releng-2026-11-06T06_03_47Z-s2app
+== 95 ok, 0 failed
