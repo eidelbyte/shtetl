@@ -89,13 +89,15 @@ static const char *relay_vn;
 static void lay(const char *, const char *);
 
 static void
-idle_ask(void *arg, struct sh_house *h)
+idle_ask(void *arg)
 {
+	size_t i;
+
 	(void) arg;
 	if (relay_vn != NULL)
 		lay(relay_vn, "releng/16.0");
-	if (asking)
-		sh_house_next(&hs, &nh, h, config);
+	for (i = 0; asking && i < nh; i++)
+		sh_house_next(&hs, &nh, hs[i], config);
 }
 
 /* The pull a create asks, for the test to deliver. */
@@ -474,6 +476,7 @@ fresh(void)
 	CHECK(sh_zfs_create(z, LF "/g/var", NULL, 0, &c.c_err) == 0);
 	take(LF "/g", V, "create");
 	relay("config/containers/web.conf", WEB);
+	relay("config/containers/app.conf", "pkg = [ \"x\" ];\n");
 	(void) unlink(scratch_path("config/shtetl.conf"));
 	(void) unlink(scratch_path("fake.log"));
 	memset(&pull, 0, sizeof (pull));
@@ -493,6 +496,19 @@ made(void)
 	pull.done(pull.arg, RF "/g@" V, NULL);
 	CHECK(is(settle(), "house web active 15.1-releng-T-web\n"));
 	CHECK(is(cap_text(&sys), ""));
+}
+
+/* app made on g at V beside web, the run's copy of it there already. */
+static void
+app_made(void)
+{
+	CHECK(sh_house_create(&hs, &nh, "app", LF "/g", V, &env, config,
+	    &c.c_err) == 0);
+	lay("15.1-releng-T-app", "releng/15.1");
+	cap_reset(&c);
+	pull.done(pull.arg, RF "/g@" V, NULL);
+	CHECK(strstr(settle(), "house app active 15.1-releng-T-app\n") !=
+	    NULL);
 }
 
 /*
@@ -1329,6 +1345,28 @@ main(void)
 		    is(told_text, "web: stalled replay: exited 1"));
 		(void) close(fd);
 	}
+
+	/*
+	 * Q20: one roll at a time on a copy: web's roll from g's copy under
+	 * way, app's asked by hand refused, "app: web is rolling on g", and
+	 * left waiting by an ask; web's end asks every house, and app rolls
+	 */
+	made();
+	app_made();
+	next();
+	lay("15.1-releng-U-app", "releng/16.0");
+	snap_at(OLD, 0, cr, sizeof (cr));
+	(void) snprintf(l[0], sizeof (l[0]), NEW "@%s", cr);
+	rbfake_end(l[0], -2);
+	CHECK(roll() == 0);
+	until_open(NEW);
+	cap_reset(&c);
+	CHECK(sh_house_roll(&hs, &nh, house("app"), config, NULL,
+	    &c.c_err) == -1 && is(cap_text(&c), "app: web is rolling on g\n"));
+	converged();
+	CHECK(strstr(status(), "house app active 15.1-releng-T-app\n") != NULL);
+	CHECK(is(settle(), "house app active 15.1-releng-U-app\n"
+	    "house web active 15.1-releng-U-web\n") && is(cap_text(&sys), ""));
 
 	sh_houses_free(hs, nh);
 	(void) close(env.he_kq);

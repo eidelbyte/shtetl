@@ -81,9 +81,10 @@ struct sh_houseenv {
 	void		(*he_beam)(void *);
 	/*
 	 * a house's act over, the house active, the last thing its end
-	 * does: the daemon asks it to take the next (sh_house_next)
+	 * does: the daemon asks every house to take the next
+	 * (sh_house_next), one having waited its turn on its copy
 	 */
-	void		(*he_idle)(void *, struct sh_house *);
+	void		(*he_idle)(void *);
 	void		*he_parg;
 };
 
@@ -164,8 +165,10 @@ int sh_house_pkg(struct sh_house *h, struct sh_err *e);
  * zfs_rebase runs on the new version, destroys it, starts the old
  * version again and stalls H: shtetl:stall on it, the step and why,
  * said once to ENV's sink. CONFIG is where zconfig is mounted; *HP the
- * houses, another's roll being on the same copy. Refused, said to E:
- * "H: up to date", or as a save is.
+ * houses, to see that no other is on the same copy. Refused, said to
+ * E: "H: up to date"; "H: G is rolling on F", or "H: G is starting",
+ * cleaning up after a crash, while another house is on the copy, one
+ * roll at a time taking it (Q20); or as a save is.
  *
  * With ATTEND, allocated, the roll is attended (Q13, Q14): a replay
  * stopped at its conflicts runs zfs_rebase -c -m -i on ATTEND's
@@ -191,9 +194,10 @@ void sh_house_hangup(struct sh_house *h);
  * house when a convergence of the beam is over and a house when its
  * act is (plan 7.2): where H is active, not stalled, and one waits, an
  * automatic roll of it, as sh_house_roll's, which a conflict stalls.
- * Nothing waiting, nothing is said; any other refusal stalls H, "next:
- * why", said once to ENV's sink, "house H: next: why", so that it is
- * not asked again until it is rolled by hand.
+ * Nothing waiting, or another house on the copy, nothing is said, H
+ * asked again when that house's act ends; any other refusal stalls H,
+ * "next: why", said once to ENV's sink, "house H: next: why", so that
+ * it is not asked again until it is rolled by hand.
  */
 void sh_house_next(struct sh_house ***hp, size_t *np, struct sh_house *h,
     const char *config);

@@ -371,13 +371,14 @@ act_over(struct sh_house *h)
 
 /*
  * H's act ended, the last thing its end does: active, the daemon told,
- * which asks it to take the next version waiting (sh_house_next).
+ * which asks every house to take the next version waiting, H, and any
+ * that waited its turn on H's copy (sh_house_next).
  */
 static void
 idle(struct sh_house *h)
 {
 	if (h->h_state == SH_H_ACTIVE)
-		h->h_env->he_idle(h->h_env->he_parg, h);
+		h->h_env->he_idle(h->h_env->he_parg);
 }
 
 /* Where H's jail's block is: <jails>/H.conf, into BUF. */
@@ -1413,20 +1414,29 @@ roll_told(struct sh_hroll *r, int status, const char *fmt, const char *s)
 	r->hr_attend->ha_done(r->hr_attend->ha_arg, status, text);
 }
 
-/* Whether a house besides R's rolls from R's copy of the foundation. */
-static int
-copy_shared(const struct sh_hroll *r)
+/*
+ * A house besides R's on R's copy of the foundation: rolling from it,
+ * or starting, a crash's clean-up aborting zfs_rebase runs; or NULL.
+ * Each release of a hold makes FreeBSD unmount the held snapshot's
+ * .zfs view by force under every other reader (dsl_userhold.c's
+ * zfs_unmount_snap, zfsctl_snapshot_unmount), and every run releases
+ * its holds as it ends, a roll's done as much as an abort: one roll
+ * at a time takes a copy (build run 15).
+ */
+static const struct sh_house *
+copy_busy(const struct sh_hroll *r)
 {
 	const struct sh_house *o;
 	size_t i;
 
 	for (i = 0; i < *r->hr_n; i++) {
 		o = (*r->hr_list)[i];
-		if (o != r->hr_h && o->h_roll != NULL &&
-		    strcmp(o->h_roll->hr_copy, r->hr_copy) == 0)
-			return (1);
+		if (o != r->hr_h && ((o->h_roll != NULL &&
+		    strcmp(o->h_roll->hr_copy, r->hr_copy) == 0) ||
+		    (o->h_state == SH_H_STARTING && o->h_nclean > 0)))
+			return (o);
 	}
-	return (0);
+	return (NULL);
 }
 
 /* Whether NAME, a filesystem or a snapshot, is there, nothing said. */
@@ -1745,15 +1755,13 @@ roll_swap(struct sh_job *j, void *arg, struct sh_err *e)
 	return (0);
 }
 
-/* The copy unmounted, where no other house's roll is on it. */
+/* The copy unmounted: no other roll is on it (copy_busy). */
 static int
 roll_copy(struct sh_job *j, void *arg, struct sh_err *e)
 {
 	struct sh_hroll *r = arg;
 
 	(void) j;
-	if (copy_shared(r))
-		return (0);
 	return (tree_unmount(r->hr_h->h_env->he_z, r->hr_copy, e));
 }
 
@@ -1995,7 +2003,7 @@ roll_undo(struct sh_job *j, void *arg, struct sh_err *e)
 	(void) j;
 	if ((r->hr_new != NULL && exists(z, r->hr_new) &&
 	    tree_destroy(z, r->hr_new, e) != 0) ||
-	    (!copy_shared(r) && tree_unmount(z, r->hr_copy, e) != 0))
+	    tree_unmount(z, r->hr_copy, e) != 0)
 		return (-1);
 	return (0);
 }
@@ -2071,13 +2079,15 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 
 /*
  * A roll of H, active, begun onto the next version waiting (roll_next):
- * 0; 1 where none waits; -1 said to E.
+ * 0; 1 where none waits; 2 where it waits its turn on the copy
+ * (copy_busy), said to E; -1 said to E.
  */
 static int
 roll_begin(struct sh_house ***hp, size_t *np, struct sh_house *h,
     const char *config, struct sh_hattend *attend, struct sh_err *e)
 {
 	const struct sh_houseenv *env = h->h_env;
+	const struct sh_house *o;
 	struct sh_hroll *r;
 	char file[1024];
 	int rc;
@@ -2093,9 +2103,17 @@ roll_begin(struct sh_house ***hp, size_t *np, struct sh_house *h,
 		return (-1);
 	}
 	r->hr_repos = sh_site_repos(&r->hr_site);
-	if ((rc = roll_next(r, e)) != 0 || house_log(h, "a", e) != 0) {
+	if ((rc = roll_next(r, e)) == 0 && (o = copy_busy(r)) != NULL) {
+		if (o->h_roll != NULL)
+			sh_errf(e, "%s: %s is rolling on %s", h->h_name,
+			    o->h_name, strrchr(r->hr_copy, '/') + 1);
+		else
+			sh_errf(e, "%s: %s is starting", h->h_name, o->h_name);
+		rc = 2;
+	}
+	if (rc != 0 || house_log(h, "a", e) != 0) {
 		roll_free(r);
-		return (rc == 1 ? 1 : -1);
+		return (rc > 0 ? rc : -1);
 	}
 	h->h_state = SH_H_ROLLING;
 	h->h_roll = r;

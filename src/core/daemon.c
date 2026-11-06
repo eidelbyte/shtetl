@@ -480,16 +480,17 @@ pruned(void *arg, struct sh_err *e)
 }
 
 /*
- * A house's act over: it takes the next version waiting, where zconfig
- * is mounted; where it is not, the convergence's prune says so.
+ * A house's act over: every house asked to take the next version
+ * waiting, that one and any that waited its turn on its copy, where
+ * zconfig is mounted; where it is not, the convergence's prune says so.
  */
 static void
-house_idle(void *arg, struct sh_house *h)
+house_idle(void *arg)
 {
 	struct daemon *d = arg;
 	char path[1024], *buf = NULL;
 	struct sh_err q;
-	size_t len = 0;
+	size_t len = 0, i;
 	FILE *f;
 	int r;
 
@@ -498,8 +499,9 @@ house_idle(void *arg, struct sh_house *h)
 	r = mounted(d, SH_SP_CONFIG, path, sizeof (path), &q);
 	(void) fclose(f);
 	free(buf);
-	if (r == 0)
-		sh_house_next(&d->d_houses, &d->d_nhouses, h, path);
+	for (i = 0; r == 0 && i < d->d_nhouses; i++)
+		sh_house_next(&d->d_houses, &d->d_nhouses, d->d_houses[i],
+		    path);
 }
 
 /* A house's pull: the beam's (m5-create). */

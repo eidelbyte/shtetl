@@ -52,10 +52,9 @@ told(void *arg)
 
 /* A house idle again: the queue is check_hroll's (family Q). */
 static void
-idle_none(void *arg, struct sh_house *h)
+idle_none(void *arg)
 {
 	(void) arg;
-	(void) h;
 }
 
 /* The pull asked, for the test to deliver. */
