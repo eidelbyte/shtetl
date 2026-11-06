@@ -1,0 +1,284 @@
+shtetl 9099541 build on box 2026-11-06T05:27:25Z
+host: 15.1-RELEASE-p2 amd64
+branch: releng/15.1 from https://git.freebsd.org/src.git
+
+# make -C . install
+install -d /usr/local/sbin /usr/local/etc/rc.d
+install -m 0555 shtetl /usr/local/sbin/shtetl
+install -m 0555 etc/rc.d/shtetl /usr/local/etc/rc.d/shtetl
+# zpool import -d /var/tmp -R /var/tmp/s2box s2box
+# zfs destroy -r s2box/lake/containers/15.1-releng-2026-11-05T12_38_05Z-s2web
+# zfs destroy -r s2box/lake/containers/S2
+# zfs destroy -r s2box/lake/containers/S3
+# zfs destroy -r s2box/run/containers/15.1-releng-2026-11-05T12_38_05Z-s2web
+# zfs destroy -r s2box/run/foundations/box
+# zfs destroy -r s2box/lake/foundations/box
+# rm -rf /var/tmp/s2box/config/foundations /var/tmp/s2box/config/containers /var/tmp/s2box/config/patches /var/tmp/s2box/config/shtetl.conf
+# mkdir -p /var/tmp/s2box/config/foundations /var/tmp/s2box/config/containers /var/tmp/s2box/config/patches/local
+# service shtetl onestart
+Starting shtetl.
+ok   R1 a create roll (F17, GS10)
+ok   R2 every dataset snapshotted, kind create
+ok   R2 shtetl:commit the checkout's
+ok   R2 usr a placeholder
+ok   R2 box and usr/local canmount noauto, set there
+ok   R2 its log: the build's step, the version
+ok   R3 a world and a kernel (K19)
+ok   R3 the package, in usr/local (X9)
+ok   R3 the command run in the chroot
+ok   R3 no resolv.conf left
+ok   R4 foundation.conf schg (F18)
+ok   R4 the head unmounted
+ok   P24 no house: no copy of box on the run
+# zfs send s2box/lake/foundations/box@15.1-releng-2026-11-06T05_28_34Z-create | zfs receive -u -o canmount=noauto 		    s2box/run/foundations/box@15.1-releng-2026-11-06T05_28_34Z-create
+# zfs send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_28_34Z-create | zfs receive -u -o canmount=noauto 		    s2box/run/foundations/box/usr@15.1-releng-2026-11-06T05_28_34Z-create
+# zfs send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_28_34Z-create | zfs receive -u -o canmount=noauto 		    s2box/run/foundations/box/usr/local@15.1-releng-2026-11-06T05_28_34Z-create
+# zfs clone -o shtetl:house=standin -o canmount=noauto s2box/run/foundations/box@15.1-releng-2026-11-06T05_28_34Z-create s2box/run/containers/S1
+# zfs snapshot -o shtetl:kind=create s2box/run/containers/S1@c1
+ok   R5 an update roll
+ok   R5 kind update
+ok   B28 converged
+ok   B28 box's update beamed onto its copy
+ok   B28 S1 on the lake, a clone of box's first version
+ok   B28 arrived: its kind there, canmount=noauto set there
+ok   P24 S1 the only version: kept; box's versions all kept
+# zfs clone -o shtetl:house=standin -o canmount=noauto s2box/run/foundations/box@15.1-releng-2026-11-06T05_30_03Z-update s2box/run/containers/S2
+# zfs mount s2box/run/containers/S2
+# dd if=/dev/random of=/var/tmp/s2box/containers/S2/fill 		    bs=64k count=128 2>/dev/null
+# zfs unmount s2box/run/containers/S2
+# zfs snapshot -o shtetl:kind=update s2box/run/containers/S2@c2
+# zfs send -i s2box/run/foundations/box@15.1-releng-2026-11-06T05_30_03Z-update s2box/run/containers/S2@c2 | head -c 1048576 |
+	    zfs receive -s -u -o origin=s2box/lake/foundations/box@15.1-releng-2026-11-06T05_30_03Z-update s2box/lake/containers/S2@c2 2>/dev/null
+warning: cannot send 's2box/run/containers/S2@c2': signal received
+-> exit 1
+ok   B28 S2's stream cut: a receive to resume on the lake
+# sed -i  1s/.*/shtetl box a/ /var/tmp/s2box/build/src/README.md
+# git -C /var/tmp/s2box/build/src checkout -q README.md
+# sed -i  1s/.*/shtetl box b/ /var/tmp/s2box/build/src/README.md
+# git -C /var/tmp/s2box/build/src checkout -q README.md
+ok   R6 a conflict: stalled
+ok   R6 shtetl:stall
+ok   R6 at its newest version still
+ok   R6 zbuild reset
+# rm /var/tmp/s2box/config/patches/local/2-b.patch
+ok   R7 asked again: the stall cleared, rolled
+ok   R7 the patch in the checkout
+ok   R7 no stall
+ok   B28 converged
+ok   B28 S2's receive resumed: no token, S2 there whole
+ok   B28 the resume in beam.log
+ok   P24 the run: S2 alone, S1 pruned
+ok   P24 box's first version gone from the run, kept on the lake
+ok   P24 the lake: S1 and S2
+# zfs clone -o shtetl:house=standin -o canmount=noauto s2box/run/foundations/box@15.1-releng-2026-11-06T05_32_03Z-update s2box/run/containers/S3
+# zfs snapshot -o shtetl:kind=update s2box/run/containers/S3@c3
+ok   R8 a pkg roll
+ok   R8 kind pkg, the version's commit
+ok   P24 converged
+ok   P24 the run: S3 alone; the lake: S2 and S3
+ok   P24 box's first version gone from both spaces
+ok   P24 its update: on the lake for S2, gone from the run
+ok   P24 S3's version and the pkg on both
+ok   P24 each pruned in beam.log
+# zfs destroy -r s2box/run/containers/S3
+# /usr/local/sbin/shtetl roll box
+# service shtetl onestop
+Stopping shtetl.
+Waiting for PIDS: 75051.
+ok   R9 stopped: devfs left on the head
+ok   R9 and the roll's marker in it
+# service shtetl onestart
+Starting shtetl.
+ok   R9 started again: idle at the newest, no stall
+ok   R9 devfs gone
+ok   R9 the head unmounted
+ok   R9 what the roll wrote gone
+ok   R10 syslog: one line, the stall
+ok   H17 nothing on the run relies on box: no copy of it there
+# /usr/local/sbin/shtetl create s2web --on box
+ok   H17 s2web made on box, active
+ok   H17 its root a clone of box's copy at that version
+ok   H17 placed at the run's containers/s2web
+ok   N17 the block: the version's path, the recipe's jailconf
+ok   N17 the jail runs at that path
+ok   N17 devfs at its dev
+ok   N17 jexec reaches it: what the chroot's command wrote
+ok   N17 pkg -j reaches it: the foundation's package
+# /usr/local/sbin/shtetl save s2web
+ok   V10 saved: every filesystem, kind save
+ok   V10 the save beamed to the lake
+# /usr/local/sbin/shtetl pkg s2web
+ok   V10 upgraded: active again
+ok   V10 every filesystem, kind pkg
+ok   V10 pkg -j ran, its own package to upgrade
+ok   V10 syslog: nothing of the save's or the pkg's
+# service shtetl onestop
+Stopping shtetl.
+Waiting for PIDS: 94958.
+ok   N15 the daemon stopped: the jail runs on
+# service shtetl onestart
+Starting shtetl.
+ok   N14 started again: active
+ok   N14 the same jail, devfs mounted there once
+ok   N14 syslog: nothing from the daemon's stop and start
+# jail -f /etc/jail.conf.d/s2web.conf -r s2web
+Stopping cron.
+Waiting for PIDS: 95360.
+.
+Terminated
+s2web: removed
+ok   N17 jail -r: the jail gone, and its devfs
+ok   W16 zfs_rebase where the daemon's PATH finds it
+# /usr/local/sbin/shtetl create s2app --on box
+ok   W16 s2app made on box, active
+ok   W16 box pkg-rolled
+ok   W16 its next version beamed to the run's copy
+# /usr/local/sbin/shtetl roll s2app
+FAIL H20 stalled at the piece: got [house s2app stalled replay: s2box/run/foundations/box/usr/local: failed to create mountpoint: Read-only file system], wanted [house s2app stalled commands: h20: exited 1]
+FAIL H20 the stall on the old version, said once: got [replay: s2box/run/foundations/box/usr/local: failed to create mountpoint: Read-only file system / house s2app: replay: s2box/run/foundations/box/usr/local: failed to create mountpoint: Read-only file system], wanted [commands: h20: exited 1 / house s2app: commands: h20: exited 1]
+ok   H20 the new version destroyed, nothing mounted at its path
+ok   H20 the old version's jail started again
+ok   H20 the run's copy unmounted
+# jexec s2app sh -c echo w16 > /root/w16
+# /usr/local/sbin/shtetl roll s2app
+FAIL W16 rolled: active: got [house s2app stalled replay: s2box/run/foundations/box/usr/local: failed to create mountpoint: Read-only file system], wanted [house s2app active 15.1-releng-DATE-s2app]
+FAIL W16 on a clone of the run's copy at the next version: got [cannot open 's2box/run/containers/15.1-releng-2026-11-06T05_35_03Z-s2app': dataset does not exist cannot open 's2box/run/containers/15.1-releng-2026-11-06T05_35_03Z-s2app': dataset does not exist], wanted [s2box/run/foundations/box@15.1-releng-2026-11-06T05_35_03Z-pkg /var/tmp/s2box/containers/s2app]
+ok   W16 what the container wrote, carried over
+ok   W16 what its command wrote, carried over
+ok   W16 the jail at its path, devfs there once
+cannot open 's2box/run/containers/15.1-releng-2026-11-06T05_35_03Z-s2app': dataset does not exist
+cannot open 's2box/run/containers/15.1-releng-2026-11-06T05_35_03Z-s2app': dataset does not exist
+cannot open '': empty component or misplaced '@' or '#' delimiter in name
+FAIL W16 its snapshots: the saves but the last, then the update: got [0 ], wanted [3 update]
+cannot open 's2box/run/containers/15.1-releng-2026-11-06T05_35_03Z-s2app': dataset does not exist
+cannot open 's2box/run/containers/15.1-releng-2026-11-06T05_35_03Z-s2app': dataset does not exist
+ok   W16 every filesystem, an update snapshot
+FAIL W16 no stall left, nothing of zfs_rebase's set: got [1], wanted [0]
+ok   W16 the run's copy unmounted
+FAIL W16 beamed: the old pruned from the run, the new on the lake: got [beam converged yes no], wanted [beam converged no yes]
+ok   W16 syslog: nothing of the roll's or the prune's
+cannot unmount '/var/tmp/s2box/containers/s2web': pool or dataset is busy
+
+syslog, daemon.log from the run's start:
+Nov  5 21:30:33 box shtetl[75051]: foundation box: patches/local: 2-b.patch: exited 1
+Nov  5 21:35:33 box shtetl[95587]: house s2app: replay: s2box/run/foundations/box/usr/local: failed to create mountpoint: Read-only file system
+
+the last roll's log, /var/log/shtetl/box.log, its step lines:
+# devfs
+# pkg
+# devfs
+# version 15.1-releng-2026-11-06T05_35_03Z-pkg
+
+the beam's log, /var/log/shtetl/beam.log, from the run's start:
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T05_28_34Z-create
+# send s2box/lake/foundations/box@15.1-releng-2026-11-06T05_30_03Z-update
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_30_03Z-update
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_30_03Z-update
+# send s2box/run/containers/S1@c1
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T05_30_03Z-update
+# arrived s2box/lake/containers/S1@c1
+# resume s2box/lake/containers/S2
+# send s2box/lake/foundations/box@15.1-releng-2026-11-06T05_32_03Z-update
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_32_03Z-update
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_32_03Z-update
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T05_32_03Z-update
+# arrived s2box/lake/containers/S2@c2
+# prune s2box/run/containers/S1
+# prune s2box/run/foundations/box@15.1-releng-2026-11-06T05_28_34Z-create
+# send s2box/lake/foundations/box@15.1-releng-2026-11-06T05_32_33Z-pkg
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_32_33Z-pkg
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_32_33Z-pkg
+# send s2box/run/containers/S3@c3
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T05_32_33Z-pkg
+# arrived s2box/lake/containers/S3@c3
+# prune s2box/run/containers/S2
+# prune s2box/lake/containers/S1
+# prune s2box/run/foundations/box@15.1-releng-2026-11-06T05_30_03Z-update
+# prune s2box/lake/foundations/box@15.1-releng-2026-11-06T05_28_34Z-create
+# prune s2box/run/foundations/box
+# send s2box/lake/foundations/box@15.1-releng-2026-11-06T05_32_33Z-pkg
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_30_03Z-update
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_32_03Z-update
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_32_33Z-pkg
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_30_03Z-update
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_32_03Z-update
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_32_33Z-pkg
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T05_32_33Z-pkg
+# send s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2web@2026-11-06T05_34_39Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2web/usr@2026-11-06T05_34_39Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2web/usr/local@2026-11-06T05_34_39Z-create
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T05_32_33Z-s2web@2026-11-06T05_34_39Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2web@2026-11-06T05_34_43Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2web/usr@2026-11-06T05_34_43Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2web/usr/local@2026-11-06T05_34_43Z-save
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T05_32_33Z-s2web@2026-11-06T05_34_43Z-save
+# send s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2web@2026-11-06T05_34_48Z-pkg
+# send s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2web/usr@2026-11-06T05_34_48Z-pkg
+# send s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2web/usr/local@2026-11-06T05_34_48Z-pkg
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T05_32_33Z-s2web@2026-11-06T05_34_48Z-pkg
+# send s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2app@2026-11-06T05_34_58Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2app/usr@2026-11-06T05_34_58Z-create
+# send s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2app/usr/local@2026-11-06T05_34_58Z-create
+# arrived s2box/lake/containers/15.1-releng-2026-11-06T05_32_33Z-s2app@2026-11-06T05_34_58Z-create
+# send s2box/lake/foundations/box@15.1-releng-2026-11-06T05_35_03Z-pkg
+# send s2box/lake/foundations/box/usr@15.1-releng-2026-11-06T05_35_03Z-pkg
+# send s2box/lake/foundations/box/usr/local@15.1-releng-2026-11-06T05_35_03Z-pkg
+# arrived s2box/run/foundations/box@15.1-releng-2026-11-06T05_35_03Z-pkg
+
+s2app's log, /var/log/shtetl/s2app.log, its last lines:
+# pull s2box/lake/foundations/box@15.1-releng-2026-11-06T05_32_33Z-pkg
+# devfs
+# commands: motd
+# devfs
+# jail
+s2app: created
+ELF ldconfig path: /lib /usr/lib /usr/lib/compat
+32-bit compatibility ldconfig path:
+Creating and/or trimming log files.
+Clearing /tmp (X related).
+Updating motd:.
+Updating /var/run/os-release done.
+Starting syslogd.
+Starting cron.
+
+Fri Nov  6 05:34:58 UTC 2026
+# version s2box/run/containers/15.1-releng-2026-11-06T05_32_33Z-s2app
+# jail
+Stopping cron.
+Waiting for PIDS: 96041.
+.
+Terminated
+s2app: removed
+# failed: replay: s2box/run/foundations/box/usr/local: failed to create mountpoint: Read-only file system
+# jail
+s2app: created
+ELF ldconfig path: /lib /usr/lib /usr/lib/compat
+32-bit compatibility ldconfig path:
+Creating and/or trimming log files.
+Clearing /tmp (X related).
+Updating motd:.
+Updating /var/run/os-release done.
+Starting syslogd.
+Starting cron.
+
+Fri Nov  6 05:35:33 UTC 2026
+# jail
+Stopping cron.
+Waiting for PIDS: 96563.
+.
+Terminated
+s2app: removed
+# failed: replay: s2box/run/foundations/box/usr/local: failed to create mountpoint: Read-only file system
+# jail
+s2app: created
+ELF ldconfig path: /lib /usr/lib /usr/lib/compat
+32-bit compatibility ldconfig path:
+Creating and/or trimming log files.
+Clearing /tmp (X related).
+Updating motd:.
+Updating /var/run/os-release done.
+Starting syslogd.
+Starting cron.
+
+Fri Nov  6 05:35:38 UTC 2026
+== 82 ok, 7 failed
