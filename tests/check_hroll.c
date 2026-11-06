@@ -876,11 +876,10 @@ main(void)
 	CHECK(is(cap_text(&sys), "house web: replay: exited 1\n"));
 	CHECK(is(user(OLD, "shtetl:stall"), "replay: exited 1") &&
 	    !there(NEW) && is(where(RF "/g"), "") && is(where(OLD), "/web"));
-	v[0] = "zfs_rebase --abort " NEW "\n";
-	v[1] = want;
+	v[0] = want;
+	v[1] = "zfs_rebase --abort " NEW "\n";
 	v[2] = NULL;
-	CHECK((text = slurp("fake.log")) != NULL && in_order(text, v) &&
-	    ends(text, want));
+	CHECK((text = slurp("fake.log")) != NULL && in_order(text, v));
 	/*
 	 * W10: stalled: active, its jail running; a save as ever; the
 	 * stall read again at a start; shtetl roll H clears it and rolls
@@ -914,12 +913,38 @@ main(void)
 	    !there(NEW));
 	(void) snprintf(want, sizeof (want), "jail -f %s/web.conf -cm web\n",
 	    jails);
-	v[0] = "zfs_rebase --abort " NEW "\n";
+	v[0] = want;
 	v[1] = "zfs_rebase --abort " NEW "\n";
-	v[2] = want;
+	v[2] = "zfs_rebase --abort " NEW "\n";
 	v[3] = NULL;
 	CHECK((text = slurp("fake.log")) != NULL && in_order(text, v));
 	CHECK(strstr(text, "no rebase") == NULL);
+
+	/*
+	 * W18: the undo refused, ZFS refusing the new version's destroy
+	 * (the second destroy, after the abort's of its pre-apply
+	 * snapshot): the old version's jail started all the same, before
+	 * it, and stalled; both said once; the next start cleans it up
+	 */
+	made();
+	next();
+	snap_at(OLD, 0, cr, sizeof (cr));
+	(void) snprintf(l[0], sizeof (l[0]), NEW "@%s", cr);
+	rbfake_end(l[0], 1);
+	zfake_fail_nth("destroy", 2);
+	CHECK(roll() == 0);
+	CHECK(is(settle(), "house web stalled replay: exited 1\n"));
+	CHECK(is(cap_text(&sys), "house web: replay: exited 1\n"
+	    "house web: undo: zfake: destroy failed as asked\n") &&
+	    there(NEW) && is(user(OLD, "shtetl:stall"), "replay: exited 1"));
+	v[0] = want;
+	v[1] = "zfs_rebase --abort " NEW "\n";
+	v[2] = NULL;
+	CHECK((text = slurp("fake.log")) != NULL && in_order(text, v));
+	cap_reset(&sys);
+	restart();
+	CHECK(is(settle(), "house web stalled replay: exited 1\n") &&
+	    !there(NEW) && is(cap_text(&sys), ""));
 
 	/*
 	 * W8: a failure at another step, as W7, its step's words, nothing

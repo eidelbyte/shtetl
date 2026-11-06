@@ -1960,25 +1960,39 @@ roll_plan(struct sh_job *j, void *arg, struct sh_err *e)
 }
 
 /*
- * The undoing of a roll that failed before its update snapshot: every
- * open zfs_rebase run on the new version already aborted, the new
- * version destroyed, the copy unmounted where no other house's roll
- * is on it, and the house stalled on its old version, shtetl:stall the
- * step and why (plan 7.4).
+ * The house stalled on its old version, a roll having failed before its
+ * update snapshot (plan 7.4): shtetl:stall the step and why, and in
+ * memory whatever ZFS says to it, its refusal the log's, so that the
+ * old version's start runs on every way out (plan 7.2) and the house
+ * is never idle for the queue to roll into the same failure.
+ */
+static int
+roll_stall(struct sh_job *j, void *arg, struct sh_err *e)
+{
+	struct sh_hroll *r = arg;
+	struct sh_house *h = r->hr_h;
+
+	(void) j;
+	(void) e;
+	(void) sh_zfs_set(h->h_env->he_z, h->h_active, "shtetl:stall",
+	    r->hr_why, &h->h_lerr);
+	free(h->h_stall);
+	h->h_stall = sh_strdup(r->hr_why);
+	return (0);
+}
+
+/*
+ * The undoing, the old version started again: every open zfs_rebase
+ * run on the new version already aborted, the new version destroyed,
+ * the copy unmounted where no other house's roll is on it.
  */
 static int
 roll_undo(struct sh_job *j, void *arg, struct sh_err *e)
 {
 	struct sh_hroll *r = arg;
-	struct sh_house *h = r->hr_h;
-	struct sh_zfs *z = h->h_env->he_z;
+	struct sh_zfs *z = r->hr_h->h_env->he_z;
 
 	(void) j;
-	/* stalled first: a refusal after it leaves H stalled, not idle */
-	if (sh_zfs_set(z, h->h_active, "shtetl:stall", r->hr_why, e) != 0)
-		return (-1);
-	free(h->h_stall);
-	h->h_stall = sh_strdup(r->hr_why);
 	if ((r->hr_new != NULL && exists(z, r->hr_new) &&
 	    tree_destroy(z, r->hr_new, e) != 0) ||
 	    (!copy_shared(r) && tree_unmount(z, r->hr_copy, e) != 0))
@@ -1998,9 +2012,6 @@ undo_end(struct sh_job *j, const char *why, void *arg)
 		sh_errf(h->h_env->he_err, "house %s: %s", h->h_name, why);
 		sh_errf(&h->h_lerr, "failed: %s", why);
 	}
-	/* where ZFS refused the stall, H is stalled until the next start */
-	if (h->h_stall == NULL)
-		h->h_stall = sh_strdup(r->hr_why);
 	h->h_state = SH_H_ACTIVE;
 	h->h_roll = NULL;
 	act_over(h);
@@ -2048,11 +2059,13 @@ roll_end(struct sh_job *j, const char *why, void *arg)
 		return;
 	}
 	r->hr_why = sh_strdup(why);
+	/* stalled, started, then undone: a refusal undoing it stops nothing */
 	sh_job_init(&h->h_job, h->h_log, undo_end, r);
+	sh_job_call(&h->h_job, "stall", roll_stall, r);
+	start_steps(h);
 	if (r->hr_new != NULL && exists(env->he_z, r->hr_new))
 		aborts(&h->h_job, env->he_z, r->hr_new, &h->h_lerr);
 	sh_job_call(&h->h_job, "undo", roll_undo, r);
-	start_steps(h);
 	sh_job_run(&h->h_job, env->he_kq);
 }
 
