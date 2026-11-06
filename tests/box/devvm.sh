@@ -81,7 +81,9 @@ vm_close() {
 # the network; the packages the box tests want.
 vm_setup() {	# KEY
 	_rc=$VALT/etc/rc.conf
-	sysrc -f "$_rc" hostname=$NAME sshd_enable=YES >/dev/null
+	# its clock its own, by ntp, whatever the host's says
+	sysrc -f "$_rc" hostname=$NAME sshd_enable=YES ntpd_enable=YES \
+	    ntpd_sync_on_start=YES >/dev/null
 	if [ -n "${DEV_ADDR:-}" ]; then
 		_gw=${DEV_GW:-$(route -n get default |
 		    awk '$1 == "gateway:" { print $2 }')}
@@ -147,7 +149,8 @@ vm_make() {	# KEY
 vm_boot() {
 	read -r _tap _br <"$NET"
 	while :; do
-		bhyve -c "$CPUS" -m "$MEM" -H -A -P -s 0,hostbridge \
+		# -u: its RTC in UTC, as FreeBSD reads it, not local time
+		bhyve -c "$CPUS" -m "$MEM" -u -H -A -P -s 0,hostbridge \
 		    -s 3,virtio-blk,"$DISK" -s 4,virtio-net,"$_tap",mac=$MAC \
 		    -s 31,lpc -l com1,"${CONS}A" -l bootrom,"$FW" "$NAME"
 		_rc=$?
