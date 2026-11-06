@@ -581,6 +581,11 @@ house() {
 	_rc=$?
 	cell N17 "jail -r: the jail gone, and its devfs" \
 	    "$_rc $(jls -j $J jid 2>/dev/null)/$(devfs_at "$_p")" "0 /"
+	# Q11: frozen, so that the queue never rolls it onto box's pkg
+	# rolls to come: its own jq would meet theirs in var/db/pkg, a
+	# derived file's conflict, m5-derivations'
+	x "$SH" freeze $J
+	cell Q11 "s2web frozen" "$(house_settled)" "house $J stalled frozen"
 }
 
 # NAME's status line, once its version DS is there and it is settled:
@@ -629,6 +634,9 @@ hroll() {
 	x "$SH" create $J2 --on $F
 	cell W16 "s2app made on box, active" "$(house_settled $J2)" \
 	    "house $J2 active $V-DATE-$J2"
+	# frozen until H20's roll, by hand, lifts it: the queue would roll
+	# it at the pkg roll's convergence (Q19 is the queue's roll)
+	x "$SH" freeze $J2
 	_old=$(versions $J2 | tr -d ' ')
 	_ap=$(dir $RC)/$J2
 	cell W16 "box pkg-rolled" "$(ask pkg)" "foundation $F idle $V-DATE-pkg"
@@ -684,7 +692,7 @@ hroll() {
 	    awk '{ print ($1 == $2 && $1 > 0) }')" 1
 	cell W16 "no stall left, nothing of zfs_rebase's set" \
 	    "$(zfs get -H -r -s local -o value shtetl:stall,zfs_rebase:tag \
-	    $RC 2>&1 | wc -l | tr -d ' ')" 0
+	    $RC/$_nv "$_old" 2>/dev/null | wc -l | tr -d ' ')" 0
 	cell W16 "the run's copy unmounted" "$(prop mounted $RD)" no
 	# the run keeps 1: the old version pruned once its copy on the lake
 	# has its final save; the new one on the lake
