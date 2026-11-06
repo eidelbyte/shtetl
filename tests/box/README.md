@@ -98,3 +98,46 @@ It needs a FreeBSD source tree for the OpenZFS headers,
 /usr/src unless FREEBSD_SRC says otherwise. On the mac, `make xcheck`
 (with FREEBSD_SRC set) compiles the FreeBSD sources against such a
 tree for a syntax check before the box sees them.
+
+## The dev VM: the box tests driven over ssh
+
+tests/box/devvm.sh makes shtetl-dev, a VM on the box for driving these
+tests from another machine over ssh without a person at the box:
+FreeBSD's own ZFS VM image of the box's release under bhyve, as
+probes/vm.sh makes its scratch VM, but bridged to the box's network,
+with sshd taking keys only and one user, claude, with sudo and no
+password. Inside it root is the VM's own, with pools, memory disks and
+jails of its own, which is what run.sh and build.sh need; the box's
+pools and jails are out of its reach. 16G of memory, 4 CPUs and a
+160G sparse disk by default (build.sh's pool file is 80G of it).
+
+On the machine that will drive it, a key of its own:
+
+    ssh-keygen -t ed25519 -N '' -C claude@shtetl-dev -f ~/.ssh/shtetl-dev
+    scp ~/.ssh/shtetl-dev.pub box:/tmp/
+
+On the box, once, the UEFI firmware, then the VM made and booted; a
+free address on the box's network outside its DHCP range, or DEV_ADDR
+left out for DHCP:
+
+    sudo pkg install bhyve-firmware
+    sudo env DEV_ADDR=192.168.1.50/24 sh tests/box/devvm.sh make /tmp/shtetl-dev.pub
+    sudo sh tests/box/devvm.sh run
+
+run leaves its console on the terminal. The first boot grows the disk
+to its size; then root logs in there with no password (only there:
+sshd takes neither root nor passwords), `ifconfig vtnet0` shows the
+address where DHCP gave it, and ~. leaves the console with the VM
+running on. From the driving machine:
+
+    ssh -i ~/.ssh/shtetl-dev claude@192.168.1.50 sudo zpool list
+
+lists the VM's own zroot. What the tests need is set up from there over
+ssh: /usr/src from the release's src.txz (make freebsd's OpenZFS
+headers), the shtetl and zfs_rebase_tool checkouts pushed to it, and
+zfs_rebase built and installed with its picker; run.sh and build.sh
+then run in it with SEND=no, their logs copied back and committed from
+the driving machine, since the VM holds no key to push with. tmux is
+there for the attended roll's picker. A wireless interface cannot be
+bridged: NIC names another. `sudo sh tests/box/devvm.sh stop` powers
+it off; `destroy`, then `make`, makes it anew.
