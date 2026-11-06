@@ -158,3 +158,31 @@ cdc7def (matrix), a6bdc5a (W17), 8eec031 (F21), eddb845 (the queue),
 2896e2b (freeze), 53ca40b (J19), 4598d07 (the attended roll, the
 house), d2859f2 (the daemon and the command), 22b6393 (W18), 4c4e04d
 (build.sh Q19), and this worklog's.
+
+## Box run 16 and build run 15
+
+- Box run 16: run.sh at 5849bfd (results c78cc6b): 143 ok, 0 failed.
+  Every unit program on FreeBSD with m5-queue's cells: check_hroll's
+  Q1 - Q12, Q14, Q15, W17, W18; check_daemon's Q11 - Q13, Q15 - Q17,
+  D26, D27; check_job's J19; check_roll's F21.
+- Build run 15: build.sh at c78cc6b (results 71b750c): 93 ok, 1 failed.
+  Q19 passed: box pkg-rolled again, s2app rolled onto the new version
+  by itself, a clone of the run's copy at it, /root/w16 carried over
+  again, syslog quiet. H20 and W16 passed but for "no stall left".
+  The failure, and what syslog held, came of the queue meeting
+  build.sh: at the convergence after hroll's first pkg roll the daemon
+  asked every idle house, and both rolled at 23:35:53 (the box's clock,
+  which runs hours fast): s2web stalled, "replay: exited 1", a conflict
+  that is surely var/db/pkg's, its own jq's against box's pkg roll
+  (m5-derivations'); s2app failed in the same second, "replay: exited
+  3", most likely when s2web's undo aborted its run and released its
+  holds on the copy's version both read, which on FreeBSD
+  force-unmounts that snapshot's .zfs view under the other run. H20's
+  and W16's own rolls, by hand, lifted s2app's stall and passed; the
+  stall W16 found under the run's containers was s2web's.
+- The same run.sh in the dev VM (tests/box/devvm.sh, 3d49fa6), at
+  9594a87: 143 ok, 0 failed (its log is the VM's, SEND=no).
+
+Owed: build.sh to freeze s2web after its cells and s2app until its own
+rolls; one roll at a time on a foundation's copy, once the VM's
+build.sh shows zfs_rebase's words for the failure; build.sh again.
