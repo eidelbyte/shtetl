@@ -1,7 +1,8 @@
 /*
  * What the command and the daemon say to each other over the socket:
  * records, each a kind, a length and that many bytes, never text to
- * parse. The command sends its arguments as one record; the daemon
+ * parse. The command sends its arguments as one record, after its
+ * terminal's type where it sends its terminal's descriptors; the daemon
  * answers with what the act wrote to its standard output and its
  * standard error, and then the exit status.
  */
@@ -12,6 +13,7 @@
 #include <stddef.h>
 
 #define	SH_WIRE_ARGS	'a'	/* the arguments, each ended by a NUL */
+#define	SH_WIRE_TERM	't'	/* the terminal's type, its TERM */
 #define	SH_WIRE_OUT	'o'	/* standard output */
 #define	SH_WIRE_ERR	'e'	/* standard error */
 #define	SH_WIRE_EXIT	'x'	/* the exit status, one byte */

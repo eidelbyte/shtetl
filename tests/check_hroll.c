@@ -615,9 +615,9 @@ told_done(void *arg, int status, const char *text)
 }
 
 /*
- * shtetl roll web attended (family Q): the person's terminal a pipe
- * whose write end, *ANSWER, is the test's to answer the picker on, and
- * the file term, where the picker writes; 0, or -1 refused.
+ * shtetl roll web attended (family Q): the person's terminal, an xterm, a
+ * pipe whose write end, *ANSWER, is the test's to answer the picker on,
+ * and the file term, where the picker writes; 0, or -1 refused.
  */
 static int
 attended(int *answer)
@@ -629,6 +629,7 @@ attended(int *answer)
 	a->ha_fds[0] = in[0];
 	CHECK((a->ha_fds[1] = open(scratch_path("term"), O_WRONLY | O_CREAT |
 	    O_TRUNC, 0644)) >= 0 && (a->ha_fds[2] = dup(a->ha_fds[1])) >= 0);
+	a->ha_term = strdup("xterm");
 	a->ha_done = told_done;
 	*answer = in[1];
 	told_status = -1;
@@ -640,6 +641,7 @@ attended(int *answer)
 	(void) close(in[1]);
 	(void) close(a->ha_fds[1]);
 	(void) close(a->ha_fds[2]);
+	free(a->ha_term);
 	free(a);
 	return (-1);
 }

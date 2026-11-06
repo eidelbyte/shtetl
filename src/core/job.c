@@ -30,6 +30,7 @@ struct sh_step {
 	int		sp_fork;	/* the call made in a child */
 	int		sp_term;	/* the child on sp_fds, no pipe */
 	int		sp_fds[3];
+	char		*sp_type;	/* its TERM there, or NULL */
 	int		sp_then;	/* the exit sp_tfn answers, or -1 */
 	int		(*sp_tfn)(struct sh_job *, void *, struct sh_err *);
 	void		*sp_targ;
@@ -73,6 +74,7 @@ step_drop(struct sh_job *j)
 		free(*a);
 	free(s->sp_argv);
 	free(s->sp_name);
+	free(s->sp_type);
 	free(s);
 }
 
@@ -124,10 +126,12 @@ sh_job_fork(struct sh_job *j, const char *step,
 }
 
 void
-sh_job_fds(struct sh_job *j, const int fds[3])
+sh_job_term(struct sh_job *j, const int fds[3], const char *type)
 {
 	j->j_added->sp_term = 1;
 	(void) memcpy(j->j_added->sp_fds, fds, sizeof (j->j_added->sp_fds));
+	if (type != NULL)
+		j->j_added->sp_type = sh_strdup(type);
 }
 
 void
@@ -232,6 +236,10 @@ job_spawn(struct sh_job *j, int kq)
 			(void) dup2(s->sp_fds[0], 0);
 			(void) dup2(s->sp_fds[1], 1);
 			(void) dup2(s->sp_fds[2], 2);
+			if (s->sp_type != NULL)
+				(void) setenv("TERM", s->sp_type, 1);
+			else
+				(void) unsetenv("TERM");
 		} else {
 			null = open("/dev/null", O_RDONLY);
 			(void) dup2(null, 0);

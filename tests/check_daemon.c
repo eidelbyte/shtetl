@@ -21,6 +21,7 @@
 #include "core/spaces.h"
 #include "core/wire.h"
 #include "core/zfs.h"
+#include "rbfake.h"
 #include "zfake.h"
 
 static const char usage[] =
@@ -507,8 +508,20 @@ main(void)
 	CHECK(b.b_len == 0);
 	CHECK(status() == 0 && strcmp(obuf, want) == 0);
 
+	/* D28: a terminal's type sent twice: hung up on, nothing sent */
+	sh_wire_put(&b, SH_WIRE_TERM, "xterm", 5);
+	sh_wire_put(&b, SH_WIRE_TERM, "xterm", 5);
+	sh_wire_put(&b, SH_WIRE_ARGS, "status", 7);
+	fd = raw();
+	CHECK(write(fd, b.b_data, b.b_len) == (ssize_t)b.b_len);
+	free(b.b_data);
+	(void) memset(&b, 0, sizeof (b));
+	drain(fd, &b);
+	CHECK(b.b_len == 0);
+	CHECK(status() == 0 && strcmp(obuf, want) == 0);
+
 	/*
-	 * D16: a request and a reply far larger than the socket takes in
+	 * D16:a request and a reply far larger than the socket takes in
 	 * one write: an unknown verb of 256 KiB, said back in its refusal
 	 */
 	big = sh_calloc(1, BIG + 1);
@@ -794,6 +807,42 @@ main(void)
 		CHECK(sht(2, rollapp) == 0 && strcmp(ebuf, "") == 0);
 		CHECK(until_status("house app stalled save: "));
 		CHECK(down() == 0);
+
+		/*
+		 * D28: the terminal's type sent with its descriptors, the
+		 * picker's TERM, a daemon with a TERM of its own, app's replay
+		 * onto s2 stopping at its conflicts: no type sent, the picker
+		 * has no TERM and refuses, exit 1, the answer unread, the roll
+		 * stalled; sent, the picker reads the answer and ends 0, and
+		 * the roll goes on past it to its recipe, where it stalls: the
+		 * fixture lays no tree in s2. The roll reads the lake's af, the
+		 * owner of the run's copy, made after the start so that the
+		 * beam leaves the fixture be
+		 */
+		rbfake_end("fast/run/containers/s2-app", 1);
+		CHECK(setenv("TERM", "xterm", 1) == 0);
+		up();
+		CHECK(until_status("house app stalled save: "));
+		CHECK(sh_zfs_create(z, "tank/lake/foundations/af", NULL, 0,
+		    &c.c_err) == 0);
+		CHECK(unsetenv("TERM") == 0);
+		w = term(fds);
+		CHECK(write(w, "ok\n", 3) == 3);
+		CHECK(shtfd(2, rollapp, fds) == 1 && strcmp(ebuf,
+		    "shtetl: app: stalled picker: exited 1\n") == 0);
+		CHECK(!let_go(w, fds));
+		/* its save a second on: same-second names collide (ruled) */
+		(void) sleep(1);
+		CHECK(setenv("TERM", "xterm", 1) == 0);
+		w = term(fds);
+		CHECK(write(w, "ok\n", 3) == 3);
+		CHECK(shtfd(2, rollapp, fds) == 1 && strcmp(ebuf,
+		    "shtetl: app: stalled recipe: /fast/run/foundations/af: "
+		    "No such file or directory\n") == 0);
+		CHECK(let_go(w, fds));
+		CHECK(down() == 0);
+		CHECK(unsetenv("TERM") == 0);
+		rbfake_reset();
 	}
 
 	/* D11: no daemon: the command says what connect said, exit 1 */

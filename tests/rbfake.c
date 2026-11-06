@@ -160,13 +160,16 @@ rf_abort(struct sh_zfs *z, const char *ds, struct sh_err *e)
  * -c [-i] IDENT: the run stopped at its conflicts taken on from the
  * gate; with -i, a person at the picker, the fake's a line on standard
  * input: "ok" answers every name, and the run goes to done; anything
- * else, or none, and the gate stands, exit 1, as headless.
+ * else, or none, and the gate stands, exit 1, as headless. The picker
+ * refuses with no TERM, or an empty one, exit 1, as zfs_rebase-picker
+ * does.
  */
 static void
 rf_continue(struct sh_zfs *z, const char *ident, int inter, struct sh_err *e)
 {
 	struct rf_local tag, pre;
 	char ds[512], line[64];
+	const char *type = getenv("TERM");
 
 	(void) snprintf(ds, sizeof (ds), "%.*s", (int)strcspn(ident, "@"),
 	    ident);
@@ -174,6 +177,11 @@ rf_continue(struct sh_zfs *z, const char *ident, int inter, struct sh_err *e)
 	if (!tag.rl_got) {
 		(void) printf("zfs_rebase: %s: no rebase\n", ident);
 		rf_exit(2);
+	}
+	if (inter && (type == NULL || type[0] == '\0')) {
+		(void) fprintf(stderr, "zfs_rebase-picker: the picker needs "
+		    "TERM set to the terminal's type\n");
+		rf_exit(1);
 	}
 	if (!inter || fgets(line, sizeof (line), stdin) == NULL ||
 	    strcmp(line, "ok\n") != 0)

@@ -82,13 +82,15 @@ void sh_job_fork(struct sh_job *j, const char *step,
     int (*fn)(struct sh_job *, void *, struct sh_err *), void *arg);
 
 /*
- * The step added last, a child's, run on the descriptors FDS, copied,
- * its standard input, output and error, a person's terminal (m5-queue,
- * the attended roll): no pipe, so nothing it writes is the job's, and
- * its failure is said as a program's is, "STEP: exited N". FDS are the
- * caller's, open while the step can run.
+ * The step added last, a child's, run on a person's terminal (m5-queue,
+ * the attended roll): the descriptors FDS, copied, its standard input,
+ * output and error, and TYPE, copied, its TERM, the terminal's type;
+ * TYPE NULL, it has no TERM, the daemon's being no terminal's. No pipe,
+ * so nothing it writes is the job's, and its failure is said as a
+ * program's is, "STEP: exited N". FDS are the caller's, open while the
+ * step can run.
  */
-void sh_job_fds(struct sh_job *j, const int fds[3]);
+void sh_job_term(struct sh_job *j, const int fds[3], const char *type);
 
 /*
  * The step added last, a child's: its exit with STATUS no failure, but

@@ -443,13 +443,13 @@ main(void)
 		fds[2] = out[1];
 		fresh();
 		child("talk", "echo hi; read x; echo got $x");
-		sh_job_fds(&job, fds);
+		sh_job_term(&job, fds, NULL);
 		CHECK(write(in[1], "yes\n", 4) == 4);
 		CHECK(strcmp(run(), "(well)") == 0);
 		CHECK(logged("# talk\n") && !logged("hi"));
 		fresh();
 		sh_job_fork(&job, "quietly", fork_fails, NULL);
-		sh_job_fds(&job, fds);
+		sh_job_term(&job, fds, NULL);
 		CHECK(strcmp(run(), "quietly: exited 1") == 0);
 		(void) close(out[1]);
 		CHECK((n = read(out[0], got, sizeof (got) - 1)) > 0);
@@ -459,6 +459,32 @@ main(void)
 		(void) close(in[0]);
 		(void) close(in[1]);
 		(void) close(out[0]);
+	}
+	/*
+	 * J20: a child on a terminal given its type: TERM that type; given
+	 * none, no TERM, the daemon's not handed on
+	 */
+	{
+		int out[2], fds[3];
+		char got[64];
+		ssize_t n;
+
+		CHECK(pipe(out) == 0 && setenv("TERM", "daemon", 1) == 0);
+		fds[0] = out[0];
+		fds[1] = out[1];
+		fds[2] = out[1];
+		fresh();
+		child("typed", "printenv TERM || echo none");
+		sh_job_term(&job, fds, "vt100");
+		child("untyped", "printenv TERM || echo none");
+		sh_job_term(&job, fds, NULL);
+		CHECK(strcmp(run(), "(well)") == 0);
+		(void) close(out[1]);
+		CHECK((n = read(out[0], got, sizeof (got) - 1)) > 0);
+		got[n] = '\0';
+		CHECK(strcmp(got, "vt100\nnone\n") == 0);
+		(void) close(out[0]);
+		(void) unsetenv("TERM");
 	}
 	/*
 	 * J19: a then: the child's exit 3 answered by a call whose steps run

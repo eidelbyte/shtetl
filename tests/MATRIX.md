@@ -214,6 +214,7 @@ over the fake on a socket listened on before the fork.
 | D25 | the lake and the run found; the run not | the beam begun at the start, beam.log made in the log directory, the lake's foundation not beamed (no house on the run), "beam converged" in status after the foundations; no beam and no line (m4-beam) | tests/check_daemon.c |
 | D26 | a request with descriptors (SCM_RIGHTS) | received with the request's first bytes, kept with the connection, closed with it unless an act takes them | tests/check_daemon.c |
 | D27 | a reply held back (an attended roll) | the connection kept, read for a half-close; the reply framed and written when the act's end sends it; a half-close told to the act once | tests/check_daemon.c |
+| D28 | a request from a terminal: its TERM, the terminal's type, sent before the arguments with the descriptors, or none | taken with the descriptors, an attended roll's: the picker's TERM that type; none sent, the picker has no TERM, the daemon's not handed on, and refuses; a type sent twice, hung up on, nothing sent (D9) | tests/check_daemon.c |
 
 Also run by hand on the mac (not in make check, since leaks(1) hangs
 on a forked child that exits): a live daemon over the fake after 600
@@ -510,6 +511,7 @@ there}; standard input; the job stopped while a child runs.
 | J17 | stopped while a child runs, the kqueue used on after, the job's memory reused (a house's job, the houses started again) | the child's watch taken off the kqueue before it is killed: no event of its exit comes after | tests/check_job.c |
 | J18 | a child that closes its output and lives on (a forked call's exit tearing down a copy of the daemon is one, briefly) | the output's end handed once and its watch taken off, not handed at every kevent until the exit, a spin | tests/check_job.c |
 | J19 | a child given descriptors of its own (sh_job_term) | its standard input, output and error those descriptors, no output pipe; its exit the step's end; stopped, killed as any child | tests/check_job.c |
+| J20 | a child on a terminal, given its type or none | TERM that type; none, no TERM at all, the daemon's not handed on | tests/check_job.c |
 
 Mutations caught: the signals not put back (J11), no SIGTERM to a
 step's leftovers (J10). On FreeBSD, make check-freebsd (in the box run)
@@ -1190,7 +1192,7 @@ command gone}; the command {a terminal, none}.
 | Q11 | shtetl freeze H | shtetl:stall "frozen" on the active version, "house H stalled frozen"; kept over a restart; never taken automatically; shtetl roll H lifts it and rolls | tests/check_hroll.c, tests/check_daemon.c |
 | Q12 | shtetl freeze: refusals | the usage; "NAME: no such house" for a foundation's or no name; "H: rolling" and the other busy states; a house frozen or stalled already, frozen again, its stall replaced | tests/check_daemon.c, tests/check_hroll.c |
 | Q13 | shtetl roll H from a terminal | the command sends its three descriptors with the request; the reply when the roll ends: nothing and 0 rolled, "H: stalled STEP: why" and 1 stalled, a refusal at once as before | tests/check_daemon.c |
-| Q14 | an attended roll's conflict | zfs_rebase -c -m -i IDENT run on the person's descriptors, the step "picker"; exit 0, the roll goes on and ends active; nonzero, undone and stalled | tests/check_hroll.c |
+| Q14 | an attended roll's conflict | zfs_rebase -c -m -i IDENT run on the person's descriptors, its TERM their terminal's type (the fake picker refuses with none, as zfs_rebase-picker does), the step "picker"; exit 0, the roll goes on and ends active; nonzero, undone and stalled | tests/check_hroll.c |
 | Q15 | the command's SIGINT, SIGTERM or SIGHUP during an attended roll | its socket half-closed; the daemon kills the picker if it runs, and no later conflict of that roll waits; the roll undone and stalled; the command prints the stall and exits 1; its terminal's modes put back | tests/check_daemon.c (the command waits on through its signal and is told the stall), tests/check_hroll.c (a hang-up ends the picker, or a later conflict fails); the half-close reaching a picker under way in the daemon: box (Q19) |
 | Q16 | the command gone during an attended roll | as Q15; the reply dropped | tests/check_daemon.c (the daemon carries on, the roll ends stalled); its hang-up reaching a picker: box (Q19) |
 | Q17 | shtetl roll with no terminal, or of a foundation | no descriptors sent, or those sent closed at once: the reply at once, a conflict stalls (W14, F16) | tests/check_daemon.c |

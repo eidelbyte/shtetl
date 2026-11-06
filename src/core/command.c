@@ -1,12 +1,13 @@
 /*
  * The shtetl command: it decides nothing. Its arguments go to the
- * daemon as they are, with its terminal's descriptors where it has one,
- * and the reply comes back as records, each copied to the stream it
- * names until the exit status. A reply the daemon holds, an attended
- * roll's (m5-queue), is waited for: the command's SIGINT, SIGTERM and
- * SIGHUP meanwhile half-close the socket, which ends the picker and
- * not the roll, and it waits on; its terminal's modes are put back as
- * it ends, whatever the picker left them.
+ * daemon as they are, with its terminal's descriptors and its TERM, the
+ * terminal's type, where it has one, and the reply comes back as
+ * records, each copied to the stream it names until the exit status. A
+ * reply the daemon holds, an attended roll's (m5-queue), is waited for:
+ * the command's SIGINT, SIGTERM and SIGHUP meanwhile half-close the
+ * socket, which ends the picker and not the roll, and it waits on; its
+ * terminal's modes are put back as it ends, whatever the picker left
+ * them.
  */
 
 #include <sys/types.h>
@@ -80,7 +81,7 @@ sh_command(const char *sock, int argc, char *const *argv, const int *fds,
 	struct termios tio;
 	struct sh_err e;
 	char buf[4096];
-	const char *p;
+	const char *p, *type;
 	size_t len;
 	ssize_t n;
 	int fd, kind, i, status = -1, kept = 0, held = 0, half = 0;
@@ -108,6 +109,8 @@ sh_command(const char *sock, int argc, char *const *argv, const int *fds,
 	}
 	for (i = 0; i < argc; i++)
 		sh_buf_add(&args, argv[i], strlen(argv[i]) + 1);
+	if (fds != NULL && (type = getenv("TERM")) != NULL)
+		sh_wire_put(&io, SH_WIRE_TERM, type, strlen(type));
 	sh_wire_put(&io, SH_WIRE_ARGS, args.b_data, args.b_len);
 	if (send_all(fd, &io, fds, sock, &e) != 0) {
 		status = 1;

@@ -43,8 +43,9 @@ struct daemon;
 
 /*
  * One person's command, from its request to the last of its reply: the
- * descriptors that came with it, and the house whose attended roll
- * holds its reply until the roll ends (m5-queue).
+ * descriptors that came with it and their terminal's type, and the
+ * house whose attended roll holds its reply until the roll ends
+ * (m5-queue).
  */
 struct conn {
 	enum sh_ev	c_ev;		/* SH_EV_CONN, first, for the udata */
@@ -53,6 +54,7 @@ struct conn {
 	struct sh_buf	c_out;
 	int		c_fds[3];
 	int		c_nfds;
+	char		*c_term;	/* their TERM, or NULL */
 	struct sh_house	*c_held;
 	struct daemon	*c_d;
 	struct conn	*c_next;
@@ -172,6 +174,7 @@ house_roll(struct daemon *d, struct sh_house *h, const char *config,
 	if (c->c_nfds == 3) {
 		a = sh_calloc(1, sizeof (*a));
 		(void) memcpy(a->ha_fds, c->c_fds, sizeof (a->ha_fds));
+		a->ha_term = c->c_term;
 		a->ha_done = held_done;
 		a->ha_arg = c;
 	}
@@ -181,8 +184,9 @@ house_roll(struct daemon *d, struct sh_house *h, const char *config,
 	}
 	if (a == NULL)
 		return (0);
-	/* the descriptors the roll's now */
+	/* the descriptors and their type the roll's now */
 	c->c_nfds = 0;
+	c->c_term = NULL;
 	c->c_held = h;
 	return (-1);
 }
@@ -552,6 +556,7 @@ hang_up(struct daemon *d, struct conn *c)
 	*p = c->c_next;
 	let_go(c);
 	(void) close(c->c_fd);
+	free(c->c_term);
 	free(c->c_in.b_data);
 	free(c->c_out.b_data);
 	free(c);
@@ -604,10 +609,11 @@ taken(struct conn *c, struct msghdr *m)
 }
 
 /*
- * More of C's request. Whole, it is answered, and C is read no more; a
- * person's command sends nothing else, so anything else hangs up. A
- * reply held, an attended roll's, C is read on for the command's
- * half-close or its going, which is the roll's hang-up (Q15, Q16).
+ * More of C's request: its terminal's type, once, and its arguments.
+ * Whole, it is answered, and C is read no more; a person's command
+ * sends nothing else, so anything else hangs up. A reply held, an
+ * attended roll's, C is read on for the command's half-close or its
+ * going, which is the roll's hang-up (Q15, Q16).
  */
 static void
 readable(struct daemon *d, struct conn *c)
@@ -642,11 +648,17 @@ readable(struct daemon *d, struct conn *c)
 		return;
 	}
 	sh_buf_add(&c->c_in, buf, (size_t)n);
-	if (!sh_wire_get(&c->c_in, &kind, &p, &len))
-		return;
-	if (kind != SH_WIRE_ARGS) {
-		hang_up(d, c);
-		return;
+	for (;;) {
+		if (!sh_wire_get(&c->c_in, &kind, &p, &len))
+			return;
+		if (kind == SH_WIRE_ARGS)
+			break;
+		if (kind != SH_WIRE_TERM || c->c_term != NULL) {
+			hang_up(d, c);
+			return;
+		}
+		c->c_term = sh_calloc(1, len + 1);
+		(void) memcpy(c->c_term, p, len);
 	}
 	act(d, c, p, len);
 	if (c->c_held != NULL)

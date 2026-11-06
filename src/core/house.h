@@ -37,12 +37,14 @@ struct sh_houseenv;
 /*
  * A person attending a roll, shtetl roll H from a terminal (m5-queue,
  * ruled 2026-10-19): the descriptors their command sent, its standard
- * input, output and error, and DONE, told with ARG once, at the roll's
- * end, as shtetl roll H's reply: 0 and "" rolled; 1 and "H: stalled
- * STEP: why", or after the update snapshot "H: STEP: why".
+ * input, output and error, and the terminal's type it sent, its TERM,
+ * or NULL; and DONE, told with ARG once, at the roll's end, as shtetl
+ * roll H's reply: 0 and "" rolled; 1 and "H: stalled STEP: why", or
+ * after the update snapshot "H: STEP: why".
  */
 struct sh_hattend {
 	int	ha_fds[3];
+	char	*ha_term;
 	void	(*ha_done)(void *arg, int status, const char *text);
 	void	*ha_arg;
 };

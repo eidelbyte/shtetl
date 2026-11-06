@@ -1394,6 +1394,7 @@ roll_free(struct sh_hroll *r)
 	if (r->hr_attend != NULL) {
 		for (i = 0; i < 3; i++)
 			(void) close(r->hr_attend->ha_fds[i]);
+		free(r->hr_attend->ha_term);
 		free(r->hr_attend);
 	}
 	free(r);
@@ -1611,14 +1612,15 @@ roll_place(struct sh_job *j, void *arg, struct sh_err *e)
 
 /*
  * A replay stopped at its conflicts (zfs_rebase's 1) in an attended
- * roll: next, the picker on the person's terminal, zfs_rebase -c -m -i
- * IDENT, the house down while they answer (plan 7.4); the person gone,
- * the replay's failure as an unattended roll's is.
+ * roll: next, the picker on the person's terminal, of its type, zfs_rebase
+ * -c -m -i IDENT, the house down while they answer (plan 7.4); the
+ * person gone, the replay's failure as an unattended roll's is.
  */
 static int
 roll_conflict(struct sh_job *j, void *arg, struct sh_err *e)
 {
 	struct hident *id = arg;
+	const struct sh_hattend *a = id->i_r->hr_attend;
 	const char *argv[] = { "-c", "-m", "-i", id->i_ident, NULL };
 
 	if (id->i_r->hr_hup) {
@@ -1626,7 +1628,7 @@ roll_conflict(struct sh_job *j, void *arg, struct sh_err *e)
 		return (-1);
 	}
 	sh_rebase(j, "picker", argv);
-	sh_job_fds(j, id->i_r->hr_attend->ha_fds);
+	sh_job_term(j, a->ha_fds, a->ha_term);
 	return (0);
 }
 
