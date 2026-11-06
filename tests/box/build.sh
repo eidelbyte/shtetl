@@ -19,7 +19,9 @@
 # same version; box pkg-rolled and its next version beamed to the run;
 # s2app rolled onto it with a command piece that fails in the chroot,
 # devfs mounted there (H20, stalled), then without it (W16, rolled by
-# the real zfs_rebase, what the container wrote carried over).
+# the real zfs_rebase, what the container wrote carried over); then box
+# pkg-rolled once more, and s2app rolled by itself (m5-queue, Q19).
+# Its rolls are asked from no terminal, so none waits on a person.
 # The first build takes hours; nothing here asks anything, so start it
 # and leave it.
 #
@@ -581,6 +583,18 @@ house() {
 	    "$_rc $(jls -j $J jid 2>/dev/null)/$(devfs_at "$_p")" "0 /"
 }
 
+# NAME's status line, once its version DS is there and it is settled:
+# no more than 10 minutes, the roll the queue's to begin.
+rolled_onto() {	# NAME DS
+	_i=0
+	while [ $_i -lt 120 ] && ! zfs list -H -o name "$2" >/dev/null 2>&1
+	do
+		sleep 5
+		_i=$((_i + 1))
+	done
+	house_settled "$1"
+}
+
 # The house NAME's version roots on the run, by name, on one line.
 versions() {	# NAME
 	zfs get -H -o name,value -d 1 -t filesystem shtetl:house $RC |
@@ -629,7 +643,7 @@ hroll() {
 	# released, the old version's jail started again, stalled
 	_from=$(($(wc -l </var/log/daemon.log) + 1))
 	app_recipe 'h20 = "exit 1";'
-	x "$SH" roll $J2
+	x "$SH" roll $J2 </dev/null
 	cell H20 "stalled at the piece" "$(house_settled $J2)" \
 	    "house $J2 stalled commands: h20: exited 1"
 	cell H20 "the stall on the old version, said once" \
@@ -648,7 +662,7 @@ hroll() {
 	x jexec $J2 sh -c 'echo w16 > /root/w16'
 	_ns=$(zfs list -H -t snapshot -d 1 -o name "$_old" | wc -l | tr -d ' ')
 	_from=$(($(wc -l </var/log/daemon.log) + 1))
-	x "$SH" roll $J2
+	x "$SH" roll $J2 </dev/null
 	cell W16 "rolled: active" "$(house_settled $J2)" \
 	    "house $J2 active $V-DATE-$J2"
 	cell W16 "on a clone of the run's copy at the next version" \
@@ -678,6 +692,23 @@ hroll() {
 	    "$(beamed) $(has "$_old") $(has $LC/$_nv)" \
 	    "beam converged no yes"
 	cell W16 "syslog: nothing of the roll's or the prune's" \
+	    "$(said $_from | wc -l | tr -d ' ')" 0
+
+	# Q19 (m5-queue): box's next version arriving on the run, s2app
+	# rolled onto it by itself, asked at the convergence's end
+	_from=$(($(wc -l </var/log/daemon.log) + 1))
+	cell Q19 "box pkg-rolled again" "$(ask pkg)" \
+	    "foundation $F idle $V-DATE-pkg"
+	_n=$(newest $FD)
+	_nv=${_n#*@}
+	_nv=${_nv%-pkg}-$J2
+	cell Q19 "s2app rolled onto it by itself" \
+	    "$(rolled_onto $J2 $RC/$_nv)" "house $J2 active $V-DATE-$J2"
+	cell Q19 "its root a clone of the run's copy at it" \
+	    "$(prop origin $RC/$_nv 2>&1)" "$RD@${_n#*@}"
+	cell Q19 "what the container wrote, carried over again" \
+	    "$(jexec $J2 cat /root/w16 2>&1)" w16
+	cell Q19 "syslog: nothing of it" \
 	    "$(said $_from | wc -l | tr -d ' ')" 0
 }
 

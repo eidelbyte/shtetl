@@ -1195,4 +1195,4 @@ command gone}; the command {a terminal, none}.
 | Q16 | the command gone during an attended roll | as Q15; the reply dropped | tests/check_daemon.c (the daemon carries on, the roll ends stalled); its hang-up reaching a picker: box (Q19) |
 | Q17 | shtetl roll with no terminal, or of a foundation | no descriptors sent, or those sent closed at once: the reply at once, a conflict stalls (W14, F16) | tests/check_daemon.c |
 | Q18 | shtetl:branch (F21) carried to the run's copy | the beam makes a version's shtetl:* the owner's, shtetl:branch among them (B family) | tests/check_hroll.c reads it from the copy; box: m5-box |
-| Q19 | the box: a version arriving rolls a real container by itself; an attended roll's picker | box: m5-box | box |
+| Q19 | the box: a version arriving rolls a real container by itself; an attended roll's picker | box pkg-rolled again, s2app rolled onto it by itself, a clone of the run's copy at it, what it wrote carried over, syslog quiet; the picker in a person's terminal, its answer and its signals, by hand | tests/box/build.sh (m5-queue); by hand |

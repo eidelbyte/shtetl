@@ -65,7 +65,11 @@ roll s2app twice: with a command piece that fails in the chroot, which
 must leave s2app stalled on its old version, the new one destroyed and
 its devfs released; then without it, which must carry what the
 container wrote onto the new version by the real zfs_rebase, installed
-where the daemon's PATH finds it. Real jails run on the box for that
+where the daemon's PATH finds it. Then it pkg-rolls box once more,
+and s2app must roll onto the new version by itself, the daemon asking
+it when the beam's convergence ends. Its rolls are asked from no
+terminal, so none of them waits on a person; an attended roll's picker
+is checked by hand. Real jails run on the box for that
 time; they and their blocks in /etc/jail.conf.d are taken away before
 the pool is exported, on every way out. The log is
 tests/box/results/build-<UTC time>.log, sent as run.sh's is, with the
